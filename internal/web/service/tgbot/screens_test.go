@@ -46,7 +46,7 @@ func (c apiCall) text() string {
 	return ""
 }
 
-func recordingServer(t *testing.T, failEdit bool) (*httptest.Server, func() []apiCall) {
+func recordingServer(t *testing.T, failEdit bool, overrides ...map[string]any) (*httptest.Server, func() []apiCall) {
 	t.Helper()
 	var mu sync.Mutex
 	var calls []apiCall
@@ -67,6 +67,13 @@ func recordingServer(t *testing.T, failEdit bool) (*httptest.Server, func() []ap
 		nextID++
 		id := nextID
 		mu.Unlock()
+		if len(overrides) > 0 {
+			if response, ok := overrides[0][method]; ok {
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(response)
+				return
+			}
+		}
 
 		fail := func(desc string) {
 			w.Header().Set("Content-Type", "application/json")
