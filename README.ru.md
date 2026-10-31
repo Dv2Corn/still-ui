@@ -122,6 +122,8 @@ systemctl enable --now x-ui
 - USDT (TRC20): `TE18ocTtSRa855uCzKFnPFgnSAtJ5Jny2x`
 - BTC: `bc1qneuy3u36lrln042uezc7a7ycxd30n5fk29f43e`
 
+Картой из России — через DonationAlerts: https://www.donationalerts.com/r/dv2corn
+
 И звезда на GitHub тоже помогает.
 
 ## Благодарности

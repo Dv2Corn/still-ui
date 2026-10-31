@@ -122,6 +122,8 @@ systemctl enable --now x-ui
 - USDT (TRC20): `TE18ocTtSRa855uCzKFnPFgnSAtJ5Jny2x`
 - BTC: `bc1qneuy3u36lrln042uezc7a7ycxd30n5fk29f43e`
 
+通过 DonationAlerts 银行卡支付：https://www.donationalerts.com/r/dv2corn
+
 在 GitHub 上点一颗星也是很大的支持。
 
 ## 致谢

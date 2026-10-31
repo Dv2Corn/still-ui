@@ -122,6 +122,8 @@ If still-ui saves you time, you can support its development:
 - USDT (TRC20): `TE18ocTtSRa855uCzKFnPFgnSAtJ5Jny2x`
 - BTC: `bc1qneuy3u36lrln042uezc7a7ycxd30n5fk29f43e`
 
+Card payments via DonationAlerts: https://www.donationalerts.com/r/dv2corn
+
 A star on GitHub helps too.
 
 ## Thanks
