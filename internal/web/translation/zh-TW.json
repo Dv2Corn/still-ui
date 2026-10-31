@@ -293,7 +293,15 @@
       "importKeepHostSettings": "保留本機設定",
       "importKeepHostSettingsDesc": "保留本面板的監聽位址、連接埠、基礎路徑、憑證與節點身分，而不是使用上傳檔案中的值。",
       "logLines": "行數",
-      "timeRange": "時間範圍"
+      "timeRange": "時間範圍",
+      "certTitle": "憑證",
+      "certStateOk": "正在提供目前的憑證",
+      "certStateRenewed": "已續期，核心仍在提供舊憑證",
+      "certStateExpiring": "即將過期",
+      "certStateExpired": "已過期",
+      "certStateUnreachable": "無法完成 TLS 交握",
+      "certServedUntil": "目前提供的憑證有效至 {{date}}",
+      "certFileUntil": "檔案有效至 {{date}}"
     },
     "inbounds": {
       "totalDownUp": "總上傳 / 下載",

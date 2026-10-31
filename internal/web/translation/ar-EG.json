@@ -293,7 +293,15 @@
       "importKeepHostSettings": "الاحتفاظ بإعدادات هذا الجهاز",
       "importKeepHostSettingsDesc": "يحتفظ بعناوين الاستماع والمنافذ والمسار الأساسي والشهادات وهوية العقدة الخاصة بهذه اللوحة بدلًا من أخذها من الملف المرفوع.",
       "logLines": "عدد الأسطر",
-      "timeRange": "النطاق الزمني"
+      "timeRange": "النطاق الزمني",
+      "certTitle": "الشهادات",
+      "certStateOk": "يقدّم الشهادة الحالية",
+      "certStateRenewed": "تم التجديد، والنواة ما زالت تقدّم القديمة",
+      "certStateExpiring": "تنتهي قريبًا",
+      "certStateExpired": "منتهية",
+      "certStateUnreachable": "لا توجد مصافحة TLS",
+      "certServedUntil": "الشهادة المقدَّمة صالحة حتى {{date}}",
+      "certFileUntil": "الملف صالح حتى {{date}}"
     },
     "inbounds": {
       "totalDownUp": "إجمالي المرسل/المستقبل",

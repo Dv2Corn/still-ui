@@ -293,7 +293,15 @@
       "importKeepHostSettings": "保留本机设置",
       "importKeepHostSettingsDesc": "保留本面板的监听地址、端口、基础路径、证书和节点身份，而不是使用上传文件中的值。",
       "logLines": "行数",
-      "timeRange": "时间范围"
+      "timeRange": "时间范围",
+      "certTitle": "证书",
+      "certStateOk": "正在提供当前证书",
+      "certStateRenewed": "已续期，核心仍在提供旧证书",
+      "certStateExpiring": "即将过期",
+      "certStateExpired": "已过期",
+      "certStateUnreachable": "无法完成 TLS 握手",
+      "certServedUntil": "当前提供的证书有效期至 {{date}}",
+      "certFileUntil": "文件有效期至 {{date}}"
     },
     "inbounds": {
       "totalDownUp": "总上传 / 下载",

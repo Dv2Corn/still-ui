@@ -1,5 +1,7 @@
 import { NumberFormatter } from '@/utils';
-import type { StatusInput as ParsedStatusInput } from '@/schemas/status';
+import type { z } from 'zod';
+
+import type { StatusInput as ParsedStatusInput, XrayCertificateSchema } from '@/schemas/status';
 
 export const USAGE_WARN_PERCENT = 80;
 export const USAGE_CRIT_PERCENT = 90;
@@ -55,11 +57,14 @@ export interface AppStats {
   uptime: number;
 }
 
+export type XrayCertificate = z.infer<typeof XrayCertificateSchema>;
+
 export interface XrayInfo {
   state: 'running' | 'stop' | 'error' | string;
   errorMsg: string;
   version: string;
   color: string;
+  certificates: XrayCertificate[];
 }
 
 export interface AmneziaWGInfo {
@@ -112,7 +117,7 @@ export class Status {
   uptime = 0;
   appUptime = 0;
   appStats: AppStats = { threads: 0, mem: 0, uptime: 0 };
-  xray: XrayInfo = { state: 'stop', errorMsg: '', version: '', color: '' };
+  xray: XrayInfo = { state: 'stop', errorMsg: '', version: '', color: '', certificates: [] };
   amneziawg: AmneziaWGInfo = { configured: false, running: false };
 
   constructor(data?: StatusInput | null) {

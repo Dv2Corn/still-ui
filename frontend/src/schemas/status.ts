@@ -26,12 +26,30 @@ export const AppStatsSchema = z.object({
   uptime: z.number(),
 });
 
+const CertInfoSchema = z.object({
+  subject: z.string(),
+  notAfter: z.number(),
+  sha256: z.string(),
+});
+
+export const XrayCertificateSchema = z.object({
+  tag: z.string(),
+  port: z.number(),
+  transport: z.string(),
+  state: z.string(),
+  file: CertInfoSchema.optional(),
+  served: CertInfoSchema.optional(),
+  probeError: z.string().optional(),
+  checkedAt: z.number(),
+});
+
 export const XrayInfoSchema = z
   .object({
     state: z.string(),
     errorMsg: z.string(),
     version: z.string(),
     color: z.string(),
+    certificates: z.array(XrayCertificateSchema),
   })
   .partial();
 

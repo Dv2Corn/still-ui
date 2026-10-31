@@ -293,7 +293,15 @@
       "importKeepHostSettings": "Manter as configurações desta máquina",
       "importKeepHostSettingsDesc": "Mantém os endereços de escuta, as portas, o caminho base, os certificados e a identidade de nó deste painel em vez de obtê-los do arquivo enviado.",
       "logLines": "Número de linhas",
-      "timeRange": "Intervalo de tempo"
+      "timeRange": "Intervalo de tempo",
+      "certTitle": "Certificados",
+      "certStateOk": "serve o certificado atual",
+      "certStateRenewed": "renovado, o núcleo ainda serve o antigo",
+      "certStateExpiring": "expira em breve",
+      "certStateExpired": "expirado",
+      "certStateUnreachable": "sem handshake TLS",
+      "certServedUntil": "o certificado servido é válido até {{date}}",
+      "certFileUntil": "o arquivo é válido até {{date}}"
     },
     "inbounds": {
       "totalDownUp": "Total Enviado/Recebido",

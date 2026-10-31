@@ -313,6 +313,7 @@ const (
 	cadenceReapOrphans   = "@every 5m"
 	cadenceRemoteRouting = "@every 5m"
 	cadenceXrayLogPrune  = "@every 10m"
+	cadenceCertWatch     = "@every 1m"
 	cadenceCheckHash     = "@every 2m"
 	// cpu.Percent samples over a full minute (blocking), so a finer cadence just
 	// stacks overlapping samplers; subscribers rate-limit alerts to 1/min anyway.
@@ -335,6 +336,11 @@ func (s *Server) startTask(restartXray, forceXrayRestart bool, loc *time.Locatio
 	// Check if xray needs to be restarted every 30 seconds
 	_, _ = s.cron.AddFunc(cadenceXrayRestart, func() {
 		s.xrayService.ApplyPendingRestart()
+	})
+
+	// Renewed TLS/Hysteria certificates: copy for the core, check what each inbound serves.
+	_, _ = s.cron.AddFunc(cadenceCertWatch, func() {
+		s.xrayService.CheckCertificates()
 	})
 
 	go func() {

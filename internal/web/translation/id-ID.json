@@ -293,7 +293,15 @@
       "importKeepHostSettings": "Pertahankan pengaturan mesin ini",
       "importKeepHostSettingsDesc": "Mempertahankan alamat dengar, port, path dasar, sertifikat, dan identitas node panel ini alih-alih mengambilnya dari berkas yang diunggah.",
       "logLines": "Jumlah baris",
-      "timeRange": "Rentang waktu"
+      "timeRange": "Rentang waktu",
+      "certTitle": "Sertifikat",
+      "certStateOk": "menyajikan sertifikat terbaru",
+      "certStateRenewed": "diperbarui, inti masih menyajikan yang lama",
+      "certStateExpiring": "segera kedaluwarsa",
+      "certStateExpired": "kedaluwarsa",
+      "certStateUnreachable": "tidak ada jabat tangan TLS",
+      "certServedUntil": "sertifikat yang disajikan berlaku hingga {{date}}",
+      "certFileUntil": "berkas berlaku hingga {{date}}"
     },
     "inbounds": {
       "totalDownUp": "Total Terkirim/Diterima",

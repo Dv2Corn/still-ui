@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,9 +11,11 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/amneziawg"
 	"github.com/mhsanaei/3x-ui/v3/internal/amneziawgnet"
+	"github.com/mhsanaei/3x-ui/v3/internal/certwatch"
 	"github.com/mhsanaei/3x-ui/v3/internal/config"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 	"github.com/mhsanaei/3x-ui/v3/internal/logger"
@@ -1618,6 +1621,37 @@ func init() {
 func seedRelayPasswords(passwords map[string]string) {
 	amneziawgnet.SeedSocksPassword(passwords[relayPasswordAmneziaWG])
 	tuic.SeedSocksPassword(passwords[relayPasswordTuic])
+}
+
+var certWatcher = certwatch.NewWatcher()
+
+// CertificateStatuses returns what the last certificate check found for each TLS inbound.
+func CertificateStatuses() []certwatch.Status { return certWatcher.Statuses() }
+
+// CheckCertificates refreshes the unit's copies of renewed certificate files and compares what
+// every TLS/Hysteria inbound serves with its file. Xray rereads the files by itself (hourly, or
+// every ocspStapling seconds); a core that missed a renewal gets one restart of the core only.
+func (s *XrayService) CheckCertificates() {
+	if xray.UnitMode() {
+		if renewed := xray.SyncCertificateMirrors(); len(renewed) > 0 {
+			logger.Info("xray: renewed certificate files copied for the core:", strings.Join(renewed, ", "))
+		}
+	}
+	process := currentXrayProcess()
+	if process == nil || !process.IsRunning() {
+		return
+	}
+	targets := certwatch.TargetsFromConfig(process.GetConfig(), xray.CertificateSource)
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Second)
+	defer cancel()
+	_, restart := certWatcher.Check(ctx, targets, time.Now())
+	if !restart {
+		return
+	}
+	logger.Warning("xray: an inbound still serves its old certificate after renewal, restarting the core")
+	if err := s.RestartXray(true); err != nil {
+		logger.Error("xray: restart for a renewed certificate failed:", err)
+	}
 }
 
 // restartToDropClients reports whether a diff that strands clients must be

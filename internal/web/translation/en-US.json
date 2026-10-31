@@ -293,7 +293,15 @@
       "importKeepHostSettings": "Keep this machine's settings",
       "importKeepHostSettingsDesc": "Keeps this panel's listen addresses, ports, base path, certificates and node identity instead of taking them from the uploaded file.",
       "logLines": "Number of lines",
-      "timeRange": "Time range"
+      "timeRange": "Time range",
+      "certTitle": "Certificates",
+      "certStateOk": "serves the current certificate",
+      "certStateRenewed": "renewed, the core still serves the old one",
+      "certStateExpiring": "expires soon",
+      "certStateExpired": "expired",
+      "certStateUnreachable": "no TLS handshake",
+      "certServedUntil": "served certificate valid until {{date}}",
+      "certFileUntil": "file valid until {{date}}"
     },
     "inbounds": {
       "totalDownUp": "Total Sent/Received",

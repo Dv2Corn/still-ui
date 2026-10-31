@@ -293,7 +293,15 @@
       "importKeepHostSettings": "Ponechať nastavenia tohto servera",
       "importKeepHostSettingsDesc": "Ponechajú sa adresy počúvania, porty, základná cesta, certifikáty a identita tohto servera namiesto nastavení z nahraného súboru.",
       "logLines": "Počet riadkov",
-      "timeRange": "Časový rozsah"
+      "timeRange": "Časový rozsah",
+      "certTitle": "Certifikáty",
+      "certStateOk": "poskytuje aktuálny certifikát",
+      "certStateRenewed": "obnovený, jadro ešte poskytuje starý",
+      "certStateExpiring": "čoskoro vyprší",
+      "certStateExpired": "vypršal",
+      "certStateUnreachable": "bez TLS handshaku",
+      "certServedUntil": "poskytovaný certifikát platí do {{date}}",
+      "certFileUntil": "súbor platí do {{date}}"
     },
     "inbounds": {
       "totalDownUp": "Celkom odoslané/prijaté",

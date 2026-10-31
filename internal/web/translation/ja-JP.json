@@ -293,7 +293,15 @@
       "importKeepHostSettings": "このマシンの設定を保持する",
       "importKeepHostSettingsDesc": "アップロードしたファイルの値ではなく、このパネルのリッスンアドレス、ポート、ベースパス、証明書、ノード ID を保持します。",
       "logLines": "行数",
-      "timeRange": "期間"
+      "timeRange": "期間",
+      "certTitle": "証明書",
+      "certStateOk": "現在の証明書を提供中",
+      "certStateRenewed": "更新済み、コアはまだ古い証明書を提供中",
+      "certStateExpiring": "まもなく期限切れ",
+      "certStateExpired": "期限切れ",
+      "certStateUnreachable": "TLS ハンドシェイクなし",
+      "certServedUntil": "提供中の証明書の有効期限: {{date}}",
+      "certFileUntil": "ファイルの有効期限: {{date}}"
     },
     "inbounds": {
       "totalDownUp": "総アップロード / ダウンロード",

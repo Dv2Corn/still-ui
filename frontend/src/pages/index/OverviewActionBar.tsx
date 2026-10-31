@@ -19,6 +19,8 @@ import { formatPanelVersion } from '@/lib/panel-version';
 import { activateOnKey } from '@/utils/a11y';
 import type { Status } from '@/models/status';
 
+import CertificateStatusTag from './CertificateStatusTag';
+
 interface OverviewActionBarProps {
   status: Status;
   isMobile: boolean;
@@ -178,6 +180,8 @@ export default function OverviewActionBar({
           <Tag color="error">{t('pages.index.xrayStatusError')}</Tag>
         </Tooltip>
       ) : null}
+
+      <CertificateStatusTag certificates={status.xray.certificates} />
 
       {updateAvailable ? (
         <Tag

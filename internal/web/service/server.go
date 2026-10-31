@@ -35,6 +35,7 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/amneziawg"
 	"github.com/mhsanaei/3x-ui/v3/internal/amneziawgkern"
 	"github.com/mhsanaei/3x-ui/v3/internal/amneziawgnet"
+	"github.com/mhsanaei/3x-ui/v3/internal/certwatch"
 	"github.com/mhsanaei/3x-ui/v3/internal/config"
 	"github.com/mhsanaei/3x-ui/v3/internal/database"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
@@ -99,6 +100,8 @@ type Status struct {
 		State    ProcessState `json:"state"`
 		ErrorMsg string       `json:"errorMsg"`
 		Version  string       `json:"version"`
+		// Certificates is what each TLS/Hysteria inbound actually answers with, against its file.
+		Certificates []certwatch.Status `json:"certificates,omitempty"`
 	} `json:"xray"`
 	// AmneziaWG gates the overview's AmneziaWG log view: Configured stays true
 	// while an inbound exists but its embedded interface isn't up yet, which
@@ -751,6 +754,7 @@ func (s *ServerService) GetStatus(lastStatus *Status) *Status {
 		status.Xray.ErrorMsg = s.xrayService.GetXrayResult()
 	}
 	status.Xray.Version = s.xrayService.GetXrayVersion()
+	status.Xray.Certificates = CertificateStatuses()
 
 	var amneziawgCount int64
 	if err := database.GetDB().Model(model.Inbound{}).

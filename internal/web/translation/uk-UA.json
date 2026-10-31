@@ -293,7 +293,15 @@
       "importKeepHostSettings": "Зберегти налаштування цієї машини",
       "importKeepHostSettingsDesc": "Залишає адреси та порти цієї панелі, базовий шлях, сертифікати та посвідчення для вузлів замість тих, що у завантаженому файлі.",
       "logLines": "Кількість рядків",
-      "timeRange": "Часовий діапазон"
+      "timeRange": "Часовий діапазон",
+      "certTitle": "Сертифікати",
+      "certStateOk": "віддає актуальний сертифікат",
+      "certStateRenewed": "подовжено, ядро ще віддає старий",
+      "certStateExpiring": "скоро спливає",
+      "certStateExpired": "прострочено",
+      "certStateUnreachable": "немає TLS-рукостискання",
+      "certServedUntil": "сертифікат, що віддається, дійсний до {{date}}",
+      "certFileUntil": "файл дійсний до {{date}}"
     },
     "inbounds": {
       "totalDownUp": "Всього надісланих/отриманих",
