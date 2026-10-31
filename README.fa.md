@@ -119,12 +119,8 @@ systemctl enable --now x-ui
 
 اگر still-ui به کارتان آمده، می‌توانید از ادامهٔ توسعهٔ آن حمایت کنید:
 
-- USDT (TRC20): `<USDT_TRC20_ADDRESS>`
-- USDT (TON): `<USDT_TON_ADDRESS>`
-- BTC: `<BTC_ADDRESS>`
-- ETH: `<ETH_ADDRESS>`
-
-پرداخت با کارت از طریق DonationAlerts: <DONATIONALERTS_URL>
+- USDT (TRC20): `TE18ocTtSRa855uCzKFnPFgnSAtJ5Jny2x`
+- BTC: `bc1qneuy3u36lrln042uezc7a7ycxd30n5fk29f43e`
 
 دادن ستاره در GitHub هم کمک می‌کند.
 

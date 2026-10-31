@@ -119,12 +119,8 @@ systemctl enable --now x-ui
 
 Если still-ui вам пригодилась, можно поддержать разработку:
 
-- USDT (TRC20): `<USDT_TRC20_ADDRESS>`
-- USDT (TON): `<USDT_TON_ADDRESS>`
-- BTC: `<BTC_ADDRESS>`
-- ETH: `<ETH_ADDRESS>`
-
-Картой из России — через DonationAlerts: <DONATIONALERTS_URL>
+- USDT (TRC20): `TE18ocTtSRa855uCzKFnPFgnSAtJ5Jny2x`
+- BTC: `bc1qneuy3u36lrln042uezc7a7ycxd30n5fk29f43e`
 
 И звезда на GitHub тоже помогает.
 

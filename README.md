@@ -119,12 +119,8 @@ This was tested with a 3x-ui v3.11.0 database. A database from a newer 3x-ui rel
 
 If still-ui saves you time, you can support its development:
 
-- USDT (TRC20): `<USDT_TRC20_ADDRESS>`
-- USDT (TON): `<USDT_TON_ADDRESS>`
-- BTC: `<BTC_ADDRESS>`
-- ETH: `<ETH_ADDRESS>`
-
-Card payments via DonationAlerts: <DONATIONALERTS_URL>
+- USDT (TRC20): `TE18ocTtSRa855uCzKFnPFgnSAtJ5Jny2x`
+- BTC: `bc1qneuy3u36lrln042uezc7a7ycxd30n5fk29f43e`
 
 A star on GitHub helps too.
 
