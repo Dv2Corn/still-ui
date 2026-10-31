@@ -23,12 +23,13 @@
 - **部分修改客户端不再把客户端改坏。** 在 3x-ui v3.11.0 中，通过 API（`/panel/api/clients/update/:email`）更新客户端时如果只提交部分字段，客户端会被禁用，请求中没有的 `limitIp`、`tgId`、`comment` 等字段也会被清零。在 still-ui 中，未提交的字段一律保持原值——密钥和客户端设置（包括 AmneziaWG 的 `preSharedKey`）都不会丢失。显式提交 0 或空值仍然会清空对应字段。
 - **REALITY 默认指纹改为 `ios`。** 它的 ClientHello 约 517 字节，可以完整放进一个 TCP 分段。较大的指纹（`chrome`、`firefox`）会把 ClientHello 拆成两个包；在会丢掉第二个包的移动运营商网络上，连接会直接断在握手阶段。用 `ios` 就不存在这个问题。每个入站仍然可以自行选择其他指纹。
 - **安装脚本为面板设置内存上限。** 服务会获得 systemd 限制：`MemoryMax` 为内存的 35%（最少 256 MiB，最多 1 GiB），`MemoryHigh` 为其 85%，并且禁止面板使用 swap。面板内存失控时由 systemd 重启它，而不是把整台服务器拖进 swap 直至卡死。如果服务器没有 swap 且内存不超过 2 GiB，安装脚本会提议为系统其余部分创建一个 2 GiB 的 `/swapfile`。
+- **Xray 作为独立服务（可选开启）。** 在 `/etc/default/still-ui` 中设置 `STILL_XRAY_UNIT=on` 后，安装脚本和 `still-ui update` 会把 Xray 作为独立服务 `still-xray` 运行：非特权用户、只有 `CAP_NET_BIND_SERVICE`、`ProtectSystem=strict`、`Restart=always`，并有自己的内存上限。面板仍通过 Xray API 增删客户端而无需重启，只有入站结构变化时才重启内核——且先用 `xray run -test` 检查配置；通过检查却启动失败的配置会被换回上一个可用配置。重启、升级或面板崩溃都不再断开客户端：已验证在通过 VPN 下载 20 MB 的过程中执行 `systemctl restart still-ui`，文件完整到达，Xray 进程未变。默认情况下 Xray 仍和 3x-ui 一样是面板的子进程。内置的 AmneziaWG、MTProto 和 TUIC 仍运行在面板内部，面板重启时会重新连接。
+- **自动加载续期后的证书。** Xray 每小时（或每 `ocspStapling` 秒）会自行重新读取 TLS 和 Hysteria 入站的证书文件。面板每分钟通过握手（TLS，Hysteria 用 QUIC）检查每个入站实际提供的证书；如果续期后内核在该时间内没有加载新文件（或入站使用 `oneTimeLoading`），或者正在提供的证书将在一小时内过期，只重启 Xray。概览页上的“证书”标签显示每个入站提供的证书及其有效期，并提前警告（提前一周；对于 IP 上的短期证书则提前其有效期的四分之一）。
+- **AmneziaWG 大量连接下的面板内存。** 经内置 AmneziaWG 的每个连接都会新分配两个 32 KiB 缓冲区；在大量短连接下这会产生数 GB 的垃圾，面板内存翻倍。现在缓冲区会被复用。在 3x-ui v3.11.0 上测量（300 个 AWG 和 300 个 VLESS 客户端，经 AWG 每秒 200 个短连接，并像界面一样轮询统计和在线状态，15 分钟）：面板平均内存 462 MB（峰值 510 MB）→ 240 MB（峰值 250 MB）。在此期间 v3.11.0 没有无限增长：负载结束后内存会回落。
 
 ### 进行中
 
-- **修复面板的内存泄漏** —— 不只是设上限，而是找到并消除根源。
-- **Xray 作为独立服务运行。** 重启或升级面板时不再断开已连接的用户：Xray 会独立运行。
-- **自动加载续期后的证书。** 证书续期后，入站自动使用新证书，无需手动重启。
+- **面板数天内的内存。** AmneziaWG 大量连接下内存增长的原因已找到并修复（见上文）；还需在负载下进行多日测量，确认没有其他增长来源。
 
 完整计划（俄文）见 [docs/ROADMAP.md](docs/ROADMAP.md)。
 
@@ -65,6 +66,7 @@ STILL_UI_ARCHIVE=/path/still-ui-linux-amd64.tar.gz bash install.sh
 | 数据库 | `/etc/still-ui/x-ui.db`（文件名沿用 3x-ui） |
 | 日志 | `/var/log/still-ui` |
 | 配置 | `/etc/default/still-ui` |
+| Xray（可选） | 服务 `still-xray`，配置 `/etc/still-xray`，日志 `/var/log/still-xray` |
 
 ### 内存上限
 
@@ -75,6 +77,10 @@ systemctl show still-ui -p MemoryMax
 ```
 
 如需自定义，在 `/etc/default/still-ui` 中加一行，例如 `STILL_UI_MEMORY_MAX=800M`；写 `STILL_UI_MEMORY_MAX=off` 则取消上限。
+
+### Xray 作为独立服务
+
+开启：在 `/etc/default/still-ui` 中加入 `STILL_XRAY_UNIT=on`，然后运行 `still-ui update`（或安装脚本）。关闭：设为 `STILL_XRAY_UNIT=off` 并再次运行 `still-ui update`。内核的内存上限为 `STILL_XRAY_MEMORY_MAX`（默认内存的一半，256M 到 4G）。需要 TPROXY、TUN 或套接字标记的入站，请用自己的 drop-in 在 `still-xray.service.d` 中加上 `CAP_NET_ADMIN`/`CAP_NET_RAW`。开启时 Xray 会重启一次；之后重启或升级面板不会影响它。
 
 ## 升级、回滚、卸载
 
@@ -90,6 +96,8 @@ still-ui update
 still-ui legacy
 bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh) v<tag>
 ```
+
+回滚到没有 `still-xray` 服务的版本（例如 `v3.11.0-still.1`）：`still-ui legacy` 会在安装前停止该服务；如果手动运行旧版安装脚本，请先执行 `systemctl disable --now still-xray`。
 
 升级前，尤其是回滚前，请先备份 `/etc/still-ui`：旧版本可能无法读取新版本写入过的数据库。
 

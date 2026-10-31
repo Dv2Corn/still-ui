@@ -23,12 +23,13 @@ The name says what we are after: a server you set up once and then leave alone.
 - **Partial client edits no longer break clients.** In 3x-ui v3.11.0, updating a client through the API (`/panel/api/clients/update/:email`) with only some of its fields disabled the client and reset `limitIp`, `tgId`, `comment` and other fields that were not in the request. In still-ui every field you do not send stays as it was — keys and client settings, including the AmneziaWG `preSharedKey`, are not lost. An explicit zero or empty value still clears a field.
 - **REALITY uses the `ios` fingerprint by default.** Its ClientHello is about 517 bytes and fits into a single TCP segment. Larger fingerprints (`chrome`, `firefox`) split the ClientHello into two packets, and on mobile networks that drop the second one the connection dies right at the handshake. With `ios` there is nothing to lose. You can still pick any other fingerprint per inbound.
 - **The installer puts a memory cap on the panel.** The service gets systemd limits: `MemoryMax` is 35% of RAM (at least 256 MiB, at most 1 GiB), `MemoryHigh` is 85% of that, and the panel is not allowed to use swap. A runaway panel is restarted by systemd instead of pushing the whole server into swap and freezing it. If the server has no swap and 2 GiB of RAM or less, the installer offers to create a 2 GiB `/swapfile` for the rest of the system.
+- **Xray as a separate service (opt-in).** With `STILL_XRAY_UNIT=on` in `/etc/default/still-ui`, the installer and `still-ui update` run Xray as its own service `still-xray`: an unprivileged user, only `CAP_NET_BIND_SERVICE`, `ProtectSystem=strict`, `Restart=always` and its own memory cap. The panel still adds and removes clients through the Xray API without a restart, and restarts the core only when the inbound structure changes — after checking the config with `xray run -test`; a config that passes the check but does not start is replaced with the last working one. Restarting, updating or crashing the panel no longer drops clients: tested by downloading 20 MB through the VPN with `systemctl restart still-ui` in the middle — the file arrived complete and the Xray process stayed the same. By default Xray stays the panel's child process, as in 3x-ui. The embedded AmneziaWG, MTProto and TUIC still live inside the panel and reconnect when it restarts.
+- **Renewed certificates are picked up automatically.** Xray rereads the certificate files of TLS and Hysteria inbounds by itself once an hour (or every `ocspStapling` seconds). Once a minute the panel does a handshake (TLS, or QUIC for Hysteria) to see which certificate each inbound really serves; if the core has not picked up a renewed file within that time (or the inbound uses `oneTimeLoading`), or the served certificate expires within an hour, only Xray is restarted. The “Certificates” tag on the overview page shows what each inbound serves and until when, and warns in advance (a week ahead, or a quarter of the lifetime for short-lived IP certificates).
+- **Panel memory under connection churn through AmneziaWG.** Every connection through the embedded AmneziaWG allocated two fresh 32 KiB buffers; under a stream of short connections this produced gigabytes of garbage and a panel twice its size. The buffers are now reused. Measured on 3x-ui v3.11.0 (300 AWG and 300 VLESS clients, 200 short connections per second through AWG plus stats and online polling like the UI does, 15 minutes): average panel memory 462 MB (peak 510 MB) → 240 MB (peak 250 MB). There was no unbounded growth on v3.11.0 within that time: memory comes back after the load.
 
 ### In progress
 
-- **Fixing the panel's memory leak** — not just capping it, finding and removing the cause.
-- **Xray as a separate service.** Restarting or updating the panel will no longer drop connected clients: Xray keeps running on its own.
-- **Automatic pickup of renewed certificates.** When a certificate is renewed, inbounds start using it without a manual restart.
+- **Panel memory over several days.** The growth under AmneziaWG connection churn is found and fixed (see above); what is left is a multi-day measurement under load to confirm there is no other source of growth.
 
 The full plan (in Russian) is in [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -65,6 +66,7 @@ Release builds exist for **Linux amd64 and arm64** only. The current release is 
 | Database | `/etc/still-ui/x-ui.db` (the file name is kept from 3x-ui) |
 | Logs | `/var/log/still-ui` |
 | Settings | `/etc/default/still-ui` |
+| Xray (opt-in) | service `still-xray`, config `/etc/still-xray`, logs `/var/log/still-xray` |
 
 ### Memory cap
 
@@ -75,6 +77,10 @@ systemctl show still-ui -p MemoryMax
 ```
 
 To set your own value, add a line to `/etc/default/still-ui` — for example `STILL_UI_MEMORY_MAX=800M`, or `STILL_UI_MEMORY_MAX=off` to remove the cap.
+
+### Xray as a separate service
+
+Turn it on: add `STILL_XRAY_UNIT=on` to `/etc/default/still-ui`, then run `still-ui update` (or the installer). Turn it off with `STILL_XRAY_UNIT=off` and `still-ui update` again. The core's memory cap is `STILL_XRAY_MEMORY_MAX` (half the RAM by default, 256M to 4G). Inbounds that need TPROXY, TUN or socket marks need `CAP_NET_ADMIN`/`CAP_NET_RAW` from a drop-in of your own in `still-xray.service.d`. Turning it on restarts Xray once; after that restarting or updating the panel leaves it alone.
 
 ## Update, roll back, remove
 
@@ -90,6 +96,8 @@ Roll back to an earlier release — `still-ui legacy` asks for the version; or r
 still-ui legacy
 bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh) v<tag>
 ```
+
+Rolling back to a release without the `still-xray` service (for example `v3.11.0-still.1`): `still-ui legacy` stops the service before installing; if you run an older installer by hand, run `systemctl disable --now still-xray` first.
 
 Back up `/etc/still-ui` before updating or rolling back: an older version may not understand a database written by a newer one.
 
