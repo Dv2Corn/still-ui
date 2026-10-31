@@ -90,10 +90,10 @@ fi
 if [[ "${running_in_docker}" == "true" ]]; then
     xui_folder="${XUI_MAIN_FOLDER:=/app}"
 else
-    xui_folder="${XUI_MAIN_FOLDER:=/usr/local/x-ui}"
+    xui_folder="${XUI_MAIN_FOLDER:=/usr/local/still-ui}"
 fi
 xui_service="${XUI_SERVICE:=/etc/systemd/system}"
-log_folder="${XUI_LOG_FOLDER:=/var/log/x-ui}"
+log_folder="${XUI_LOG_FOLDER:=/var/log/still-ui}"
 mkdir -p "${log_folder}"
 iplimit_log_path="${log_folder}/3xipl.log"
 iplimit_banned_log_path="${log_folder}/3xipl-banned.log"
@@ -129,7 +129,7 @@ before_show_menu() {
 }
 
 install() {
-    bash <(curl -Ls https://raw.githubusercontent.com/MHSanaei/3x-ui/main/install.sh)
+    bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh)
     if [[ $? == 0 ]]; then
         if [[ $# == 0 ]]; then
             start
@@ -140,7 +140,7 @@ install() {
 }
 
 update() {
-    confirm "This function will update all x-ui components to the latest version, and the data will not be lost. Do you want to continue?" "y"
+    confirm "This function will update all still-ui components to the latest version, and the data will not be lost. Do you want to continue?" "y"
     if [[ $? != 0 ]]; then
         LOGE "Cancelled"
         if [[ $# == 0 ]]; then
@@ -148,7 +148,7 @@ update() {
         fi
         return 0
     fi
-    bash <(curl -Ls https://raw.githubusercontent.com/MHSanaei/3x-ui/main/update.sh)
+    bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/update.sh)
     if [[ $? == 0 ]]; then
         LOGI "Update is complete, Panel has automatically restarted "
         before_show_menu
@@ -156,7 +156,7 @@ update() {
 }
 
 update_dev() {
-    confirm "This will update x-ui to the latest DEV commit (the rolling 'dev-latest' build, not a stable release). Your data is preserved. Continue?" "y"
+    confirm "This will update still-ui to the latest DEV commit (the rolling 'dev-latest' build, not a stable release). Your data is preserved. Continue?" "y"
     if [[ $? != 0 ]]; then
         LOGE "Cancelled"
         if [[ $# == 0 ]]; then
@@ -166,7 +166,7 @@ update_dev() {
     fi
     # XUI_UPDATE_TAG tells update.sh to install the dev-latest pre-release
     # instead of the latest stable tag.
-    XUI_UPDATE_TAG="dev-latest" bash <(curl -Ls https://raw.githubusercontent.com/MHSanaei/3x-ui/main/update.sh)
+    XUI_UPDATE_TAG="dev-latest" bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/update.sh)
     if [[ $? == 0 ]]; then
         LOGI "Dev update is complete, Panel has automatically restarted "
         before_show_menu
@@ -176,11 +176,11 @@ update_dev() {
 replace_xui_script() {
     local url="$1"
     local use_if_modified_since="$2"
-    local temp_file="/usr/bin/x-ui-temp.$$"
+    local temp_file="/usr/bin/still-ui-temp.$$"
 
     rm -f "$temp_file"
     if [[ "$use_if_modified_since" == "true" ]]; then
-        curl -fLRo "$temp_file" -z /usr/bin/x-ui "$url"
+        curl -fLRo "$temp_file" -z /usr/bin/still-ui "$url"
     else
         curl -fLRo "$temp_file" "$url"
     fi
@@ -191,20 +191,20 @@ replace_xui_script() {
 
     if [[ ! -s "$temp_file" ]]; then
         rm -f "$temp_file"
-        # -z above means "not modified since /usr/bin/x-ui" rather than a
+        # -z above means "not modified since /usr/bin/still-ui" rather than a
         # real failure, so an empty download here is success, not an error.
         [[ "$use_if_modified_since" == "true" ]] && return 0
         return 1
     fi
 
-    mv -f "$temp_file" /usr/bin/x-ui
+    mv -f "$temp_file" /usr/bin/still-ui
     if [[ $? != 0 ]]; then
         rm -f "$temp_file"
         return 1
     fi
     # The move already landed the new script; a transient chmod failure here
     # shouldn't make callers think the whole replace failed.
-    chmod +x /usr/bin/x-ui
+    chmod +x /usr/bin/still-ui
     return 0
 }
 
@@ -213,11 +213,11 @@ replace_xui_script() {
 installed_script_url() {
     local ver
     ver=$("${xui_folder}/x-ui" -v 2> /dev/null | tr -d '[:space:]')
-    if [[ "$ver" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] && curl -fsIL -o /dev/null "https://raw.githubusercontent.com/MHSanaei/3x-ui/v${ver}/x-ui.sh"; then
-        echo "https://raw.githubusercontent.com/MHSanaei/3x-ui/v${ver}/x-ui.sh"
+    if [[ "$ver" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-still\.[0-9]+)?$ ]] && curl -fsIL -o /dev/null "https://raw.githubusercontent.com/Dv2Corn/still-ui/v${ver}/x-ui.sh"; then
+        echo "https://raw.githubusercontent.com/Dv2Corn/still-ui/v${ver}/x-ui.sh"
     else
         echo -e "${yellow}No x-ui.sh published for the installed version (${ver:-unknown}), using main${plain}" >&2
-        echo "https://raw.githubusercontent.com/MHSanaei/3x-ui/main/x-ui.sh"
+        echo "https://raw.githubusercontent.com/Dv2Corn/still-ui/main/x-ui.sh"
     fi
 }
 
@@ -251,7 +251,7 @@ legacy_version() {
         exit 1
     fi
     # Use the entered panel version in the download link
-    install_command="bash <(curl -Ls "https://raw.githubusercontent.com/mhsanaei/3x-ui/v$tag_version/install.sh") v$tag_version"
+    install_command="bash <(curl -Ls "https://raw.githubusercontent.com/Dv2Corn/still-ui/v$tag_version/install.sh") v$tag_version"
 
     echo "Downloading and installing panel version $tag_version..."
     eval $install_command
@@ -266,13 +266,13 @@ delete_script() {
 xui_env_file_path() {
     case "${release}" in
         ubuntu | debian | armbian)
-            echo "/etc/default/x-ui"
+            echo "/etc/default/still-ui"
             ;;
         arch | manjaro | parch | alpine)
-            echo "/etc/conf.d/x-ui"
+            echo "/etc/conf.d/still-ui"
             ;;
         *)
-            echo "/etc/sysconfig/x-ui"
+            echo "/etc/sysconfig/still-ui"
             ;;
     esac
 }
@@ -287,19 +287,19 @@ uninstall() {
     fi
 
     if [[ $release == "alpine" ]]; then
-        rc-service x-ui stop
-        rc-update del x-ui
-        rm /etc/init.d/x-ui -f
+        rc-service still-ui stop
+        rc-update del still-ui
+        rm /etc/init.d/still-ui -f
     else
-        systemctl stop x-ui
-        systemctl disable x-ui
-        rm ${xui_service}/x-ui.service -f
+        systemctl stop still-ui
+        systemctl disable still-ui
+        rm ${xui_service}/still-ui.service -f
         # The sandbox drop-in generated by install.sh/update.sh lives beside the
-        # unit; leaving it behind would keep an empty x-ui.service.d around and
+        # unit; leaving it behind would keep an empty still-ui.service.d around and
         # silently re-apply on a later install of another unit of the same name.
         # Local drop-ins the operator added go with it, which is what an
         # uninstall is expected to do.
-        rm -rf -- "${xui_service}/x-ui.service.d"
+        rm -rf -- "${xui_service}/still-ui.service.d"
         systemctl daemon-reload
         systemctl reset-failed
     fi
@@ -311,7 +311,7 @@ uninstall() {
         panel_used_postgres="true"
     fi
 
-    rm /etc/x-ui/ -rf
+    rm /etc/still-ui/ -rf
     rm ${xui_folder}/ -rf
     rm -f "$db_env_file"
 
@@ -322,7 +322,7 @@ uninstall() {
     echo ""
     echo -e "Uninstalled Successfully.\n"
     echo "If you need to install this panel again, you can use below command:"
-    echo -e "${green}bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh)${plain}"
+    echo -e "${green}bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh)${plain}"
     echo ""
     # Trap the SIGTERM signal
     trap delete_script SIGTERM
@@ -414,7 +414,7 @@ check_config() {
         dsn_safe="$(echo "$dsn" | sed -E 's|(://[^:/@]+:)[^@]+@|\1****@|')"
         echo -e "${green}Database: PostgreSQL — ${dsn_safe}${plain}"
     else
-        echo -e "${green}Database: SQLite (/etc/x-ui/x-ui.db)${plain}"
+        echo -e "${green}Database: SQLite (/etc/still-ui/x-ui.db)${plain}"
     fi
 
     local existing_webBasePath=$(echo "$info" | grep -Eo 'webBasePath: .+' | awk '{print $2}')
@@ -525,9 +525,9 @@ start() {
             return 0
         fi
         if [[ $release == "alpine" ]]; then
-            rc-service x-ui start
+            rc-service still-ui start
         else
-            systemctl start x-ui
+            systemctl start still-ui
         fi
         sleep 2
         check_status
@@ -559,9 +559,9 @@ stop() {
             return 0
         fi
         if [[ $release == "alpine" ]]; then
-            rc-service x-ui stop
+            rc-service still-ui stop
         else
-            systemctl stop x-ui
+            systemctl stop still-ui
         fi
         sleep 2
         check_status
@@ -599,9 +599,9 @@ restart() {
         return 0
     fi
     if [[ $release == "alpine" ]]; then
-        rc-service x-ui restart
+        rc-service still-ui restart
     else
-        systemctl restart x-ui
+        systemctl restart still-ui
     fi
     sleep 2
     check_status
@@ -630,9 +630,9 @@ restart_xray() {
         return 0
     fi
     if [[ $release == "alpine" ]]; then
-        rc-service x-ui reload
+        rc-service still-ui reload
     else
-        systemctl reload x-ui
+        systemctl reload still-ui
     fi
     LOGI "xray-core Restart signal sent successfully, Please check the log information to confirm whether xray restarted successfully"
     sleep 2
@@ -651,9 +651,9 @@ status() {
         return 0
     fi
     if [[ $release == "alpine" ]]; then
-        rc-service x-ui status
+        rc-service still-ui status
     else
-        systemctl status x-ui -l
+        systemctl status still-ui -l
     fi
     if [[ $# == 0 ]]; then
         before_show_menu
@@ -670,9 +670,9 @@ enable() {
         return 0
     fi
     if [[ $release == "alpine" ]]; then
-        rc-update add x-ui default
+        rc-update add still-ui default
     else
-        systemctl enable x-ui
+        systemctl enable still-ui
     fi
     if [[ $? == 0 ]]; then
         LOGI "x-ui Set to boot automatically on startup successfully"
@@ -695,9 +695,9 @@ disable() {
         return 0
     fi
     if [[ $release == "alpine" ]]; then
-        rc-update del x-ui
+        rc-update del still-ui
     else
-        systemctl disable x-ui
+        systemctl disable still-ui
     fi
     if [[ $? == 0 ]]; then
         LOGI "x-ui Autostart Cancelled successfully"
@@ -742,7 +742,7 @@ show_log() {
                 show_menu
                 ;;
             1)
-                journalctl -u x-ui -e --no-pager -f -p debug
+                journalctl -u still-ui -e --no-pager -f -p debug
                 if [[ $# == 0 ]]; then
                     before_show_menu
                 fi
@@ -891,19 +891,19 @@ check_status() {
         fi
     fi
     if [[ $release == "alpine" ]]; then
-        if [[ ! -f /etc/init.d/x-ui ]]; then
+        if [[ ! -f /etc/init.d/still-ui ]]; then
             return 2
         fi
-        if [[ $(rc-service x-ui status | grep -F 'status: started' -c) == 1 ]]; then
+        if [[ $(rc-service still-ui status | grep -F 'status: started' -c) == 1 ]]; then
             return 0
         else
             return 1
         fi
     else
-        if [[ ! -f ${xui_service}/x-ui.service ]]; then
+        if [[ ! -f ${xui_service}/still-ui.service ]]; then
             return 2
         fi
-        temp=$(systemctl show --property=SubState x-ui)
+        temp=$(systemctl show --property=SubState still-ui)
         temp=${temp#SubState=}
         if [[ "${temp}" == "running" ]]; then
             return 0
@@ -915,13 +915,13 @@ check_status() {
 
 check_enabled() {
     if [[ $release == "alpine" ]]; then
-        if [[ $(rc-update show | grep -F 'x-ui' | grep default -c) == 1 ]]; then
+        if [[ $(rc-update show | grep -F 'still-ui' | grep default -c) == 1 ]]; then
             return 0
         else
             return 1
         fi
     else
-        temp=$(systemctl is-enabled x-ui)
+        temp=$(systemctl is-enabled still-ui)
         if [[ "${temp}" == "enabled" ]]; then
             return 0
         else
@@ -1509,7 +1509,7 @@ ssl_cert_issue_main() {
                             ~/.acme.sh/acme.sh --installcert --force -d "${domain}" \
                                 --key-file "${webKeyFile}" \
                                 --fullchain-file "${webCertFile}" \
-                                --reloadcmd "x-ui restart" 2>&1 || true
+                                --reloadcmd "still-ui restart" 2>&1 || true
                             echo "Registered acme.sh auto-renewal hook for ${domain}."
                         fi
                         restart
@@ -1680,7 +1680,7 @@ ssl_cert_issue_for_ip() {
     done
 
     # Reload command - restarts panel after renewal
-    local reloadCmd="systemctl restart x-ui 2>/dev/null || rc-service x-ui restart 2>/dev/null"
+    local reloadCmd="systemctl restart still-ui 2>/dev/null || rc-service still-ui restart 2>/dev/null"
 
     # issue the certificate for IP with shortlived profile
     ~/.acme.sh/acme.sh --set-default-ca --server letsencrypt --force
@@ -1887,24 +1887,24 @@ ssl_cert_issue() {
         LOGI "Using existing certificate, installing certificates..."
     fi
 
-    reloadCmd="x-ui restart"
+    reloadCmd="still-ui restart"
 
-    LOGI "Default --reloadcmd for ACME is: ${yellow}x-ui restart"
+    LOGI "Default --reloadcmd for ACME is: ${yellow}still-ui restart"
     LOGI "This command will run on every certificate issue and renew."
     read -rp "Would you like to modify --reloadcmd for ACME? (y/n): " setReloadcmd
     if [[ "$setReloadcmd" == "y" || "$setReloadcmd" == "Y" ]]; then
-        echo -e "\n${green}\t1.${plain} Preset: systemctl reload nginx ; x-ui restart"
+        echo -e "\n${green}\t1.${plain} Preset: systemctl reload nginx ; still-ui restart"
         echo -e "${green}\t2.${plain} Input your own command"
         echo -e "${green}\t0.${plain} Keep default reloadcmd"
         read -rp "Choose an option: " choice
         case "$choice" in
             1)
-                LOGI "Reloadcmd is: systemctl reload nginx ; x-ui restart"
-                reloadCmd="systemctl reload nginx ; x-ui restart"
+                LOGI "Reloadcmd is: systemctl reload nginx ; still-ui restart"
+                reloadCmd="systemctl reload nginx ; still-ui restart"
                 ;;
             2)
-                LOGD "It's recommended to put x-ui restart at the end, so it won't raise an error if other services fails"
-                read -rp "Please enter your reloadcmd (example: systemctl reload nginx ; x-ui restart): " reloadCmd
+                LOGD "It's recommended to put still-ui restart at the end, so it won't raise an error if other services fails"
+                read -rp "Please enter your reloadcmd (example: systemctl reload nginx ; still-ui restart): " reloadCmd
                 LOGI "Your reloadcmd is: ${reloadCmd}"
                 ;;
             *)
@@ -2052,24 +2052,24 @@ ssl_cert_issue_CF() {
             exit 1
         fi
 
-        reloadCmd="x-ui restart"
+        reloadCmd="still-ui restart"
 
-        LOGI "Default --reloadcmd for ACME is: ${yellow}x-ui restart"
+        LOGI "Default --reloadcmd for ACME is: ${yellow}still-ui restart"
         LOGI "This command will run on every certificate issue and renew."
         read -rp "Would you like to modify --reloadcmd for ACME? (y/n): " setReloadcmd
         if [[ "$setReloadcmd" == "y" || "$setReloadcmd" == "Y" ]]; then
-            echo -e "\n${green}\t1.${plain} Preset: systemctl reload nginx ; x-ui restart"
+            echo -e "\n${green}\t1.${plain} Preset: systemctl reload nginx ; still-ui restart"
             echo -e "${green}\t2.${plain} Input your own command"
             echo -e "${green}\t0.${plain} Keep default reloadcmd"
             read -rp "Choose an option: " choice
             case "$choice" in
                 1)
-                    LOGI "Reloadcmd is: systemctl reload nginx ; x-ui restart"
-                    reloadCmd="systemctl reload nginx ; x-ui restart"
+                    LOGI "Reloadcmd is: systemctl reload nginx ; still-ui restart"
+                    reloadCmd="systemctl reload nginx ; still-ui restart"
                     ;;
                 2)
-                    LOGD "It's recommended to put x-ui restart at the end, so it won't raise an error if other services fails"
-                    read -rp "Please enter your reloadcmd (example: systemctl reload nginx ; x-ui restart): " reloadCmd
+                    LOGD "It's recommended to put still-ui restart at the end, so it won't raise an error if other services fails"
+                    read -rp "Please enter your reloadcmd (example: systemctl reload nginx ; still-ui restart): " reloadCmd
                     LOGI "Your reloadcmd is: ${reloadCmd}"
                     ;;
                 *)
@@ -2403,7 +2403,7 @@ setup_fail2ban_iplimit() {
 
 # install_iplimit is the interactive (menu) entry point: it runs the shared
 # setup and then returns to the menu. The non-interactive installer path uses
-# setup_fail2ban_iplimit directly via `x-ui setup-fail2ban`.
+# setup_fail2ban_iplimit directly via `still-ui setup-fail2ban`.
 install_iplimit() {
     setup_fail2ban_iplimit
     before_show_menu
@@ -3129,7 +3129,7 @@ pg_client_major() {
 # major version is at least $1 (e.g. 17); with no argument any installed version
 # is accepted. Falls back to the official PostgreSQL package repository when the
 # distribution one is too old. Restoring a panel backup made by a newer pg_dump
-# needs this:   x-ui pgclient <major>
+# needs this:   still-ui pgclient <major>
 pg_upgrade_client() {
     local want="$1" have
     if [[ -n "$want" && ! "$want" =~ ^[0-9]+$ ]]; then
@@ -3385,10 +3385,10 @@ postgresql_menu() {
 # Convert between the panel's SQLite database and a portable .dump (SQL text)
 # file using the bundled x-ui binary. With no arguments it dumps the installed
 # panel database; an optional second argument overrides the output path.
-#   x-ui migrateDB [file.db|file.dump] [output]
+#   still-ui migrateDB [file.db|file.dump] [output]
 migrate_db() {
     local input="$1" output="$2"
-    local default_db="/etc/x-ui/x-ui.db"
+    local default_db="/etc/still-ui/x-ui.db"
     local bin="${xui_folder}/x-ui"
 
     [[ -z "$input" ]] && input="$default_db"
@@ -3400,13 +3400,13 @@ migrate_db() {
 
     if ! "$bin" migrate-db -h 2>&1 | grep -q -- '-dump'; then
         LOGE "This x-ui build does not support .db <-> .dump conversion yet."
-        LOGE "Update the panel first (x-ui update) to a version with 'migrate-db --dump/--restore'."
+        LOGE "Update the panel first (still-ui update) to a version with 'migrate-db --dump/--restore'."
         return 1
     fi
 
     if [[ ! -f "$input" ]]; then
         LOGE "Input file not found: ${input}"
-        echo -e "Usage: ${green}x-ui migrateDB [file.db|file.dump] [output]${plain}"
+        echo -e "Usage: ${green}still-ui migrateDB [file.db|file.dump] [output]${plain}"
         return 1
     fi
 
@@ -3444,7 +3444,7 @@ migrate_db() {
         [[ -z "$output" ]] && output="${input%.*}.db"
         if [[ "$output" == "$default_db" ]] && check_status > /dev/null 2>&1; then
             LOGE "Refusing to restore into the live database (${default_db}) while x-ui is running."
-            LOGE "Stop the panel first (x-ui stop) or choose a different output path."
+            LOGE "Stop the panel first (still-ui stop) or choose a different output path."
             return 1
         fi
         if [[ -f "$output" ]]; then
@@ -3466,7 +3466,7 @@ migrate_db() {
 # Interactive wrapper around migrate_db for the menu: prompts for the paths and
 # lets migrate_db auto-detect the direction.
 migrate_db_prompt() {
-    local default_db="/etc/x-ui/x-ui.db"
+    local default_db="/etc/still-ui/x-ui.db"
     local input output
     echo -e "Convert between a SQLite ${green}.db${plain} and a portable ${green}.dump${plain} (direction auto-detected)."
     read -rp "Input file [${default_db}]: " input
@@ -3477,34 +3477,34 @@ migrate_db_prompt() {
 
 show_usage() {
     echo -e "┌────────────────────────────────────────────────────────────────┐
-│  ${blue}x-ui control menu usages (subcommands):${plain}                       │
+│  ${blue}still-ui control menu usages (subcommands):${plain}                       │
 │                                                                │
-│  ${blue}x-ui${plain}                       - Admin Management Script          │
-│  ${blue}x-ui start${plain}                 - Start                            │
-│  ${blue}x-ui stop${plain}                  - Stop                             │
-│  ${blue}x-ui restart${plain}               - Restart                          │
-|  ${blue}x-ui restart-xray${plain}          - Restart Xray                     │
-│  ${blue}x-ui status${plain}                - Current Status                   │
-│  ${blue}x-ui settings${plain}              - Current Settings                 │
-│  ${blue}x-ui enable${plain}                - Enable Autostart on OS Startup   │
-│  ${blue}x-ui disable${plain}               - Disable Autostart on OS Startup  │
-│  ${blue}x-ui log${plain}                   - Check logs                       │
-│  ${blue}x-ui banlog${plain}                - Check Fail2ban ban logs          │
-│  ${blue}x-ui update${plain}                - Update                           │
-│  ${blue}x-ui update-dev${plain}            - Update to Dev channel (latest)   │
-│  ${blue}x-ui update-all-geofiles${plain}   - Update all geo files             │
-│  ${blue}x-ui migrateDB [file]${plain}      - Convert .db <-> .dump (SQLite)   │
-│  ${blue}x-ui pgclient [ver]${plain}        - Upgrade pg_dump/pg_restore tools │
-│  ${blue}x-ui legacy${plain}                - Legacy version                   │
-│  ${blue}x-ui install${plain}               - Install                          │
-│  ${blue}x-ui uninstall${plain}             - Uninstall                        │
+│  ${blue}still-ui${plain}                       - Admin Management Script          │
+│  ${blue}still-ui start${plain}                 - Start                            │
+│  ${blue}still-ui stop${plain}                  - Stop                             │
+│  ${blue}still-ui restart${plain}               - Restart                          │
+|  ${blue}still-ui restart-xray${plain}          - Restart Xray                     │
+│  ${blue}still-ui status${plain}                - Current Status                   │
+│  ${blue}still-ui settings${plain}              - Current Settings                 │
+│  ${blue}still-ui enable${plain}                - Enable Autostart on OS Startup   │
+│  ${blue}still-ui disable${plain}               - Disable Autostart on OS Startup  │
+│  ${blue}still-ui log${plain}                   - Check logs                       │
+│  ${blue}still-ui banlog${plain}                - Check Fail2ban ban logs          │
+│  ${blue}still-ui update${plain}                - Update                           │
+│  ${blue}still-ui update-dev${plain}            - Update to Dev channel (latest)   │
+│  ${blue}still-ui update-all-geofiles${plain}   - Update all geo files             │
+│  ${blue}still-ui migrateDB [file]${plain}      - Convert .db <-> .dump (SQLite)   │
+│  ${blue}still-ui pgclient [ver]${plain}        - Upgrade pg_dump/pg_restore tools │
+│  ${blue}still-ui legacy${plain}                - Legacy version                   │
+│  ${blue}still-ui install${plain}               - Install                          │
+│  ${blue}still-ui uninstall${plain}             - Uninstall                        │
 └────────────────────────────────────────────────────────────────┘"
 }
 
 show_menu() {
     echo -e "
 ╔────────────────────────────────────────────────╗
-│  ${green}3X-UI Panel Management Script${plain}                │
+│  ${green}still-ui Panel Management Script${plain}                │
 │  ${green}0.${plain} Exit Script                               │
 │────────────────────────────────────────────────│
 │  ${green}1.${plain} Install                                   │

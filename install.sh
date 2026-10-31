@@ -6,7 +6,7 @@ blue='\033[0;34m'
 yellow='\033[0;33m'
 plain='\033[0m'
 
-xui_folder="${XUI_MAIN_FOLDER:=/usr/local/x-ui}"
+xui_folder="${XUI_MAIN_FOLDER:=/usr/local/still-ui}"
 xui_service="${XUI_SERVICE:=/etc/systemd/system}"
 
 # check root
@@ -144,18 +144,71 @@ prompt_or_default() {
     fi
 }
 
+
+# still-ui: moving over from 3x-ui. still-ui keeps its database in
+# /etc/still-ui, so a fresh install next to 3x-ui starts empty. When
+# /etc/still-ui/x-ui.db does not exist yet and a 3x-ui database does, the
+# installer offers to copy it (3x-ui's files are left untouched) and to stop
+# and disable the x-ui service, which would otherwise hold the same ports.
+# Non-interactive: STILL_UI_IMPORT_3XUI=yes. A database from a 3x-ui newer than
+# the version still-ui is based on may not open; see the README.
+_still_import_3xui() {
+    local answer src_env dst_env
+    [[ -f /etc/x-ui/x-ui.db && ! -e /etc/still-ui/x-ui.db ]] || return 0
+    echo -e "${yellow}Found a 3x-ui database at /etc/x-ui/x-ui.db.${plain}"
+    if [[ "$NONINTERACTIVE" == "1" ]]; then
+        answer="${STILL_UI_IMPORT_3XUI:-no}"
+    else
+        read -rp "Copy it into still-ui and stop/disable the x-ui service? [y/N]: " answer
+    fi
+    case "$answer" in
+        y | Y | yes | YES) ;;
+        *)
+            echo -e "${yellow}Starting with an empty database. 3x-ui is left as it is; do not run both on the same ports.${plain}"
+            return 0
+            ;;
+    esac
+    if [[ $release == "alpine" ]]; then
+        rc-service x-ui stop > /dev/null 2>&1
+        rc-update del x-ui > /dev/null 2>&1
+    else
+        systemctl stop x-ui > /dev/null 2>&1
+        systemctl disable x-ui > /dev/null 2>&1
+    fi
+    install -d -m 700 /etc/still-ui
+    local copied=1 f
+    for f in /etc/x-ui/x-ui.db /etc/x-ui/x-ui.db-wal /etc/x-ui/x-ui.db-shm; do
+        [[ -f "$f" ]] || continue
+        cp -a "$f" /etc/still-ui/ || copied=0
+    done
+    if [[ "$copied" != 1 ]]; then
+        echo -e "${red}Could not copy the 3x-ui database; starting with an empty database.${plain}"
+        rm -f /etc/still-ui/x-ui.db /etc/still-ui/x-ui.db-wal /etc/still-ui/x-ui.db-shm
+        return 0
+    fi
+    [[ -f /etc/x-ui/node_token_key.json ]] && cp -a /etc/x-ui/node_token_key.json /etc/still-ui/
+    for src_env in /etc/default/x-ui /etc/conf.d/x-ui /etc/sysconfig/x-ui; do
+        dst_env="${src_env%/x-ui}/still-ui"
+        if [[ -f "$src_env" && ! -e "$dst_env" ]]; then
+            cp -a "$src_env" "$dst_env"
+        fi
+    done
+    echo -e "${green}Copied the 3x-ui database to /etc/still-ui/x-ui.db; x-ui is stopped and disabled.${plain}"
+    echo -e "${green}Your panel login, inbounds and clients are kept. To go back: systemctl enable --now x-ui (after stopping still-ui).${plain}"
+}
+
 # write_install_result <user> <pass> <port> <webpath> <scheme> <host> <token> <dbtype>
 # Persists a parseable, root-only credentials file consumed by cloud-init/MOTD.
 # Values are written with printf '%q' so a pinned password/username containing
 # spaces, quotes, $(...) or backticks is shell-escaped and the file stays safely
 # source-able (consumers do '. install-result.env'). For the alphanumeric random
 # values gen_random_string emits, %q is a no-op. This is a DIFFERENT file from the
-# Postgres env file (/etc/default/x-ui).
+# Postgres env file (/etc/default/still-ui).
 write_install_result() {
     local u="$1" p="$2" port="$3" wbp="$4" scheme="$5" host="$6" token="$7" dbtype="$8"
-    local result_file="/etc/x-ui/install-result.env"
+    local result_file="/etc/still-ui/install-result.env"
     local url_host="${host:-SERVER_IP_UNKNOWN}"
-    install -d -m 700 /etc/x-ui 2> /dev/null
+    install -d -m 700 /etc/still-ui 2> /dev/null
     local prev_umask
     prev_umask=$(umask)
     umask 077
@@ -457,7 +510,7 @@ setup_ssl_certificate() {
 
     if [ $? -ne 0 ]; then
         echo -e "${yellow}Failed to issue certificate for ${domain}${plain}"
-        echo -e "${yellow}Please ensure port 80 is open and try again later with: x-ui${plain}"
+        echo -e "${yellow}Please ensure port 80 is open and try again later with: still-ui${plain}"
         rm -rf ~/.acme.sh/${domain} ~/.acme.sh/${domain}_ecc 2> /dev/null
         rm -rf "$certPath" 2> /dev/null
         return 1
@@ -467,7 +520,7 @@ setup_ssl_certificate() {
     ~/.acme.sh/acme.sh --installcert --force -d ${domain} \
         --key-file /root/cert/${domain}/privkey.pem \
         --fullchain-file /root/cert/${domain}/fullchain.pem \
-        --reloadcmd "systemctl restart x-ui" > /dev/null 2>&1
+        --reloadcmd "systemctl restart still-ui" > /dev/null 2>&1
 
     if [ $? -ne 0 ]; then
         echo -e "${yellow}Failed to install certificate${plain}"
@@ -536,7 +589,7 @@ setup_ip_certificate() {
     fi
 
     # Set reload command for auto-renewal (add || true so it doesn't fail during first install)
-    local reloadCmd="systemctl restart x-ui 2>/dev/null || rc-service x-ui restart 2>/dev/null || true"
+    local reloadCmd="systemctl restart still-ui 2>/dev/null || rc-service still-ui restart 2>/dev/null || true"
 
     # Choose port for HTTP-01 listener (default 80, prompt override)
     local WebPort=""
@@ -647,7 +700,7 @@ setup_ip_certificate() {
 
     echo -e "${green}IP certificate installed and configured successfully!${plain}"
     echo -e "${green}Certificate valid for ~6 days, auto-renews via acme.sh cron job.${plain}"
-    echo -e "${yellow}acme.sh will automatically renew and reload x-ui before expiry.${plain}"
+    echo -e "${yellow}acme.sh will automatically renew and reload still-ui before expiry.${plain}"
     return 0
 }
 
@@ -747,7 +800,7 @@ ssl_cert_issue() {
 
     # Stop panel temporarily
     echo -e "${yellow}Stopping panel temporarily...${plain}"
-    systemctl stop x-ui 2> /dev/null || rc-service x-ui stop 2> /dev/null
+    systemctl stop still-ui 2> /dev/null || rc-service still-ui stop 2> /dev/null
 
     if [[ ${cert_exists} -eq 0 ]]; then
         # issue the certificate
@@ -757,7 +810,7 @@ ssl_cert_issue() {
         if [ $? -ne 0 ]; then
             echo -e "${red}Issuing certificate failed, please check logs.${plain}"
             rm -rf ~/.acme.sh/${domain} ~/.acme.sh/${domain}_ecc
-            systemctl start x-ui 2> /dev/null || rc-service x-ui start 2> /dev/null
+            systemctl start still-ui 2> /dev/null || rc-service still-ui start 2> /dev/null
             return 1
         else
             echo -e "${green}Issuing certificate succeeded, installing certificates...${plain}"
@@ -767,8 +820,8 @@ ssl_cert_issue() {
     fi
 
     # Setup reload command
-    reloadCmd="systemctl restart x-ui || rc-service x-ui restart"
-    echo -e "${green}Default --reloadcmd for ACME is: ${yellow}systemctl restart x-ui || rc-service x-ui restart${plain}"
+    reloadCmd="systemctl restart still-ui || rc-service still-ui restart"
+    echo -e "${green}Default --reloadcmd for ACME is: ${yellow}systemctl restart still-ui || rc-service still-ui restart${plain}"
     echo -e "${green}This command will run on every certificate issue and renew.${plain}"
     if [[ "$NONINTERACTIVE" == "1" ]]; then
         setReloadcmd="n"
@@ -776,17 +829,17 @@ ssl_cert_issue() {
         read -rp "Would you like to modify --reloadcmd for ACME? (y/n): " setReloadcmd
     fi
     if [[ "$setReloadcmd" == "y" || "$setReloadcmd" == "Y" ]]; then
-        echo -e "\n${green}\t1.${plain} Preset: systemctl reload nginx ; systemctl restart x-ui"
+        echo -e "\n${green}\t1.${plain} Preset: systemctl reload nginx ; systemctl restart still-ui"
         echo -e "${green}\t2.${plain} Input your own command"
         echo -e "${green}\t0.${plain} Keep default reloadcmd"
         read -rp "Choose an option: " choice
         case "$choice" in
             1)
-                echo -e "${green}Reloadcmd is: systemctl reload nginx ; systemctl restart x-ui${plain}"
-                reloadCmd="systemctl reload nginx ; systemctl restart x-ui"
+                echo -e "${green}Reloadcmd is: systemctl reload nginx ; systemctl restart still-ui${plain}"
+                reloadCmd="systemctl reload nginx ; systemctl restart still-ui"
                 ;;
             2)
-                echo -e "${yellow}It's recommended to put x-ui restart at the end${plain}"
+                echo -e "${yellow}It's recommended to put still-ui restart at the end${plain}"
                 read -rp "Please enter your custom reloadcmd: " reloadCmd
                 echo -e "${green}Reloadcmd is: ${reloadCmd}${plain}"
                 ;;
@@ -816,7 +869,7 @@ ssl_cert_issue() {
         if [[ ${cert_exists} -eq 0 ]]; then
             rm -rf ~/.acme.sh/${domain} ~/.acme.sh/${domain}_ecc
         fi
-        systemctl start x-ui 2> /dev/null || rc-service x-ui start 2> /dev/null
+        systemctl start still-ui 2> /dev/null || rc-service still-ui start 2> /dev/null
         return 1
     fi
 
@@ -837,7 +890,7 @@ ssl_cert_issue() {
     fi
 
     # start panel
-    systemctl start x-ui 2> /dev/null || rc-service x-ui start 2> /dev/null
+    systemctl start still-ui 2> /dev/null || rc-service still-ui start 2> /dev/null
 
     # Prompt user to set panel paths after successful certificate installation
     if [[ "$NONINTERACTIVE" == "1" ]]; then
@@ -857,7 +910,7 @@ ssl_cert_issue() {
             echo ""
             echo -e "${green}Access URL: https://${domain}:${existing_port}/${existing_webBasePath}${plain}"
             echo -e "${yellow}Panel will restart to apply SSL certificate...${plain}"
-            systemctl restart x-ui 2> /dev/null || rc-service x-ui restart 2> /dev/null
+            systemctl restart still-ui 2> /dev/null || rc-service still-ui restart 2> /dev/null
         else
             echo -e "${red}Error: Certificate or private key file not found for domain: $domain.${plain}"
         fi
@@ -956,9 +1009,9 @@ prompt_and_setup_ssl() {
 
             # Stop panel if running (port 80 needed)
             if [[ $release == "alpine" ]]; then
-                rc-service x-ui stop > /dev/null 2>&1
+                rc-service still-ui stop > /dev/null 2>&1
             else
-                systemctl stop x-ui > /dev/null 2>&1
+                systemctl stop still-ui > /dev/null 2>&1
             fi
 
             setup_ip_certificate "${server_ip}" "${ipv6_addr}"
@@ -1028,7 +1081,7 @@ prompt_and_setup_ssl() {
             echo -e "${green}✓ Custom certificate paths applied.${plain}"
             echo -e "${yellow}Note: You are responsible for renewing these files externally.${plain}"
 
-            systemctl restart x-ui > /dev/null 2>&1 || rc-service x-ui restart > /dev/null 2>&1
+            systemctl restart still-ui > /dev/null 2>&1 || rc-service still-ui restart > /dev/null 2>&1
             ;;
         4)
             echo ""
@@ -1067,7 +1120,7 @@ prompt_and_setup_ssl() {
                 echo -e "${yellow}Panel will listen on all interfaces over plain HTTP. Make sure something else is terminating TLS in front of it.${plain}"
             fi
 
-            systemctl restart x-ui > /dev/null 2>&1 || rc-service x-ui restart > /dev/null 2>&1
+            systemctl restart still-ui > /dev/null 2>&1 || rc-service still-ui restart > /dev/null 2>&1
             echo -e "${green}✓ SSL setup skipped.${plain}"
             ;;
         *)
@@ -1127,7 +1180,7 @@ config_after_install() {
             local config_password="${XUI_PASSWORD:-$(gen_random_string 10)}"
             local config_port=""
 
-            local db_label="SQLite (/etc/x-ui/x-ui.db)"
+            local db_label="SQLite (/etc/still-ui/x-ui.db)"
             echo ""
             echo -e "${green}═══════════════════════════════════════════${plain}"
             echo -e "${green}     Database Selection                    ${plain}"
@@ -1148,13 +1201,13 @@ config_after_install() {
                 local xui_env_file
                 case "${release}" in
                     ubuntu | debian | armbian)
-                        xui_env_file="/etc/default/x-ui"
+                        xui_env_file="/etc/default/still-ui"
                         ;;
                     arch | manjaro | parch | alpine)
-                        xui_env_file="/etc/conf.d/x-ui"
+                        xui_env_file="/etc/conf.d/still-ui"
                         ;;
                     *)
-                        xui_env_file="/etc/sysconfig/x-ui"
+                        xui_env_file="/etc/sysconfig/still-ui"
                         ;;
                 esac
 
@@ -1423,23 +1476,23 @@ setup_fail2ban() {
         return 0
     fi
 
-    if [[ ! -x /usr/bin/x-ui ]]; then
-        echo -e "${yellow}x-ui CLI not found; skipping Fail2ban auto-setup.${plain}"
+    if [[ ! -x /usr/bin/still-ui ]]; then
+        echo -e "${yellow}still-ui CLI not found; skipping Fail2ban auto-setup.${plain}"
         return 0
     fi
 
     # Scripts older than v3.4.0 have no setup-fail2ban and exit 0 from the
     # usage banner, which would read as success here.
-    if ! grep -q '"setup-fail2ban")' /usr/bin/x-ui; then
-        echo -e "${yellow}This x-ui.sh predates 'x-ui setup-fail2ban'; skipping Fail2ban auto-setup.${plain}"
+    if ! grep -q '"setup-fail2ban")' /usr/bin/still-ui; then
+        echo -e "${yellow}This x-ui.sh predates 'still-ui setup-fail2ban'; skipping Fail2ban auto-setup.${plain}"
         return 0
     fi
 
     echo -e "${green}Setting up Fail2ban for the IP Limit feature...${plain}"
-    if /usr/bin/x-ui setup-fail2ban; then
+    if /usr/bin/still-ui setup-fail2ban; then
         echo -e "${green}Fail2ban setup complete.${plain}"
     else
-        echo -e "${yellow}Fail2ban setup did not finish; IP Limit stays disabled until you run 'x-ui' and open the IP Limit menu. Continuing.${plain}"
+        echo -e "${yellow}Fail2ban setup did not finish; IP Limit stays disabled until you run 'still-ui' and open the IP Limit menu. Continuing.${plain}"
     fi
     return 0
 }
@@ -1480,7 +1533,7 @@ _xui_warn_unsupported_hardening() {
         fi
     done
     [[ -n "$missing" ]] || return 0
-    echo -e "${yellow}Note: systemd ${version} ignores part of the hardening in x-ui.service; the panel still starts.${plain}"
+    echo -e "${yellow}Note: systemd ${version} ignores part of the hardening in still-ui.service; the panel still starts.${plain}"
     echo "      Not applied, needs a newer systemd: ${missing}."
     if [[ "$version" -lt 231 ]]; then
         echo "      The panel's folders stay writable through ReadWriteDirectories=, the alias this script installs."
@@ -1514,13 +1567,13 @@ _xui_service_write_paths_dropin() {
     if [[ -z "$env_file" ]]; then
         case "${release}" in
             ubuntu | debian | armbian)
-                env_file="/etc/default/x-ui"
+                env_file="/etc/default/still-ui"
                 ;;
             arch | manjaro | parch | alpine)
-                env_file="/etc/conf.d/x-ui"
+                env_file="/etc/conf.d/still-ui"
                 ;;
             *)
-                env_file="/etc/sysconfig/x-ui"
+                env_file="/etc/sysconfig/still-ui"
                 ;;
         esac
     fi
@@ -1535,8 +1588,8 @@ _xui_service_write_paths_dropin() {
     # file to the panel through EnvironmentFile=, so these are the folders it
     # will actually use.
     main_folder="${XUI_MAIN_FOLDER:-${xui_folder}}"
-    db_folder="${XUI_DB_FOLDER:-/etc/x-ui}"
-    log_folder="${XUI_LOG_FOLDER:-/var/log/x-ui}"
+    db_folder="${XUI_DB_FOLDER:-/etc/still-ui}"
+    log_folder="${XUI_LOG_FOLDER:-/var/log/still-ui}"
     # An empty XUI_BIN_FOLDER resolves to "bin" relative to the panel's working
     # directory, which the unit sets to the main folder.
     bin_folder="${XUI_BIN_FOLDER:-bin}"
@@ -1572,7 +1625,7 @@ _xui_service_write_paths_dropin() {
     line="${line# }"
     [[ -n "$line" ]] || return 1
 
-    dropin_dir="${xui_service}/x-ui.service.d"
+    dropin_dir="${xui_service}/still-ui.service.d"
     dropin="${dropin_dir}/10-xui-sandbox.conf"
     temp_file="${dropin}.tmp.$$"
 
@@ -1607,16 +1660,16 @@ EOF
     return 0
 }
 
-# Lands a systemd unit file at ${xui_service}/x-ui.service via a temp file +
+# Lands a systemd unit file at ${xui_service}/still-ui.service via a temp file +
 # atomic mv, so a failed cp/curl or an interrupted mv never leaves a
 # truncated unit file at the live path -- systemd would then fail to parse
 # it on the next daemon-reload/start. Same pattern already used for
-# /usr/bin/x-ui elsewhere in this script. source_is_url picks cp (from a
+# /usr/bin/still-ui elsewhere in this script. source_is_url picks cp (from a
 # file already extracted from the release tarball) vs curl (GitHub fallback).
 _install_xui_service_unit() {
     local source="$1"
     local source_is_url="$2"
-    local dest="${xui_service}/x-ui.service"
+    local dest="${xui_service}/still-ui.service"
     local temp_file="${dest}.tmp.$$"
 
     rm -f "$temp_file"
@@ -1639,8 +1692,8 @@ _install_xui_service_unit() {
         return 1
     fi
     if ! _xui_service_write_paths_dropin; then
-        echo -e "${yellow}Warning: could not refresh ${xui_service}/x-ui.service.d/10-xui-sandbox.conf.${plain}"
-        echo -e "${yellow}If XUI_DB_FOLDER or XUI_LOG_FOLDER points outside /etc/x-ui and /var/log/x-ui, the panel may not be able to write to it under ProtectSystem=full.${plain}"
+        echo -e "${yellow}Warning: could not refresh ${xui_service}/still-ui.service.d/10-xui-sandbox.conf.${plain}"
+        echo -e "${yellow}If XUI_DB_FOLDER or XUI_LOG_FOLDER points outside /etc/still-ui and /var/log/still-ui, the panel may not be able to write to it under ProtectSystem=full.${plain}"
     fi
     _xui_warn_unsupported_hardening
     return 0
@@ -1649,16 +1702,16 @@ _install_xui_service_unit() {
 # resolve_latest_tag prints the latest stable release tag. It prefers the web
 # releases/latest redirect, which is not subject to the unauthenticated API's
 # 60 req/h-per-IP limit that trips shared CI/CGNAT addresses (the install then
-# fails with "Failed to fetch x-ui version"), and falls back to the API.
+# fails with "Failed to fetch still-ui version"), and falls back to the API.
 resolve_latest_tag() {
     local url tag
-    url=$(curl -sSLI -o /dev/null -w '%{url_effective}' --retry 5 --retry-delay 3 --connect-timeout 15 --max-time 60 "https://github.com/MHSanaei/3x-ui/releases/latest" 2>/dev/null)
+    url=$(curl -sSLI -o /dev/null -w '%{url_effective}' --retry 5 --retry-delay 3 --connect-timeout 15 --max-time 60 "https://github.com/Dv2Corn/still-ui/releases/latest" 2>/dev/null)
     tag=${url##*/tag/}
     if [[ "$tag" != "$url" && -n "$tag" && "$tag" != "latest" ]]; then
         echo "$tag"
         return 0
     fi
-    curl -Ls --retry 5 --retry-delay 3 --connect-timeout 15 --max-time 60 "https://api.github.com/repos/MHSanaei/3x-ui/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'
+    curl -Ls --retry 5 --retry-delay 3 --connect-timeout 15 --max-time 60 "https://api.github.com/repos/Dv2Corn/still-ui/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'
 }
 
 # Releases publish <asset>.sha256 next to each archive. A mismatch or a failed
@@ -1697,7 +1750,7 @@ require_repo_files() {
     shift
     [[ "${ref}" == "main" ]] && return 0
     for name in "$@"; do
-        status=$(curl -sIL --retry 3 --connect-timeout 15 -o /dev/null -w '%{http_code}' "https://raw.githubusercontent.com/MHSanaei/3x-ui/${ref}/${name}")
+        status=$(curl -sIL --retry 3 --connect-timeout 15 -o /dev/null -w '%{http_code}' "https://raw.githubusercontent.com/Dv2Corn/still-ui/${ref}/${name}")
         if [[ "${status}" != "200" ]]; then
             echo -e "${red}${name} is not available for ${ref} (HTTP ${status})${plain}"
             echo -e "${red}Install a release that ships it, or 'dev' for the rolling build. Your existing installation has not been touched.${plain}"
@@ -1707,27 +1760,47 @@ require_repo_files() {
 }
 
 install_x-ui() {
-    cd ${xui_folder%/x-ui}/
+    cd ${xui_folder%/still-ui}/
+
+    # still-ui: STILL_UI_ARCHIVE=/path/still-ui-linux-<arch>.tar.gz installs a
+    # release archive that is already on this server (offline install, a build
+    # of your own, or rolling back to a kept archive) instead of downloading
+    # one. STILL_UI_VERSION only labels it in the messages.
+    local local_archive="${STILL_UI_ARCHIVE:-}"
 
     # Download resources
-    if [ $# == 0 ]; then
-        tag_version=$(resolve_latest_tag)
-        if [[ ! -n "$tag_version" ]]; then
-            echo -e "${red}Failed to fetch x-ui version, it may be due to GitHub API restrictions, please try it later${plain}"
+    if [[ -n "${local_archive}" ]]; then
+        if [[ ! -s "${local_archive}" ]]; then
+            echo -e "${red}STILL_UI_ARCHIVE=${local_archive} does not exist or is empty${plain}"
             exit 1
         fi
-        echo -e "Got x-ui latest version: ${tag_version}, beginning the installation..."
-        curl -fLR --retry 5 --retry-delay 3 --connect-timeout 15 --speed-limit 1 --speed-time 300 -o ${xui_folder}-linux-$(arch).tar.gz https://github.com/MHSanaei/3x-ui/releases/download/${tag_version}/x-ui-linux-$(arch).tar.gz
+        if ! tar -tzf "${local_archive}" still-ui/x-ui still-ui/x-ui.sh > /dev/null 2>&1; then
+            echo -e "${red}${local_archive} is not a still-ui release archive (no still-ui/x-ui and still-ui/x-ui.sh inside)${plain}"
+            exit 1
+        fi
+        tag_version="${STILL_UI_VERSION:-local}"
+        echo -e "Installing still-ui ${tag_version} from the local archive ${local_archive}"
+        if [[ "$(realpath "${local_archive}")" != "$(realpath -m "${xui_folder}-linux-$(arch).tar.gz")" ]]; then
+            cp -f "${local_archive}" "${xui_folder}-linux-$(arch).tar.gz" || exit 1
+        fi
+    elif [ $# == 0 ]; then
+        tag_version=$(resolve_latest_tag)
+        if [[ ! -n "$tag_version" ]]; then
+            echo -e "${red}Failed to fetch still-ui version, it may be due to GitHub API restrictions, please try it later${plain}"
+            exit 1
+        fi
+        echo -e "Got still-ui latest version: ${tag_version}, beginning the installation..."
+        curl -fLR --retry 5 --retry-delay 3 --connect-timeout 15 --speed-limit 1 --speed-time 300 -o ${xui_folder}-linux-$(arch).tar.gz https://github.com/Dv2Corn/still-ui/releases/download/${tag_version}/still-ui-linux-$(arch).tar.gz
         if [[ $? -ne 0 ]]; then
-            echo -e "${red}Downloading x-ui failed, please be sure that your server can access GitHub ${plain}"
+            echo -e "${red}Downloading still-ui failed, please be sure that your server can access GitHub ${plain}"
             exit 1
         fi
         if [[ ! -s ${xui_folder}-linux-$(arch).tar.gz ]]; then
             rm ${xui_folder}-linux-$(arch).tar.gz -f
-            echo -e "${red}Downloaded x-ui release archive is empty${plain}"
+            echo -e "${red}Downloaded still-ui release archive is empty${plain}"
             exit 1
         fi
-        verify_release_checksum "https://github.com/MHSanaei/3x-ui/releases/download/${tag_version}/x-ui-linux-$(arch).tar.gz" "${xui_folder}-linux-$(arch).tar.gz"
+        verify_release_checksum "https://github.com/Dv2Corn/still-ui/releases/download/${tag_version}/still-ui-linux-$(arch).tar.gz" "${xui_folder}-linux-$(arch).tar.gz"
     else
         tag_version=$1
         # The rolling dev channel ships under a fixed, non-semver tag that is
@@ -1746,16 +1819,16 @@ install_x-ui() {
             fi
         fi
 
-        url="https://github.com/MHSanaei/3x-ui/releases/download/${tag_version}/x-ui-linux-$(arch).tar.gz"
-        echo -e "Beginning to install x-ui ${tag_version}"
+        url="https://github.com/Dv2Corn/still-ui/releases/download/${tag_version}/still-ui-linux-$(arch).tar.gz"
+        echo -e "Beginning to install still-ui ${tag_version}"
         curl -fLR --retry 5 --retry-delay 3 --connect-timeout 15 --speed-limit 1 --speed-time 300 -o ${xui_folder}-linux-$(arch).tar.gz ${url}
         if [[ $? -ne 0 ]]; then
-            echo -e "${red}Download x-ui ${tag_version} failed, please check if the version exists ${plain}"
+            echo -e "${red}Download still-ui ${tag_version} failed, please check if the version exists ${plain}"
             exit 1
         fi
         if [[ ! -s ${xui_folder}-linux-$(arch).tar.gz ]]; then
             rm ${xui_folder}-linux-$(arch).tar.gz -f
-            echo -e "${red}Downloaded x-ui release archive is empty${plain}"
+            echo -e "${red}Downloaded still-ui release archive is empty${plain}"
             exit 1
         fi
         verify_release_checksum "${url}" "${xui_folder}-linux-$(arch).tar.gz"
@@ -1770,10 +1843,14 @@ install_x-ui() {
     # they are checked at that point instead of here.
     local required_files=("x-ui.sh")
     [[ $release == "alpine" ]] && required_files+=("x-ui.rc")
-    require_repo_files "${script_ref}" "${required_files[@]}"
-    local xui_script_temp="/usr/bin/x-ui-temp.$$"
+    [[ -n "${local_archive}" ]] || require_repo_files "${script_ref}" "${required_files[@]}"
+    local xui_script_temp="/usr/bin/still-ui-temp.$$"
     rm -f "${xui_script_temp}"
-    curl -fLRo "${xui_script_temp}" "https://raw.githubusercontent.com/MHSanaei/3x-ui/${script_ref}/x-ui.sh"
+    if [[ -n "${local_archive}" ]]; then
+        tar -xzOf "${xui_folder}-linux-$(arch).tar.gz" still-ui/x-ui.sh > "${xui_script_temp}"
+    else
+        curl -fLRo "${xui_script_temp}" "https://raw.githubusercontent.com/Dv2Corn/still-ui/${script_ref}/x-ui.sh"
+    fi
     if [[ $? -ne 0 ]]; then
         rm -f "${xui_script_temp}"
         echo -e "${red}Failed to download x-ui.sh${plain}"
@@ -1789,9 +1866,9 @@ install_x-ui() {
     local custom_bin_backup=""
     if [[ -e ${xui_folder}/ ]]; then
         if [[ $release == "alpine" ]]; then
-            rc-service x-ui stop
+            rc-service still-ui stop
         else
-            systemctl stop x-ui
+            systemctl stop still-ui
         fi
         # Kill any leftover mtg (MTProto) sidecars. x-ui runs them outside its own
         # lifecycle, so on Linux a stale one can survive the stop and keep holding
@@ -1812,7 +1889,7 @@ install_x-ui() {
         # runs out mid-copy, unlike `cp`) and keeps the snapshot under
         # /usr/local rather than a separate, possibly small/tmpfs $TMPDIR.
         if [[ -d "${xui_folder}/bin" ]]; then
-            custom_bin_backup="${xui_folder%/x-ui}/x-ui-bin-backup.$$"
+            custom_bin_backup="${xui_folder%/still-ui}/x-ui-bin-backup.$$"
             rm -rf "${custom_bin_backup}"
             if ! mv "${xui_folder}/bin" "${custom_bin_backup}"; then
                 custom_bin_backup=""
@@ -1828,19 +1905,19 @@ install_x-ui() {
     fi
 
     # Extract resources and set permissions
-    tar zxvf x-ui-linux-$(arch).tar.gz
+    tar zxvf still-ui-linux-$(arch).tar.gz
     if [[ $? -ne 0 ]]; then
-        rm x-ui-linux-$(arch).tar.gz -f
+        rm still-ui-linux-$(arch).tar.gz -f
         rm -f "${xui_script_temp}"
-        echo -e "${red}Failed to extract the x-ui release archive -- the previous installation has already been removed, so the panel will not start until this is fixed; try running the installer again${plain}"
+        echo -e "${red}Failed to extract the still-ui release archive -- the previous installation has already been removed, so the panel will not start until this is fixed; try running the installer again${plain}"
         exit 1
     fi
-    rm x-ui-linux-$(arch).tar.gz -f
+    rm still-ui-linux-$(arch).tar.gz -f
 
-    cd x-ui
+    cd still-ui
     if [[ $? -ne 0 || ! -s x-ui ]]; then
         rm -f "${xui_script_temp}"
-        echo -e "${red}Extracted x-ui archive is missing the x-ui binary -- the previous installation has already been removed, so the panel will not start until this is fixed; try running the installer again${plain}"
+        echo -e "${red}Extracted still-ui archive is missing the x-ui binary -- the previous installation has already been removed, so the panel will not start until this is fixed; try running the installer again${plain}"
         exit 1
     fi
     chmod +x x-ui
@@ -1901,34 +1978,39 @@ install_x-ui() {
     rm -rf bin/tuic > /dev/null 2>&1 || true
 
     # Update x-ui cli and se set permission
-    mv -f "${xui_script_temp}" /usr/bin/x-ui
+    mv -f "${xui_script_temp}" /usr/bin/still-ui
     if [[ $? -ne 0 ]]; then
         rm -f "${xui_script_temp}"
         echo -e "${red}Failed to install x-ui.sh${plain}"
         exit 1
     fi
-    chmod +x /usr/bin/x-ui
-    mkdir -p /var/log/x-ui
+    chmod +x /usr/bin/still-ui
+    mkdir -p /var/log/still-ui
+    _still_import_3xui
     config_after_install
 
     # Etckeeper compatibility
     if [ -d "/etc/.git" ]; then
         if [ -f "/etc/.gitignore" ]; then
-            if ! grep -q "x-ui/x-ui.db" "/etc/.gitignore"; then
+            if ! grep -q "still-ui/x-ui.db" "/etc/.gitignore"; then
                 echo "" >> "/etc/.gitignore"
-                echo "x-ui/x-ui.db" >> "/etc/.gitignore"
+                echo "still-ui/x-ui.db" >> "/etc/.gitignore"
                 echo -e "${green}Added x-ui.db to /etc/.gitignore for etckeeper${plain}"
             fi
         else
-            echo "x-ui/x-ui.db" > "/etc/.gitignore"
+            echo "still-ui/x-ui.db" > "/etc/.gitignore"
             echo -e "${green}Created /etc/.gitignore and added x-ui.db for etckeeper${plain}"
         fi
     fi
 
     if [[ $release == "alpine" ]]; then
-        xui_rc_temp="/etc/init.d/x-ui.tmp.$$"
+        xui_rc_temp="/etc/init.d/still-ui.tmp.$$"
         rm -f "${xui_rc_temp}"
-        curl -fLRo "${xui_rc_temp}" "https://raw.githubusercontent.com/MHSanaei/3x-ui/${script_ref}/x-ui.rc"
+        if [[ -s x-ui.rc ]]; then
+            cp -f x-ui.rc "${xui_rc_temp}"
+        else
+            curl -fLRo "${xui_rc_temp}" "https://raw.githubusercontent.com/Dv2Corn/still-ui/${script_ref}/x-ui.rc"
+        fi
         if [[ $? -ne 0 ]]; then
             rm -f "${xui_rc_temp}"
             echo -e "${red}Failed to download x-ui.rc${plain}"
@@ -1939,22 +2021,22 @@ install_x-ui() {
             echo -e "${red}Downloaded x-ui.rc is empty${plain}"
             exit 1
         fi
-        mv -f "${xui_rc_temp}" /etc/init.d/x-ui
+        mv -f "${xui_rc_temp}" /etc/init.d/still-ui
         if [[ $? -ne 0 ]]; then
             rm -f "${xui_rc_temp}"
             echo -e "${red}Failed to install x-ui.rc${plain}"
             exit 1
         fi
-        chmod +x /etc/init.d/x-ui
-        rc-update add x-ui
-        rc-service x-ui start
+        chmod +x /etc/init.d/still-ui
+        rc-update add still-ui
+        rc-service still-ui start
     else
         # Install systemd service file
         service_installed=false
 
-        if [ -f "x-ui.service" ]; then
-            echo -e "${green}Found x-ui.service in extracted files, installing...${plain}"
-            if _install_xui_service_unit "x-ui.service" "false"; then
+        if [ -f "still-ui.service" ]; then
+            echo -e "${green}Found still-ui.service in extracted files, installing...${plain}"
+            if _install_xui_service_unit "still-ui.service" "false"; then
                 service_installed=true
             fi
         fi
@@ -1993,18 +2075,18 @@ install_x-ui() {
             echo -e "${yellow}Service files not found in tar.gz, downloading from GitHub...${plain}"
             case "${release}" in
                 ubuntu | debian | armbian)
-                    service_unit_url="https://raw.githubusercontent.com/MHSanaei/3x-ui/${script_ref}/x-ui.service.debian"
+                    service_unit_url="https://raw.githubusercontent.com/Dv2Corn/still-ui/${script_ref}/x-ui.service.debian"
                     ;;
                 arch | manjaro | parch)
-                    service_unit_url="https://raw.githubusercontent.com/MHSanaei/3x-ui/${script_ref}/x-ui.service.arch"
+                    service_unit_url="https://raw.githubusercontent.com/Dv2Corn/still-ui/${script_ref}/x-ui.service.arch"
                     ;;
                 *)
-                    service_unit_url="https://raw.githubusercontent.com/MHSanaei/3x-ui/${script_ref}/x-ui.service.rhel"
+                    service_unit_url="https://raw.githubusercontent.com/Dv2Corn/still-ui/${script_ref}/x-ui.service.rhel"
                     ;;
             esac
 
             if ! _install_xui_service_unit "$service_unit_url" "true"; then
-                echo -e "${red}Failed to install x-ui.service from GitHub (${script_ref}) -- the release tarball did not ship one either${plain}"
+                echo -e "${red}Failed to install still-ui.service from GitHub (${script_ref}) -- the release tarball did not ship one either${plain}"
                 exit 1
             fi
             service_installed=true
@@ -2012,13 +2094,13 @@ install_x-ui() {
 
         if [ "$service_installed" = true ]; then
             echo -e "${green}Setting up systemd unit...${plain}"
-            chown root:root ${xui_service}/x-ui.service > /dev/null 2>&1
-            chmod 644 ${xui_service}/x-ui.service > /dev/null 2>&1
+            chown root:root ${xui_service}/still-ui.service > /dev/null 2>&1
+            chmod 644 ${xui_service}/still-ui.service > /dev/null 2>&1
             systemctl daemon-reload
-            systemctl enable x-ui
-            systemctl start x-ui
+            systemctl enable still-ui
+            systemctl start still-ui
         else
-            echo -e "${red}Failed to install x-ui.service file${plain}"
+            echo -e "${red}Failed to install still-ui.service file${plain}"
             exit 1
         fi
     fi
@@ -2027,25 +2109,25 @@ install_x-ui() {
     # works out of the box (no-op when XUI_ENABLE_FAIL2BAN=false). Never fatal.
     setup_fail2ban
 
-    echo -e "${green}x-ui ${tag_version}${plain} installation finished, it is running now..."
+    echo -e "${green}still-ui ${tag_version}${plain} installation finished, it is running now..."
     echo -e ""
     echo -e "┌───────────────────────────────────────────────────────┐
-│  ${blue}x-ui control menu usages (subcommands):${plain}              │
+│  ${blue}still-ui control menu usages (subcommands):${plain}              │
 │                                                       │
-│  ${blue}x-ui${plain}              - Admin Management Script          │
-│  ${blue}x-ui start${plain}        - Start                            │
-│  ${blue}x-ui stop${plain}         - Stop                             │
-│  ${blue}x-ui restart${plain}      - Restart                          │
-│  ${blue}x-ui status${plain}       - Current Status                   │
-│  ${blue}x-ui settings${plain}     - Current Settings                 │
-│  ${blue}x-ui enable${plain}       - Enable Autostart on OS Startup   │
-│  ${blue}x-ui disable${plain}      - Disable Autostart on OS Startup  │
-│  ${blue}x-ui log${plain}          - Check logs                       │
-│  ${blue}x-ui banlog${plain}       - Check Fail2ban ban logs          │
-│  ${blue}x-ui update${plain}       - Update                           │
-│  ${blue}x-ui legacy${plain}       - Legacy version                   │
-│  ${blue}x-ui install${plain}      - Install                          │
-│  ${blue}x-ui uninstall${plain}    - Uninstall                        │
+│  ${blue}still-ui${plain}              - Admin Management Script          │
+│  ${blue}still-ui start${plain}        - Start                            │
+│  ${blue}still-ui stop${plain}         - Stop                             │
+│  ${blue}still-ui restart${plain}      - Restart                          │
+│  ${blue}still-ui status${plain}       - Current Status                   │
+│  ${blue}still-ui settings${plain}     - Current Settings                 │
+│  ${blue}still-ui enable${plain}       - Enable Autostart on OS Startup   │
+│  ${blue}still-ui disable${plain}      - Disable Autostart on OS Startup  │
+│  ${blue}still-ui log${plain}          - Check logs                       │
+│  ${blue}still-ui banlog${plain}       - Check Fail2ban ban logs          │
+│  ${blue}still-ui update${plain}       - Update                           │
+│  ${blue}still-ui legacy${plain}       - Legacy version                   │
+│  ${blue}still-ui install${plain}      - Install                          │
+│  ${blue}still-ui uninstall${plain}    - Uninstall                        │
 └───────────────────────────────────────────────────────┘"
 }
 
