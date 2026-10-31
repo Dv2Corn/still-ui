@@ -17,7 +17,13 @@ describe('REALITY fingerprint default for new inbounds', () => {
 
   it('does not rewrite the fingerprint an existing inbound stores', () => {
     const parsed = RealityStreamSettingsSchema.parse({
-      settings: { publicKey: 'k', fingerprint: 'firefox', serverName: '', spiderX: '/', mldsa65Verify: '' },
+      settings: {
+        publicKey: 'k',
+        fingerprint: 'firefox',
+        serverName: '',
+        spiderX: '/',
+        mldsa65Verify: '',
+      },
     }) as { settings: { fingerprint: string } };
     expect(parsed.settings.fingerprint).toBe('firefox');
   });
