@@ -9,7 +9,7 @@
 
 **still-ui** 是 MHSanaei 开发的 [3x-ui](https://github.com/MHSanaei/3x-ui) 面板的一个分支（fork），用于管理 [Xray-core](https://github.com/XTLS/Xray-core)。它以 3x-ui **v3.11.0** 为基础，保留了原面板的全部能力：相同的协议、相同的界面、相同的数据库。
 
-不同之处在于关注点。当面板在一台小服务器上连续运行几个月、用户大多使用移动网络时，一些问题会逐渐暴露出来：密钥莫名丢失、握手在丢包严重的线路上失败、面板进程一点点吃光服务器内存。still-ui 专门解决这些问题。
+不同之处在于关注点。当面板在一台小服务器上连续运行几个月、用户大多使用移动网络时，一些问题会逐渐暴露出来：客户端设置悄无声息地丢失、握手在丢包严重的线路上失败、面板进程一点点吃光服务器内存。still-ui 专门解决这些问题。
 
 名字本身就说明了目标：服务器配置一次，之后就不用再操心。
 
@@ -20,9 +20,9 @@
 
 ### 已完成
 
-- **编辑客户端不会再清除 AmneziaWG 密钥。** 在 3x-ui 中，如果更新 AmneziaWG 客户端时没有带上它的 `preSharedKey`，密钥会被悄悄清空，客户端随之无法连接。still-ui 会保留已保存的密钥，除非你主动修改。
+- **部分修改客户端不再把客户端改坏。** 在 3x-ui v3.11.0 中，通过 API（`/panel/api/clients/update/:email`）更新客户端时如果只提交部分字段，客户端会被禁用，请求中没有的 `limitIp`、`tgId`、`comment` 等字段也会被清零。在 still-ui 中，未提交的字段一律保持原值——密钥和客户端设置（包括 AmneziaWG 的 `preSharedKey`）都不会丢失。显式提交 0 或空值仍然会清空对应字段。
 - **REALITY 默认指纹改为 `ios`。** 它的 ClientHello 约 517 字节，可以完整放进一个 TCP 分段。较大的指纹（`chrome`、`firefox`）会把 ClientHello 拆成两个包；在会丢掉第二个包的移动运营商网络上，连接会直接断在握手阶段。用 `ios` 就不存在这个问题。每个入站仍然可以自行选择其他指纹。
-- **安装脚本为面板设置内存上限。** 服务会获得 systemd 的 `MemoryMax` 限制：面板内存失控时由 systemd 重启它，而不是把整台服务器拖进 swap 直至卡死。
+- **安装脚本为面板设置内存上限。** 服务会获得 systemd 限制：`MemoryMax` 为内存的 35%（最少 256 MiB，最多 1 GiB），`MemoryHigh` 为其 85%，并且禁止面板使用 swap。面板内存失控时由 systemd 重启它，而不是把整台服务器拖进 swap 直至卡死。如果服务器没有 swap 且内存不超过 2 GiB，安装脚本会提议为系统其余部分创建一个 2 GiB 的 `/swapfile`。
 
 ### 进行中
 
@@ -34,79 +34,86 @@
 
 ## 安装
 
-在一台全新的服务器上以 root 身份运行：
+以 root 身份运行：
 
-<!-- TODO: сверить с установщиком -->
 ```bash
 bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh)
 ```
 
-如需安装指定版本，在末尾加上版本标签：
+如需安装指定版本，在末尾加上版本标签（标签格式为 `vX.Y.Z-still.N`）：
 
-<!-- TODO: сверить с установщиком -->
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh) <version>
+bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh) v3.11.0-still.1
 ```
 
-安装脚本会随机生成用户名、密码和面板访问路径，并在结束时显示出来，请妥善保存。之后运行 `still-ui` 即可打开管理菜单：启动和停止服务、查看或重置登录信息、修改端口、管理证书等。
+使用已下载的发行版压缩包安装：
 
-<!-- TODO: сверить с установщиком -->
 ```bash
-still-ui
+STILL_UI_ARCHIVE=/path/still-ui-linux-amd64.tar.gz bash install.sh
 ```
 
-支持的操作系统和 CPU 架构与 3x-ui v3.11.0 相同。
+安装脚本会随机生成用户名、密码和面板访问路径，并在结束时显示出来，请妥善保存。之后运行 `still-ui` 即可打开管理菜单：启动和停止服务、查看或重置登录信息、修改端口、管理证书等。子命令与 3x-ui 的 `x-ui` 脚本相同：`still-ui start`、`stop`、`restart`、`status`、`log`、`update`、`legacy`、`uninstall` 等。
+
+发行版只提供 **Linux amd64 和 arm64** 的构建。当前版本：面板 **3.11.0-still.1**，内置 **Xray v26.10.21**。
+
+### 文件位置
+
+| 内容 | 位置 |
+| --- | --- |
+| 服务 | `still-ui`（`systemctl status still-ui`） |
+| 程序 | `/usr/local/still-ui` |
+| 数据库 | `/etc/still-ui/x-ui.db`（文件名沿用 3x-ui） |
+| 日志 | `/var/log/still-ui` |
+| 配置 | `/etc/default/still-ui` |
+
+### 内存上限
+
+查看当前上限：
+
+```bash
+systemctl show still-ui -p MemoryMax
+```
+
+如需自定义，在 `/etc/default/still-ui` 中加一行，例如 `STILL_UI_MEMORY_MAX=800M`；写 `STILL_UI_MEMORY_MAX=off` 则取消上限。
 
 ## 升级、回滚、卸载
 
-<!-- TODO: сверить с установщиком -->
+升级到最新版本——使用下面的命令，或点击面板中的更新按钮：
+
 ```bash
-still-ui update      # 升级到最新版本
+still-ui update
 ```
 
-<!-- TODO: сверить с установщиком -->
+回滚到之前的版本——`still-ui legacy` 会询问版本号；也可以带上对应标签运行安装脚本。数据库会保留。
+
 ```bash
-still-ui legacy      # 安装指定的旧版本（会询问版本号）
+still-ui legacy
+bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh) v<tag>
 ```
 
-<!-- TODO: сверить с установщиком -->
+升级前，尤其是回滚前，请先备份 `/etc/still-ui`：旧版本可能无法读取新版本写入过的数据库。
+
+卸载面板：
+
 ```bash
-still-ui uninstall   # 卸载面板及其服务
+still-ui uninstall
 ```
 
-其他常用命令：
-
-<!-- TODO: сверить с установщиком -->
-```bash
-still-ui status      # 服务状态
-still-ui restart     # 重启面板
-still-ui log         # 查看日志
-```
-
-服务名称为 `still-ui`：
-
-<!-- TODO: сверить с установщиком -->
-```bash
-systemctl status still-ui
-systemctl show still-ui -p MemoryMax   # 安装脚本设置的内存上限
-```
-
-每次升级前，尤其是回滚前，请先备份数据库：旧版本可能无法读取新版本写入过的数据库。
+> [!WARNING]
+> `still-ui uninstall` 会同时删除 `/etc/still-ui` 中的数据库，与 3x-ui 的行为一致。如果以后还可能用到入站和客户端，请先把 `/etc/still-ui/x-ui.db` 复制到安全的地方。
 
 ## 从 3x-ui 迁移
 
-still-ui 的数据库格式与 3x-ui v3.11.0 相同，入站、客户端和设置都可以原样迁移，用户无需更换链接。
+如果安装脚本发现 `/etc/x-ui/x-ui.db`，会提议把该数据库复制到 still-ui 并停止 x-ui。在没有终端的环境（如 cloud-init）中，设置 `STILL_UI_IMPORT_3XUI=yes` 即表示同意。面板登录信息、API 访问、入站和客户端都会保留，用户无需更换链接。3x-ui 自身的文件不会被改动。
 
-<!-- TODO: сверить с установщиком -->
-1. 备份 3x-ui 数据库：`cp /etc/x-ui/x-ui.db /root/x-ui.db.backup`
-2. 停止 3x-ui 并关闭开机自启：`systemctl disable --now x-ui`
-3. 用上面的命令安装 still-ui。
-4. 放回数据库：`cp /root/x-ui.db.backup /etc/still-ui/still-ui.db`，然后执行 `systemctl restart still-ui`。
-5. 用原来 3x-ui 的用户名和密码登录，检查入站是否正常。
+如果想退回，停止 still-ui，再重新启动 3x-ui 即可：
 
-如果想退回，停止 still-ui（`systemctl disable --now still-ui`），再重新启动 3x-ui（`systemctl enable --now x-ui`）即可，它的数据库没有被改动。
+```bash
+systemctl disable --now still-ui
+systemctl enable --now x-ui
+```
 
-如果你的 3x-ui 版本低于 v3.11.0，请先升级到 v3.11.0 再迁移。
+此流程已在 3x-ui v3.11.0 的数据库上验证。更新版本 3x-ui 的数据库，still-ui 可能无法打开。
 
 ## 支持本项目
 
