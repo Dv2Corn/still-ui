@@ -5,8 +5,10 @@ import type { MessageInstance } from 'antd/es/message/interface';
 import type { HookAPI as ModalHookAPI } from 'antd/es/modal/useModal';
 
 import { HttpUtil, RandomUtil } from '@/utils';
-import { createTlsSettingsWithDefaultCert } from '@/lib/xray/inbound-tls-defaults';
-import { RealityStreamSettingsSchema } from '@/schemas/protocols/security/reality';
+import {
+  createRealitySettingsForNewInbound,
+  createTlsSettingsWithDefaultCert,
+} from '@/lib/xray/inbound-tls-defaults';
 import type { InboundFormValues } from '@/schemas/forms/inbound-form';
 import type { RealityScanResult } from '@/generated/types';
 
@@ -348,7 +350,7 @@ export function useSecurityActions({
       cleaned.tlsSettings = createTlsSettingsWithDefaultCert(network);
     }
     if (next === 'reality') {
-      const reality = RealityStreamSettingsSchema.parse({}) as Record<string, unknown>;
+      const reality = createRealitySettingsForNewInbound();
       reality.target = '';
       reality.serverNames = [];
       reality.shortIds = RandomUtil.randomShortIds()

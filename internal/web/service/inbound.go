@@ -1286,6 +1286,8 @@ func (s *InboundService) AddInbound(inbound *model.Inbound) (*model.Inbound, boo
 	// Normalize streamSettings based on protocol
 	s.normalizeStreamSettings(inbound)
 	if !s.FromNodeSync {
+		// still-ui: new REALITY inbounds default to the one-segment ios ClientHello.
+		inbound.StreamSettings = applyNewRealityFingerprintDefault(inbound.StreamSettings)
 		if err := validateInboundTLSCertificates(inbound.StreamSettings); err != nil {
 			return inbound, false, err
 		}
