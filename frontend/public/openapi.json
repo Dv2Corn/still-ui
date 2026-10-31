@@ -4364,7 +4364,7 @@
             "type": "array"
           },
           "installCommand": {
-            "example": "sudo /usr/local/x-ui/x-ui install-awg-kernel",
+            "example": "sudo /usr/local/still-ui/x-ui install-awg-kernel",
             "type": "string"
           },
           "ready": {
@@ -5551,7 +5551,7 @@
                         "detail": "awg"
                       }
                     ],
-                    "installCommand": "sudo /usr/local/x-ui/x-ui install-awg-kernel",
+                    "installCommand": "sudo /usr/local/still-ui/x-ui install-awg-kernel",
                     "ready": false
                   }
                 }

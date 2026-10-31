@@ -1273,7 +1273,7 @@ func (s *ServerService) GetLogs(count string, level string, syslog string) []str
 		// Use hardcoded command with validated parameters
 		ctx, cancel := context.WithTimeout(context.Background(), syslogTimeout)
 		defer cancel()
-		cmd := exec.CommandContext(ctx, "journalctl", "-u", "x-ui", "--no-pager", "-n", strconv.Itoa(countInt), "-p", level)
+		cmd := exec.CommandContext(ctx, "journalctl", "-u", config.ServiceName, "--no-pager", "-n", strconv.Itoa(countInt), "-p", level)
 		var out bytes.Buffer
 		cmd.Stdout = &out
 		err = cmd.Run()
@@ -1281,7 +1281,7 @@ func (s *ServerService) GetLogs(count string, level string, syslog string) []str
 			return []string{"journalctl did not answer in time. Try a smaller line count or a less strict level."}
 		}
 		if err != nil {
-			return []string{"Failed to run journalctl command! Make sure systemd is available and x-ui service is registered."}
+			return []string{"Failed to run journalctl command! Make sure systemd is available and the " + config.ServiceName + " service is registered."}
 		}
 		lines = strings.Split(out.String(), "\n")
 	} else {

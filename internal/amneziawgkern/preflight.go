@@ -9,13 +9,14 @@ import (
 	"time"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/amneziawg"
+	"github.com/mhsanaei/3x-ui/v3/internal/config"
 )
 
 // installCommand is what an admin runs to satisfy every host-level blocker at once.
 func installCommand() string {
 	exe, err := os.Executable()
 	if err != nil || exe == "" {
-		return "sudo /usr/local/x-ui/x-ui install-awg-kernel"
+		return "sudo " + config.DefaultMainFolder + "/x-ui install-awg-kernel"
 	}
 	return "sudo " + exe + " install-awg-kernel"
 }
@@ -44,7 +45,7 @@ type Blocker struct {
 type Readiness struct {
 	Ready          bool      `json:"ready" example:"false"`
 	Blockers       []Blocker `json:"blockers" example:"[{\"code\":\"tools\",\"detail\":\"awg\"}]"`
-	InstallCommand string    `json:"installCommand" example:"sudo /usr/local/x-ui/x-ui install-awg-kernel"`
+	InstallCommand string    `json:"installCommand" example:"sudo /usr/local/still-ui/x-ui install-awg-kernel"`
 }
 
 // readinessTTL keeps the form's polling from re-running modprobe on every

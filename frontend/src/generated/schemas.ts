@@ -4338,7 +4338,7 @@ export const SCHEMAS: Record<string, unknown> = {
         "type": "array"
       },
       "installCommand": {
-        "example": "sudo /usr/local/x-ui/x-ui install-awg-kernel",
+        "example": "sudo /usr/local/still-ui/x-ui install-awg-kernel",
         "type": "string"
       },
       "ready": {

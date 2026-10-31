@@ -795,7 +795,7 @@ func installAmneziaWGKernelModule() {
 	if os.Geteuid() != 0 {
 		exe, err := os.Executable()
 		if err != nil || exe == "" {
-			exe = "/usr/local/x-ui/x-ui"
+			exe = config.DefaultMainFolder + "/x-ui"
 		}
 		fmt.Println("run as root: sudo " + exe + " install-awg-kernel")
 		return

@@ -1080,7 +1080,7 @@ export const EXAMPLES: Record<string, unknown> = {
         "detail": "awg"
       }
     ],
-    "installCommand": "sudo /usr/local/x-ui/x-ui install-awg-kernel",
+    "installCommand": "sudo /usr/local/still-ui/x-ui install-awg-kernel",
     "ready": false
   },
   "RealityScanResult": {
