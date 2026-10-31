@@ -227,6 +227,31 @@ func GetEnvFilePaths() []string {
 	}
 }
 
+// GetXrayUnit names the systemd unit that runs Xray apart from the panel (XUI_XRAY_UNIT,
+// set by install.sh); empty means Xray is the panel's child process, as in 3x-ui.
+func GetXrayUnit() string {
+	if runtime.GOOS != "linux" {
+		return ""
+	}
+	return strings.TrimSpace(os.Getenv("XUI_XRAY_UNIT"))
+}
+
+// GetXrayUnitFolder holds the unit's config and the certificate copies it may read.
+func GetXrayUnitFolder() string {
+	if p := strings.TrimSpace(os.Getenv("XUI_XRAY_UNIT_FOLDER")); p != "" {
+		return p
+	}
+	return "/etc/still-xray"
+}
+
+// GetXrayUnitLogFolder is where the unit's Xray may write its access and error logs.
+func GetXrayUnitLogFolder() string {
+	if p := strings.TrimSpace(os.Getenv("XUI_XRAY_UNIT_LOG_FOLDER")); p != "" {
+		return p
+	}
+	return "/var/log/still-xray"
+}
+
 // GetLogFolder returns the path to the log folder based on environment variables or platform defaults.
 func GetLogFolder() string {
 	logFolderPath := os.Getenv("XUI_LOG_FOLDER")

@@ -482,6 +482,7 @@ func (s *XrayService) GetXrayConfig() (*xray.Config, error) {
 
 	xrayConfig.RouterConfig = dropRefusedScript(xrayConfig.RouterConfig, "routing", routingScriptRefused)
 	xrayConfig.DNSConfig = dropRefusedScript(xrayConfig.DNSConfig, "dns", dnsScriptRefused)
+	xray.MirrorCertificateFiles(xrayConfig)
 	return xrayConfig, nil
 }
 
@@ -1223,6 +1224,14 @@ func caseVariantKeys(parsed map[string]any, want string) []string {
 	return keys
 }
 
+// xrayLogFolder is where the core may write its logs: a unit's core cannot write the panel's folder.
+func xrayLogFolder() string {
+	if xray.UnitMode() {
+		return config.GetXrayUnitLogFolder()
+	}
+	return config.GetLogFolder()
+}
+
 func resolveXrayLogPaths(logCfg json_util.RawMessage) json_util.RawMessage {
 	if len(logCfg) == 0 {
 		return logCfg
@@ -1262,7 +1271,7 @@ func resolveXrayLogPaths(logCfg json_util.RawMessage) json_util.RawMessage {
 		if base == "" || base == "." || base == ".." || base == "/" {
 			continue
 		}
-		confined := filepath.Join(config.GetLogFolder(), base)
+		confined := filepath.Join(xrayLogFolder(), base)
 		if confined == trimmed {
 			continue
 		}
@@ -1523,7 +1532,9 @@ func (s *XrayService) RestartXray(isForce bool) error {
 		}
 		invalidateTuicRelayReadiness(process.GetConfig())
 		invalidateTuicRelayReadiness(xrayConfig)
-		_ = process.Stop()
+		if !xray.UnitMode() {
+			_ = process.Stop()
+		}
 	} else if conflicts := bindConflicts(xrayConfig, nil); len(conflicts) > 0 {
 		// Nothing is running to protect and the core is the authority on what it
 		// can bind: start it and let its own error name the port it lost.
@@ -1531,6 +1542,12 @@ func (s *XrayService) RestartXray(isForce bool) error {
 	}
 
 	invalidateTuicRelayReadiness(xrayConfig)
+	if xray.UnitMode() {
+		if err := s.restartXrayUnit(process, xrayConfig); err != nil {
+			return err
+		}
+		return publishTuicRelayReadiness(xrayConfig)
+	}
 	process = xray.NewProcess(xrayConfig)
 	xrayState.replace(process)
 	s.xrayAPI.StatsLastValues = nil
@@ -1544,6 +1561,69 @@ func (s *XrayService) RestartXray(isForce bool) error {
 	}
 
 	return nil
+}
+
+// restartXrayUnit replaces the unit's core with one built from newCfg. A config the core refuses
+// leaves the previous one serving, and the status page names why. Hold the package lock.
+func (s *XrayService) restartXrayUnit(previous *xray.Process, newCfg *xray.Config) error {
+	process := xray.NewProcess(newCfg)
+	err := process.Start()
+	var rollback *xray.RollbackError
+	if errors.Is(err, xray.ErrConfigRejected) || errors.As(err, &rollback) {
+		if previous == nil || !previous.IsRunning() {
+			previous = xray.AdoptRunningUnit()
+		}
+		if previous != nil {
+			xrayState.replace(previous)
+			xrayState.holdBack(err.Error())
+		}
+		return err
+	}
+	xrayState.replace(process)
+	s.xrayAPI.StatsLastValues = nil
+	return err
+}
+
+// AdoptRunningXrayUnit takes over a core the unit already runs, so a panel restart or update
+// keeps client connections; it reports whether there was one to take over.
+func (s *XrayService) AdoptRunningXrayUnit() bool {
+	lock.Lock()
+	defer lock.Unlock()
+	process := xray.AdoptRunningUnit()
+	if process == nil {
+		return false
+	}
+	seedRelayPasswords(process.GetConfig())
+	xrayState.replace(process)
+	logger.Info("xray: took over the core already running in", config.GetXrayUnit())
+	return true
+}
+
+// seedRelayPasswords reuses the loopback SOCKS relay passwords of an adopted core: they are
+// random per panel process, and new ones would force a restart of every relay inbound.
+func seedRelayPasswords(cfg *xray.Config) {
+	if cfg == nil {
+		return
+	}
+	for _, inbound := range cfg.InboundConfigs {
+		if inbound.Protocol != "socks" {
+			continue
+		}
+		var settings struct {
+			Accounts []struct {
+				Pass string `json:"pass"`
+			} `json:"accounts"`
+		}
+		if json.Unmarshal(inbound.Settings, &settings) != nil || len(settings.Accounts) == 0 {
+			continue
+		}
+		switch {
+		case inbound.TuicRelay:
+			tuic.SeedSocksPassword(settings.Accounts[0].Pass)
+		case inbound.Port > amneziawgnet.SOCKSBasePort:
+			amneziawgnet.SeedSocksPassword(settings.Accounts[0].Pass)
+		}
+	}
 }
 
 // restartToDropClients reports whether a diff that strands clients must be
@@ -1820,6 +1900,9 @@ func (s *XrayService) ApplyPendingRestart() {
 
 // DidXrayCrash checks if Xray crashed by verifying it's not running and wasn't manually stopped.
 func (s *XrayService) DidXrayCrash() bool {
+	if process := currentXrayProcess(); process != nil && process.Recovering() {
+		return false
+	}
 	return !s.IsXrayRunning() && !isManuallyStopped.Load()
 }
 

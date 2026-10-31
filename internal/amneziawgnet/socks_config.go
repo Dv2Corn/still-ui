@@ -36,6 +36,15 @@ var (
 // SocksRelay's own doc comment); this only needs to be unpredictable enough
 // that nothing outside this process could plausibly guess it and dial in
 // over loopback.
+// SeedSocksPassword makes p the relay password when none was generated yet, so a panel that
+// takes over a running Xray unit keeps the accounts that core already has.
+func SeedSocksPassword(p string) {
+	if p == "" {
+		return
+	}
+	socksPasswordOnce.Do(func() { socksPassword = p })
+}
+
 func SocksPassword() string {
 	socksPasswordOnce.Do(func() {
 		var b [24]byte

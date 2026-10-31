@@ -322,9 +322,9 @@ const (
 
 // startTask schedules background jobs (Xray checks, traffic jobs, cron
 // jobs) which the panel relies on for periodic maintenance and monitoring.
-func (s *Server) startTask(restartXray bool, loc *time.Location) {
+func (s *Server) startTask(restartXray, forceXrayRestart bool, loc *time.Location) {
 	if restartXray {
-		err := s.xrayService.RestartXray(true)
+		err := s.xrayService.RestartXray(forceXrayRestart)
 		if err != nil {
 			logger.Warning("start xray failed:", err)
 		}
@@ -534,6 +534,8 @@ func (s *Server) start(restartXray bool, startTgBot bool) (err error) {
 	if err != nil {
 		return err
 	}
+	// Before anything derives relay passwords: a core running in its own unit is kept as is.
+	adoptedXray := restartXray && s.xrayService.AdoptRunningXrayUnit()
 	service.StartTrafficWriter()
 
 	// SkipIfStillRunning stops a slow job (e.g. the 5s traffic poll on a large
@@ -755,7 +757,7 @@ func (s *Server) start(restartXray bool, startTgBot bool) (err error) {
 		}
 	})
 
-	s.startTask(restartXray, loc)
+	s.startTask(restartXray, !adoptedXray, loc)
 
 	if startTgBot {
 		isTgbotenabled, err := s.settingService.GetTgbotEnabled()
@@ -808,7 +810,8 @@ func (s *Server) stop(stopXray bool, stopTgBot bool) error {
 		amneziawgkern.GetManager().StopAll()
 		amneziawgnet.GetOutboundManager().StopAll()
 	}
-	if stopXray {
+	// A core in its own unit outlives the panel: that is what keeps clients connected.
+	if stopXray && !xray.UnitMode() {
 		if err := s.xrayService.StopXray(); err != nil && !errors.Is(err, service.ErrXrayNotRunning) {
 			err2 = common.Combine(err2, err)
 		}

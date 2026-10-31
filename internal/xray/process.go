@@ -38,6 +38,9 @@ func GetBinaryPath() string {
 
 // GetConfigPath returns the path to the Xray configuration file in the binary folder.
 func GetConfigPath() string {
+	if UnitMode() {
+		return unitConfigPath()
+	}
 	return config.GetBinFolderPath() + "/config.json"
 }
 
@@ -111,6 +114,11 @@ type Process struct {
 // NewProcess creates a new Xray process and sets up cleanup on garbage collection.
 func NewProcess(xrayConfig *Config) *Process {
 	p := &Process{newProcess(xrayConfig)}
+	if name := config.GetXrayUnit(); name != "" {
+		// No finalizer: dropping a superseded Process must never stop the unit it shares.
+		p.unit = newUnitControl(name)
+		return p
+	}
 	runtime.SetFinalizer(p, stopProcess)
 	return p
 }
@@ -196,6 +204,9 @@ type process struct {
 	startTime  time.Time
 
 	intentionalStop atomic.Bool
+
+	// unit is set when the core runs as its own systemd unit instead of as this child.
+	unit *unitControl
 }
 
 // OnlineAPISupport describes whether the running Xray core implements the
@@ -253,6 +264,9 @@ func newTestProcess(config *Config, configPath string) *process {
 
 // IsRunning returns true if the Xray process is currently running.
 func (p *process) IsRunning() bool {
+	if p.unit != nil {
+		return p.unit.state(false).running()
+	}
 	p.mu.RLock()
 	cmd, done := p.cmd, p.done
 	p.mu.RUnlock()
@@ -275,8 +289,12 @@ func (p *process) IsRunning() bool {
 // GetErr returns the last error encountered by the Xray process.
 func (p *process) GetErr() error {
 	p.mu.RLock()
-	defer p.mu.RUnlock()
-	return p.exitErr
+	exitErr := p.exitErr
+	p.mu.RUnlock()
+	if exitErr == nil && p.unit != nil && p.unit.state(false).Active == "failed" {
+		return fmt.Errorf("%s failed: %s", p.unit.name, lastLines(p.unit.journalTail(), 1))
+	}
+	return exitErr
 }
 
 // GetResult returns the last log line or error from the Xray process.
@@ -284,6 +302,12 @@ func (p *process) GetResult() string {
 	p.mu.RLock()
 	exitErr := p.exitErr
 	p.mu.RUnlock()
+	if p.unit != nil {
+		if exitErr != nil {
+			return exitErr.Error()
+		}
+		return lastLines(p.unit.journalTail(), 1)
+	}
 	lastLine := p.logWriter.LastLine()
 	if len(lastLine) == 0 && exitErr != nil {
 		return exitErr.Error()
@@ -330,6 +354,12 @@ func (p *Process) PersistConfig() error {
 	p.mu.RUnlock()
 	if err != nil {
 		return common.NewErrorf("Failed to generate XRAY configuration files: %v", err)
+	}
+	if path == "" && p.unit != nil {
+		p.mu.RLock()
+		cfg := p.config
+		p.mu.RUnlock()
+		return writeUnitConfig(cfg, data)
 	}
 	if path == "" {
 		path = GetConfigPath()
@@ -578,6 +608,9 @@ func (p *Process) RetainNodeOnlineClients(keep func(nodeID int) bool) {
 
 // GetUptime returns the uptime of the Xray process in seconds.
 func (p *Process) GetUptime() uint64 {
+	if p.unit != nil {
+		return p.unit.uptime()
+	}
 	return uint64(time.Since(p.startTime).Seconds())
 }
 
@@ -613,7 +646,8 @@ func (p *process) refreshVersion() {
 
 // Start launches the Xray process with the current configuration.
 func (p *process) Start() (err error) {
-	if p.IsRunning() {
+	// A unit start replaces the running core in place: systemd restarts it.
+	if p.unit == nil && p.IsRunning() {
 		return errors.New("xray is already running")
 	}
 
@@ -623,6 +657,15 @@ func (p *process) Start() (err error) {
 			p.setExitErr(err)
 		}
 	}()
+
+	if p.unit != nil {
+		if err = p.startUnit(); err != nil {
+			return err
+		}
+		p.refreshVersion()
+		p.refreshAPIPort()
+		return nil
+	}
 
 	data, err := json.MarshalIndent(p.config, "", "  ")
 	if err != nil {
@@ -766,6 +809,9 @@ func (p *process) Stop() error {
 		return ErrXrayNotRunning
 	}
 	p.intentionalStop.Store(true)
+	if p.unit != nil {
+		return p.unit.stop()
+	}
 
 	// Snapshot cmd once, then run the blocking Signal/Kill/Wait on the local copy
 	// without holding the lock.
