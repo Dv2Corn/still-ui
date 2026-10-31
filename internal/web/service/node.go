@@ -1287,6 +1287,10 @@ func (b *outboundBridge) removeInbound() {
 // broken node from dictating the master's allocation on every heartbeat.
 const maxProbeBodyBytes = 1 << 20 // 1 MiB
 
+// maxPanelGuidLen bounds a GUID a peer reports: panels mint 36-character UUIDs, and the
+// value is copied into every inbound row and indexed columns.
+const maxPanelGuidLen = 64
+
 func (s *NodeService) probe(ctx context.Context, n *model.Node, proxyURL string) (HeartbeatPatch, error) {
 	patch := HeartbeatPatch{LastHeartbeat: time.Now().Unix()}
 
@@ -1396,6 +1400,10 @@ func (s *NodeService) probe(ctx context.Context, n *model.Node, proxyURL string)
 	patch.XrayError = o.Xray.ErrorMsg
 	patch.PanelVersion = o.PanelVersion
 	patch.UpstreamVersion = o.UpstreamVersion
+	if len(o.PanelGuid) > maxPanelGuidLen {
+		patch.LastError = fmt.Sprintf("remote panel reported a %d-byte panelGuid", len(o.PanelGuid))
+		return patch, errors.New(patch.LastError)
+	}
 	patch.Guid = o.PanelGuid
 	patch.UptimeSecs = o.Uptime
 	patch.NetUp = o.NetIO.Up
