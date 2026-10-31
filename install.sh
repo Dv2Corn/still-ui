@@ -171,9 +171,9 @@ _still_size_mib() {
     esac
 }
 
-# still-xray: Xray runs as a systemd unit of its own, under an unprivileged user, so a
-# restart, update or crash of the panel never drops a client. The panel starts and
-# configures the unit; STILL_XRAY_UNIT=off in the env file keeps Xray inside the panel.
+# still-xray (opt-in, STILL_XRAY_UNIT=on in the env file or the environment): Xray runs as a
+# systemd unit of its own, under an unprivileged user, so a restart, update or crash of the
+# panel never drops a client. Without it Xray is the panel's child process, as in 3x-ui.
 # STILL_XRAY_MEMORY_MAX (e.g. 1G, default half the RAM within 256M..4G) caps the core.
 _still_xray_unit() {
     local env_file setting template unit temp_file xray_bin bin_dir dropin_dir dropin
@@ -191,14 +191,15 @@ _still_xray_unit() {
     fi
     template="${xui_folder}/still-xray.service"
     xray_bin=$(ls "${xui_folder}"/bin/xray-linux-* 2> /dev/null | head -n 1)
-    if [[ "$setting" == "off" || ! -s "$template" || ! -x "$xray_bin" ]]; then
+    if [[ "$setting" != "on" || ! -s "$template" || ! -x "$xray_bin" ]]; then
         _still_env_set "$env_file" XUI_XRAY_UNIT ""
         if systemctl is-enabled still-xray > /dev/null 2>&1; then
             systemctl disable --now still-xray > /dev/null 2>&1
         fi
-        echo -e "${yellow}Xray runs inside the panel process (STILL_XRAY_UNIT=${setting:-unset}); restarting the panel restarts Xray.${plain}"
+        echo -e "${yellow}Xray runs inside the panel process, as in 3x-ui. STILL_XRAY_UNIT=on in ${env_file} runs it as its own service still-xray.${plain}"
         return 0
     fi
+    _still_env_set "$env_file" STILL_XRAY_UNIT on || return 1
     bin_dir="${xui_folder}/bin"
     if ! id still-xray > /dev/null 2>&1; then
         useradd --system --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin --user-group still-xray > /dev/null 2>&1 \

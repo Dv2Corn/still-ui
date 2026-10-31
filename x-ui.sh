@@ -253,6 +253,11 @@ legacy_version() {
     # Use the entered panel version in the download link
     install_command="bash <(curl -Ls "https://raw.githubusercontent.com/Dv2Corn/still-ui/v$tag_version/install.sh") v$tag_version"
 
+    # A release without still-xray would start a second Xray next to the unit; one that has it
+    # sets the unit up again during the install.
+    if systemctl cat still-xray > /dev/null 2>&1; then
+        systemctl disable --now still-xray > /dev/null 2>&1
+    fi
     echo "Downloading and installing panel version $tag_version..."
     eval $install_command
 }
