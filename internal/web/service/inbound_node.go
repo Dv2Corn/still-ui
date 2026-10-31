@@ -1017,11 +1017,7 @@ func (s *InboundService) setRemoteTrafficLocked(nodeID int, snap *runtime.Traffi
 				}
 			}
 		}
-		if err := s.clientService.DetachInbound(tx, c.Id); err != nil {
-			return false, err
-		}
-		if err := tx.Where("id = ?", c.Id).
-			Delete(&model.Inbound{}).Error; err != nil {
+		if err := s.deleteInboundRow(tx, c.Id); err != nil {
 			return false, err
 		}
 		delete(tagToCentral, c.Tag)
