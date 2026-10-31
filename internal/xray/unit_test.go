@@ -215,6 +215,9 @@ func TestUnitCrashIsReportedOncePerSystemdRestart(t *testing.T) {
 	if len(crashes) != 1 || !strings.Contains(crashes[0], "NRestarts=1") {
 		t.Fatalf("crashes = %q, want one report of NRestarts=1", crashes)
 	}
+	if !TakeUnitRestart() || TakeUnitRestart() {
+		t.Fatal("a systemd restart was not handed to the reconcile loop exactly once")
+	}
 	if !slices.Contains(f.calls, "show") {
 		t.Fatal("state was not read from systemd")
 	}

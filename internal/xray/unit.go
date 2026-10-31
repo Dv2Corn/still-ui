@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/config"
@@ -49,6 +50,13 @@ var (
 		return exec.CommandContext(ctx, GetBinaryPath(), "run", "-test", "-c", configPath).CombinedOutput()
 	}
 )
+
+// unitRestarted is set when systemd restarted the core by itself: that core started from the
+// config on disk, which may miss clients added through the API since the last full apply.
+var unitRestarted atomic.Bool
+
+// TakeUnitRestart reports, once, that systemd restarted the core since the last call.
+func TakeUnitRestart() bool { return unitRestarted.Swap(false) }
 
 // UnitMode reports whether Xray runs as its own systemd unit rather than as the panel's child.
 func UnitMode() bool { return config.GetXrayUnit() != "" }
@@ -115,6 +123,9 @@ func (u *unitControl) state(fresh bool) unitState {
 		u.restarts, u.baselined = st.NRestarts, true
 	}
 	u.mu.Unlock()
+	if crashed {
+		unitRestarted.Store(true)
+	}
 	if crashed && OnCrash != nil {
 		OnCrash(fmt.Errorf("%s was restarted by systemd after a crash (NRestarts=%d)", u.name, st.NRestarts))
 	}

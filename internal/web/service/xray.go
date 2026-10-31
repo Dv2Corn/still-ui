@@ -1654,6 +1654,16 @@ func (s *XrayService) CheckCertificates() {
 	}
 }
 
+// readoptXrayUnit takes the config a core restarted by systemd actually runs as the diff base.
+func (s *XrayService) readoptXrayUnit() {
+	lock.Lock()
+	defer lock.Unlock()
+	if process := xray.AdoptRunningUnit(); process != nil {
+		xrayState.replace(process)
+		logger.Warning("xray: the core was restarted by systemd, re-applying clients added since its config was written")
+	}
+}
+
 // restartToDropClients reports whether a diff that strands clients must be
 // applied by restarting instead of through the API.
 func (s *XrayService) restartToDropClients(diff *xray.HotDiff) bool {
@@ -1910,6 +1920,10 @@ func (s *XrayService) IsNeedRestartAndSetFalse() bool {
 // ApplyPendingRestart re-arms the original flags when applying fails, so the next tick retries; a
 // reconcile retry never becomes a restart, which would disconnect unrelated clients.
 func (s *XrayService) ApplyPendingRestart() {
+	if xray.TakeUnitRestart() {
+		s.readoptXrayUnit()
+		s.SetToNeedReconcile()
+	}
 	reconcile := isNeedXrayReconcile.Swap(false)
 	restart := s.IsNeedRestartAndSetFalse()
 	if !restart && !reconcile {
