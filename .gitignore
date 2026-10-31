@@ -44,3 +44,7 @@ docker-compose.override.yml
 
 # Ignore .env (Environment Variables) file
 .env
+
+# still-ui: local release builds (scripts/still-release.sh)
+build-release/
+dist-release/
