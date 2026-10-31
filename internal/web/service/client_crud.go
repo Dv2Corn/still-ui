@@ -940,7 +940,7 @@ func (s *ClientService) update(inboundSvc *InboundService, id int, updated model
 	// including the empty string that removes the client from its group.
 	if err := database.GetDB().Model(&model.ClientRecord{}).
 		Where("id = ?", id).
-		UpdateColumn("group_name", updated.Group).Error; err != nil {
+		UpdateColumn("group_name", strings.TrimSpace(updated.Group)).Error; err != nil {
 		return needRestart, err
 	}
 

@@ -1291,7 +1291,7 @@ func (c *Client) ToRecord() *ClientRecord {
 		ExpiryTime:        c.ExpiryTime,
 		Enable:            c.Enable,
 		TgID:              c.TgID,
-		Group:             c.Group,
+		Group:             strings.TrimSpace(c.Group),
 		Comment:           c.Comment,
 		Reset:             c.Reset,
 		ResetDay:          c.ResetDay,
