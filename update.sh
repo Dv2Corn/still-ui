@@ -336,6 +336,76 @@ _xui_warn_unsupported_hardening() {
     return 0
 }
 
+# still-ui: memory ceiling for the panel service.
+# The panel and the Xray it supervises share one cgroup. Without a ceiling a
+# leak or a burst of clients grows it until the host thrashes swap and stops
+# answering (SSH included). A drop-in caps it: under MemoryHigh the kernel
+# reclaims, at MemoryMax the OOM killer stops the service and systemd restarts
+# it (Restart=on-failure) a few seconds later -- the host stays reachable.
+# MemorySwapMax=0 keeps the panel out of swap, where it would only thrash.
+# Size: 35% of RAM, at least 256 MiB, at most 1 GiB. Override in the env file:
+# STILL_UI_MEMORY_MAX=800M (any systemd size) or STILL_UI_MEMORY_MAX=off.
+# 15-still-memory.conf sorts before a local 20-*.conf, so a local drop-in wins.
+_still_memory_dropin() {
+    local env_file="${1:-}" dropin_dir dropin temp_file mem_kb max_mb high_mb max high setting
+    [[ -n "${xui_service:-}" ]] || return 0
+    command -v systemctl > /dev/null 2>&1 || return 0
+    if [[ -z "$env_file" ]]; then
+        case "${release}" in
+            ubuntu | debian | armbian) env_file="/etc/default/still-ui" ;;
+            arch | manjaro | parch | alpine) env_file="/etc/conf.d/still-ui" ;;
+            *) env_file="/etc/sysconfig/still-ui" ;;
+        esac
+    fi
+    setting="${STILL_UI_MEMORY_MAX:-}"
+    if [[ -z "$setting" && -r "$env_file" ]]; then
+        setting=$(sed -n 's/^[[:space:]]*\(export[[:space:]]\+\)\?STILL_UI_MEMORY_MAX=["'"'"']\?\([^"'"'"' ]*\).*/\2/p' "$env_file" | tail -n 1)
+    fi
+    dropin_dir="${xui_service}/still-ui.service.d"
+    dropin="${dropin_dir}/15-still-memory.conf"
+    if [[ "$setting" == "off" || "$setting" == "none" || "$setting" == "infinity" ]]; then
+        rm -f "$dropin"
+        echo -e "${yellow}Panel memory ceiling disabled (STILL_UI_MEMORY_MAX=${setting}).${plain}"
+        systemctl daemon-reload > /dev/null 2>&1 || true
+        return 0
+    fi
+    if [[ -n "$setting" ]]; then
+        if [[ ! "$setting" =~ ^[0-9]+[KMGT]?$ ]]; then
+            echo -e "${yellow}Ignoring STILL_UI_MEMORY_MAX=${setting}: use a size like 800M or 1G, or off.${plain}"
+            setting=""
+        fi
+    fi
+    if [[ -n "$setting" ]]; then
+        max="$setting"
+        high=""
+    else
+        mem_kb=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo 2> /dev/null)
+        [[ "$mem_kb" =~ ^[0-9]+$ ]] || return 0
+        max_mb=$((mem_kb * 35 / 100 / 1024))
+        ((max_mb < 256)) && max_mb=256
+        ((max_mb > 1024)) && max_mb=1024
+        high_mb=$((max_mb * 85 / 100))
+        max="${max_mb}M"
+        high="${high_mb}M"
+    fi
+    mkdir -p "$dropin_dir" || return 1
+    temp_file="${dropin}.tmp.$$"
+    {
+        echo "# Written by still-ui install.sh/update.sh; edits here are lost."
+        echo "# Change it with STILL_UI_MEMORY_MAX in ${env_file} and re-run the"
+        echo "# update, or put your own values in a 20-*.conf drop-in."
+        echo "[Service]"
+        [[ -n "$high" ]] && echo "MemoryHigh=${high}"
+        echo "MemoryMax=${max}"
+        echo "MemorySwapMax=0"
+    } > "$temp_file" || { rm -f "$temp_file"; return 1; }
+    chmod 644 "$temp_file"
+    mv -f "$temp_file" "$dropin" || { rm -f "$temp_file"; return 1; }
+    systemctl daemon-reload > /dev/null 2>&1 || true
+    echo -e "${green}Panel memory ceiling: MemoryMax=${max}${high:+, MemoryHigh=${high}} (${dropin}).${plain}"
+    return 0
+}
+
 # ProtectSystem=full makes /usr, /boot, /efi and /etc read-only. ProtectSystem=
 # strict would make the whole hierarchy read-only (only the kernel API
 # filesystems stay as they are), and that would break the panel's own use of
@@ -478,6 +548,9 @@ _install_xui_service_unit() {
     if ! _xui_service_write_paths_dropin; then
         echo -e "${yellow}Warning: could not refresh ${xui_service}/still-ui.service.d/10-xui-sandbox.conf.${plain}"
         echo -e "${yellow}If XUI_DB_FOLDER or XUI_LOG_FOLDER points outside /etc/still-ui and /var/log/still-ui, the panel may not be able to write to it under ProtectSystem=full.${plain}"
+    fi
+    if ! _still_memory_dropin; then
+        echo -e "${yellow}Warning: could not write the panel memory ceiling drop-in.${plain}"
     fi
     _xui_warn_unsupported_hardening
     return 0

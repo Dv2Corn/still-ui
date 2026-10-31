@@ -144,6 +144,129 @@ prompt_or_default() {
     fi
 }
 
+# still-ui: memory ceiling for the panel service.
+# The panel and the Xray it supervises share one cgroup. Without a ceiling a
+# leak or a burst of clients grows it until the host thrashes swap and stops
+# answering (SSH included). A drop-in caps it: under MemoryHigh the kernel
+# reclaims, at MemoryMax the OOM killer stops the service and systemd restarts
+# it (Restart=on-failure) a few seconds later -- the host stays reachable.
+# MemorySwapMax=0 keeps the panel out of swap, where it would only thrash.
+# Size: 35% of RAM, at least 256 MiB, at most 1 GiB. Override in the env file:
+# STILL_UI_MEMORY_MAX=800M (any systemd size) or STILL_UI_MEMORY_MAX=off.
+# 15-still-memory.conf sorts before a local 20-*.conf, so a local drop-in wins.
+_still_memory_dropin() {
+    local env_file="${1:-}" dropin_dir dropin temp_file mem_kb max_mb high_mb max high setting
+    [[ -n "${xui_service:-}" ]] || return 0
+    command -v systemctl > /dev/null 2>&1 || return 0
+    if [[ -z "$env_file" ]]; then
+        case "${release}" in
+            ubuntu | debian | armbian) env_file="/etc/default/still-ui" ;;
+            arch | manjaro | parch | alpine) env_file="/etc/conf.d/still-ui" ;;
+            *) env_file="/etc/sysconfig/still-ui" ;;
+        esac
+    fi
+    setting="${STILL_UI_MEMORY_MAX:-}"
+    if [[ -z "$setting" && -r "$env_file" ]]; then
+        setting=$(sed -n 's/^[[:space:]]*\(export[[:space:]]\+\)\?STILL_UI_MEMORY_MAX=["'"'"']\?\([^"'"'"' ]*\).*/\2/p' "$env_file" | tail -n 1)
+    fi
+    dropin_dir="${xui_service}/still-ui.service.d"
+    dropin="${dropin_dir}/15-still-memory.conf"
+    if [[ "$setting" == "off" || "$setting" == "none" || "$setting" == "infinity" ]]; then
+        rm -f "$dropin"
+        echo -e "${yellow}Panel memory ceiling disabled (STILL_UI_MEMORY_MAX=${setting}).${plain}"
+        systemctl daemon-reload > /dev/null 2>&1 || true
+        return 0
+    fi
+    if [[ -n "$setting" ]]; then
+        if [[ ! "$setting" =~ ^[0-9]+[KMGT]?$ ]]; then
+            echo -e "${yellow}Ignoring STILL_UI_MEMORY_MAX=${setting}: use a size like 800M or 1G, or off.${plain}"
+            setting=""
+        fi
+    fi
+    if [[ -n "$setting" ]]; then
+        max="$setting"
+        high=""
+    else
+        mem_kb=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo 2> /dev/null)
+        [[ "$mem_kb" =~ ^[0-9]+$ ]] || return 0
+        max_mb=$((mem_kb * 35 / 100 / 1024))
+        ((max_mb < 256)) && max_mb=256
+        ((max_mb > 1024)) && max_mb=1024
+        high_mb=$((max_mb * 85 / 100))
+        max="${max_mb}M"
+        high="${high_mb}M"
+    fi
+    mkdir -p "$dropin_dir" || return 1
+    temp_file="${dropin}.tmp.$$"
+    {
+        echo "# Written by still-ui install.sh/update.sh; edits here are lost."
+        echo "# Change it with STILL_UI_MEMORY_MAX in ${env_file} and re-run the"
+        echo "# update, or put your own values in a 20-*.conf drop-in."
+        echo "[Service]"
+        [[ -n "$high" ]] && echo "MemoryHigh=${high}"
+        echo "MemoryMax=${max}"
+        echo "MemorySwapMax=0"
+    } > "$temp_file" || { rm -f "$temp_file"; return 1; }
+    chmod 644 "$temp_file"
+    mv -f "$temp_file" "$dropin" || { rm -f "$temp_file"; return 1; }
+    systemctl daemon-reload > /dev/null 2>&1 || true
+    echo -e "${green}Panel memory ceiling: MemoryMax=${max}${high:+, MemoryHigh=${high}} (${dropin}).${plain}"
+    return 0
+}
+
+# still-ui: swap check. On a small VPS without swap a memory spike goes
+# straight to the OOM killer, and the same spike with too little swap thrashes
+# the host. With RAM <= 2 GiB and no swap at all the installer offers a swap
+# file (2 GiB, vm.swappiness=10). Non-interactive: STILL_UI_CREATE_SWAP=yes
+# creates it, anything else only warns. Containers are skipped: they cannot
+# enable swap of their own.
+_still_swap_check() {
+    local mem_kb swap_kb answer
+    mem_kb=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo 2> /dev/null)
+    swap_kb=$(awk '/^SwapTotal:/ {print $2}' /proc/meminfo 2> /dev/null)
+    [[ "$mem_kb" =~ ^[0-9]+$ && "$swap_kb" =~ ^[0-9]+$ ]] || return 0
+    ((swap_kb > 0)) && return 0
+    ((mem_kb > 2 * 1024 * 1024 + 262144)) && return 0
+    if command -v systemd-detect-virt > /dev/null 2>&1 && systemd-detect-virt -cq 2> /dev/null; then
+        echo -e "${yellow}No swap and $((mem_kb / 1024)) MiB RAM; this is a container, so swap has to be added on the host.${plain}"
+        return 0
+    fi
+    echo -e "${yellow}This server has $((mem_kb / 1024)) MiB RAM and no swap. A memory spike would go straight to the OOM killer.${plain}"
+    if [[ "$NONINTERACTIVE" == "1" ]]; then
+        answer="${STILL_UI_CREATE_SWAP:-no}"
+    else
+        read -rp "Create a 2 GiB swap file at /swapfile now? [y/N]: " answer
+    fi
+    case "$answer" in
+        y | Y | yes | YES) ;;
+        *)
+            echo -e "${yellow}Swap not created. You can add it later; see the still-ui README.${plain}"
+            return 0
+            ;;
+    esac
+    if [[ -e /swapfile ]]; then
+        echo -e "${yellow}/swapfile already exists but is not active; leaving it alone.${plain}"
+        return 0
+    fi
+    if ! { fallocate -l 2G /swapfile 2> /dev/null || dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none; }; then
+        rm -f /swapfile
+        echo -e "${yellow}Could not allocate /swapfile; continuing without swap.${plain}"
+        return 0
+    fi
+    chmod 600 /swapfile
+    if ! mkswap /swapfile > /dev/null || ! swapon /swapfile; then
+        swapoff /swapfile > /dev/null 2>&1
+        rm -f /swapfile
+        echo -e "${yellow}Could not enable /swapfile; continuing without swap.${plain}"
+        return 0
+    fi
+    grep -qE '^[[:space:]]*/swapfile[[:space:]]' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+    if [[ -d /etc/sysctl.d ]]; then
+        echo 'vm.swappiness=10' > /etc/sysctl.d/60-still-ui-swappiness.conf
+        sysctl -q -w vm.swappiness=10 > /dev/null 2>&1 || true
+    fi
+    echo -e "${green}Swap enabled: /swapfile 2 GiB, vm.swappiness=10.${plain}"
+}
 
 # still-ui: moving over from 3x-ui. still-ui keeps its database in
 # /etc/still-ui, so a fresh install next to 3x-ui starts empty. When
@@ -1695,6 +1818,9 @@ _install_xui_service_unit() {
         echo -e "${yellow}Warning: could not refresh ${xui_service}/still-ui.service.d/10-xui-sandbox.conf.${plain}"
         echo -e "${yellow}If XUI_DB_FOLDER or XUI_LOG_FOLDER points outside /etc/still-ui and /var/log/still-ui, the panel may not be able to write to it under ProtectSystem=full.${plain}"
     fi
+    if ! _still_memory_dropin; then
+        echo -e "${yellow}Warning: could not write the panel memory ceiling drop-in.${plain}"
+    fi
     _xui_warn_unsupported_hardening
     return 0
 }
@@ -2133,4 +2259,5 @@ install_x-ui() {
 
 echo -e "${green}Running...${plain}"
 install_base
+_still_swap_check
 install_x-ui $1
