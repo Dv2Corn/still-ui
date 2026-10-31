@@ -88,7 +88,7 @@ for arch in "${ARCHES[@]}"; do
     pkg="$stage/still-ui"
     mkdir -p "$pkg/bin"
     cp "$SRC/build-release/x-ui-$arch" "$pkg/x-ui"
-    cp "$SRC/x-ui.sh" "$SRC/x-ui.rc" "$SRC/x-ui.service.debian" "$SRC/x-ui.service.arch" "$SRC/x-ui.service.rhel" "$pkg/"
+    cp "$SRC/x-ui.sh" "$SRC/x-ui.rc" "$SRC/x-ui.service.debian" "$SRC/x-ui.service.arch" "$SRC/x-ui.service.rhel" "$SRC/still-xray.service" "$pkg/"
     chmod 755 "$pkg/x-ui" "$pkg/x-ui.sh"
 
     fetch "https://github.com/XTLS/Xray-core/releases/download/${XRAY_VERSION}/Xray-linux-${xray_zip}.zip" "$CACHE/dl/Xray-${XRAY_VERSION}-linux-${xray_zip}.zip"

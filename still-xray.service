@@ -1,0 +1,54 @@
+[Unit]
+Description=Xray core run by still-ui
+Documentation=https://github.com/Dv2Corn/still-ui
+After=network-online.target
+Wants=network-online.target
+# Unbounded on purpose: after a burst of OOM kills a start limit would leave every
+# client down for good. The panel tests each config with `xray run -test` first.
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=still-xray
+Group=still-xray
+# install.sh/update.sh replace @XRAY_BIN@ with the core shipped in the panel's bin folder.
+# The panel writes the config (0640 root:still-xray); the core only reads it.
+ExecStart=@XRAY_BIN@ run -c /etc/still-xray/config.json
+Environment=XRAY_LOCATION_ASSET=@XRAY_ASSETS@
+Restart=always
+RestartSec=1
+# Back off to at most 5 s between failing starts, never more: each second is an outage.
+RestartSteps=5
+RestartMaxDelaySec=5
+LimitNOFILE=1048576
+
+# Least privilege: bind ports below 1024 and nothing else. Inbounds that need more
+# (TPROXY, TUN, sockopt mark) take a local drop-in with CAP_NET_ADMIN/CAP_NET_RAW.
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+SystemCallArchitectures=native
+UMask=0027
+# Access and error logs; the panel reads them for the IP limit and the log viewer.
+LogsDirectory=still-xray
+LogsDirectoryMode=0750
+# The memory ceiling (MemoryMax, MemorySwapMax=0, GOMEMLIMIT) is written by install.sh into
+# still-xray.service.d/15-still-memory.conf from STILL_XRAY_MEMORY_MAX.
+
+[Install]
+WantedBy=multi-user.target

@@ -300,6 +300,11 @@ uninstall() {
         # Local drop-ins the operator added go with it, which is what an
         # uninstall is expected to do.
         rm -rf -- "${xui_service}/still-ui.service.d"
+        # Xray's own unit (still-xray) outlives the panel by design, so it goes explicitly.
+        systemctl disable --now still-xray > /dev/null 2>&1
+        rm -rf -- "${xui_service}/still-xray.service" "${xui_service}/still-xray.service.d"
+        rm -rf -- /etc/still-xray /var/log/still-xray
+        id still-xray > /dev/null 2>&1 && userdel still-xray > /dev/null 2>&1
         systemctl daemon-reload
         systemctl reset-failed
     fi
@@ -654,6 +659,9 @@ status() {
         rc-service still-ui status
     else
         systemctl status still-ui -l
+        if systemctl cat still-xray > /dev/null 2>&1; then
+            systemctl status still-xray -l --no-pager
+        fi
     fi
     if [[ $# == 0 ]]; then
         before_show_menu
