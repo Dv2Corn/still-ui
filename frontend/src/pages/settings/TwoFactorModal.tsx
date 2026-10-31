@@ -6,6 +6,7 @@ import * as OTPAuth from 'otpauth';
 import { ClipboardManager } from '@/utils';
 import { activateOnKey } from '@/utils/a11y';
 import { TotpCodeSchema } from '@/schemas/login';
+import { BRAND_NAME } from '@/lib/brand';
 import './TwoFactorModal.css';
 
 type Type = 'set' | 'confirm';
@@ -36,7 +37,7 @@ export default function TwoFactorModal({
   const totp = useMemo(() => {
     if (!open || !token) return null;
     return new OTPAuth.TOTP({
-      issuer: '3x-ui',
+      issuer: BRAND_NAME,
       label: 'Administrator',
       algorithm: 'SHA1',
       digits: 6,

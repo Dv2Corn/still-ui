@@ -39,6 +39,7 @@ import { useAllSettings } from '@/api/queries/useAllSettings';
 import { useTheme } from '@/hooks/useTheme';
 import { PANEL_ROUTES } from '@/routes/panelRoutes';
 import type { ClientRecord, InboundOption } from '@/schemas/client';
+import { BRAND_NAME } from '@/lib/brand';
 import { commandPaletteStore, useCommandPalette } from './useCommandPalette';
 import './CommandPalette.css';
 
@@ -757,7 +758,7 @@ export default function CommandPalette() {
                 {t('close')}
               </span>
             </div>
-            <span>3x-ui Command Palette</span>
+            <span>{BRAND_NAME} Command Palette</span>
           </div>
         </div>
       </div>

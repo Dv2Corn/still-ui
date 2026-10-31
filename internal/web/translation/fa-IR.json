@@ -107,6 +107,7 @@
     "saveQr": "ذخیره QR"
   },
   "menu": {
+    "basedOn": "بر پایهٔ 3x-ui از MHSanaei · GPL-3.0",
     "theme": "تم",
     "dashboard": "نمای کلی",
     "inbounds": "ورودی‌ها",
@@ -152,7 +153,7 @@
       "xrayUpdates": "به‌روزرسانی‌های Xray",
       "xraySwitchClickDesk": "لطفا بادقت انتخاب کنید. درصورت انتخاب نسخه قدیمی‌تر، امکان ناهماهنگی با پیکربندی فعلی وجود دارد",
       "updatePanel": "به‌روزرسانی پنل",
-      "panelUpdateDesc": "این عملیات 3X-UI را به آخرین نسخه به‌روزرسانی می‌کند و سرویس پنل را مجدداً راه‌اندازی می‌کند.",
+      "panelUpdateDesc": "این عملیات still-ui را به آخرین نسخه به‌روزرسانی می‌کند و سرویس پنل را مجدداً راه‌اندازی می‌کند.",
       "currentPanelVersion": "نسخه فعلی پنل",
       "latestPanelVersion": "آخرین نسخه پنل",
       "panelUpToDate": "پنل به‌روز است",
@@ -216,7 +217,7 @@
       "xraySwitchVersionDialogDesc": "این کار نسخه Xray را به #version# تغییر می‌دهد.",
       "xraySwitchVersionPopover": "Xray با موفقیت به‌روز شد",
       "panelUpdateDialog": "آیا مطمئن هستید که می‌خواهید پنل را به‌روزرسانی کنید؟",
-      "panelUpdateDialogDesc": "این 3X-UI را به نسخه #version# به‌روزرسانی کرده و سرویس پنل را مجدداً راه‌اندازی می‌کند.",
+      "panelUpdateDialogDesc": "این still-ui را به نسخه #version# به‌روزرسانی کرده و سرویس پنل را مجدداً راه‌اندازی می‌کند.",
       "panelUpdateStartedPopover": "به‌روزرسانی پنل آغاز شد",
       "panelUpdateFailedTitle": "به‌روزرسانی پنل ناموفق بود",
       "panelUpdateFailedDesc": "به‌روزرسانی با موفقیت به پایان نرسید. گزارش‌های سرور را بررسی کنید یا دستور «x-ui update» را از خط فرمان اجرا کنید.",
@@ -2752,10 +2753,10 @@
   },
   "discord": {
     "test": {
-      "title": "آزمایش اعلان دیسکورد 3x-ui",
+      "title": "آزمایش اعلان دیسکورد still-ui",
       "body": "این یک اعلان آزمایشی است که تأیید می‌کند اعلان‌های دیسکورد به‌درستی پیکربندی شده‌اند."
     },
-    "footer": "پنل 3x-ui",
+    "footer": "پنل still-ui",
     "fields": {
       "panelVersion": "نسخه پنل",
       "xrayCore": "هسته Xray",
@@ -2790,13 +2791,13 @@
       "loginFailed": "ورود ناموفق"
     },
     "report": {
-      "title": "📊 گزارش وضعیت 3x-ui",
+      "title": "📊 گزارش وضعیت still-ui",
       "summary": "گزارش دوره‌ای وضعیت سرور و پراکسی برای **{{ .Host }}**",
-      "footer": "گزارش زمان‌بندی‌شده 3x-ui • زمان‌بندی: {{ .RunTime }}"
+      "footer": "گزارش زمان‌بندی‌شده still-ui • زمان‌بندی: {{ .RunTime }}"
     },
     "commands": {
-      "helpTitle": "🤖 دستورات ربات دیسکورد 3x-ui",
-      "helpDescription": "دستورات موجود برای پایش و مدیریت سرور 3x-ui:",
+      "helpTitle": "🤖 دستورات ربات دیسکورد still-ui",
+      "helpDescription": "دستورات موجود برای پایش و مدیریت سرور still-ui:",
       "helpStatus": "نمایش بار سیستم، رم، پردازنده، اتصالات و کاربران آنلاین",
       "helpReport": "ایجاد گزارش کامل وضعیت (همراه پشتیبان پایگاه داده در صورت فعال بودن)",
       "helpBackup": "ارسال فوری فایل پشتیبان پایگاه داده",
@@ -2804,10 +2805,10 @@
       "helpInbounds": "فهرست همه ورودی‌های پیکربندی‌شده همراه پورت‌ها و آمار کاربران",
       "helpRestart": "راه‌اندازی مجدد هسته Xray",
       "helpHelp": "نمایش همین فهرست دستورات",
-      "statusTitle": "⚡ وضعیت سرور 3x-ui",
+      "statusTitle": "⚡ وضعیت سرور still-ui",
       "statusDescription": "شاخص‌های عملکرد فعلی **{{ .Host }}**",
       "backupTitle": "🗄️ پشتیبان پایگاه داده",
-      "backupDescription": "آرشیو پشتیبان 3x-ui ایجادشده در `{{ .Time }}`",
+      "backupDescription": "آرشیو پشتیبان still-ui ایجادشده در `{{ .Time }}`",
       "backupUnavailable": "❌ سرویس پشتیبان‌گیری در دسترس نیست",
       "backupFailed": "❌ خواندن پشتیبان پایگاه داده ناموفق بود: {{ .Error }}",
       "usageHint": "⚠️ نحوه استفاده: `!usage <email>` یا `/usage <email>`",

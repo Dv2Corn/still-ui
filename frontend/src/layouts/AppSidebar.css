@@ -308,6 +308,24 @@
   outline: none;
 }
 
+/* still-ui: "based on 3x-ui" attribution under the version badge. */
+.sider-upstream {
+  display: block;
+  padding: 0 16px 8px;
+  color: var(--ant-color-text-tertiary);
+  font-size: 11px;
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sider-upstream:hover,
+.sider-upstream:focus-visible {
+  color: var(--ant-color-primary);
+  outline: none;
+}
+
 .drawer-footer {
   flex: 0 0 auto;
   padding: 8px 8px 12px;

@@ -8,6 +8,7 @@ import type { AllSetting } from '@/models/setting';
 import { DefaultSettingTag, SettingListItem } from '@/components/ui';
 import { EmailNotifications } from '@/components/ui/notifications/EmailNotifications';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { BRAND_NAME } from '@/lib/brand';
 import { catTabLabel } from './catTabLabel';
 import SecretInput from './SecretInput';
 
@@ -151,7 +152,7 @@ export default function EmailTab({ allSetting, updateSetting }: EmailTabProps) {
               >
                 <Input
                   value={allSetting.smtpFromName}
-                  placeholder="3x-ui"
+                  placeholder={BRAND_NAME}
                   onChange={(e) => updateSetting({ smtpFromName: e.target.value })}
                 />
               </SettingListItem>

@@ -107,6 +107,7 @@
     "saveQr": "Uložiť QR kód"
   },
   "menu": {
+    "basedOn": "Založené na 3x-ui od MHSanaei · GPL-3.0",
     "theme": "Vzhľad",
     "dashboard": "Prehľad",
     "inbounds": "Vstupy",
@@ -152,7 +153,7 @@
       "xrayUpdates": "Aktualizácie Xray",
       "xraySwitchClickDesk": "Verziu vyberajte opatrne. Staršie verzie nemusia podporovať aktuálnu konfiguráciu.",
       "updatePanel": "Aktualizovať panel",
-      "panelUpdateDesc": "Aktualizuje sa samotný 3X-UI na najnovšie vydanie a reštartuje sa služba panelu.",
+      "panelUpdateDesc": "Aktualizuje sa samotný still-ui na najnovšie vydanie a reštartuje sa služba panelu.",
       "currentPanelVersion": "Aktuálna verzia panelu",
       "latestPanelVersion": "Najnovšia verzia panelu",
       "panelUpToDate": "Panel je aktuálny",
@@ -216,7 +217,7 @@
       "xraySwitchVersionDialogDesc": "Verzia Xray sa zmení na #version#.",
       "xraySwitchVersionPopover": "Xray bol úspešne aktualizovaný",
       "panelUpdateDialog": "Naozaj chcete aktualizovať panel?",
-      "panelUpdateDialogDesc": "3X-UI sa aktualizuje na #version# a reštartuje sa služba panelu.",
+      "panelUpdateDialogDesc": "still-ui sa aktualizuje na #version# a reštartuje sa služba panelu.",
       "panelUpdateStartedPopover": "Aktualizácia panelu sa začala",
       "panelUpdateFailedTitle": "Aktualizácia panelu zlyhala",
       "panelUpdateFailedDesc": "Aktualizácia sa nedokončila úspešne. Skontrolujte záznamy servera alebo spustite príkaz 'x-ui update'.",
@@ -2545,7 +2546,7 @@
       "report": "🕰 Plánované správy: {{ .RunTime }}\r\n",
       "datetime": "⏰ Dátum a čas: {{ .DateTime }}\r\n",
       "hostname": "💻 Hostiteľ: {{ .Hostname }}\r\n",
-      "version": "🚀 Verzia 3X-UI: {{ .Version }}\r\n",
+      "version": "🚀 Verzia still-ui: {{ .Version }}\r\n",
       "xrayVersion": "📡 Verzia Xray: {{ .XrayVersion }}\r\n",
       "ipv6": "🌐 IPv6: {{ .IPv6 }}\r\n",
       "ipv4": "🌐 IPv4: {{ .IPv4 }}\r\n",
@@ -2752,10 +2753,10 @@
   },
   "discord": {
     "test": {
-      "title": "Skúška upozornení Discordu v 3x-ui",
+      "title": "Skúška upozornení Discordu v still-ui",
       "body": "Toto je skúšobné upozornenie na overenie správneho nastavenia upozornení Discordu."
     },
-    "footer": "Panel 3x-ui",
+    "footer": "Panel still-ui",
     "fields": {
       "panelVersion": "Verzia panelu",
       "xrayCore": "Jadro Xray",
@@ -2790,13 +2791,13 @@
       "loginFailed": "Neúspešné prihlásenie"
     },
     "report": {
-      "title": "📊 Správa o stave 3x-ui",
+      "title": "📊 Správa o stave still-ui",
       "summary": "Pravidelná správa o stave servera a proxy **{{ .Host }}**",
-      "footer": "Plánovaná správa 3x-ui • Plán: {{ .RunTime }}"
+      "footer": "Plánovaná správa still-ui • Plán: {{ .RunTime }}"
     },
     "commands": {
-      "helpTitle": "🤖 Príkazy Discord bota 3x-ui",
-      "helpDescription": "Dostupné príkazy na sledovanie a správu servera 3x-ui:",
+      "helpTitle": "🤖 Príkazy Discord bota still-ui",
+      "helpDescription": "Dostupné príkazy na sledovanie a správu servera still-ui:",
       "helpStatus": "Zobraziť záťaž systému, RAM, CPU, spojenia a pripojených používateľov",
       "helpReport": "Vytvoriť úplnú správu o stave, prípadne aj so zálohou databázy",
       "helpBackup": "Okamžite poslať súbor so zálohou databázy",
@@ -2804,10 +2805,10 @@
       "helpInbounds": "Zobraziť všetky nastavené vstupy s portmi a štatistikami klientov",
       "helpRestart": "Reštartovať jadro Xray",
       "helpHelp": "Zobraziť tento zoznam dostupných príkazov",
-      "statusTitle": "⚡ Stav servera 3x-ui",
+      "statusTitle": "⚡ Stav servera still-ui",
       "statusDescription": "Aktuálne prevádzkové údaje pre **{{ .Host }}**",
       "backupTitle": "🗄️ Záloha databázy",
-      "backupDescription": "Záloha 3x-ui vytvorená o `{{ .Time }}`",
+      "backupDescription": "Záloha still-ui vytvorená o `{{ .Time }}`",
       "backupUnavailable": "❌ Služba zálohovania nie je dostupná",
       "backupFailed": "❌ Nepodarilo sa načítať zálohu databázy: {{ .Error }}",
       "usageHint": "⚠️ Použitie: `!usage <email>` alebo `/usage <email>`",

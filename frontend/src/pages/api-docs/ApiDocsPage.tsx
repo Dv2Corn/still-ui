@@ -7,6 +7,7 @@ import 'swagger-ui-react/swagger-ui.css';
 import { useTheme } from '@/hooks/useTheme';
 import AppSidebar from '@/layouts/AppSidebar';
 import { EXAMPLES } from '@/generated/examples';
+import { BRAND_NAME } from '@/lib/brand';
 import { buildWebSocketEvents } from './websocket-events';
 import './ApiDocsPage.css';
 
@@ -91,7 +92,7 @@ export default function ApiDocsPage() {
               items={[
                 {
                   key: 'panel-api',
-                  label: '3X-UI Panel API',
+                  label: `${BRAND_NAME} Panel API`,
                   children: (
                     <div className="docs-wrapper" role="region" aria-label={t('menu.apiDocs')}>
                       <SwaggerUI

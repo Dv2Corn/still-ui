@@ -107,6 +107,7 @@
     "saveQr": "QR を保存"
   },
   "menu": {
+    "basedOn": "MHSanaei の 3x-ui をベースにしています · GPL-3.0",
     "theme": "テーマ",
     "dashboard": "ダッシュボード",
     "inbounds": "インバウンド",
@@ -152,7 +153,7 @@
       "xrayUpdates": "Xrayの更新",
       "xraySwitchClickDesk": "慎重に選択してください。古いバージョンは現在の設定と互換性がない可能性があります。",
       "updatePanel": "パネルを更新",
-      "panelUpdateDesc": "これにより3X-UIが最新リリースに更新され、パネルサービスが再起動されます。",
+      "panelUpdateDesc": "これによりstill-uiが最新リリースに更新され、パネルサービスが再起動されます。",
       "currentPanelVersion": "現在のパネルバージョン",
       "latestPanelVersion": "最新のパネルバージョン",
       "panelUpToDate": "パネルは最新です",
@@ -216,7 +217,7 @@
       "xraySwitchVersionDialogDesc": "Xrayのバージョンが#version#に変更されます。",
       "xraySwitchVersionPopover": "Xrayの更新が成功しました",
       "panelUpdateDialog": "本当にパネルを更新しますか？",
-      "panelUpdateDialogDesc": "これにより3X-UIが#version#に更新され、パネルサービスが再起動されます。",
+      "panelUpdateDialogDesc": "これによりstill-uiが#version#に更新され、パネルサービスが再起動されます。",
       "panelUpdateStartedPopover": "パネルの更新を開始しました",
       "panelUpdateFailedTitle": "パネルの更新に失敗しました",
       "panelUpdateFailedDesc": "更新が正常に完了しませんでした。サーバーのログを確認するか、コマンドラインで「x-ui update」を実行してください。",
@@ -2752,10 +2753,10 @@
   },
   "discord": {
     "test": {
-      "title": "3x-ui Discord通知テスト",
+      "title": "still-ui Discord通知テスト",
       "body": "これはDiscord通知が正しく設定されていることを確認するためのテスト通知です。"
     },
-    "footer": "3x-ui パネル",
+    "footer": "still-ui パネル",
     "fields": {
       "panelVersion": "パネルバージョン",
       "xrayCore": "Xray コア",
@@ -2790,13 +2791,13 @@
       "loginFailed": "ログイン失敗"
     },
     "report": {
-      "title": "📊 3x-ui ステータスレポート",
+      "title": "📊 still-ui ステータスレポート",
       "summary": "**{{ .Host }}** のサーバーとプロキシの定期ステータスレポート",
-      "footer": "3x-ui 定期レポート • スケジュール: {{ .RunTime }}"
+      "footer": "still-ui 定期レポート • スケジュール: {{ .RunTime }}"
     },
     "commands": {
-      "helpTitle": "🤖 3x-ui Discord Bot コマンド",
-      "helpDescription": "3x-ui サーバーの監視と管理に使えるコマンド:",
+      "helpTitle": "🤖 still-ui Discord Bot コマンド",
+      "helpDescription": "still-ui サーバーの監視と管理に使えるコマンド:",
       "helpStatus": "システム負荷、RAM、CPU、接続数、オンラインユーザーを表示",
       "helpReport": "完全なステータスレポートを生成（設定されていればDBバックアップ付き）",
       "helpBackup": "データベースのバックアップファイルを今すぐ送信",
@@ -2804,10 +2805,10 @@
       "helpInbounds": "設定済みのすべてのインバウンドをポートとクライアント統計付きで一覧表示",
       "helpRestart": "Xray コアを再起動",
       "helpHelp": "このコマンド一覧を表示",
-      "statusTitle": "⚡ 3x-ui サーバーステータス",
+      "statusTitle": "⚡ still-ui サーバーステータス",
       "statusDescription": "**{{ .Host }}** の現在の稼働メトリクス",
       "backupTitle": "🗄️ データベースバックアップ",
-      "backupDescription": "`{{ .Time }}` に生成された 3x-ui のバックアップ",
+      "backupDescription": "`{{ .Time }}` に生成された still-ui のバックアップ",
       "backupUnavailable": "❌ バックアップサービスを利用できません",
       "backupFailed": "❌ データベースのバックアップを読み込めませんでした: {{ .Error }}",
       "usageHint": "⚠️ 使い方: `!usage <email>` または `/usage <email>`",

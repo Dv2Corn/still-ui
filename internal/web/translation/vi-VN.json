@@ -107,6 +107,7 @@
     "saveQr": "Lưu QR"
   },
   "menu": {
+    "basedOn": "Dựa trên 3x-ui của MHSanaei · GPL-3.0",
     "theme": "Chủ đề",
     "dashboard": "Trạng thái hệ thống",
     "inbounds": "Inbound",
@@ -152,7 +153,7 @@
       "xrayUpdates": "Cập nhật Xray",
       "xraySwitchClickDesk": "Hãy lựa chọn thận trọng, vì các phiên bản cũ có thể không tương thích với các cấu hình hiện tại.",
       "updatePanel": "Cập nhật Panel",
-      "panelUpdateDesc": "Điều này sẽ cập nhật 3X-UI lên bản phát hành mới nhất và khởi động lại dịch vụ panel.",
+      "panelUpdateDesc": "Điều này sẽ cập nhật still-ui lên bản phát hành mới nhất và khởi động lại dịch vụ panel.",
       "currentPanelVersion": "Phiên bản panel hiện tại",
       "latestPanelVersion": "Phiên bản panel mới nhất",
       "panelUpToDate": "Panel đã được cập nhật",
@@ -216,7 +217,7 @@
       "xraySwitchVersionDialogDesc": "Hành động này sẽ thay đổi phiên bản Xray thành #version#.",
       "xraySwitchVersionPopover": "Xray đã được cập nhật thành công",
       "panelUpdateDialog": "Bạn có chắc muốn cập nhật panel không?",
-      "panelUpdateDialogDesc": "Điều này sẽ cập nhật 3X-UI lên #version# và khởi động lại dịch vụ panel.",
+      "panelUpdateDialogDesc": "Điều này sẽ cập nhật still-ui lên #version# và khởi động lại dịch vụ panel.",
       "panelUpdateStartedPopover": "Bắt đầu cập nhật panel",
       "panelUpdateFailedTitle": "Cập nhật panel thất bại",
       "panelUpdateFailedDesc": "Bản cập nhật không hoàn tất thành công. Hãy kiểm tra nhật ký máy chủ, hoặc chạy 'x-ui update' từ dòng lệnh.",
@@ -2752,10 +2753,10 @@
   },
   "discord": {
     "test": {
-      "title": "Kiểm tra thông báo Discord của 3x-ui",
+      "title": "Kiểm tra thông báo Discord của still-ui",
       "body": "Đây là thông báo thử nghiệm xác nhận rằng thông báo Discord đã được cấu hình đúng."
     },
-    "footer": "Bảng điều khiển 3x-ui",
+    "footer": "Bảng điều khiển still-ui",
     "fields": {
       "panelVersion": "Phiên bản bảng điều khiển",
       "xrayCore": "Lõi Xray",
@@ -2790,13 +2791,13 @@
       "loginFailed": "Đăng nhập thất bại"
     },
     "report": {
-      "title": "📊 Báo cáo trạng thái 3x-ui",
+      "title": "📊 Báo cáo trạng thái still-ui",
       "summary": "Báo cáo định kỳ trạng thái máy chủ và proxy của **{{ .Host }}**",
-      "footer": "Báo cáo định kỳ 3x-ui • Lịch: {{ .RunTime }}"
+      "footer": "Báo cáo định kỳ still-ui • Lịch: {{ .RunTime }}"
     },
     "commands": {
-      "helpTitle": "🤖 Lệnh bot Discord của 3x-ui",
-      "helpDescription": "Các lệnh có sẵn để giám sát và quản lý máy chủ 3x-ui:",
+      "helpTitle": "🤖 Lệnh bot Discord của still-ui",
+      "helpDescription": "Các lệnh có sẵn để giám sát và quản lý máy chủ still-ui:",
       "helpStatus": "Hiển thị tải hệ thống, RAM, CPU, kết nối và người dùng trực tuyến",
       "helpReport": "Tạo báo cáo trạng thái đầy đủ (kèm bản sao lưu CSDL nếu được cấu hình)",
       "helpBackup": "Gửi ngay tệp sao lưu cơ sở dữ liệu",
@@ -2804,10 +2805,10 @@
       "helpInbounds": "Liệt kê tất cả inbound đã cấu hình kèm cổng và thống kê máy khách",
       "helpRestart": "Khởi động lại lõi Xray",
       "helpHelp": "Hiển thị danh sách lệnh này",
-      "statusTitle": "⚡ Trạng thái máy chủ 3x-ui",
+      "statusTitle": "⚡ Trạng thái máy chủ still-ui",
       "statusDescription": "Chỉ số vận hành hiện tại của **{{ .Host }}**",
       "backupTitle": "🗄️ Sao lưu cơ sở dữ liệu",
-      "backupDescription": "Bản sao lưu 3x-ui được tạo lúc `{{ .Time }}`",
+      "backupDescription": "Bản sao lưu still-ui được tạo lúc `{{ .Time }}`",
       "backupUnavailable": "❌ Dịch vụ sao lưu không khả dụng",
       "backupFailed": "❌ Không thể đọc bản sao lưu cơ sở dữ liệu: {{ .Error }}",
       "usageHint": "⚠️ Cách dùng: `!usage <email>` hoặc `/usage <email>`",

@@ -107,6 +107,7 @@
     "saveQr": "Сохранить QR"
   },
   "menu": {
+    "basedOn": "Основано на 3x-ui от MHSanaei · GPL-3.0",
     "theme": "Тема",
     "dashboard": "Дашборд",
     "inbounds": "Входящие",
@@ -152,7 +153,7 @@
       "xrayUpdates": "Обновления Xray",
       "xraySwitchClickDesk": "Важно: старые версии могут не поддерживать текущие настройки",
       "updatePanel": "Обновить панель",
-      "panelUpdateDesc": "Это обновит 3X-UI до последнего релиза и перезапустит сервис панели.",
+      "panelUpdateDesc": "Это обновит still-ui до последнего релиза и перезапустит сервис панели.",
       "currentPanelVersion": "Текущая версия панели",
       "latestPanelVersion": "Последняя версия панели",
       "panelUpToDate": "Панель обновлена",
@@ -216,7 +217,7 @@
       "xraySwitchVersionDialogDesc": "Вы точно хотите сменить версию Xray?",
       "xraySwitchVersionPopover": "Xray успешно обновлён",
       "panelUpdateDialog": "Вы действительно хотите обновить панель?",
-      "panelUpdateDialogDesc": "Это обновит 3X-UI до версии #version# и перезапустит сервис панели.",
+      "panelUpdateDialogDesc": "Это обновит still-ui до версии #version# и перезапустит сервис панели.",
       "panelUpdateStartedPopover": "Обновление панели началось",
       "panelUpdateFailedTitle": "Не удалось обновить панель",
       "panelUpdateFailedDesc": "Обновление не завершилось успешно. Проверьте журналы сервера или выполните 'x-ui update' в командной строке.",
@@ -2752,10 +2753,10 @@
   },
   "discord": {
     "test": {
-      "title": "Тестовое уведомление Discord от 3x-ui",
+      "title": "Тестовое уведомление Discord от still-ui",
       "body": "Это тестовое уведомление подтверждает, что уведомления Discord настроены правильно."
     },
-    "footer": "Панель 3x-ui",
+    "footer": "Панель still-ui",
     "fields": {
       "panelVersion": "Версия панели",
       "xrayCore": "Ядро Xray",
@@ -2790,13 +2791,13 @@
       "loginFailed": "Неудачный вход"
     },
     "report": {
-      "title": "📊 Отчёт о состоянии 3x-ui",
+      "title": "📊 Отчёт о состоянии still-ui",
       "summary": "Периодический отчёт о состоянии сервера и прокси для **{{ .Host }}**",
-      "footer": "Плановый отчёт 3x-ui • Расписание: {{ .RunTime }}"
+      "footer": "Плановый отчёт still-ui • Расписание: {{ .RunTime }}"
     },
     "commands": {
-      "helpTitle": "🤖 Команды Discord-бота 3x-ui",
-      "helpDescription": "Доступные команды для мониторинга и управления сервером 3x-ui:",
+      "helpTitle": "🤖 Команды Discord-бота still-ui",
+      "helpDescription": "Доступные команды для мониторинга и управления сервером still-ui:",
       "helpStatus": "Показать нагрузку системы, RAM, CPU, соединения и пользователей онлайн",
       "helpReport": "Сформировать полный отчёт о состоянии (с резервной копией БД, если включена)",
       "helpBackup": "Немедленно отправить файл резервной копии базы данных",
@@ -2804,10 +2805,10 @@
       "helpInbounds": "Список всех настроенных входящих подключений с портами и статистикой клиентов",
       "helpRestart": "Перезапустить ядро Xray",
       "helpHelp": "Показать этот список команд",
-      "statusTitle": "⚡ Состояние сервера 3x-ui",
+      "statusTitle": "⚡ Состояние сервера still-ui",
       "statusDescription": "Текущие рабочие показатели **{{ .Host }}**",
       "backupTitle": "🗄️ Резервная копия базы данных",
-      "backupDescription": "Резервная копия 3x-ui создана `{{ .Time }}`",
+      "backupDescription": "Резервная копия still-ui создана `{{ .Time }}`",
       "backupUnavailable": "❌ Служба резервного копирования недоступна",
       "backupFailed": "❌ Не удалось прочитать резервную копию базы данных: {{ .Error }}",
       "usageHint": "⚠️ Использование: `!usage <email>` или `/usage <email>`",

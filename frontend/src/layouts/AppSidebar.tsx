@@ -35,14 +35,13 @@ import { pauseAnimationsUntilLeave, useTheme } from '@/hooks/useTheme';
 import { useAllSettings } from '@/api/queries/useAllSettings';
 import { useCommandPalette } from '@/components/command-palette/useCommandPalette';
 import { PANEL_ROUTES } from '@/routes/panelRoutes';
+import { BRAND_NAME, BRAND_SHORT, DONATE_URL, REPO_URL, UPSTREAM_URL } from '@/lib/brand';
 import './AppSidebar.css';
 
-const DONATE_URL = 'https://donate.sanaei.dev/';
 // The palette listens for Ctrl as well as Cmd, so the chip must not show a
 // Mac glyph to the Linux and Windows operators who are most of this panel's.
 const SHORTCUT_MODIFIER = /Mac|iPhone|iPad|iPod/.test(navigator.userAgent) ? '⌘' : 'Ctrl';
 const DOCS_URL = 'https://docs.sanaei.dev/';
-const REPO_URL = 'https://github.com/MHSanaei/3x-ui';
 const LOGOUT_KEY = '__logout__';
 const RAIL_WIDTH = 72;
 const SIDER_WIDTH = 220;
@@ -81,20 +80,36 @@ function DocsButton({ ariaLabel }: { ariaLabel: string }) {
 }
 
 function VersionBadge({ version, collapsed }: { version: string; collapsed?: boolean }) {
+  const { t } = useTranslation();
   if (!version) return null;
   const label = formatPanelVersion(version);
+  // still-ui is a fork of 3x-ui (MHSanaei), GPL-3.0: say so next to the version.
+  const basedOn = t('menu.basedOn');
   return (
-    <a
-      href={REPO_URL}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="sider-version"
-      aria-label={`GitHub ${label}`}
-      title={label}
-    >
-      <GithubOutlined aria-hidden />
-      {!collapsed && <span className="sider-version-text">{label}</span>}
-    </a>
+    <>
+      <a
+        href={REPO_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="sider-version"
+        aria-label={`GitHub ${BRAND_NAME} ${label}`}
+        title={`${BRAND_NAME} ${label} — ${basedOn}`}
+      >
+        <GithubOutlined aria-hidden />
+        {!collapsed && <span className="sider-version-text">{label}</span>}
+      </a>
+      {!collapsed && (
+        <a
+          href={UPSTREAM_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="sider-upstream"
+          title={basedOn}
+        >
+          {basedOn}
+        </a>
+      )}
+    </>
   );
 }
 
@@ -367,7 +382,7 @@ export default function AppSidebar() {
       >
         <div className="sider-brand">
           <div className="brand-block">
-            <span className="brand-text">{railCollapsed ? '3X' : '3X-UI'}</span>
+            <span className="brand-text">{railCollapsed ? BRAND_SHORT : BRAND_NAME}</span>
           </div>
           {!railCollapsed && (
             <div className="brand-actions">
@@ -455,7 +470,7 @@ export default function AppSidebar() {
       >
         <div className="drawer-header">
           <div className="brand-block">
-            <span className="drawer-brand">3X-UI</span>
+            <span className="drawer-brand">{BRAND_NAME}</span>
           </div>
           <div className="drawer-header-actions">
             <DocsButton ariaLabel={t('menu.docs') || 'Documentation'} />

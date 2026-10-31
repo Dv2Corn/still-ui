@@ -107,6 +107,7 @@
     "saveQr": "Salvar QR"
   },
   "menu": {
+    "basedOn": "Baseado no 3x-ui de MHSanaei · GPL-3.0",
     "theme": "Tema",
     "dashboard": "Visão Geral",
     "inbounds": "Entradas",
@@ -152,7 +153,7 @@
       "xrayUpdates": "Atualizações do Xray",
       "xraySwitchClickDesk": "Escolha com cuidado, pois versões mais antigas podem não ser compatíveis com as configurações atuais.",
       "updatePanel": "Atualizar painel",
-      "panelUpdateDesc": "Isso atualizará o 3X-UI para a versão mais recente e reiniciará o serviço do painel.",
+      "panelUpdateDesc": "Isso atualizará o still-ui para a versão mais recente e reiniciará o serviço do painel.",
       "currentPanelVersion": "Versão atual do painel",
       "latestPanelVersion": "Última versão do painel",
       "panelUpToDate": "O painel está atualizado",
@@ -216,7 +217,7 @@
       "xraySwitchVersionDialogDesc": "Isso mudará a versão do Xray para #version#.",
       "xraySwitchVersionPopover": "Xray atualizado com sucesso",
       "panelUpdateDialog": "Deseja realmente atualizar o painel?",
-      "panelUpdateDialogDesc": "Isso atualizará o 3X-UI para #version# e reiniciará o serviço do painel.",
+      "panelUpdateDialogDesc": "Isso atualizará o still-ui para #version# e reiniciará o serviço do painel.",
       "panelUpdateStartedPopover": "Atualização do painel iniciada",
       "panelUpdateFailedTitle": "Falha ao atualizar o painel",
       "panelUpdateFailedDesc": "A atualização não foi concluída com sucesso. Verifique os logs do servidor ou execute 'x-ui update' na linha de comando.",
@@ -2545,7 +2546,7 @@
       "report": "🕰 Relatórios agendados: {{ .RunTime }}\r\n",
       "datetime": "⏰ Data&Hora: {{ .DateTime }}\r\n",
       "hostname": "💻 Host: {{ .Hostname }}\r\n",
-      "version": "🚀 Versão 3X-UI: {{ .Version }}\r\n",
+      "version": "🚀 Versão still-ui: {{ .Version }}\r\n",
       "xrayVersion": "📡 Versão Xray: {{ .XrayVersion }}\r\n",
       "ipv6": "🌐 IPv6: {{ .IPv6 }}\r\n",
       "ipv4": "🌐 IPv4: {{ .IPv4 }}\r\n",
@@ -2752,10 +2753,10 @@
   },
   "discord": {
     "test": {
-      "title": "Teste de notificação do Discord do 3x-ui",
+      "title": "Teste de notificação do Discord do still-ui",
       "body": "Esta é uma notificação de teste confirmando que as notificações do Discord estão configuradas corretamente."
     },
-    "footer": "Painel 3x-ui",
+    "footer": "Painel still-ui",
     "fields": {
       "panelVersion": "Versão do painel",
       "xrayCore": "Núcleo Xray",
@@ -2790,13 +2791,13 @@
       "loginFailed": "Falha no login"
     },
     "report": {
-      "title": "📊 Relatório de status do 3x-ui",
+      "title": "📊 Relatório de status do still-ui",
       "summary": "Relatório periódico de status do servidor e do proxy de **{{ .Host }}**",
-      "footer": "Relatório agendado do 3x-ui • Agendamento: {{ .RunTime }}"
+      "footer": "Relatório agendado do still-ui • Agendamento: {{ .RunTime }}"
     },
     "commands": {
-      "helpTitle": "🤖 Comandos do bot do Discord do 3x-ui",
-      "helpDescription": "Comandos disponíveis para monitorar e gerenciar o servidor 3x-ui:",
+      "helpTitle": "🤖 Comandos do bot do Discord do still-ui",
+      "helpDescription": "Comandos disponíveis para monitorar e gerenciar o servidor still-ui:",
       "helpStatus": "Exibe carga do sistema, RAM, CPU, conexões e usuários online",
       "helpReport": "Gera um relatório de status completo (com backup do BD, se configurado)",
       "helpBackup": "Envia imediatamente o arquivo de backup do banco de dados",
@@ -2804,10 +2805,10 @@
       "helpInbounds": "Lista todas as entradas configuradas com portas e estatísticas de clientes",
       "helpRestart": "Reinicia o núcleo Xray",
       "helpHelp": "Exibe esta lista de comandos disponíveis",
-      "statusTitle": "⚡ Status do servidor 3x-ui",
+      "statusTitle": "⚡ Status do servidor still-ui",
       "statusDescription": "Métricas operacionais atuais de **{{ .Host }}**",
       "backupTitle": "🗄️ Backup do banco de dados",
-      "backupDescription": "Arquivo de backup do 3x-ui gerado em `{{ .Time }}`",
+      "backupDescription": "Arquivo de backup do still-ui gerado em `{{ .Time }}`",
       "backupUnavailable": "❌ Serviço de backup indisponível",
       "backupFailed": "❌ Falha ao ler o backup do banco de dados: {{ .Error }}",
       "usageHint": "⚠️ Uso: `!usage <email>` ou `/usage <email>`",
