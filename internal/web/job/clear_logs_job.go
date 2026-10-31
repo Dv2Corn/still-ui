@@ -107,19 +107,26 @@ func truncateXrayLog(pathFn func() (string, error), maxBytes int64) {
 	if err != nil || disabledLogPath(logPath) {
 		return
 	}
+	// Through the descriptor: the path may sit in a folder the core's own user controls.
+	f, err := xray.OpenLogFile(logPath, os.O_WRONLY)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			logger.Warning("Failed to open Xray log:", logPath, "-", err)
+		}
+		return
+	}
+	defer f.Close()
 	if maxBytes > 0 {
-		info, err := os.Stat(logPath)
+		info, err := f.Stat()
 		if err != nil {
-			if !os.IsNotExist(err) {
-				logger.Warning("Failed to stat Xray log:", logPath, "-", err)
-			}
+			logger.Warning("Failed to stat Xray log:", logPath, "-", err)
 			return
 		}
 		if info.Size() <= maxBytes {
 			return
 		}
 	}
-	if err := os.Truncate(logPath, 0); err != nil && !os.IsNotExist(err) {
+	if err := f.Truncate(0); err != nil {
 		logger.Warning("Failed to truncate Xray log:", logPath, "-", err)
 	}
 }

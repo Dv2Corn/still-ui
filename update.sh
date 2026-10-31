@@ -400,7 +400,7 @@ _still_xray_unit() {
     # setgid folders: what the panel (root) writes there is readable by the core's group only.
     install -d -o root -g still-xray -m 2750 /etc/still-xray /etc/still-xray/certs || return 1
     chgrp -R still-xray /etc/still-xray > /dev/null 2>&1
-    find /etc/still-xray -type f -exec chmod 0640 {} + > /dev/null 2>&1
+    find /etc/still-xray -type f ! -name panel-meta.json -exec chmod 0640 {} + > /dev/null 2>&1
 
     unit="${xui_service}/still-xray.service"
     temp_file="${unit}.tmp.$$"

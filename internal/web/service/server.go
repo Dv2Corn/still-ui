@@ -1490,7 +1490,7 @@ func (s *ServerService) GetXrayLogs(
 		return nil
 	}
 
-	file, err := os.Open(pathToAccessLog)
+	file, err := xray.OpenLogFile(pathToAccessLog, os.O_RDONLY)
 	if err != nil {
 		return nil
 	}

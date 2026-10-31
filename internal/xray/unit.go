@@ -241,11 +241,19 @@ func apiPortAnswers(port int) bool {
 // unitMeta keeps what the config file cannot carry (json:"-" fields), so a restarted
 // panel can take over the running core with the exact config it was given.
 type unitMeta struct {
-	TuicRelays map[string]int `json:"tuicRelays,omitempty"`
+	TuicRelays     map[string]int    `json:"tuicRelays,omitempty"`
+	RelayPasswords map[string]string `json:"relayPasswords,omitempty"`
 }
+
+// RelayPasswords supplies the loopback relay passwords kept beside the unit's config (0600, root),
+// so a restarted panel reuses them instead of trusting whatever a config's inbounds claim.
+var RelayPasswords func() map[string]string
 
 func writeUnitMeta(cfg *Config) error {
 	meta := unitMeta{}
+	if RelayPasswords != nil {
+		meta.RelayPasswords = RelayPasswords()
+	}
 	for _, ib := range cfg.InboundConfigs {
 		if ib.TuicRelay {
 			if meta.TuicRelays == nil {
@@ -261,15 +269,15 @@ func writeUnitMeta(cfg *Config) error {
 	return writeFileAtomic(unitMetaPath(), data, 0o600)
 }
 
-func applyUnitMeta(cfg *Config) {
-	data, err := os.ReadFile(unitMetaPath())
-	if err != nil {
-		return
-	}
+func readUnitMeta() unitMeta {
 	var meta unitMeta
-	if json.Unmarshal(data, &meta) != nil {
-		return
+	if data, err := os.ReadFile(unitMetaPath()); err == nil {
+		_ = json.Unmarshal(data, &meta)
 	}
+	return meta
+}
+
+func applyUnitMeta(cfg *Config, meta unitMeta) {
 	for i := range cfg.InboundConfigs {
 		if id, ok := meta.TuicRelays[cfg.InboundConfigs[i].Tag]; ok {
 			cfg.InboundConfigs[i].TuicRelay = true
@@ -398,13 +406,18 @@ func AdoptRunningUnit() *Process {
 	for i := range cfg.InboundConfigs {
 		clearNullSections(reflect.ValueOf(&cfg.InboundConfigs[i]).Elem())
 	}
-	applyUnitMeta(cfg)
+	meta := readUnitMeta()
+	applyUnitMeta(cfg, meta)
 	p := &Process{newProcess(cfg)}
 	p.unit = u
+	p.adoptedRelayPasswords = meta.RelayPasswords
 	p.refreshVersion()
 	p.refreshAPIPort()
 	return p
 }
+
+// AdoptedRelayPasswords returns the relay passwords recorded with an adopted core's config.
+func (p *Process) AdoptedRelayPasswords() map[string]string { return p.adoptedRelayPasswords }
 
 // Recovering reports a unit that systemd itself is restarting after a crash: the panel must
 // not start a second restart of its own on top of it.

@@ -206,7 +206,8 @@ type process struct {
 	intentionalStop atomic.Bool
 
 	// unit is set when the core runs as its own systemd unit instead of as this child.
-	unit *unitControl
+	unit                  *unitControl
+	adoptedRelayPasswords map[string]string
 }
 
 // OnlineAPISupport describes whether the running Xray core implements the

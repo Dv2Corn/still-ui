@@ -1593,37 +1593,31 @@ func (s *XrayService) AdoptRunningXrayUnit() bool {
 	if process == nil {
 		return false
 	}
-	seedRelayPasswords(process.GetConfig())
+	seedRelayPasswords(process.AdoptedRelayPasswords())
 	xrayState.replace(process)
 	logger.Info("xray: took over the core already running in", config.GetXrayUnit())
 	return true
 }
 
-// seedRelayPasswords reuses the loopback SOCKS relay passwords of an adopted core: they are
-// random per panel process, and new ones would force a restart of every relay inbound.
-func seedRelayPasswords(cfg *xray.Config) {
-	if cfg == nil {
-		return
-	}
-	for _, inbound := range cfg.InboundConfigs {
-		if inbound.Protocol != "socks" {
-			continue
-		}
-		var settings struct {
-			Accounts []struct {
-				Pass string `json:"pass"`
-			} `json:"accounts"`
-		}
-		if json.Unmarshal(inbound.Settings, &settings) != nil || len(settings.Accounts) == 0 {
-			continue
-		}
-		switch {
-		case inbound.TuicRelay:
-			tuic.SeedSocksPassword(settings.Accounts[0].Pass)
-		case inbound.Port > amneziawgnet.SOCKSBasePort:
-			amneziawgnet.SeedSocksPassword(settings.Accounts[0].Pass)
+// Relay passwords are random per panel process; a panel that adopts a running unit takes
+// them from the root-only record kept with that core's config, never from its inbounds.
+const (
+	relayPasswordAmneziaWG = "amneziawg"
+	relayPasswordTuic      = "tuic"
+)
+
+func init() {
+	xray.RelayPasswords = func() map[string]string {
+		return map[string]string{
+			relayPasswordAmneziaWG: amneziawgnet.SocksPassword(),
+			relayPasswordTuic:      tuic.SocksPassword(),
 		}
 	}
+}
+
+func seedRelayPasswords(passwords map[string]string) {
+	amneziawgnet.SeedSocksPassword(passwords[relayPasswordAmneziaWG])
+	tuic.SeedSocksPassword(passwords[relayPasswordTuic])
 }
 
 // restartToDropClients reports whether a diff that strands clients must be
