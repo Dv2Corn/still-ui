@@ -55,6 +55,9 @@ var (
 // config on disk, which may miss clients added through the API since the last full apply.
 var unitRestarted atomic.Bool
 
+// unitStarts counts start boundaries of panel-requested restarts: odd while one is under way.
+var unitStarts atomic.Uint64
+
 // TakeUnitRestart reports, once, that systemd restarted the core since the last call.
 func TakeUnitRestart() bool { return unitRestarted.Swap(false) }
 
@@ -86,6 +89,7 @@ type unitControl struct {
 	cachedAt  time.Time
 	restarts  int // NRestarts already accounted for, so only systemd's own restarts count as crashes
 	baselined bool
+	baseGen   uint64 // unitStarts when restarts was taken
 	journal   string
 	journalAt time.Time
 }
@@ -118,9 +122,11 @@ func (u *unitControl) state(fresh bool) unitState {
 
 	u.mu.Lock()
 	u.cached, u.cachedAt = st, time.Now()
-	crashed := u.baselined && st.NRestarts > u.restarts
+	// Restarts during or since a start this panel requested are that start's, not crashes.
+	gen := unitStarts.Load()
+	crashed := u.baselined && gen%2 == 0 && gen == u.baseGen && st.NRestarts > u.restarts
 	if err == nil {
-		u.restarts, u.baselined = st.NRestarts, true
+		u.restarts, u.baselined, u.baseGen = st.NRestarts, true, gen
 	}
 	u.mu.Unlock()
 	if crashed {
@@ -164,8 +170,8 @@ func (u *unitControl) journalTail() string {
 	u.mu.Unlock()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	out, _ := journalCommand(ctx, u.name, 5)
-	tail := strings.TrimSpace(string(out))
+	out, _ := journalCommand(ctx, u.name, 30)
+	tail := failureLines(string(out))
 	u.mu.Lock()
 	u.journal, u.journalAt = tail, time.Now()
 	u.mu.Unlock()
@@ -175,10 +181,13 @@ func (u *unitControl) journalTail() string {
 // restartAndWait restarts the unit and waits until it is active, its API port answers and it
 // stays up for unitSettleTime; anything else is an error carrying the unit's last log lines.
 func (u *unitControl) restartAndWait(apiPort int) error {
+	unitStarts.Add(1)
+	defer unitStarts.Add(1)
 	_, _ = u.systemctl(10*time.Second, "reset-failed", u.name)
 	if out, err := u.systemctl(unitStartTimeout+5*time.Second, "restart", u.name); err != nil {
 		return fmt.Errorf("systemctl restart %s: %v: %s", u.name, err, strings.TrimSpace(string(out)))
 	}
+	started := u.state(true)
 	deadline := time.Now().Add(unitStartTimeout)
 	var st unitState
 	for {
@@ -186,7 +195,8 @@ func (u *unitControl) restartAndWait(apiPort int) error {
 		if st.running() && apiPortAnswers(apiPort) {
 			break
 		}
-		if st.Active == "failed" || time.Now().After(deadline) {
+		// A core systemd already had to restart once will not come up with this config.
+		if st.Active == "failed" || st.NRestarts > started.NRestarts || time.Now().After(deadline) {
 			u.forgetJournal()
 			return fmt.Errorf("%s did not start (%s): %s", u.name, st.Active, u.journalTail())
 		}
@@ -200,6 +210,21 @@ func (u *unitControl) restartAndWait(apiPort int) error {
 	}
 	u.forgetJournal()
 	return nil
+}
+
+// failureLines keeps what explains a failed start: the core's error lines, not its routine warnings.
+func failureLines(journal string) string {
+	var picked []string
+	for line := range strings.SplitSeq(strings.TrimSpace(journal), "\n") {
+		lower := strings.ToLower(line)
+		if strings.Contains(lower, "failed") || strings.Contains(lower, "error") {
+			picked = append(picked, strings.TrimSpace(line))
+		}
+	}
+	if len(picked) == 0 {
+		return lastLines(journal, 1)
+	}
+	return lastLines(strings.Join(picked, "\n"), 2)
 }
 
 func (u *unitControl) forgetJournal() {

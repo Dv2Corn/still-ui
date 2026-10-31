@@ -41,6 +41,21 @@ type xrayLifecycle struct {
 	result  string
 	// heldBack is why the running core still serves the previous config.
 	heldBack string
+	// refused is the last config the core unit could not start, and why.
+	refused    *xray.Config
+	refusedErr error
+}
+
+func (s *xrayLifecycle) refuse(cfg *xray.Config, err error) {
+	s.mu.Lock()
+	s.refused, s.refusedErr = cfg, err
+	s.mu.Unlock()
+}
+
+func (s *xrayLifecycle) lastRefused() (*xray.Config, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.refused, s.refusedErr
 }
 
 func (s *xrayLifecycle) snapshot() (*xray.Process, string) {
@@ -1530,6 +1545,8 @@ func (s *XrayService) RestartXray(isForce bool) error {
 			}
 			if applied {
 				logger.Info("Xray config changes applied through the core API, no restart needed")
+				// The running core now serves the desired config: nothing is held back any more.
+				xrayState.holdBack("")
 				return nil
 			}
 		}
@@ -1546,7 +1563,7 @@ func (s *XrayService) RestartXray(isForce bool) error {
 
 	invalidateTuicRelayReadiness(xrayConfig)
 	if xray.UnitMode() {
-		if err := s.restartXrayUnit(process, xrayConfig); err != nil {
+		if err := s.restartXrayUnit(process, xrayConfig, isForce); err != nil {
 			return err
 		}
 		return publishTuicRelayReadiness(xrayConfig)
@@ -1568,7 +1585,12 @@ func (s *XrayService) RestartXray(isForce bool) error {
 
 // restartXrayUnit replaces the unit's core with one built from newCfg. A config the core refuses
 // leaves the previous one serving, and the status page names why. Hold the package lock.
-func (s *XrayService) restartXrayUnit(previous *xray.Process, newCfg *xray.Config) error {
+func (s *XrayService) restartXrayUnit(previous *xray.Process, newCfg *xray.Config, isForce bool) error {
+	// Retrying a config that already failed would cut every client off again each 30 s tick;
+	// only a forced restart (the Restart button) tries it again.
+	if refused, err := xrayState.lastRefused(); !isForce && refused != nil && refused.Equals(newCfg) && previous != nil && previous.IsRunning() {
+		return err
+	}
 	process := xray.NewProcess(newCfg)
 	err := process.Start()
 	var rollback *xray.RollbackError
@@ -1579,6 +1601,7 @@ func (s *XrayService) restartXrayUnit(previous *xray.Process, newCfg *xray.Confi
 		if previous != nil {
 			xrayState.replace(previous)
 			xrayState.holdBack(err.Error())
+			xrayState.refuse(newCfg, err)
 		}
 		return err
 	}

@@ -222,3 +222,22 @@ func TestUnitCrashIsReportedOncePerSystemdRestart(t *testing.T) {
 		t.Fatal("state was not read from systemd")
 	}
 }
+
+func TestFailedStartIsNotReportedAsACrash(t *testing.T) {
+	f := setupFakeUnit(t)
+	startGood(t)
+	var crashes int
+	prev := OnCrash
+	OnCrash = func(error) { crashes++ }
+	t.Cleanup(func() { OnCrash = prev })
+	watching := newUnitControl("still-xray-test")
+	watching.state(true)
+
+	f.nrestarts = 1 // the failing start below is restarted once by systemd
+	_ = NewProcess(unitTestConfig("will-not-start")).Start()
+	watching.state(true)
+
+	if crashes != 0 || TakeUnitRestart() {
+		t.Fatalf("a start the panel requested was reported as %d crash(es)", crashes)
+	}
+}
