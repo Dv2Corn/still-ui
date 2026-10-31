@@ -1480,7 +1480,10 @@ func (s *ServerService) GetXrayLogs(
 		Proxied
 	)
 
-	countInt, _ := strconv.Atoi(count)
+	countInt, err := strconv.Atoi(count)
+	if err != nil || countInt < 1 || countInt > 10000 {
+		countInt = 100
+	}
 	var entries []LogEntry
 
 	pathToAccessLog, err := xray.GetAccessLogPath()
@@ -1528,15 +1531,16 @@ func (s *ServerService) GetXrayLogs(
 			entry.Event = Proxied
 		}
 
+		// Anyone reaching an inbound port adds lines here, so only the newest
+		// countInt entries are kept while reading, not one per line of the file.
 		entries = append(entries, entry)
+		if len(entries) > countInt {
+			entries = entries[1:]
+		}
 	}
 
 	if err := scanner.Err(); err != nil {
 		return nil
-	}
-
-	if len(entries) > countInt {
-		entries = entries[len(entries)-countInt:]
 	}
 
 	return entries
