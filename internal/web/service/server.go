@@ -19,6 +19,7 @@ import (
 	"mime/multipart"
 	stdnet "net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"os"
 	"os/exec"
@@ -408,6 +409,10 @@ type MLKEM768Response struct {
 	Client string `json:"client" example:"mlkem768-client"`
 }
 
+// maxPublicIPBytes caps an IP echo service's answer; a textual IPv6 address
+// with its line ending fits well within it.
+const maxPublicIPBytes = 64
+
 func getPublicIP(url string) string {
 	client := &http.Client{
 		Timeout: 3 * time.Second,
@@ -431,17 +436,19 @@ func getPublicIP(url string) string {
 		return "N/A"
 	}
 
-	ip, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxPublicIPBytes))
 	if err != nil {
 		return "N/A"
 	}
 
-	ipString := strings.TrimSpace(string(ip))
-	if ipString == "" {
+	// The answer is cached and sent with every status sample, so only a bare
+	// address is accepted; an over-long one is cut above and fails to parse.
+	ip, err := netip.ParseAddr(strings.TrimSpace(string(body)))
+	if err != nil {
 		return "N/A"
 	}
 
-	return ipString
+	return ip.WithZone("").String()
 }
 
 var publicIPv4Services = []string{
@@ -908,6 +915,9 @@ const (
 	// maxXrayDigestBytes caps the .dgst checksum sidecar read; it is a few
 	// hundred bytes in practice.
 	maxXrayDigestBytes = 64 << 10
+	// maxXrayReleasesBytes caps the GitHub release list read; a page of
+	// releases with all their assets is a few MiB.
+	maxXrayReleasesBytes = 32 << 20
 )
 
 // Tests point these at a local server that stands in for GitHub.
@@ -931,7 +941,7 @@ func (s *ServerService) GetXrayVersions() ([]string, error) {
 
 	// Check HTTP status code - GitHub API returns object instead of array on error
 	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp.Body)
+		bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, maxXrayReleasesBytes))
 		var errorResponse struct {
 			Message string `json:"message"`
 		}
@@ -943,7 +953,7 @@ func (s *ServerService) GetXrayVersions() ([]string, error) {
 
 	buffer := bytes.NewBuffer(make([]byte, bufferSize))
 	buffer.Reset()
-	if _, err := buffer.ReadFrom(resp.Body); err != nil {
+	if _, err := buffer.ReadFrom(io.LimitReader(resp.Body, maxXrayReleasesBytes)); err != nil {
 		return nil, err
 	}
 
