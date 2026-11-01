@@ -2552,6 +2552,10 @@ func (s *ServerService) stageGeofile(client *http.Client, entry geofileEntry, ta
 	if err := file.Close(); err != nil {
 		return false, common.NewErrorf("Failed to save Geofile %s: %v", stagePath, err)
 	}
+	// The panel's UMask=0077 would leave it 0600, unreadable to the still-xray core.
+	if err := os.Chmod(stagePath, 0o644); err != nil {
+		return false, common.NewErrorf("Failed to save Geofile %s: %v", stagePath, err)
+	}
 
 	// TLS protects the transport, not the artifact. Xray parses these databases
 	// when it builds its routing matchers, so a bad one takes the core down.

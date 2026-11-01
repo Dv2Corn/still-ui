@@ -210,6 +210,8 @@ _still_xray_unit() {
     install -d -o root -g still-xray -m 2750 /etc/still-xray /etc/still-xray/certs || return 1
     chgrp -R still-xray /etc/still-xray > /dev/null 2>&1
     find /etc/still-xray -type f ! -name panel-meta.json -exec chmod 0640 {} + > /dev/null 2>&1
+    # Older panels wrote geo files 0600 (UMask=0077); the core reads them as still-xray.
+    chmod a+r "${bin_dir}"/*.dat > /dev/null 2>&1
 
     unit="${xui_service}/still-xray.service"
     temp_file="${unit}.tmp.$$"
