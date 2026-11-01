@@ -80,7 +80,7 @@ systemctl show still-ui -p MemoryMax
 
 ### Xray отдельной службой
 
-Включить: строка `STILL_XRAY_UNIT=on` в `/etc/default/still-ui`, затем `still-ui update` (или установщик). Выключить — `STILL_XRAY_UNIT=off` и снова `still-ui update`. Потолок памяти ядра — `STILL_XRAY_MEMORY_MAX` (по умолчанию половина ОЗУ, от 256M до 4G). Входам, которым нужны TPROXY, TUN или метки сокетов, добавьте своим drop-in `CAP_NET_ADMIN`/`CAP_NET_RAW` в `still-xray.service.d`. При включении Xray один раз перезапускается; дальше перезапуск и обновление панели его не трогают.
+Включить: строка `STILL_XRAY_UNIT=on` в `/etc/default/still-ui`, затем `still-ui update` (или установщик). Выключить — `STILL_XRAY_UNIT=off` и снова `still-ui update`. Потолок памяти ядра — `STILL_XRAY_MEMORY_MAX` (по умолчанию половина ОЗУ, от 256M до 4G). Входам, которым нужны TPROXY, TUN или метки сокетов, добавьте своим drop-in `CAP_NET_ADMIN`/`CAP_NET_RAW` в `still-xray.service.d`. При включении Xray один раз перезапускается; дальше перезапуск и обновление панели его не трогают, поэтому новый Xray из обновления заработает только после перезапуска Xray (главная страница об этом скажет). Вход, который слушает unix-сокет (fallback из nginx), должен использовать `/run/still-xray/` или `/dev/shm/`, например `/dev/shm/xray.sock,0666`: `/tmp` у службы свой, а всё остальное для неё только для чтения, поэтому другие пути панель отклоняет и объясняет почему.
 
 ## Обновление, откат, удаление
 

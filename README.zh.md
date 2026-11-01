@@ -80,7 +80,7 @@ systemctl show still-ui -p MemoryMax
 
 ### Xray 作为独立服务
 
-开启：在 `/etc/default/still-ui` 中加入 `STILL_XRAY_UNIT=on`，然后运行 `still-ui update`（或安装脚本）。关闭：设为 `STILL_XRAY_UNIT=off` 并再次运行 `still-ui update`。内核的内存上限为 `STILL_XRAY_MEMORY_MAX`（默认内存的一半，256M 到 4G）。需要 TPROXY、TUN 或套接字标记的入站，请用自己的 drop-in 在 `still-xray.service.d` 中加上 `CAP_NET_ADMIN`/`CAP_NET_RAW`。开启时 Xray 会重启一次；之后重启或升级面板不会影响它。
+开启：在 `/etc/default/still-ui` 中加入 `STILL_XRAY_UNIT=on`，然后运行 `still-ui update`（或安装脚本）。关闭：设为 `STILL_XRAY_UNIT=off` 并再次运行 `still-ui update`。内核的内存上限为 `STILL_XRAY_MEMORY_MAX`（默认内存的一半，256M 到 4G）。需要 TPROXY、TUN 或套接字标记的入站，请用自己的 drop-in 在 `still-xray.service.d` 中加上 `CAP_NET_ADMIN`/`CAP_NET_RAW`。开启时 Xray 会重启一次；之后重启或升级面板不会影响它，因此升级带来的新 Xray 只有在重启 Xray 后才会运行（概览页会提示）。监听 unix 套接字的入站（来自 nginx 的 fallback）必须使用 `/run/still-xray/` 或 `/dev/shm/`，例如 `/dev/shm/xray.sock,0666`：该服务有自己独立的 `/tmp`，其他路径对它都是只读的，因此面板会拒绝其他路径并说明原因。
 
 ## 升级、回滚、卸载
 

@@ -149,6 +149,14 @@ func (s *XrayService) GetHeldBackConfig() string {
 	return xrayState.heldBackReason()
 }
 
+// CoreRestartNeeded says why the running core is older than the installed binary, or "".
+func (s *XrayService) CoreRestartNeeded() string {
+	if process := currentXrayProcess(); process != nil {
+		return process.CoreRestartNeeded()
+	}
+	return ""
+}
+
 // GetXrayResult returns the result string from the Xray process.
 func (s *XrayService) GetXrayResult() string {
 	process, cachedResult := xrayState.snapshot()
@@ -1538,6 +1546,11 @@ func (s *XrayService) RestartXray(isForce bool) error {
 			xrayState.holdBack(refused)
 			return fmt.Errorf("xray %s", refused)
 		}
+		// Hot-added inbounds bypass the unit start that refuses these too.
+		if err := xray.UnitListenError(xrayConfig); err != nil {
+			xrayState.holdBack("config refused: " + err.Error())
+			return fmt.Errorf("xray config refused: %w", err)
+		}
 		if !isForce && !configUnchanged {
 			applied, err := s.tryHotApply(process, xrayConfig)
 			if err != nil {
@@ -1684,14 +1697,18 @@ func (s *XrayService) CheckCertificates() {
 	}
 }
 
-// readoptXrayUnit takes the config a core restarted by systemd actually runs as the diff base.
-func (s *XrayService) readoptXrayUnit() {
+// readoptXrayUnit takes the config a core restarted by systemd actually runs as the diff base;
+// false while that core is not up yet.
+func (s *XrayService) readoptXrayUnit() bool {
 	lock.Lock()
 	defer lock.Unlock()
-	if process := xray.AdoptRunningUnit(); process != nil {
-		xrayState.replace(process)
-		logger.Warning("xray: the core was restarted by systemd, re-applying clients added since its config was written")
+	process := xray.ReadoptRestartedUnit()
+	if process == nil {
+		return false
 	}
+	xrayState.replace(process)
+	logger.Warning("xray: the core was restarted by systemd, re-applying clients added since its config was written")
+	return true
 }
 
 // restartToDropClients reports whether a diff that strands clients must be
@@ -1950,8 +1967,7 @@ func (s *XrayService) IsNeedRestartAndSetFalse() bool {
 // ApplyPendingRestart re-arms the original flags when applying fails, so the next tick retries; a
 // reconcile retry never becomes a restart, which would disconnect unrelated clients.
 func (s *XrayService) ApplyPendingRestart() {
-	if xray.TakeUnitRestart() {
-		s.readoptXrayUnit()
+	if xray.TakeUnitRestart() && s.readoptXrayUnit() {
 		s.SetToNeedReconcile()
 	}
 	reconcile := isNeedXrayReconcile.Swap(false)

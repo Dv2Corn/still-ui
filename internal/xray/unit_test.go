@@ -22,6 +22,7 @@ type fakeUnit struct {
 	active    string
 	pid       int
 	nrestarts int
+	startMono uint64 // ExecMainStartTimestampMonotonic, µs since boot; 0 reads as 1
 	calls     []string
 }
 
@@ -31,8 +32,8 @@ func (f *fakeUnit) systemctl(_ context.Context, args ...string) ([]byte, error) 
 	f.calls = append(f.calls, args[0])
 	switch args[0] {
 	case "show":
-		return fmt.Appendf(nil, "ActiveState=%s\nMainPID=%d\nNRestarts=%d\nExecMainStartTimestampMonotonic=1\n",
-			f.active, f.pid, f.nrestarts), nil
+		return fmt.Appendf(nil, "ActiveState=%s\nMainPID=%d\nNRestarts=%d\nExecMainStartTimestampMonotonic=%d\n",
+			f.active, f.pid, f.nrestarts, max(f.startMono, 1)), nil
 	case "restart":
 		data, err := os.ReadFile(unitConfigPath())
 		if err != nil || strings.Contains(string(data), "will-not-start") {
@@ -66,6 +67,9 @@ func setupFakeUnit(t *testing.T) *fakeUnit {
 	t.Setenv("XUI_XRAY_UNIT", "still-xray-test")
 	t.Setenv("XUI_XRAY_UNIT_FOLDER", t.TempDir())
 	f := &fakeUnit{active: "active", pid: 7}
+	certMirrors.Lock()
+	certMirrors.source, certMirrors.keyOf = map[string]string{}, map[string]string{}
+	certMirrors.Unlock()
 	prevSystemctl, prevJournal, prevTest := systemctlCommand, journalCommand, testConfigCommand
 	prevStart, prevSettle := unitStartTimeout, unitSettleTime
 	systemctlCommand = f.systemctl

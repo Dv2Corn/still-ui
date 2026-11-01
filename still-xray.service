@@ -47,6 +47,11 @@ UMask=0027
 # Access and error logs; the panel reads them for the IP limit and the log viewer.
 LogsDirectory=still-xray
 LogsDirectoryMode=0750
+# Unix sockets an inbound listens on (fallbacks from nginx): here or in /dev/shm, the only
+# places this sandbox lets the core create one that other services see. The panel refuses others.
+RuntimeDirectory=still-xray
+RuntimeDirectoryMode=0755
+RuntimeDirectoryPreserve=restart
 # The memory ceiling (MemoryMax, MemorySwapMax=0, GOMEMLIMIT) is written by install.sh into
 # still-xray.service.d/15-still-memory.conf from STILL_XRAY_MEMORY_MAX.
 

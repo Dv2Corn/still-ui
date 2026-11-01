@@ -80,7 +80,7 @@ To set your own value, add a line to `/etc/default/still-ui` — for example `ST
 
 ### Xray as a separate service
 
-Turn it on: add `STILL_XRAY_UNIT=on` to `/etc/default/still-ui`, then run `still-ui update` (or the installer). Turn it off with `STILL_XRAY_UNIT=off` and `still-ui update` again. The core's memory cap is `STILL_XRAY_MEMORY_MAX` (half the RAM by default, 256M to 4G). Inbounds that need TPROXY, TUN or socket marks need `CAP_NET_ADMIN`/`CAP_NET_RAW` from a drop-in of your own in `still-xray.service.d`. Turning it on restarts Xray once; after that restarting or updating the panel leaves it alone.
+Turn it on: add `STILL_XRAY_UNIT=on` to `/etc/default/still-ui`, then run `still-ui update` (or the installer). Turn it off with `STILL_XRAY_UNIT=off` and `still-ui update` again. The core's memory cap is `STILL_XRAY_MEMORY_MAX` (half the RAM by default, 256M to 4G). Inbounds that need TPROXY, TUN or socket marks need `CAP_NET_ADMIN`/`CAP_NET_RAW` from a drop-in of your own in `still-xray.service.d`. Turning it on restarts Xray once; after that restarting or updating the panel leaves it alone, so a new Xray from an update runs only after you restart Xray (the overview says so). An inbound listening on a unix socket (a fallback from nginx) must use `/run/still-xray/` or `/dev/shm/`, e.g. `/dev/shm/xray.sock,0666`: the service has its own `/tmp` and everything else is read-only to it, so the panel refuses other paths and says why.
 
 ## Update, roll back, remove
 

@@ -1,6 +1,8 @@
 package xray
 
 import (
+	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -10,6 +12,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -279,14 +283,15 @@ func apiPortAnswers(port int) bool {
 type unitMeta struct {
 	TuicRelays     map[string]int    `json:"tuicRelays,omitempty"`
 	RelayPasswords map[string]string `json:"relayPasswords,omitempty"`
+	CoreVersion    string            `json:"coreVersion,omitempty"`
 }
 
 // RelayPasswords supplies the loopback relay passwords kept beside the unit's config (0600, root),
 // so a restarted panel reuses them instead of trusting whatever a config's inbounds claim.
 var RelayPasswords func() map[string]string
 
-func writeUnitMeta(cfg *Config) error {
-	meta := unitMeta{}
+func writeUnitMeta(cfg *Config, coreVersion string) error {
+	meta := unitMeta{CoreVersion: coreVersion}
 	if RelayPasswords != nil {
 		meta.RelayPasswords = RelayPasswords()
 	}
@@ -323,14 +328,14 @@ func applyUnitMeta(cfg *Config, meta unitMeta) {
 }
 
 // writeUnitConfig installs data as the unit's config and as its last known good copy.
-func writeUnitConfig(cfg *Config, data []byte) error {
+func writeUnitConfig(cfg *Config, data []byte, coreVersion string) error {
 	if err := writeFileAtomic(unitConfigPath(), data, 0o640); err != nil {
 		return err
 	}
 	if err := writeFileAtomic(unitLastGoodPath(), data, 0o640); err != nil {
 		return err
 	}
-	return writeUnitMeta(cfg)
+	return writeUnitMeta(cfg, coreVersion)
 }
 
 // startUnit tests the config, installs it and restarts the unit; a config that passes the test
@@ -340,8 +345,15 @@ func (p *process) startUnit() error {
 	if err != nil {
 		return fmt.Errorf("failed to generate xray config: %w", err)
 	}
-	if err := os.MkdirAll(config.GetXrayUnitFolder(), 0o750); err != nil {
+	if err := makeUnitFolder(config.GetXrayUnitFolder()); err != nil {
 		return err
+	}
+	if err := UnitListenError(p.config); err != nil {
+		return fmt.Errorf("%w: %w", ErrConfigRejected, err)
+	}
+	// `xray run -test` runs as root and would pass; the core and the rollback would both fail.
+	if err := unreadableAssets(data); err != nil {
+		return fmt.Errorf("%w: %w", ErrConfigRejected, err)
 	}
 	candidate := unitCandidatePath()
 	if err := writeFileAtomic(candidate, data, 0o640); err != nil {
@@ -365,9 +377,11 @@ func (p *process) startUnit() error {
 		if err := writeFileAtomic(unitLastGoodPath(), data, 0o640); err != nil {
 			logger.Warning("xray unit: could not record the last good config:", err)
 		}
-		if err := writeUnitMeta(p.config); err != nil {
+		p.refreshVersion()
+		if err := writeUnitMeta(p.config, p.GetXrayVersion()); err != nil {
 			logger.Warning("xray unit: could not record config metadata:", err)
 		}
+		pruneCertMirrors(p.config)
 		return nil
 	}
 	if prevErr != nil || string(previous) == string(data) {
@@ -425,7 +439,8 @@ func AdoptRunningUnit() *Process {
 		return nil
 	}
 	u := newUnitControl(name)
-	if !u.state(true).running() {
+	st := u.state(true)
+	if !st.running() {
 		return nil
 	}
 	data, err := os.ReadFile(unitConfigPath())
@@ -448,8 +463,123 @@ func AdoptRunningUnit() *Process {
 	p.unit = u
 	p.adoptedRelayPasswords = meta.RelayPasswords
 	p.refreshVersion()
+	if installed := p.GetXrayVersion(); binaryReplacedSince(st) && meta.CoreVersion != installed {
+		p.mu.Lock()
+		p.version, p.installedVersion = cmp.Or(meta.CoreVersion, "Unknown"), installed
+		p.mu.Unlock()
+	}
 	p.refreshAPIPort()
 	return p
+}
+
+// ReadoptRestartedUnit adopts the core systemd restarted by itself. While that core is still
+// activating it returns nil, and TakeUnitRestart reports the restart again on the next tick.
+func ReadoptRestartedUnit() *Process {
+	p := AdoptRunningUnit()
+	if p == nil && newUnitControl(config.GetXrayUnit()).state(true).Active == "activating" {
+		unitRestarted.Store(true)
+	}
+	return p
+}
+
+// binaryReplacedSince reports a core binary installed after the unit's core started: the
+// core still runs the old, deleted file. The panel cannot read /proc/<pid>/exe without CAP_SYS_PTRACE.
+func binaryReplacedSince(st unitState) bool {
+	info, err := os.Stat(GetBinaryPath())
+	if err != nil || st.StartMono == 0 {
+		return false
+	}
+	raw, err := os.ReadFile("/proc/uptime")
+	fields := strings.Fields(string(raw))
+	if err != nil || len(fields) == 0 {
+		return false
+	}
+	uptime, err := strconv.ParseFloat(fields[0], 64)
+	if err != nil {
+		return false
+	}
+	sinceStart := time.Duration(uptime*float64(time.Second)) - time.Duration(st.StartMono)*time.Microsecond
+	return fileChangedAt(info).After(time.Now().Add(-sinceStart).Add(time.Second))
+}
+
+// CoreRestartNeeded names the core binary installed while the unit's core kept running the
+// previous one; empty when the running core is the installed one.
+func (p *Process) CoreRestartNeeded() string {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	if p.installedVersion == "" {
+		return ""
+	}
+	return fmt.Sprintf("Xray %s is installed but the running core is still %s: restart Xray to run it", p.installedVersion, p.version)
+}
+
+// makeUnitFolder creates a missing folder the core reads through its group; an existing one is
+// left alone, as chmod would clear the setgid bit RestrictSUIDSGID forbids the panel to set again.
+func makeUnitFolder(dir string) error {
+	if _, err := os.Stat(dir); err == nil {
+		return nil
+	}
+	return mkdirAllGroupReadable(dir)
+}
+
+// unitSocketFolders are where the unit's core can create a unix socket other services reach:
+// its RuntimeDirectory, and /dev/shm, which PrivateDevices shares with the host.
+var unitSocketFolders = []string{"/run/still-xray/", "/dev/shm/"}
+
+// UnitListenError refuses an inbound listening on a unix socket the unit's sandbox hides
+// (PrivateTmp) or makes read-only (ProtectSystem=strict); in 3x-ui's child mode any path works.
+func UnitListenError(cfg *Config) error {
+	if cfg == nil || !UnitMode() {
+		return nil
+	}
+	for _, ib := range cfg.InboundConfigs {
+		var listen string
+		if len(ib.Listen) == 0 || json.Unmarshal(ib.Listen, &listen) != nil {
+			continue
+		}
+		path, _, _ := strings.Cut(listen, ",")
+		if !strings.HasPrefix(path, "/") {
+			continue
+		}
+		clean := filepath.Clean(path)
+		if !slices.ContainsFunc(unitSocketFolders, func(dir string) bool { return strings.HasPrefix(clean, dir) }) {
+			return fmt.Errorf("inbound %q listens on the unix socket %s, which the still-xray service cannot create there: use a path in %s",
+				ib.Tag, path, strings.Join(unitSocketFolders, " or "))
+		}
+	}
+	return nil
+}
+
+// extAssetRef matches the external geo files a config names (ext:file.dat:tag).
+var extAssetRef = regexp.MustCompile(`"ext(?:-ip|-domain)?:([^:"/]+):`)
+
+// unreadableAssets reports a geo file the config uses that the unit's core cannot read.
+func unreadableAssets(data []byte) error {
+	var names []string
+	if bytes.Contains(data, []byte("geoip:")) {
+		names = append(names, "geoip.dat")
+	}
+	if bytes.Contains(data, []byte("geosite:")) {
+		names = append(names, "geosite.dat")
+	}
+	for _, m := range extAssetRef.FindAllSubmatch(data, -1) {
+		names = append(names, string(m[1]))
+	}
+	folder, err := os.Stat(config.GetXrayUnitFolder())
+	if err != nil {
+		return nil
+	}
+	for _, name := range names {
+		path := filepath.Join(config.GetBinFolderPath(), name)
+		info, err := os.Stat(path)
+		if err != nil {
+			continue // a missing file is for `xray run -test` to report
+		}
+		if !readableByGroupOf(info, folder) {
+			return fmt.Errorf("%s is not readable by the still-xray service (mode %o): run chmod a+r %s", path, info.Mode().Perm(), path)
+		}
+	}
+	return nil
 }
 
 // AdoptedRelayPasswords returns the relay passwords recorded with an adopted core's config.
