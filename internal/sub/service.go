@@ -1433,7 +1433,7 @@ func (s *SubService) genVlessLink(inbound *model.Inbound, email string) string {
 			params,
 			security,
 			func(ep map[string]any, dest string, port int) string {
-				return fmt.Sprintf("vless://%s@%s", encodeUserinfo(applyVlessRoute(uuid, hostVlessRoute(ep))), joinHostPort(dest, port))
+				return fmt.Sprintf("vless://%s@%s", encodeLinkUserinfo(applyVlessRoute(uuid, hostVlessRoute(ep))), joinHostPort(dest, port))
 			},
 			func(ep map[string]any) string {
 				return s.endpointRemark(inbound, email, ep, streamNetwork)
@@ -1441,7 +1441,7 @@ func (s *SubService) genVlessLink(inbound *model.Inbound, email string) string {
 		)
 	}
 
-	link := fmt.Sprintf("vless://%s@%s", encodeUserinfo(uuid), joinHostPort(address, port))
+	link := fmt.Sprintf("vless://%s@%s", encodeLinkUserinfo(uuid), joinHostPort(address, port))
 	return buildLinkWithParams(link, params, s.genRemark(inbound, email, "", streamNetwork))
 }
 
@@ -1507,6 +1507,21 @@ func (s *SubService) genTrojanLink(inbound *model.Inbound, email string) string 
 // frontend and round-trips cleanly through net/url's parser.
 func encodeUserinfo(s string) string {
 	return strings.ReplaceAll(url.QueryEscape(s), "+", "%20")
+}
+
+// encodeLinkUserinfo escapes with the WHATWG userinfo set, as the panel's own links do through
+// the browser's URL parser, so a non-UUID id reads the same in a subscription and a QR.
+func encodeLinkUserinfo(s string) string {
+	const escaped = " \"#<>?`{}/:;=@[\\]^|"
+	var sb strings.Builder
+	for _, b := range []byte(s) {
+		if b < 0x20 || b > 0x7e || strings.IndexByte(escaped, b) >= 0 {
+			fmt.Fprintf(&sb, "%%%02X", b)
+		} else {
+			sb.WriteByte(b)
+		}
+	}
+	return sb.String()
 }
 
 // joinHostPort wraps an IPv6 host in square brackets the way RFC 3986
