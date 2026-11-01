@@ -4,6 +4,7 @@ package certwatch
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"crypto/sha256"
 	"crypto/tls"
@@ -15,6 +16,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -56,7 +58,7 @@ type Status struct {
 	CheckedAt  int64     `json:"checkedAt" example:"1767225600"`
 }
 
-// Target is one certificate of one inbound to check.
+// Target is one TLS inbound to check, with every certificate file it may answer with.
 type Target struct {
 	Tag       string
 	Port      int
@@ -64,13 +66,20 @@ type Target struct {
 	Transport string // "tls" over TCP or "quic"
 	SNI       string
 	ALPN      []string
-	File      string
-	// ReloadAfter is how long the core may take to reread File by itself; 0 means never.
+	Files     []CertFile
+	// Issuers are the CA files (usage "issue") Xray signs short-lived leaves with on the fly.
+	Issuers []string
+}
+
+// CertFile is one certificate file of an inbound.
+type CertFile struct {
+	Path string
+	// ReloadAfter is how long the core may take to reread Path by itself; 0 means never.
 	ReloadAfter time.Duration
 }
 
-// TargetsFromConfig lists the file-based certificates of cfg's TLS inbounds; source maps a
-// path in the running config back to the file the admin configured.
+// TargetsFromConfig lists cfg's TLS inbounds with their file-based server certificates; source
+// maps a path in the running config back to the file the admin configured.
 func TargetsFromConfig(cfg *xray.Config, source func(string) string) []Target {
 	if cfg == nil {
 		return nil
@@ -87,6 +96,7 @@ func TargetsFromConfig(cfg *xray.Config, source func(string) string) []Target {
 					CertificateFile string `json:"certificateFile"`
 					OneTimeLoading  bool   `json:"oneTimeLoading"`
 					OcspStapling    uint64 `json:"ocspStapling"`
+					Usage           string `json:"usage"`
 				} `json:"certificates"`
 			} `json:"tlsSettings"`
 		}
@@ -105,8 +115,16 @@ func TargetsFromConfig(cfg *xray.Config, source func(string) string) []Target {
 		if transport == "quic" && len(alpn) == 0 {
 			alpn = []string{"h3"}
 		}
+		target := Target{
+			Tag: ib.Tag, Port: ib.Port, Addr: net.JoinHostPort(addr, strconv.Itoa(ib.Port)),
+			Transport: transport, SNI: stream.TLSSettings.ServerName, ALPN: alpn,
+		}
 		for _, cert := range stream.TLSSettings.Certificates {
-			if cert.CertificateFile == "" {
+			if cert.CertificateFile != "" && cert.Usage == "issue" {
+				target.Issuers = append(target.Issuers, source(cert.CertificateFile))
+			}
+			// A CA ("issue"/"verify") is never what the inbound answers with.
+			if cert.CertificateFile == "" || (cert.Usage != "" && cert.Usage != "encipherment") {
 				continue
 			}
 			reload := xrayReloadInterval
@@ -115,11 +133,10 @@ func TargetsFromConfig(cfg *xray.Config, source func(string) string) []Target {
 			} else if cert.OcspStapling > 0 {
 				reload = time.Duration(cert.OcspStapling) * time.Second
 			}
-			targets = append(targets, Target{
-				Tag: ib.Tag, Port: ib.Port, Addr: net.JoinHostPort(addr, strconv.Itoa(ib.Port)),
-				Transport: transport, SNI: stream.TLSSettings.ServerName, ALPN: alpn,
-				File: source(cert.CertificateFile), ReloadAfter: reload,
-			})
+			target.Files = append(target.Files, CertFile{Path: source(cert.CertificateFile), ReloadAfter: reload})
+		}
+		if len(target.Files) > 0 {
+			targets = append(targets, target)
 		}
 	}
 	return targets
@@ -210,8 +227,9 @@ type Watcher struct {
 // NewWatcher returns an empty watcher.
 func NewWatcher() *Watcher { return &Watcher{renewedAt: map[string]time.Time{}} }
 
-// restartCooldown keeps a renewal the core never takes from restarting it over and over.
-const restartCooldown = 30 * time.Minute
+// restartCooldown keeps a renewal the core never takes from restarting it over and over;
+// only a build with -tags e2e may shorten it (cooldown_e2e.go).
+var restartCooldown = 30 * time.Minute
 
 // Check probes every target and reports whether the core has to be restarted to serve a
 // renewed certificate: it did not reread the file in time, or what it serves expires within the hour.
@@ -225,16 +243,16 @@ func (w *Watcher) Check(ctx context.Context, targets []Target, now time.Time) (s
 	seen := map[string]bool{}
 	for _, t := range targets {
 		st := Status{Tag: t.Tag, Port: t.Port, Transport: t.Transport, CheckedAt: now.Unix()}
-		fileLeaf, err := readLeaf(t.File)
-		if err != nil {
+		files, err := readFiles(t.Files)
+		if len(files) == 0 {
 			st.State, st.ProbeError = StateUnreachable, "certificate file: "+err.Error()
 			statuses = append(statuses, st)
 			continue
 		}
-		st.File = describe(fileLeaf)
+		st.File = describe(files[0].leaf)
 		sni := t.SNI
-		if sni == "" && len(fileLeaf.DNSNames) > 0 {
-			sni = fileLeaf.DNSNames[0]
+		if sni == "" && len(files[0].leaf.DNSNames) > 0 {
+			sni = files[0].leaf.DNSNames[0]
 		}
 		pctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		served, err := probeFn(pctx, t, sni)
@@ -245,10 +263,19 @@ func (w *Watcher) Check(ctx context.Context, targets []Target, now time.Time) (s
 			continue
 		}
 		st.Served = describe(served)
-		key := t.Tag + "\x00" + t.File
-		renewed := !bytes.Equal(served.Raw, fileLeaf.Raw) && fileLeaf.NotAfter.After(served.NotAfter)
+		match, renewal := compareServed(served, files)
+		if match != nil {
+			st.File = describe(match.leaf)
+		} else if renewal != nil {
+			st.File = describe(renewal.leaf)
+		}
+		issuer := issuedBy(served, t.Issuers)
 		switch {
-		case renewed:
+		case issuer != nil:
+			// Xray reissues these hour-long leaves itself: neither a renewal nor an expiry.
+			st.File, st.State = describe(issuer), StateOK
+		case renewal != nil:
+			key := t.Tag + "\x00" + renewal.Path
 			seen[key] = true
 			first, ok := w.renewedAt[key]
 			if !ok {
@@ -256,7 +283,7 @@ func (w *Watcher) Check(ctx context.Context, targets []Target, now time.Time) (s
 				w.renewedAt[key] = now
 			}
 			st.State = StateRenewed
-			late := now.Sub(first) > t.ReloadAfter+2*time.Minute
+			late := now.Sub(first) > renewal.ReloadAfter+2*time.Minute
 			if late || served.NotAfter.Sub(now) < time.Hour {
 				restart = true
 			}
@@ -284,6 +311,67 @@ func (w *Watcher) Check(ctx context.Context, targets []Target, now time.Time) (s
 		w.lastRestart = now
 	}
 	return statuses, restart
+}
+
+type fileLeaf struct {
+	CertFile
+	leaf *x509.Certificate
+}
+
+// readFiles parses every readable file; err is the first failure, for when none could be read.
+func readFiles(files []CertFile) (leaves []fileLeaf, err error) {
+	for _, f := range files {
+		leaf, readErr := readLeaf(f.Path)
+		if readErr != nil {
+			err = cmp.Or(err, readErr)
+			continue
+		}
+		leaves = append(leaves, fileLeaf{f, leaf})
+	}
+	return leaves, err
+}
+
+// compareServed finds the file the inbound answers with, or else the newest file renewing the
+// served certificate's names: an RSA+ECDSA pair or one file per domain is not a renewal.
+func compareServed(served *x509.Certificate, files []fileLeaf) (match, renewal *fileLeaf) {
+	for i := range files {
+		if bytes.Equal(files[i].leaf.Raw, served.Raw) {
+			return &files[i], nil
+		}
+	}
+	for i := range files {
+		f := &files[i]
+		if sameNames(f.leaf, served) && f.leaf.NotAfter.After(served.NotAfter) &&
+			(renewal == nil || f.leaf.NotAfter.After(renewal.leaf.NotAfter)) {
+			renewal = f
+		}
+	}
+	return nil, renewal
+}
+
+// issuedBy returns the CA among issuers that signed served, or nil.
+func issuedBy(served *x509.Certificate, issuers []string) *x509.Certificate {
+	for _, path := range issuers {
+		if ca, err := readLeaf(path); err == nil && served.CheckSignatureFrom(ca) == nil {
+			return ca
+		}
+	}
+	return nil
+}
+
+func sameNames(a, b *x509.Certificate) bool {
+	names := func(c *x509.Certificate) []string {
+		out := slices.Clone(c.DNSNames)
+		for _, ip := range c.IPAddresses {
+			out = append(out, ip.String())
+		}
+		if len(out) == 0 {
+			out = append(out, c.Subject.CommonName)
+		}
+		slices.Sort(out)
+		return slices.Compact(out)
+	}
+	return slices.Equal(names(a), names(b))
 }
 
 // expiringWithin warns a week ahead, or at a quarter of the lifetime for short-lived

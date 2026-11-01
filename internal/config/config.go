@@ -236,6 +236,12 @@ func GetXrayUnit() string {
 	return strings.TrimSpace(os.Getenv("XUI_XRAY_UNIT"))
 }
 
+// GetCertRestart reports STILL_CERT_RESTART=on: restart a core run as the panel's child when it
+// missed a certificate renewal. Off by default, as that restart drops every client.
+func GetCertRestart() bool {
+	return strings.EqualFold(strings.TrimSpace(os.Getenv("STILL_CERT_RESTART")), "on")
+}
+
 // GetXrayUnitFolder holds the unit's config and the certificate copies it may read.
 func GetXrayUnitFolder() string {
 	if p := strings.TrimSpace(os.Getenv("XUI_XRAY_UNIT_FOLDER")); p != "" {

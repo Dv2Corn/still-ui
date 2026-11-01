@@ -1648,12 +1648,15 @@ func seedRelayPasswords(passwords map[string]string) {
 
 var certWatcher = certwatch.NewWatcher()
 
+// restartXrayForCertificate is a seam: tests see whether a missed renewal restarts the core.
+var restartXrayForCertificate = func(s *XrayService) error { return s.RestartXray(true) }
+
 // CertificateStatuses returns what the last certificate check found for each TLS inbound.
 func CertificateStatuses() []certwatch.Status { return certWatcher.Statuses() }
 
 // CheckCertificates refreshes the unit's copies of renewed certificate files and compares what
-// every TLS/Hysteria inbound serves with its file. Xray rereads the files by itself (hourly, or
-// every ocspStapling seconds); a core that missed a renewal gets one restart of the core only.
+// every TLS/Hysteria inbound serves with its files. A core that missed a renewal is restarted,
+// a child core only with STILL_CERT_RESTART=on: that restart drops every client.
 func (s *XrayService) CheckCertificates() {
 	if xray.UnitMode() {
 		if renewed := xray.SyncCertificateMirrors(); len(renewed) > 0 {
@@ -1671,8 +1674,12 @@ func (s *XrayService) CheckCertificates() {
 	if !restart {
 		return
 	}
+	if !xray.UnitMode() && !config.GetCertRestart() {
+		logger.Warning("xray: an inbound still serves its old certificate after renewal; restart Xray, or set STILL_CERT_RESTART=on")
+		return
+	}
 	logger.Warning("xray: an inbound still serves its old certificate after renewal, restarting the core")
-	if err := s.RestartXray(true); err != nil {
+	if err := restartXrayForCertificate(s); err != nil {
 		logger.Error("xray: restart for a renewed certificate failed:", err)
 	}
 }
