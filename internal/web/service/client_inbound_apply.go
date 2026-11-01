@@ -67,7 +67,7 @@ func validateAmneziaWGClientWrite(inbound *model.Inbound, clients []model.Client
 	inst.Address = []string{v4Base}
 	for _, client := range clients {
 		inst.Peers = append(inst.Peers, amneziawg.Peer{
-			Email: client.Email, AllowedIPs: client.AllowedIPs, ForwardedPorts: client.ForwardedPorts,
+			Email: client.Email, AllowedIPs: client.AllowedIPs, ForwardedPorts: client.ForwardedPortsSpec(),
 		})
 	}
 	if err := amneziawgkern.ValidateInstanceFeatures(inst, settings.Server.RouteThroughXray); err != nil {
@@ -570,7 +570,7 @@ func (s *ClientService) AddInboundClient(inboundSvc *InboundService, data *model
 			}
 		}
 		if oldInbound.Protocol == model.AmneziaWG {
-			if hit := inboundSvc.checkForwardedPortsConflict(portCtx, client.ForwardedPorts); hit != "" {
+			if hit := inboundSvc.checkForwardedPortsConflict(portCtx, client.ForwardedPortsSpec()); hit != "" {
 				return false, common.NewError("amneziawg: forwardedPorts collides with", hit)
 			}
 		}
@@ -640,7 +640,7 @@ func (s *ClientService) AddInboundClient(inboundSvc *InboundService, data *model
 				return pErr
 			}
 			for i := range clients {
-				if hit := inboundSvc.checkForwardedPortsConflict(txPortCtx, clients[i].ForwardedPorts); hit != "" {
+				if hit := inboundSvc.checkForwardedPortsConflict(txPortCtx, clients[i].ForwardedPortsSpec()); hit != "" {
 					return common.NewError("amneziawg: forwardedPorts collides with", hit)
 				}
 			}
@@ -878,8 +878,8 @@ func (s *ClientService) UpdateInboundClient(inboundSvc *InboundService, data *mo
 		if clients[0].KeepAlive == nil {
 			clients[0].KeepAlive = old.KeepAlive
 		}
-		// AWG partial edits preserve forwarding specs; kernel mode rejects legacy specs.
-		if oldInbound.Protocol == model.AmneziaWG && clients[0].ForwardedPorts == "" {
+		// AWG partial edits (nil: the field was not sent) keep the stored spec; "" withdraws it.
+		if oldInbound.Protocol == model.AmneziaWG && clients[0].ForwardedPorts == nil {
 			clients[0].ForwardedPorts = old.ForwardedPorts
 		}
 	}
@@ -891,7 +891,7 @@ func (s *ClientService) UpdateInboundClient(inboundSvc *InboundService, data *mo
 		if err != nil {
 			return false, err
 		}
-		if hit := inboundSvc.checkForwardedPortsConflict(portCtx, clients[0].ForwardedPorts); hit != "" {
+		if hit := inboundSvc.checkForwardedPortsConflict(portCtx, clients[0].ForwardedPortsSpec()); hit != "" {
 			return false, common.NewError("amneziawg: forwardedPorts collides with", hit)
 		}
 	}
@@ -944,9 +944,13 @@ func (s *ClientService) UpdateInboundClient(inboundSvc *InboundService, data *mo
 				if clients[0].KeepAlive != nil {
 					newMap["keepAlive"] = clients[0].KeepAlive
 				}
-				if oldInbound.Protocol == model.AmneziaWG && clients[0].ForwardedPorts != "" {
-					newMap["forwardedPorts"] = clients[0].ForwardedPorts
+				if oldInbound.Protocol == model.AmneziaWG && clients[0].ForwardedPortsSpec() != "" {
+					newMap["forwardedPorts"] = clients[0].ForwardedPortsSpec()
 				}
+			}
+			// Withdrawn forwards are stored as no spec at all, whatever the protocol.
+			if clients[0].ForwardedPortsSpec() == "" {
+				delete(newMap, "forwardedPorts")
 			}
 			if oldClientMap != nil && sameClientConfigExceptUpdatedAt(oldClientMap, newMap) {
 				if v, ok2 := oldClientMap["updated_at"]; ok2 {
@@ -1028,7 +1032,7 @@ func (s *ClientService) UpdateInboundClient(inboundSvc *InboundService, data *mo
 			if pErr != nil {
 				return pErr
 			}
-			if hit := inboundSvc.checkForwardedPortsConflict(txPortCtx, clients[0].ForwardedPorts); hit != "" {
+			if hit := inboundSvc.checkForwardedPortsConflict(txPortCtx, clients[0].ForwardedPortsSpec()); hit != "" {
 				return common.NewError("amneziawg: forwardedPorts collides with", hit)
 			}
 		}
