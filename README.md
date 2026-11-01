@@ -44,7 +44,7 @@ bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.
 To install a specific release, pass its tag (tags look like `vX.Y.Z-still.N`):
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh) v3.11.0-still.2
+bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh) v3.11.0-still.3
 ```
 
 To install from a release archive you already downloaded:
@@ -55,7 +55,7 @@ STILL_UI_ARCHIVE=/path/still-ui-linux-amd64.tar.gz bash install.sh
 
 The installer generates a random username, password and panel path and prints them at the end — save them. After that, run `still-ui` to open the management menu: start and stop the service, show or reset the login, change the port, manage certificates and so on. The subcommands are the same as in 3x-ui's `x-ui` script (`still-ui start`, `stop`, `restart`, `status`, `log`, `update`, `legacy`, `uninstall` and others).
 
-Release builds exist for **Linux amd64 and arm64** only. The current release is panel **3.11.0-still.2** with **Xray v26.10.21**.
+Release builds exist for **Linux amd64 and arm64** only. The current release is panel **3.11.0-still.3** with **Xray v26.10.21**.
 
 ### Where things live
 
