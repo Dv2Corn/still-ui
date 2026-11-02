@@ -1854,8 +1854,9 @@ func (s *InboundService) SetInboundSubSortIndex(id int, index int) error {
 		return nil
 	}
 
-	db := database.GetDB()
-	if err := db.Transaction(func(tx *gorm.DB) error {
+	// Serialized with the node merge, which samples config_dirty before writing
+	// the node's sort order back onto this row.
+	if err := runSerializedTx(func(tx *gorm.DB) error {
 		if err := tx.Model(model.Inbound{}).Where("id = ?", id).
 			Update("sub_sort_index", index).Error; err != nil {
 			return err
@@ -1912,7 +1913,9 @@ func (s *InboundService) SetInboundEnable(id int, enable bool) (bool, error) {
 			return false, common.NewError(conflict.String())
 		}
 	}
-	if err := db.Transaction(func(tx *gorm.DB) error {
+	// Serialized with the node merge, which samples config_dirty before writing
+	// the node's enable state back onto this row.
+	if err := runSerializedTx(func(tx *gorm.DB) error {
 		if err := tx.Model(model.Inbound{}).Where("id = ?", id).
 			Update("enable", enable).Error; err != nil {
 			return err
