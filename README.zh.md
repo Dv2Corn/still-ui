@@ -44,7 +44,7 @@ bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.
 如需安装指定版本，在末尾加上版本标签（标签格式为 `vX.Y.Z-still.N`）：
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh) v1.0.0
+bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh) v1.1.0
 ```
 
 使用已下载的发行版压缩包安装：
@@ -55,7 +55,7 @@ STILL_UI_ARCHIVE=/path/still-ui-linux-amd64.tar.gz bash install.sh
 
 安装脚本会随机生成用户名、密码和面板访问路径，并在结束时显示出来，请妥善保存。之后运行 `still-ui` 即可打开管理菜单：启动和停止服务、查看或重置登录信息、修改端口、管理证书等。子命令与 3x-ui 的 `x-ui` 脚本相同：`still-ui start`、`stop`、`restart`、`status`、`log`、`update`、`legacy`、`uninstall` 等。
 
-发行版只提供 **Linux amd64 和 arm64** 的构建。当前版本：still-ui **1.0.0**（基于 3x-ui 3.11.0），内置 **Xray v26.10.21**。
+发行版只提供 **Linux amd64 和 arm64** 的构建。当前版本：still-ui **1.1.0**（基于 3x-ui 3.11.0 及其后合并的修复），内置 **Xray v26.10.31**。
 
 ### 文件位置
 
