@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/robfig/cron/v3"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/database/dbtest"
@@ -23,7 +24,7 @@ and an entry for a removed route documents an endpoint that 404s. This test
 constructs the real router and diffs it against the registry both ways.
 
 Scope: everything under /panel/api/ plus the session-auth surface the
-registry also documents (/login, /logout, /csrf-token, /sponsors,
+registry also documents (/login, /logout, /csrf-token,
 /getTwoFactorEnable, /ws). SPA page routes are UI, not API, and stay out;
 registry paths that start with "/{" describe the standalone subscription
 server, which this engine does not serve.
@@ -33,7 +34,6 @@ var contractExtraRoutes = map[string]bool{
 	"POST /login":              true,
 	"POST /logout":             true,
 	"GET /csrf-token":          true,
-	"GET /sponsors":            true,
 	"POST /getTwoFactorEnable": true,
 	"GET /ws":                  true,
 }
@@ -42,7 +42,8 @@ func inContractScope(method, path string) bool {
 	return strings.HasPrefix(path, "/panel/api/") || contractExtraRoutes[method+" "+path]
 }
 
-func registeredContractRoutes(t *testing.T) map[string]bool {
+// newTestEngine builds the real panel router on a throwaway database.
+func newTestEngine(t *testing.T) *gin.Engine {
 	t.Helper()
 	dbtest.InitDB(t, filepath.Join(t.TempDir(), "x-ui.db"))
 
@@ -59,6 +60,12 @@ func registeredContractRoutes(t *testing.T) map[string]bool {
 	if err != nil {
 		t.Fatalf("init router: %v", err)
 	}
+	return engine
+}
+
+func registeredContractRoutes(t *testing.T) map[string]bool {
+	t.Helper()
+	engine := newTestEngine(t)
 	routes := make(map[string]bool)
 	for _, r := range engine.Routes() {
 		routes[r.Method+" "+r.Path] = true

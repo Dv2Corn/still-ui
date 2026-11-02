@@ -453,7 +453,7 @@ export const ClientSchema = z.object({
   enable: z.boolean(),
   expiryTime: z.number().int(),
   flow: z.string().optional(),
-  forwardedPorts: z.string().optional(),
+  forwardedPorts: z.string().nullable().optional(),
   group: z.string().optional(),
   id: z.string().optional(),
   keepAlive: z.union([z.number().int(), z.string()]).optional(),
@@ -1126,26 +1126,6 @@ export const SettingSchema = z.object({
   value: z.string(),
 });
 export type Setting = z.infer<typeof SettingSchema>;
-
-export const SponsorSchema = z.object({
-  enable: z.boolean().nullable().optional(),
-  from: z.string().nullable().optional(),
-  id: z.string(),
-  link: z.string(),
-  logo: z.string().optional(),
-  name: z.string(),
-  slots: z.array(z.string()),
-  text: z.record(z.string(), z.string()),
-  title: z.record(z.string(), z.string()),
-  until: z.string(),
-});
-export type Sponsor = z.infer<typeof SponsorSchema>;
-
-export const SponsorListSchema = z.object({
-  contact: z.string().optional(),
-  sponsors: z.array(z.lazy(() => SponsorSchema)),
-});
-export type SponsorList = z.infer<typeof SponsorListSchema>;
 
 export const SubBalancerSchema = z.object({
   createdAt: z.number().int(),

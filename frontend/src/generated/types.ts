@@ -427,7 +427,7 @@ export interface Client {
   enable: boolean;
   expiryTime: number;
   flow?: string;
-  forwardedPorts?: string;
+  forwardedPorts?: string | null;
   group?: string;
   id?: string;
   keepAlive?: number | string;
@@ -1056,24 +1056,6 @@ export interface Setting {
   id: number;
   key: string;
   value: string;
-}
-
-export interface Sponsor {
-  enable?: boolean | null;
-  from?: string | null;
-  id: string;
-  link: string;
-  logo?: string;
-  name: string;
-  slots: string[];
-  text: Record<string, string>;
-  title: Record<string, string>;
-  until: string;
-}
-
-export interface SponsorList {
-  contact?: string;
-  sponsors: Sponsor[];
 }
 
 export interface SubBalancer {
