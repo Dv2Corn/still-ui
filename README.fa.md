@@ -136,7 +136,7 @@ systemctl enable --now x-ui
 
 ## سپاسگزاری
 
-- [3x-ui](https://github.com/MHSanaei/3x-ui) — از MHSanaei و همهٔ مشارکت‌کنندگان؛ still-ui بر پایهٔ کار آن‌ها ساخته شده است.
+- [3x-ui](https://github.com/MHSanaei/3x-ui) — از MHSanaei و همهٔ مشارکت‌کنندگان؛ still-ui بر پایهٔ کار آن‌ها ساخته شده است. حمایت از نویسندهٔ 3x-ui: [GitHub Sponsors](https://github.com/sponsors/MHSanaei), [donate.sanaei.dev](https://donate.sanaei.dev/).
 - [x-ui](https://github.com/vaxilu/x-ui) — از vaxilu که همه‌چیز از آنجا شروع شد، و از [alireza0](https://github.com/alireza0/).
 - [Xray-core](https://github.com/XTLS/Xray-core) — از Project X، موتوری که زیر این پنل کار می‌کند.
 

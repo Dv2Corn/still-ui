@@ -136,7 +136,7 @@ systemctl enable --now x-ui
 
 ## Благодарности
 
-- [3x-ui](https://github.com/MHSanaei/3x-ui) — MHSanaei и всем участникам: still-ui стоит на их работе.
+- [3x-ui](https://github.com/MHSanaei/3x-ui) — MHSanaei и всем участникам: still-ui стоит на их работе. Поддержать автора 3x-ui: [GitHub Sponsors](https://github.com/sponsors/MHSanaei), [donate.sanaei.dev](https://donate.sanaei.dev/).
 - [x-ui](https://github.com/vaxilu/x-ui) — vaxilu, с которого всё началось, и [alireza0](https://github.com/alireza0/).
 - [Xray-core](https://github.com/XTLS/Xray-core) — Project X, движок под капотом.
 

@@ -136,7 +136,7 @@ systemctl enable --now x-ui
 
 ## 致谢
 
-- [3x-ui](https://github.com/MHSanaei/3x-ui) —— 感谢 MHSanaei 及所有贡献者，still-ui 建立在他们的工作之上。
+- [3x-ui](https://github.com/MHSanaei/3x-ui) —— 感谢 MHSanaei 及所有贡献者，still-ui 建立在他们的工作之上。也可以支持 3x-ui 的作者：[GitHub Sponsors](https://github.com/sponsors/MHSanaei), [donate.sanaei.dev](https://donate.sanaei.dev/)。
 - [x-ui](https://github.com/vaxilu/x-ui) —— 感谢一切的起点 vaxilu，以及 [alireza0](https://github.com/alireza0/)。
 - [Xray-core](https://github.com/XTLS/Xray-core) —— 感谢 Project X 提供底层引擎。
 
