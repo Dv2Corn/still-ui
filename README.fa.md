@@ -44,7 +44,7 @@ bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.
 برای نصب یک نسخهٔ مشخص، برچسب آن را اضافه کنید (برچسب‌ها به شکل `vX.Y.Z-still.N` هستند):
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh) v3.11.0-still.4
+bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh) v1.0.0
 ```
 
 نصب از آرشیو نسخه‌ای که قبلاً دانلود کرده‌اید:
@@ -55,7 +55,7 @@ STILL_UI_ARCHIVE=/path/still-ui-linux-amd64.tar.gz bash install.sh
 
 نصب‌کننده نام کاربری، رمز عبور و مسیر پنل را به‌صورت تصادفی می‌سازد و در پایان نشان می‌دهد؛ آن‌ها را جایی نگه دارید. پس از آن، دستور `still-ui` منوی مدیریت را باز می‌کند: روشن و خاموش کردن سرویس، دیدن یا بازنشانی اطلاعات ورود، تغییر پورت، مدیریت گواهی‌ها و غیره. زیردستورها همان‌هایی هستند که اسکریپت `x-ui` در 3x-ui دارد: `still-ui start`، `stop`، `restart`، `status`، `log`، `update`، `legacy`، `uninstall` و موارد دیگر.
 
-بسته‌های آمادهٔ هر نسخه فقط برای **Linux amd64 و arm64** ساخته می‌شوند. نسخهٔ فعلی: پنل **3.11.0-still.4** همراه با **Xray v26.10.21**.
+بسته‌های آمادهٔ هر نسخه فقط برای **Linux amd64 و arm64** ساخته می‌شوند. نسخهٔ فعلی: still-ui **1.0.0** بر پایهٔ 3x-ui 3.11.0، همراه با **Xray v26.10.21**.
 
 ### چه چیزی کجاست
 
