@@ -194,6 +194,73 @@ func RemoveIndex(s []any, index int) []any {
 	return append(s[:index], s[index+1:]...)
 }
 
+// coreInboundStream is the stream an inbound runs with in the core: the panel-only
+// keys dropped and stored legacy or crashing shapes healed. GetXrayConfig and the
+// direct API pushes both use it, so the core gets one shape either way.
+func coreInboundStream(tag, streamSettings string) (string, error) {
+	// Unmarshal stream JSON
+	var stream map[string]any
+	_ = json.Unmarshal([]byte(streamSettings), &stream)
+
+	// Remove the "settings" field under "tlsSettings" and "realitySettings"
+	tlsSettings, ok1 := stream["tlsSettings"].(map[string]any)
+	realitySettings, ok2 := stream["realitySettings"].(map[string]any)
+	if ok1 || ok2 {
+		if ok1 {
+			delete(tlsSettings, "settings")
+		} else if ok2 {
+			delete(realitySettings, "settings")
+		}
+	}
+
+	delete(stream, "externalProxy")
+
+	// finalmask.tcp + REALITY panics Xray-core on the first connection
+	// (XTLS/Xray-core#6453). AddInbound/UpdateInbound reject this
+	// combination at save time, but a row saved before that guard
+	// existed (upgrade, node sync, restored backup, direct DB edit)
+	// would still crash Xray on the next restart without this — drop
+	// it here too, the same way liftXhttpSessionIDKeys and
+	// HealShadowsocksClientMethods heal other legacy data in place.
+	if len(finalMaskRealityTcpMasks(stream)) > 0 {
+		logger.Warningf("Inbound %q: dropping finalmask, incompatible with REALITY security (crashes Xray-core, see XTLS/Xray-core#6453)", tag)
+		delete(stream, "finalmask")
+	}
+
+	dropEmptyRandPackets(stream["finalmask"])
+
+	if dropped := stripIncompleteXmcMasks(stream); dropped > 0 {
+		logger.Warningf("Inbound %q: dropping %d XMC finalmask mask(s) without complete Minecraft profiles — reconfigure them to restore the obfuscation (see XTLS/Xray-core#6487)", tag, dropped)
+	}
+
+	// A row that skipped the save path can still carry an xdns shape older than 26.10.10.
+	maskcompat.UpgradeLegacyXdns(stream["finalmask"])
+
+	// xray-core v26.6.22 (#6258) renamed the XHTTP session keys and
+	// kept no fallback. Lift legacy sessionPlacement/sessionKey onto the
+	// new names here so inbounds stored before the rename keep working
+	// without the admin re-saving them.
+	liftXhttpSessionIDKeys(stream)
+
+	newStream, err := json.MarshalIndent(stream, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	return string(newStream), nil
+}
+
+// coreClientFlow is the flow a client runs with in the core: Vision only where
+// the inbound's stream can carry it, and the client-side udp443 variant as Vision.
+func coreClientFlow(flow string, flowAllowed bool) string {
+	if !flowAllowed {
+		return ""
+	}
+	if flow == "xtls-rprx-vision-udp443" {
+		return "xtls-rprx-vision"
+	}
+	return flow
+}
+
 // GetXrayConfig retrieves and builds the Xray configuration from settings and inbounds.
 func (s *XrayService) GetXrayConfig() (*xray.Config, error) {
 	templateConfig, err := s.settingService.GetXrayConfigTemplate()
@@ -283,13 +350,7 @@ func (s *XrayService) GetXrayConfig() (*xray.Config, error) {
 			if !c.Enable {
 				continue
 			}
-			flow := c.Flow
-			if flow == "xtls-rprx-vision-udp443" {
-				flow = "xtls-rprx-vision"
-			}
-			if !flowAllowed {
-				flow = ""
-			}
+			flow := coreClientFlow(c.Flow, flowAllowed)
 			entry := map[string]any{"email": c.Email}
 			switch inbound.Protocol {
 			case model.VLESS:
@@ -390,55 +451,11 @@ func (s *XrayService) GetXrayConfig() (*xray.Config, error) {
 		}
 
 		if len(inbound.StreamSettings) > 0 {
-			// Unmarshal stream JSON
-			var stream map[string]any
-			_ = json.Unmarshal([]byte(inbound.StreamSettings), &stream)
-
-			// Remove the "settings" field under "tlsSettings" and "realitySettings"
-			tlsSettings, ok1 := stream["tlsSettings"].(map[string]any)
-			realitySettings, ok2 := stream["realitySettings"].(map[string]any)
-			if ok1 || ok2 {
-				if ok1 {
-					delete(tlsSettings, "settings")
-				} else if ok2 {
-					delete(realitySettings, "settings")
-				}
-			}
-
-			delete(stream, "externalProxy")
-
-			// finalmask.tcp + REALITY panics Xray-core on the first connection
-			// (XTLS/Xray-core#6453). AddInbound/UpdateInbound reject this
-			// combination at save time, but a row saved before that guard
-			// existed (upgrade, node sync, restored backup, direct DB edit)
-			// would still crash Xray on the next restart without this — drop
-			// it here too, the same way liftXhttpSessionIDKeys and
-			// HealShadowsocksClientMethods heal other legacy data in place.
-			if len(finalMaskRealityTcpMasks(stream)) > 0 {
-				logger.Warningf("Inbound %q: dropping finalmask, incompatible with REALITY security (crashes Xray-core, see XTLS/Xray-core#6453)", inbound.Tag)
-				delete(stream, "finalmask")
-			}
-
-			dropEmptyRandPackets(stream["finalmask"])
-
-			if dropped := stripIncompleteXmcMasks(stream); dropped > 0 {
-				logger.Warningf("Inbound %q: dropping %d XMC finalmask mask(s) without complete Minecraft profiles — reconfigure them to restore the obfuscation (see XTLS/Xray-core#6487)", inbound.Tag, dropped)
-			}
-
-			// A row that skipped the save path can still carry an xdns shape older than 26.10.10.
-			maskcompat.UpgradeLegacyXdns(stream["finalmask"])
-
-			// xray-core v26.6.22 (#6258) renamed the XHTTP session keys and
-			// kept no fallback. Lift legacy sessionPlacement/sessionKey onto the
-			// new names here so inbounds stored before the rename keep working
-			// without the admin re-saving them.
-			liftXhttpSessionIDKeys(stream)
-
-			newStream, err := json.MarshalIndent(stream, "", "  ")
+			newStream, err := coreInboundStream(inbound.Tag, inbound.StreamSettings)
 			if err != nil {
 				return nil, err
 			}
-			inbound.StreamSettings = string(newStream)
+			inbound.StreamSettings = newStream
 		}
 
 		if inbound.Protocol == model.Shadowsocks {

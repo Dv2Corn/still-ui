@@ -1594,6 +1594,9 @@ func (s *InboundService) AddInbound(inbound *model.Inbound) (*model.Inbound, boo
 						if inbound.Protocol != model.MTProto && inbound.Protocol != model.TUIC {
 							needRestart = true
 						}
+					} else if !servedOutsideXray(inbound.Protocol) && hotSwapRefused(nil, payload) {
+						// RestartXray adds it from the generated config.
+						needRestart = true
 					} else {
 						postCommitApply = func() {
 							if err1 := rt.AddInbound(context.Background(), payload); err1 == nil {
@@ -1957,6 +1960,19 @@ func (s *InboundService) SetInboundEnable(id int, enable bool) (bool, error) {
 		return true, nil
 	}
 
+	var runtimeInbound *model.Inbound
+	if enable {
+		runtimeInbound, err = s.buildInboundForLocalRuntime(db, inbound)
+		if err != nil {
+			logger.Debug("SetInboundEnable: build runtime config failed:", err)
+			return true, nil
+		}
+		if !servedOutsideXray(inbound.Protocol) && hotSwapRefused(nil, runtimeInbound) {
+			// RestartXray adds it from the generated config.
+			return true, nil
+		}
+	}
+
 	if err := rt.DelInbound(context.Background(), inbound); err != nil &&
 		!strings.Contains(err.Error(), "not found") {
 		logger.Debug("SetInboundEnable: DelInbound on", rt.Name(), "failed:", err)
@@ -1966,11 +1982,6 @@ func (s *InboundService) SetInboundEnable(id int, enable bool) (bool, error) {
 		return needRestart, nil
 	}
 
-	runtimeInbound, err := s.buildInboundForLocalRuntime(db, inbound)
-	if err != nil {
-		logger.Debug("SetInboundEnable: build runtime config failed:", err)
-		return true, nil
-	}
 	if err := rt.AddInbound(context.Background(), runtimeInbound); err != nil {
 		logger.Debug("SetInboundEnable: AddInbound on", rt.Name(), "failed:", err)
 		needRestart = true
@@ -2322,22 +2333,31 @@ func (s *InboundService) UpdateInbound(inbound *model.Inbound) (*model.Inbound, 
 					// Unbuildable means unknown running state: the rebuild below covers it.
 					runningInbound, _ = s.buildRunningInbound(tx, &running)
 				}
-				postCommitApply = func() {
-					if runningInbound != nil && applyInboundUserOps(rt, runningInbound, runtimeInbound) {
-						logger.Debug("Inbound clients updated in place on", rt.Name(), ":", oldInbound.Tag)
-						return
-					}
-					if err2 := rt.DelInbound(context.Background(), &oldSnapshot); err2 == nil {
-						logger.Debug("Old inbound deleted on", rt.Name(), ":", tag)
-					}
-					if runtimeInbound == nil {
-						return
-					}
-					if err2 := rt.AddInbound(context.Background(), runtimeInbound); err2 == nil {
-						logger.Debug("Updated inbound added on", rt.Name(), ":", oldInbound.Tag)
-					} else {
-						logger.Debug("Unable to update inbound on", rt.Name(), ":", err2)
-						needRestart = true
+				previous := runningInbound
+				if previous == nil && running.Enable {
+					previous = &running
+				}
+				if runtimeInbound != nil && hotSwapRefused(previous, runtimeInbound) {
+					// RestartXray applies this change from the generated config.
+					needRestart = true
+				} else {
+					postCommitApply = func() {
+						if runningInbound != nil && applyInboundUserOps(rt, runningInbound, runtimeInbound) {
+							logger.Debug("Inbound clients updated in place on", rt.Name(), ":", oldInbound.Tag)
+							return
+						}
+						if err2 := rt.DelInbound(context.Background(), &oldSnapshot); err2 == nil {
+							logger.Debug("Old inbound deleted on", rt.Name(), ":", tag)
+						}
+						if runtimeInbound == nil {
+							return
+						}
+						if err2 := rt.AddInbound(context.Background(), runtimeInbound); err2 == nil {
+							logger.Debug("Updated inbound added on", rt.Name(), ":", oldInbound.Tag)
+						} else {
+							logger.Debug("Unable to update inbound on", rt.Name(), ":", err2)
+							needRestart = true
+						}
 					}
 				}
 			}
@@ -2531,6 +2551,11 @@ func (s *InboundService) stripDisabledClients(tx *gorm.DB, inbound *model.Inboun
 			trafficIDs[row.Email] = row.Id
 		}
 	}
+	// Xray runs the client and stream shapes GetXrayConfig generates; a pushed
+	// client with a flow its stream cannot carry is refused by the core.
+	xrayServed := !servedOutsideXray(inbound.Protocol)
+	flowAllowed := !built.DisableFlow &&
+		inboundCanEnableTlsFlow(string(built.Protocol), built.StreamSettings, built.Settings)
 	finalClients := make([]any, 0, len(clients))
 	for _, client := range clients {
 		c, ok := client.(map[string]any)
@@ -2550,6 +2575,14 @@ func (s *InboundService) stripDisabledClients(tx *gorm.DB, inbound *model.Inboun
 				c["traffic_id"] = id
 			}
 		}
+		if xrayServed {
+			flow, _ := c["flow"].(string)
+			if flow = coreClientFlow(flow, flowAllowed); flow != "" {
+				c["flow"] = flow
+			} else {
+				delete(c, "flow")
+			}
+		}
 		finalClients = append(finalClients, c)
 	}
 	settings["clients"] = finalClients
@@ -2563,7 +2596,30 @@ func (s *InboundService) stripDisabledClients(tx *gorm.DB, inbound *model.Inboun
 	}
 	runtimeInbound := *built
 	runtimeInbound.Settings = string(modifiedSettings)
+	if xrayServed && len(runtimeInbound.StreamSettings) > 0 {
+		stream, err := coreInboundStream(runtimeInbound.Tag, runtimeInbound.StreamSettings)
+		if err != nil {
+			return nil, err
+		}
+		runtimeInbound.StreamSettings = stream
+	}
 	return &runtimeInbound, nil
+}
+
+// hotSwapRefused reports whether RestartXray's hot-diff rules refuse to move the
+// core's handler from running (nil when not served) to next over the API: a
+// REALITY change, a TPROXY target, a password SOCKS relay or a reverse client.
+// A direct push would then leave the core in a state a restart never produces.
+func hotSwapRefused(running, next *model.Inbound) bool {
+	oldCfg, newCfg := &xray.Config{}, &xray.Config{}
+	if running != nil {
+		oldCfg.InboundConfigs = []xray.InboundConfig{*running.GenXrayInboundConfig()}
+	}
+	if next != nil {
+		newCfg.InboundConfigs = []xray.InboundConfig{*next.GenXrayInboundConfig()}
+	}
+	_, ok := xray.ComputeHotDiff(oldCfg, newCfg)
+	return !ok
 }
 
 // updateClientTraffics syncs the ClientTraffic rows with the inbound's clients
