@@ -511,6 +511,9 @@ func parseShadowsocks(link string) (*ParseResult, error) {
 		method, pass = splitMethodPass(userInfo)
 	}
 	identity := "ss:" + method + ":" + pass + "@" + host + ":" + strconv.Itoa(port)
+	// An IPv6 host is stored bare, as url.Hostname gives the other parsers: Clash
+	// and other consumers add the brackets back when they join it with the port.
+	address := strings.Trim(host, "[]")
 	// The panel and v2rayN express shadowsocks tcp/http obfuscation only as the
 	// SIP002 plugin, so it has to become the header it stands for.
 	applyObfsLocalPlugin(params, rawQuery)
@@ -531,7 +534,7 @@ func parseShadowsocks(link string) (*ParseResult, error) {
 		"tag":      remark,
 		"settings": map[string]any{
 			"servers": []any{
-				map[string]any{"address": host, "port": port, "password": pass, "method": method},
+				map[string]any{"address": address, "port": port, "password": pass, "method": method},
 			},
 		},
 		"streamSettings": stream,
