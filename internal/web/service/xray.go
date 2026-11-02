@@ -1572,6 +1572,9 @@ func (s *XrayService) RestartXray(isForce bool) error {
 		configUnchanged := process.GetConfig().Equals(xrayConfig)
 		if !isForce && configUnchanged && !isNeedXrayRestart.Load() {
 			logger.Debug("It does not need to restart Xray")
+			// The core already serves the desired config (e.g. a refused change was
+			// reverted), so an earlier refusal no longer holds anything back.
+			xrayState.holdBack("")
 			return repairUnavailableTuicRelays(xrayConfig, process.GetAPIPort())
 		}
 		// A config the core cannot bind never replaces one that works: its failed
