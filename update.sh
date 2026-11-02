@@ -53,13 +53,112 @@ _write_update_status() {
     mv -f "${tmp_file}" "${xui_update_status_file}" > /dev/null 2>&1
 }
 
+# Set by update_x-ui once the running panel is stopped / its files are being
+# replaced; any non-zero exit after that puts the previous install back and
+# starts the panel again (see _update_restore_and_start).
+update_stopped=0
+update_rollback_files=0
+update_backup_dir=""
+update_stage_dir=""
+update_backup_paths=()
+
 _report_update_exit() {
     local code=$?
+    if [[ "${code}" -ne 0 ]]; then
+        _update_restore_and_start
+    fi
+    [[ -n "${update_stage_dir}" ]] && rm -rf "${update_stage_dir}"
+    [[ -n "${update_backup_dir}" ]] && rm -rf "${update_backup_dir}"
     if [[ "${code}" -eq 0 ]]; then
         _write_update_status "success" "0"
     else
         _write_update_status "failed" "${code}"
     fi
+}
+
+# Undoes a failed update after the panel was stopped: the replaced files come
+# back from the backup while the database is not yet migrated, the service
+# unit or init script comes back if the new one is missing, and the panel is
+# started again. Never exits, so it is safe inside the EXIT trap.
+_update_restore_and_start() {
+    [[ "${update_stopped}" == "1" ]] || return 0
+    local p unit
+    if [[ "${update_rollback_files}" == "1" && -n "${update_backup_dir}" && -n "${xui_folder}" ]]; then
+        echo -e "${yellow}Update failed, restoring the previous still-ui version...${plain}"
+        for p in "${update_backup_paths[@]}"; do
+            rm -rf "${xui_folder:?}/${p}"
+            if [[ -e "${update_backup_dir}/files/${p}" || -L "${update_backup_dir}/files/${p}" ]]; then
+                mkdir -p "$(dirname "${xui_folder}/${p}")"
+                cp -a "${update_backup_dir}/files/${p}" "${xui_folder}/${p}"
+            fi
+        done
+        [[ -s "${update_backup_dir}/still-ui.cli" ]] && cp -a "${update_backup_dir}/still-ui.cli" /usr/bin/still-ui
+    fi
+    if [[ $release == "alpine" ]]; then
+        unit="/etc/init.d/still-ui"
+    else
+        unit="${xui_service}/still-ui.service"
+    fi
+    if [[ -n "${update_backup_dir}" && -s "${update_backup_dir}/service-unit" ]] &&
+        [[ "${update_rollback_files}" == "1" || ! -s "${unit}" ]]; then
+        cp -a "${update_backup_dir}/service-unit" "${unit}"
+    fi
+    echo -e "${yellow}Starting still-ui again...${plain}"
+    if [[ $release == "alpine" ]]; then
+        rc-update add still-ui > /dev/null 2>&1
+        rc-service still-ui start > /dev/null 2>&1
+    else
+        systemctl daemon-reload > /dev/null 2>&1
+        systemctl enable still-ui > /dev/null 2>&1
+        systemctl start still-ui > /dev/null 2>&1
+    fi
+}
+
+# Extracts the release archive into a scratch folder and checks it carries
+# what the update installs, before anything of the running panel is touched.
+_stage_update_archive() {
+    local archive="$1" f
+    update_stage_dir="$(mktemp -d "${xui_folder%/*}/.still-ui-update.XXXXXX")" ||
+        _fail "ERROR: Cannot create a scratch folder next to ${xui_folder}; the running panel was not touched"
+    if ! tar -xzf "${archive}" -C "${update_stage_dir}" > /dev/null 2>&1; then
+        rm -f "${archive}"
+        _fail "ERROR: Failed to extract the still-ui release archive; the running panel was not touched, try the update again"
+    fi
+    for f in x-ui x-ui.sh; do
+        [[ -s "${update_stage_dir}/still-ui/${f}" ]] ||
+            _fail "ERROR: The still-ui release archive has no ${f}; the running panel was not touched"
+    done
+    if [[ $release == "alpine" && ! -s "${update_stage_dir}/still-ui/x-ui.rc" ]]; then
+        _fail "ERROR: The still-ui release archive has no x-ui.rc; the running panel was not touched"
+    fi
+    rm -rf "${update_stage_dir}"
+    update_stage_dir=""
+}
+
+# Copies every file the update removes or overwrites, so a failure after the
+# stop can put the previous version back.
+_backup_current_install() {
+    local p
+    update_backup_paths=(x-ui x-ui.sh x-ui.rc still-ui.service x-ui.service.debian x-ui.service.arch x-ui.service.rhel
+        "bin/xray-linux-$(arch)" bin/xray-linux-arm32 "bin/mtg-linux-$(arch)" bin/mtg-linux-arm
+        bin/README.md bin/LICENSE bin/tuic-server bin/tuic)
+    update_backup_dir="$(mktemp -d "${xui_folder%/*}/.still-ui-backup.XXXXXX")" ||
+        _fail "ERROR: Cannot create a backup folder next to ${xui_folder}; the running panel was not touched"
+    for p in "${update_backup_paths[@]}"; do
+        [[ -e "${xui_folder}/${p}" || -L "${xui_folder}/${p}" ]] || continue
+        mkdir -p "$(dirname "${update_backup_dir}/files/${p}")" &&
+            cp -a "${xui_folder}/${p}" "${update_backup_dir}/files/${p}" ||
+            _fail "ERROR: Cannot back up ${xui_folder}/${p} (disk full?); the running panel was not touched"
+    done
+    if [[ -e /usr/bin/still-ui ]]; then
+        cp -a /usr/bin/still-ui "${update_backup_dir}/still-ui.cli" ||
+            _fail "ERROR: Cannot back up /usr/bin/still-ui; the running panel was not touched"
+    fi
+    if [[ $release == "alpine" ]]; then
+        cp -a /etc/init.d/still-ui "${update_backup_dir}/service-unit"
+    else
+        cp -a "${xui_service}/still-ui.service" "${update_backup_dir}/service-unit"
+    fi || _fail "ERROR: Cannot back up the still-ui service unit; the running panel was not touched"
 }
 trap _report_update_exit EXIT
 trap 'exit 143' TERM
@@ -764,28 +863,28 @@ update_x-ui() {
     fi
 
     if [[ -e ${xui_folder}/ ]]; then
-        echo -e "${green}Stopping still-ui...${plain}"
         if [[ $release == "alpine" ]]; then
-            if [ -f "/etc/init.d/still-ui" ]; then
-                rc-service still-ui stop > /dev/null 2>&1
-                rc-update del still-ui > /dev/null 2>&1
-                echo -e "${green}Removing old service unit version...${plain}"
-                rm -f /etc/init.d/still-ui > /dev/null 2>&1
-            else
+            if [ ! -f "/etc/init.d/still-ui" ]; then
                 rm still-ui-linux-$(arch).tar.gz -f > /dev/null 2>&1
                 _fail "ERROR: still-ui service unit not installed."
             fi
         else
-            if [ -f "${xui_service}/still-ui.service" ]; then
-                systemctl stop still-ui > /dev/null 2>&1
-                systemctl disable still-ui > /dev/null 2>&1
-                echo -e "${green}Removing old systemd unit version...${plain}"
-                rm ${xui_service}/still-ui.service -f > /dev/null 2>&1
-                systemctl daemon-reload > /dev/null 2>&1
-            else
+            if [ ! -f "${xui_service}/still-ui.service" ]; then
                 rm still-ui-linux-$(arch).tar.gz -f > /dev/null 2>&1
                 _fail "ERROR: still-ui systemd unit not installed."
             fi
+        fi
+        # Everything that can fail without a network is checked and backed up
+        # while the panel still runs. The unit file / init script stays in place
+        # (it is overwritten below), so a failed update can always be retried.
+        _stage_update_archive "still-ui-linux-$(arch).tar.gz"
+        _backup_current_install
+        echo -e "${green}Stopping still-ui...${plain}"
+        update_stopped=1
+        if [[ $release == "alpine" ]]; then
+            rc-service still-ui stop > /dev/null 2>&1
+        else
+            systemctl stop still-ui > /dev/null 2>&1
         fi
         # Kill any leftover mtg (MTProto) sidecars. x-ui runs them outside its own
         # lifecycle, so on Linux a stale one can survive the stop and keep holding
@@ -794,6 +893,7 @@ update_x-ui() {
         pkill -f 'mtg-linux-[^ ]* run ' > /dev/null 2>&1 || true
         pkill -f 'tuic-server.*-c .*bin/tuic/tuic_[0-9]+\.json' > /dev/null 2>&1 || true
         echo -e "${green}Removing old still-ui version...${plain}"
+        update_rollback_files=1
         rm ${xui_folder} -f > /dev/null 2>&1
         rm ${xui_folder}/still-ui.service -f > /dev/null 2>&1
         rm ${xui_folder}/x-ui.service.debian -f > /dev/null 2>&1
@@ -819,12 +919,12 @@ update_x-ui() {
     tar zxvf still-ui-linux-$(arch).tar.gz > /dev/null 2>&1
     if [[ $? -ne 0 ]]; then
         rm still-ui-linux-$(arch).tar.gz -f > /dev/null 2>&1
-        _fail "ERROR: Failed to extract the still-ui release archive -- the previous installation has already been removed, so the panel will not start until this is fixed; try running the update again"
+        _fail "ERROR: Failed to extract the still-ui release archive; try running the update again"
     fi
     rm still-ui-linux-$(arch).tar.gz -f > /dev/null 2>&1
     cd still-ui > /dev/null 2>&1
     if [[ $? -ne 0 || ! -s x-ui ]]; then
-        _fail "ERROR: Extracted still-ui archive is missing the x-ui binary -- the previous installation has already been removed, so the panel will not start until this is fixed; try running the update again"
+        _fail "ERROR: Extracted still-ui archive is missing the x-ui binary; try running the update again"
     fi
     chmod +x x-ui > /dev/null 2>&1
 
@@ -854,7 +954,7 @@ update_x-ui() {
     rm -f "${xui_script_temp}"
     if ! cp -f "${xui_folder}/x-ui.sh" "${xui_script_temp}" > /dev/null 2>&1 || [[ ! -s "${xui_script_temp}" ]]; then
         rm -f "${xui_script_temp}"
-        _fail "ERROR: The still-ui release archive has no x-ui.sh -- the previous installation has already been removed; try running the update again"
+        _fail "ERROR: The still-ui release archive has no x-ui.sh; try running the update again"
     fi
     mv -f "${xui_script_temp}" /usr/bin/still-ui
     if [[ $? -ne 0 ]]; then
@@ -877,6 +977,9 @@ update_x-ui() {
     # Finish the schema/data migrations before the service starts, so the service and
     # config_after_update's CLI calls never run them on the same database at once (#6728).
     echo -e "${green}Migrating database...${plain}"
+    # The old binary may not read a migrated database: from here on a failure
+    # only restarts the panel (with the new files) instead of rolling back.
+    update_rollback_files=0
     "${xui_folder}/x-ui" migrate
 
     if [[ $release == "alpine" ]]; then
@@ -885,7 +988,7 @@ update_x-ui() {
         rm -f "${xui_rc_temp}"
         if ! cp -f "${xui_folder}/x-ui.rc" "${xui_rc_temp}" > /dev/null 2>&1 || [[ ! -s "${xui_rc_temp}" ]]; then
             rm -f "${xui_rc_temp}"
-            _fail "ERROR: The still-ui release archive has no x-ui.rc -- the previous installation has already been removed; try running the update again"
+            _fail "ERROR: The still-ui release archive has no x-ui.rc; try running the update again"
         fi
         mv -f "${xui_rc_temp}" /etc/init.d/still-ui
         if [[ $? -ne 0 ]]; then
