@@ -8,7 +8,7 @@ The change under test is [`b638e494`](https://github.com/Dv2Corn/still-ui/commit
 
 It is compared with its parent [`107b7610`](https://github.com/Dv2Corn/still-ui/commit/107b7610312266c91e2fd1a94d511d71a83f31d1). Both are still-ui 3.11.0-still.1, and the two trees differ only by this commit.
 
-There are two separate claims, with two separate tests:
+There are separate claims, with separate tests:
 
 1. **Allocations per relayed connection.** A Go benchmark of the relay alone.
 2. **Memory of the whole panel under connection churn.** The real panel on a test server, with real AmneziaWG clients.
@@ -82,6 +82,8 @@ IDLE=60 LOAD=300 COOL=180 RATE=25 bash scripts/run-bench.sh
 python3 scripts/analyze.py results/memory results/churn
 ```
 
+The two commits were run with `A=still-ui-107b7610 B=still-ui-b638e494 DB=/root/still-bench/master-311.db` (archives built from those commits, a database already migrated to 3.11).
+
 ### Results
 
 MiB, mean of 3 runs with min–max in brackets. Per-run numbers are in [`results/summary.md`](results/summary.md).
@@ -103,9 +105,37 @@ MiB, mean of 3 runs with min–max in brackets. Per-run numbers are in [`results
 - The quiet-state memory and the Xray child are the same in both builds, so the difference comes from the panel's relay path.
 - Without the fix, memory goes down slowly after the load: it is still 309–436 MiB two to three minutes later.
 
+### Against the release people install today: 3x-ui v3.11.0
+
+The same test with the official release archives on both sides. The same starting database for both: a copy of an older 3x-ui database, which each panel migrates on start.
+
+| Archive | sha256 |
+|---|---|
+| 3x-ui `x-ui-linux-amd64.tar.gz` v3.11.0 | `0ddfa4702f595442e2962acd81addc768fdacaa4ff2672c971a0463dae744916` (matches the GitHub release digest) |
+| still-ui `still-ui-linux-amd64.tar.gz` v3.11.0-still.4 | `c26890636ce985e78a6bc319d4b2167071411d929fbd8cc8c02c7f2a9b107717` |
+
+Both ship Xray 26.10.21. 3x-ui `main` of 1 November 2026 still relays with `io.Copy`, so its next release behaves the same until the fix lands.
+
+```
+A=x-ui-v3.11.0 B=still-ui-v3.11.0-still.4 IDLE=60 LOAD=300 COOL=180 RATE=25 bash scripts/run-bench.sh
+```
+
+| MiB, mean of 3 runs (min–max) | 3x-ui v3.11.0 | still-ui 3.11.0-still.4 |
+|---|---|---|
+| Panel RSS, quiet before load | 93 (93–94) | 94 (94–95) |
+| Panel RSS, mean under load | **403** (401–405) | **176** (175–176) |
+| Panel RSS, peak under load | **525** (525–525) | **211** (211–212) |
+| Panel RSS, last minute of the quiet phase | 323 (236–429) | 178 (177–180) |
+| Xray child RSS under load | 46 | 47 |
+| `x-ui.service` memory.current, peak | 498 (498–499) | 183 (182–184) |
+| Connections completed / failed | 84 067 / 5 945 | 83 893 / 6 119 |
+| Panel restarts, OOM kills | 0 | 0 |
+
+Per-run numbers: [`results/release/summary.md`](results/release/summary.md); raw samples: [`results/release/`](results/release/).
+
 ### Failed connections
 
-In both builds some connections did not complete within the client's 10 s timeout: 6.3–8.0 % per run, 6.9 % (before) and 7.5 % (fix) per build.
+In both builds some connections did not complete within the client's 10 s timeout: 6.3–8.0 % per run, 6.9 % (before) and 7.5 % (fix) per build; 6.6 % (3x-ui v3.11.0) and 6.8 % (still-ui) in the release comparison.
 
 What is known:
 - During the first 20–30 s of each load phase almost none fail. After that it is a steady 5–10 % in every 10-second interval.
@@ -122,6 +152,21 @@ The cause is **not established**. It is the same in both builds (0.6 percentage 
 - 4 active clients; the other client records are idle.
 - The numbers describe this test server. They are not a promise for any other server or traffic.
 
+## 3. Partial client update through the API
+
+[`scripts/partial-update.py`](scripts/partial-update.py) runs against the installed panel:
+
+1. It gives an AmneziaWG client non-default settings with a full update.
+2. It sends `POST /panel/api/clients/update/:email` with only `{"email", "expiryTime"}`, the way a bot renews a subscription.
+3. It reports every other field that changed.
+
+| | 3x-ui v3.11.0 | still-ui 3.11.0-still.4 |
+|---|---|---|
+| New `expiryTime` applied | yes | yes |
+| Other fields changed | 7: `enable` true → false; `limitIp`, `totalGB`, `tgId`, `reset` → 0; `comment`, `flow` → empty | none |
+
+Keys (`privateKey`, `publicKey`, `preSharedKey`) were kept by both. Output: [`results/release/partial-update.txt`](results/release/partial-update.txt).
+
 ## Files
 
 - [`scripts/`](scripts/):
@@ -132,4 +177,5 @@ The cause is **not established**. It is the same in both builds (0.6 percentage 
   - `analyze.py` — the tables.
 - [`results/memory/`](results/memory/) — one sampler CSV per run (every 5 s, with the phase).
 - [`results/churn/`](results/churn/) — per-client load counters per second (`epoch,started,ok,failed,in_flight`).
+- [`results/release/`](results/release/) — the same against the official 3x-ui v3.11.0 release, and the partial update check.
 - [`results/relay-bench.txt`](results/relay-bench.txt), [`results/summary.md`](results/summary.md).
