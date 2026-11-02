@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"html"
+	"slices"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/logger"
 
@@ -48,8 +50,9 @@ func splitMessageLines(block string, limit int) []string {
 		// A single link can exceed a caption on its own; Telegram counts bytes,
 		// so such a line is split rather than kept whole and rejected.
 		for len(line) > limit {
-			pages = append(pages, line[:limit])
-			line = line[limit:]
+			head, rest := cutHTMLLine(line, limit)
+			pages = append(pages, head)
+			line = rest
 		}
 		if len(pages) == 0 {
 			pages = append(pages, line)
@@ -66,6 +69,71 @@ func splitMessageLines(block string, limit int) []string {
 		pages = append(pages, "")
 	}
 	return pages
+}
+
+// cutHTMLLine splits off a head of at most limit bytes that Telegram's HTML mode
+// still accepts on its own: the cut never falls inside a tag, an entity or a
+// UTF-8 character, and tags still open there are closed at the end of the head
+// and reopened at the start of rest. Falls back to a byte cut when no such
+// point exists (a tag longer than the page).
+func cutHTMLLine(line string, limit int) (head, rest string) {
+	type openTag struct{ name, raw string }
+	var open, bestOpen []openTag
+	closers := func(tags []openTag) string {
+		var b strings.Builder
+		for i := len(tags) - 1; i >= 0; i-- {
+			b.WriteString("</" + tags[i].name + ">")
+		}
+		return b.String()
+	}
+	best := -1
+	for i := 0; i < len(line) && i <= limit; {
+		if i > 0 && i+len(closers(open)) <= limit {
+			best, bestOpen = i, slices.Clone(open)
+		}
+		switch line[i] {
+		case '<':
+			end := strings.IndexByte(line[i:], '>')
+			if end < 0 {
+				i++
+				continue
+			}
+			tag := line[i : i+end+1]
+			name := strings.TrimPrefix(strings.Trim(tag, "<>"), "/")
+			if sp := strings.IndexAny(name, " \t"); sp >= 0 {
+				name = name[:sp]
+			}
+			if strings.HasPrefix(tag, "</") {
+				for k := len(open) - 1; k >= 0; k-- {
+					if open[k].name == name {
+						open = open[:k]
+						break
+					}
+				}
+			} else if name != "" {
+				open = append(open, openTag{name: name, raw: tag})
+			}
+			i += end + 1
+		case '&':
+			if end := strings.IndexByte(line[i:], ';'); end > 0 && end <= 10 {
+				i += end + 1
+			} else {
+				i++
+			}
+		default:
+			_, size := utf8.DecodeRuneInString(line[i:])
+			i += size
+		}
+	}
+	var reopen strings.Builder
+	for _, t := range bestOpen {
+		reopen.WriteString(t.raw)
+	}
+	// The rest must shrink, or a reopened tag as long as the page loops forever.
+	if best <= reopen.Len() {
+		return line[:limit], line[limit:]
+	}
+	return line[:best] + closers(bestOpen), reopen.String() + line[best:]
 }
 
 // SendMsgToTgbot sends a message with optional reply markup and returns the id
