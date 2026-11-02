@@ -31,7 +31,15 @@ EOF
     # the administrator out of SSH or the panel. The ban still covers every other
     # TCP port (including all Xray inbounds), so IP-limit keeps working for inbounds
     # added later without regenerating these files.
-    SSH_PORTS=$(grep -oE '^[[:space:]]*Port[[:space:]]+[0-9]+' /etc/ssh/sshd_config 2>/dev/null | grep -oE '[0-9]+' | paste -sd, -)
+    # sshd's effective config when sshd is present, else the config files
+    # including sshd_config.d/*.conf, where distributions now set Port.
+    SSH_PORTS=""
+    if command -v sshd > /dev/null 2>&1; then
+        SSH_PORTS=$(sshd -T 2>/dev/null | awk 'tolower($1) == "port" && $2 ~ /^[0-9]+$/ {print $2}' | sort -un | paste -sd, -)
+    fi
+    if [ -z "$SSH_PORTS" ]; then
+        SSH_PORTS=$(cat /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf 2>/dev/null | awk 'tolower($1) == "port" && $2 ~ /^[0-9]+$/ {print $2}' | sort -un | paste -sd, -)
+    fi
     [ -z "$SSH_PORTS" ] && SSH_PORTS="22"
     PANEL_PORT=$(/app/x-ui setting -show true 2>/dev/null | grep -Eo 'port: .+' | awk '{print $2}')
     EXEMPT_PORTS="$SSH_PORTS"

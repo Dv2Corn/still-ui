@@ -103,6 +103,27 @@ func effectiveHwidLimitForSubID(tx *gorm.DB, subID string) (int, error) {
 	return limit, err
 }
 
+// lockHwidLimitForSubID is effectiveHwidLimitForSubID that also row-locks the subId's
+// clients (PostgreSQL; SQLite runs one writer at a time anyway), so concurrent new
+// devices of one subscription are counted and inserted one after another.
+func lockHwidLimitForSubID(tx *gorm.DB, subID string) (int, error) {
+	var limits []*int
+	if err := tx.Model(&model.ClientRecord{}).
+		Clauses(clause.Locking{Strength: "UPDATE"}).
+		Where("sub_id = ?", subID).
+		Order("id ASC").
+		Pluck("limit_hwid", &limits).Error; err != nil {
+		return 0, err
+	}
+	limit := 0
+	for _, l := range limits {
+		if l != nil {
+			limit = max(limit, *l)
+		}
+	}
+	return limit, nil
+}
+
 // subIDHasEnabledClient separates "no device limit" from "no such subscription":
 // effectiveHwidLimitForSubID yields 0 for both.
 func subIDHasEnabledClient(tx *gorm.DB, subID string) (bool, error) {
@@ -151,7 +172,7 @@ func (s *ClientService) EnforceHwidForSubID(subID string, req HwidRequest) (Hwid
 	hwidHash := hashHwid(req.Hwid)
 
 	err = db.Transaction(func(tx *gorm.DB) error {
-		limit, err := effectiveHwidLimitForSubID(tx, subID)
+		limit, err := lockHwidLimitForSubID(tx, subID)
 		if err != nil {
 			return err
 		}

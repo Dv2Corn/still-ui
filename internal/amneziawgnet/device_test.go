@@ -190,8 +190,10 @@ func TestBuildUAPIConfigHeaderProtectionAndContentPaddingLines(t *testing.T) {
 	if !strings.Contains(conf, "header_protection_key="+strings.Repeat("0", 64)+"\n") {
 		t.Fatalf("an unset key must be emitted as the all-zero key, got:\n%s", conf)
 	}
-	if strings.Contains(conf, "content_padding_addition=") {
-		t.Fatalf("empty DeviceOptions must not emit AWG 3.0 lines, got:\n%s", conf)
+	// Same for content padding: an omitted line would keep a stale value on a
+	// running device, so blank is sent as the zero range that disables it.
+	if !strings.Contains(conf, "content_padding_addition=0\n") {
+		t.Fatalf("empty DeviceOptions must reset content padding explicitly, got:\n%s", conf)
 	}
 
 	key, err := wireguard.GenerateWireguardPSK()

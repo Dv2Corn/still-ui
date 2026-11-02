@@ -1,7 +1,6 @@
 package job
 
 import (
-	"github.com/mhsanaei/3x-ui/v3/internal/web/service"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/service/tgbot"
 )
 
@@ -13,21 +12,22 @@ const (
 	LoginFail    LoginStatus = 0 // Failed login attempt
 )
 
+// reportSender is the part of the Telegram bot this job uses.
+type reportSender interface{ SendReport() }
+
 // StatsNotifyJob sends periodic statistics reports via Telegram bot.
 type StatsNotifyJob struct {
-	xrayService  service.XrayService
-	tgbotService tgbot.Tgbot
+	tgbotService reportSender
 }
 
 // NewStatsNotifyJob creates a new statistics notification job instance.
 func NewStatsNotifyJob() *StatsNotifyJob {
-	return new(StatsNotifyJob)
+	return &StatsNotifyJob{tgbotService: &tgbot.Tgbot{}}
 }
 
-// Run sends a statistics report via Telegram bot if Xray is running.
+// Run sends the statistics report (and the DB backup, when enabled). It runs
+// while Xray is down too -- the report shows Xray's state, and this is the only
+// scheduled backup, so skipping it then hid an outage and lost the backup.
 func (j *StatsNotifyJob) Run() {
-	if !j.xrayService.IsXrayRunning() {
-		return
-	}
 	j.tgbotService.SendReport()
 }

@@ -152,90 +152,106 @@ func (t *Tgbot) OnReceive() {
 
 		h.HandleMessage(func(ctx *th.Context, message telego.Message) error {
 			defer recoverBotPanic()
-			userStateMgr.maybePrune(time.Hour)
-			actor := messageActor(message)
-			if userState, exists := userStateMgr.get(actor); exists {
-				if userState == broadcastAwaitingText {
-					t.handleBroadcastInput(&message, actor)
-					return nil
-				}
-				// Only a wizard step touches the draft, so only it takes the lock.
-				draft := addClientDrafts.forActor(actor)
-				draft.Lock()
-				defer draft.Unlock()
-				switch userState {
-				case "awaiting_email":
-					if draft.email == strings.TrimSpace(message.Text) {
-						t.deleteIncoming(&message)
-						userStateMgr.clear(actor)
-						return nil
-					}
-
-					draft.email = strings.TrimSpace(message.Text)
-					if t.isSingleWord(draft.email) {
-						userStateMgr.set(actor, "awaiting_email")
-						t.deleteIncoming(&message)
-						t.wizardInvalidInput(message.Chat.ID, draft)
-					} else {
-						t.deleteIncoming(&message)
-						userStateMgr.clear(actor)
-						t.addClient(message.Chat.ID, draft, t.BuildClientDraftMessage(draft))
-					}
-				case "awaiting_comment":
-					if draft.comment == strings.TrimSpace(message.Text) {
-						t.deleteIncoming(&message)
-						userStateMgr.clear(actor)
-						return nil
-					}
-
-					draft.comment = strings.TrimSpace(message.Text)
-					t.deleteIncoming(&message)
-					userStateMgr.clear(actor)
-					t.addClient(message.Chat.ID, draft, t.BuildClientDraftMessage(draft))
-				case "awaiting_tg_id":
-					input := strings.TrimSpace(message.Text)
-					if input == "" || input == "-" || strings.EqualFold(input, "none") {
-						draft.tgID = ""
-						t.deleteIncoming(&message)
-						userStateMgr.clear(actor)
-						t.addClient(message.Chat.ID, draft, t.BuildClientDraftMessage(draft))
-						return nil
-					}
-					if _, err := strconv.ParseInt(input, 10, 64); err != nil {
-						t.deleteIncoming(&message)
-						t.wizardInvalidInput(message.Chat.ID, draft)
-						return nil
-					}
-					draft.tgID = input
-					t.deleteIncoming(&message)
-					userStateMgr.clear(actor)
-					t.addClient(message.Chat.ID, draft, t.BuildClientDraftMessage(draft))
-				}
-			} else {
-				if message.UsersShared != nil {
-					if checkAdmin(message.From.ID) {
-						for _, sharedUser := range message.UsersShared.Users {
-							userID := sharedUser.UserID
-							needRestart, err := t.clientService.SetClientTelegramUserID(&t.inboundService, message.UsersShared.RequestID, userID)
-							if needRestart {
-								t.xrayService.SetToNeedRestart()
-							}
-							output := t.I18nBot("tgbot.messages.userSaved")
-							if err != nil {
-								output = t.I18nBot("tgbot.messages.selectUserFailed")
-							}
-							t.sendNoticeNoKeyboard(message.Chat.ID, output)
-						}
-					} else {
-						t.sendNoticeNoKeyboard(message.Chat.ID, t.I18nBot("tgbot.noResult"))
-					}
-				}
-			}
+			t.handleMessage(message)
 			return nil
 		}, th.AnyMessage())
 
 		_ = h.Start()
 	}()
+}
+
+// handleMessage routes a plain (non-command) message: a pending wizard step,
+// or the user shared through the Telegram user picker.
+func (t *Tgbot) handleMessage(message telego.Message) {
+	userStateMgr.maybePrune(time.Hour)
+	actor := messageActor(message)
+	// A picked user can only come from the picker, whatever step the chat is in:
+	// tgid_pick leaves it in awaiting_tg_pick, which no wizard case handles.
+	if message.UsersShared != nil {
+		if st, ok := userStateMgr.get(actor); ok && st == "awaiting_tg_pick" {
+			userStateMgr.clear(actor)
+		}
+		t.handleUsersShared(&message)
+		return
+	}
+	if userState, exists := userStateMgr.get(actor); exists {
+		if userState == broadcastAwaitingText {
+			t.handleBroadcastInput(&message, actor)
+			return
+		}
+		// Only a wizard step touches the draft, so only it takes the lock.
+		draft := addClientDrafts.forActor(actor)
+		draft.Lock()
+		defer draft.Unlock()
+		switch userState {
+		case "awaiting_email":
+			if draft.email == strings.TrimSpace(message.Text) {
+				t.deleteIncoming(&message)
+				userStateMgr.clear(actor)
+				return
+			}
+
+			draft.email = strings.TrimSpace(message.Text)
+			if t.isSingleWord(draft.email) {
+				userStateMgr.set(actor, "awaiting_email")
+				t.deleteIncoming(&message)
+				t.wizardInvalidInput(message.Chat.ID, draft)
+			} else {
+				t.deleteIncoming(&message)
+				userStateMgr.clear(actor)
+				t.addClient(message.Chat.ID, draft, t.BuildClientDraftMessage(draft))
+			}
+		case "awaiting_comment":
+			if draft.comment == strings.TrimSpace(message.Text) {
+				t.deleteIncoming(&message)
+				userStateMgr.clear(actor)
+				return
+			}
+
+			draft.comment = strings.TrimSpace(message.Text)
+			t.deleteIncoming(&message)
+			userStateMgr.clear(actor)
+			t.addClient(message.Chat.ID, draft, t.BuildClientDraftMessage(draft))
+		case "awaiting_tg_id":
+			input := strings.TrimSpace(message.Text)
+			if input == "" || input == "-" || strings.EqualFold(input, "none") {
+				draft.tgID = ""
+				t.deleteIncoming(&message)
+				userStateMgr.clear(actor)
+				t.addClient(message.Chat.ID, draft, t.BuildClientDraftMessage(draft))
+				return
+			}
+			if _, err := strconv.ParseInt(input, 10, 64); err != nil {
+				t.deleteIncoming(&message)
+				t.wizardInvalidInput(message.Chat.ID, draft)
+				return
+			}
+			draft.tgID = input
+			t.deleteIncoming(&message)
+			userStateMgr.clear(actor)
+			t.addClient(message.Chat.ID, draft, t.BuildClientDraftMessage(draft))
+		}
+	}
+}
+
+// handleUsersShared saves the user picked with the Telegram user picker as the
+// client's Telegram user (RequestID carries the client's traffic id).
+func (t *Tgbot) handleUsersShared(message *telego.Message) {
+	if message.From == nil || !checkAdmin(message.From.ID) {
+		t.sendNoticeNoKeyboard(message.Chat.ID, t.I18nBot("tgbot.noResult"))
+		return
+	}
+	for _, sharedUser := range message.UsersShared.Users {
+		needRestart, err := t.clientService.SetClientTelegramUserID(&t.inboundService, message.UsersShared.RequestID, sharedUser.UserID)
+		if needRestart {
+			t.xrayService.SetToNeedRestart()
+		}
+		output := t.I18nBot("tgbot.messages.userSaved")
+		if err != nil {
+			output = t.I18nBot("tgbot.messages.selectUserFailed")
+		}
+		t.sendNoticeNoKeyboard(message.Chat.ID, output)
+	}
 }
 
 // answerCommand processes incoming command messages from Telegram users.
@@ -835,7 +851,7 @@ func (t *Tgbot) answerCallback(callbackQuery *telego.CallbackQuery, isAdmin bool
 				t.sendTGPicker(chatId, t.clientTrafficID(email))
 			case "tg_user":
 				t.sendCallbackAnswerTgBot(callbackQuery.ID, t.I18nBot("tgbot.answers.getUserInfo", "Email=="+email))
-				t.screenClientTG(chatId, email, false)
+				t.screenClientTG(chatId, email, true)
 			case "client_invite_link":
 				t.sendCallbackAnswerTgBot(callbackQuery.ID, t.I18nBot("tgbot.buttons.inviteLink"))
 				t.screenInviteLink(chatId, email)

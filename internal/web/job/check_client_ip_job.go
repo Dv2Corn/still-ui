@@ -209,29 +209,41 @@ func (j *CheckClientIpJob) loadClientLimits(emails []string) map[string]int {
 }
 
 // loadInboundsByEmails resolves each email's owning inbound through the
-// clients/client_inbounds relation in chunked queries. Like the old per-email
-// First() it keeps the lowest inbound id when a client spans several inbounds.
+// clients/client_inbounds relation in chunked queries. When a client spans
+// several inbounds it keeps the lowest enabled inbound id, and the lowest id
+// only when none is enabled: a disabled inbound would skip the IP limit.
 func (j *CheckClientIpJob) loadInboundsByEmails(emails []string) map[string]*model.Inbound {
 	db := database.GetDB()
-	minInboundByEmail := make(map[string]int, len(emails))
+	type pick struct {
+		id      int
+		enabled bool
+	}
+	best := make(map[string]pick, len(emails))
 	for _, batch := range chunkEmails(emails, ipScanChunk) {
 		var pairs []struct {
 			Email     string
 			InboundId int
+			Enable    bool
 		}
 		if err := db.Table("client_inbounds").
-			Select("clients.email AS email, client_inbounds.inbound_id AS inbound_id").
+			Select("clients.email AS email, client_inbounds.inbound_id AS inbound_id, inbounds.enable AS enable").
 			Joins("JOIN clients ON clients.id = client_inbounds.client_id").
+			Joins("JOIN inbounds ON inbounds.id = client_inbounds.inbound_id").
 			Where("clients.email IN ?", batch).
 			Scan(&pairs).Error; err != nil {
 			j.checkError(err)
 			return nil
 		}
 		for _, p := range pairs {
-			if cur, ok := minInboundByEmail[p.Email]; !ok || p.InboundId < cur {
-				minInboundByEmail[p.Email] = p.InboundId
+			cur, ok := best[p.Email]
+			if !ok || (p.Enable && !cur.enabled) || (p.Enable == cur.enabled && p.InboundId < cur.id) {
+				best[p.Email] = pick{id: p.InboundId, enabled: p.Enable}
 			}
 		}
+	}
+	minInboundByEmail := make(map[string]int, len(best))
+	for email, p := range best {
+		minInboundByEmail[email] = p.id
 	}
 	if len(minInboundByEmail) == 0 {
 		return nil
@@ -930,6 +942,7 @@ func (j *CheckClientIpJob) getInboundByEmail(clientEmail string) (*model.Inbound
 		Joins("JOIN client_inbounds ON client_inbounds.inbound_id = inbounds.id").
 		Joins("JOIN clients ON clients.id = client_inbounds.client_id").
 		Where("clients.email = ?", clientEmail).
+		Order("inbounds.enable DESC").
 		First(inbound).Error
 	if err == nil {
 		return inbound, nil

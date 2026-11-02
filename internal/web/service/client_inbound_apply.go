@@ -32,6 +32,48 @@ func droppedClientNeedsRestart() bool {
 	return on
 }
 
+// validateAmneziaWGClientKeys refuses a client key the device cannot load.
+// A key equal to the one already stored for that client (prev) is left alone,
+// so an old row saved before this check can still be disabled or edited.
+func validateAmneziaWGClientKeys(c, prev *model.Client) error {
+	for _, k := range []struct{ field, v, old string }{
+		{"publicKey", c.PublicKey, prevKey(prev, false)},
+		{"preSharedKey", c.PreSharedKey, prevKey(prev, true)},
+	} {
+		if prev != nil && k.v == k.old {
+			continue
+		}
+		if err := amneziawg.ValidatePeerKey(k.field, k.v); err != nil {
+			return fmt.Errorf("amneziawg: client %q: %w", c.Email, err)
+		}
+	}
+	return nil
+}
+
+func prevKey(prev *model.Client, psk bool) string {
+	switch {
+	case prev == nil:
+		return ""
+	case psk:
+		return prev.PreSharedKey
+	default:
+		return prev.PublicKey
+	}
+}
+
+// storedAmneziaWGClient returns the client stored under email, or nil.
+func storedAmneziaWGClient(clients []model.Client, email string) *model.Client {
+	if email == "" {
+		return nil
+	}
+	for i := range clients {
+		if strings.EqualFold(clients[i].Email, email) {
+			return &clients[i]
+		}
+	}
+	return nil
+}
+
 func validateAmneziaWGClientWrite(inbound *model.Inbound, clients []model.Client, previousEmail string) error {
 	if inbound.Protocol != model.AmneziaWG {
 		return nil
@@ -49,6 +91,9 @@ func validateAmneziaWGClientWrite(inbound *model.Inbound, clients []model.Client
 			if err := amneziawg.ValidateConfigValue(value.field, value.value); err != nil {
 				return fmt.Errorf("amneziawg: client %q: %w", client.Email, err)
 			}
+		}
+		if err := validateAmneziaWGClientKeys(&client, storedAmneziaWGClient(settings.Clients, previousEmail)); err != nil {
+			return err
 		}
 		for _, allowedIP := range client.AllowedIPs {
 			if err := amneziawg.ValidateConfigValue("allowedIPs", allowedIP); err != nil {

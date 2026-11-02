@@ -294,7 +294,7 @@ func TestNormalizeAmneziaWGSettings_RejectsInjectedClientAllowedIPs(t *testing.T
 		Protocol: model.AmneziaWG,
 		Port:     51820,
 		Settings: `{"server":{"privateKey":"x","publicKey":"y","subnetIp":"10.8.1.0","subnetCidr":24},` +
-			`"clients":[{"email":"a@x","enable":true,"publicKey":"pk",` +
+			`"clients":[{"email":"a@x","enable":true,"publicKey":"` + awgValidPeerKey + `",` +
 			`"allowedIPs":["10.8.1.2/32\n[Interface]\nPostUp = touch /tmp/pwned"]}]}`,
 	}
 	err := svc.normalizeAmneziaWGSettings(inbound, nil)
@@ -337,7 +337,7 @@ func TestNormalizeAmneziaWGSettings_CanonicalizesClientAllowedIPs(t *testing.T) 
 		Protocol: model.AmneziaWG,
 		Port:     51820,
 		Settings: `{"server":{"privateKey":"x","publicKey":"y","subnetIp":"10.8.1.0","subnetCidr":24},` +
-			`"clients":[{"email":"a@x","enable":true,"publicKey":"pk","allowedIPs":[" 10.8.1.2 "]}]}`,
+			`"clients":[{"email":"a@x","enable":true,"publicKey":"` + awgValidPeerKey + `","allowedIPs":[" 10.8.1.2 "]}]}`,
 	}
 	if err := svc.normalizeAmneziaWGSettings(inbound, nil); err != nil {
 		t.Fatalf("normalize: %v", err)

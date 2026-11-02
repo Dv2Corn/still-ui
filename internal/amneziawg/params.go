@@ -366,6 +366,24 @@ func validateHeaderProtectionKey(v string) error {
 	return nil
 }
 
+// ValidatePeerKey accepts blank (no key) or a WireGuard key as written in an
+// AmneziaWG config file: standard base64 of exactly 32 bytes. One malformed
+// client key used to fail the whole inbound's device config on every tick,
+// so no client change applied any more; it is now refused at save time.
+func ValidatePeerKey(field, v string) error {
+	if v == "" {
+		return nil
+	}
+	if err := ValidateConfigValue(field, v); err != nil {
+		return err
+	}
+	key, err := base64.StdEncoding.DecodeString(v)
+	if err != nil || len(key) != 32 {
+		return fmt.Errorf("invalid %s: must be a base64-encoded 32-byte key", field)
+	}
+	return nil
+}
+
 // ValidateIPv6Subnet rejects a malformed subnet before it's saved. A blank
 // value is only valid when IPv6 itself is disabled.
 func ValidateIPv6Subnet(enabled bool, subnet string) error {
@@ -456,7 +474,8 @@ func validateUintRange(v string, minAllowed int64) error {
 }
 
 // validateHNoOverlap mirrors amneziawg-go's "headers must not overlap" (device/uapi.go).
-// A blank Hn is never sent, so the engine keeps its default: WireGuard's own type n.
+// A blank Hn is sent to the engine as WireGuard's own type n (amneziawgnet's
+// writeDeviceObfuscationLines), so it is checked as n here.
 func validateHNoOverlap(hs [4]string) error {
 	var lo, hi [4]int64
 	for i, h := range hs {

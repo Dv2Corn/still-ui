@@ -29,50 +29,9 @@ func buildClientUAPIConfig(inst amneziawg.OutboundInstance, opts DeviceOptions) 
 	if err := amneziawg.ValidateHandshakePreamble(inst.Obfuscation); err != nil {
 		return "", err
 	}
-	o := inst.Obfuscation
-	fmt.Fprintf(&b, "jc=%d\njmin=%d\njmax=%d\n", o.Jc, o.Jmin, o.Jmax)
-	fmt.Fprintf(&b, "s1=%d\ns2=%d\ns3=%d\ns4=%d\n", o.S1, o.S2, o.S3, o.S4)
-	writeOptionalLine(&b, "h1", o.H1)
-	writeOptionalLine(&b, "h2", o.H2)
-	writeOptionalLine(&b, "h3", o.H3)
-	writeOptionalLine(&b, "h4", o.H4)
-	writeOptionalLine(&b, "i1", o.I1)
-	writeOptionalLine(&b, "i2", o.I2)
-	writeOptionalLine(&b, "i3", o.I3)
-	writeOptionalLine(&b, "i4", o.I4)
-	writeOptionalLine(&b, "i5", o.I5)
-
-	// An omitted line means "unchanged" to amneziawg-go, so a cleared key can
-	// only reach a live device as the all-zero one that disables the feature.
-	hpHex := strings.Repeat("0", 64)
-	if opts.HeaderProtectionKey != "" {
-		var err error
-		hpHex, err = wireguard.KeyToHex(opts.HeaderProtectionKey)
-		if err != nil {
-			return "", fmt.Errorf("invalid header protection key: %w", err)
-		}
+	if err := writeDeviceObfuscationLines(&b, inst.Obfuscation, opts); err != nil {
+		return "", err
 	}
-	fmt.Fprintf(&b, "header_protection_key=%s\n", hpHex)
-	if opts.ContentPaddingAddition != "" {
-		fmt.Fprintf(&b, "content_padding_addition=%s\n", opts.ContentPaddingAddition)
-	}
-	if opts.RekeyAfterTime != "" {
-		fmt.Fprintf(&b, "rekey_after_time=%s\n", opts.RekeyAfterTime)
-	}
-	if opts.RekeyTimeout != "" {
-		fmt.Fprintf(&b, "rekey_timeout=%s\n", opts.RekeyTimeout)
-	}
-	if opts.RejectAfterTime != "" {
-		fmt.Fprintf(&b, "reject_after_time=%s\n", opts.RejectAfterTime)
-	}
-	if opts.KeepaliveTimeout != "" {
-		fmt.Fprintf(&b, "keepalive_timeout=%s\n", opts.KeepaliveTimeout)
-	}
-	if opts.MaxHandshakeAttempts != "" {
-		fmt.Fprintf(&b, "max_handshake_attempts=%s\n", opts.MaxHandshakeAttempts)
-	}
-	fmt.Fprintf(&b, "random_trailers=%t\n", opts.RandomTrailers)
-	fmt.Fprintf(&b, "disable_cookies=%t\n", opts.DisableCookies)
 
 	for _, p := range inst.Peers {
 		pubHex, err := wireguard.KeyToHex(p.PublicKey)

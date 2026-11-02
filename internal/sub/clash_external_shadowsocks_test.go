@@ -73,3 +73,16 @@ func TestClashExternalShadowsocksMatchesInboundPath(t *testing.T) {
 		})
 	}
 }
+
+// An IPv6 server is written bare in Clash, as the inbound path does: mihomo joins
+// server and port itself, so a bracketed address never dials.
+func TestClashExternalShadowsocksIPv6Server(t *testing.T) {
+	svc := NewSubClashService(false, "", false, &SubService{})
+	proxy := svc.clashProxyFromExternal("ss://YWVzLTI1Ni1nY206Y2xpZW50cHc@[2001:db8::1]:8443#ss", "external")
+	if proxy == nil {
+		t.Fatal("external IPv6 shadowsocks link was dropped")
+	}
+	if proxy["server"] != "2001:db8::1" || proxy["port"] != 8443 {
+		t.Fatalf("server/port = %v/%v, want 2001:db8::1/8443", proxy["server"], proxy["port"])
+	}
+}

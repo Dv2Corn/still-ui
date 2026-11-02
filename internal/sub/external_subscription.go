@@ -28,6 +28,9 @@ const (
 	subscriptionMaxBytes      = 2 << 20 // 2 MiB
 	subscriptionMaxLinks      = 1000
 	subscriptionCacheCapacity = 256
+	// subscriptionFailureBackoff spaces out fetches of a failing provider; each
+	// one can hold a subscription request for the whole client timeout.
+	subscriptionFailureBackoff = 30 * time.Second
 )
 
 // The provider picks every redirect target, so each hop is resolved, checked and dialed by
@@ -74,6 +77,8 @@ func operatorChosePrivateHost(u *url.URL) bool {
 type subscriptionCacheEntry struct {
 	links     []string
 	fetchedAt time.Time
+	// failedAt is the last failed fetch since fetchedAt; links stay the last good ones.
+	failedAt time.Time
 }
 
 type subscriptionFetch struct {
@@ -101,7 +106,8 @@ type subscriptionFetchResult struct {
 // fetchSubscriptionLinks returns the share links contained in a remote
 // subscription URL, using a short-lived cache. On any failure it returns the
 // last cached value (if present) or nil — never an error, so the rest of the
-// client's subscription still renders.
+// client's subscription still renders — and serves that for
+// subscriptionFailureBackoff before asking the provider again.
 func fetchSubscriptionLinks(rawURL string) subscriptionFetchResult {
 	rawURL = strings.TrimSpace(rawURL)
 	if rawURL == "" {
@@ -110,7 +116,7 @@ func fetchSubscriptionLinks(rawURL string) subscriptionFetchResult {
 
 	subscriptionCache.Lock()
 	cached, ok := subscriptionCache.m[rawURL]
-	if ok && time.Since(cached.fetchedAt) < subscriptionCacheTTL {
+	if ok && (time.Since(cached.fetchedAt) < subscriptionCacheTTL || time.Since(cached.failedAt) < subscriptionFailureBackoff) {
 		subscriptionCache.Unlock()
 		return subscriptionFetchResult{links: cached.links}
 	}
@@ -134,6 +140,10 @@ func fetchSubscriptionLinks(rawURL string) subscriptionFetchResult {
 		if ok {
 			fetch.links = cached.links
 		}
+		subscriptionCache.Lock()
+		subscriptionCache.m[rawURL] = subscriptionCacheEntry{links: cached.links, fetchedAt: cached.fetchedAt, failedAt: time.Now()}
+		trimSubscriptionCacheLocked(rawURL)
+		subscriptionCache.Unlock()
 		return subscriptionFetchResult{links: fetch.links, fetched: true, err: err}
 	}
 

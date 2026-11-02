@@ -38,12 +38,12 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/web/service/email"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/service/panel"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/service/tgbot"
+	"github.com/mhsanaei/3x-ui/v3/internal/web/session"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/websocket"
 	"github.com/mhsanaei/3x-ui/v3/internal/xray"
 
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-contrib/sessions"
-	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"github.com/robfig/cron/v3"
 )
@@ -208,7 +208,6 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 	// per request lets every stalled download pin its own compressor until WriteTimeout.
 	engine.Use(gzip.Gzip(gzip.DefaultCompression, gzip.WithExcludedPaths([]string{assetsBasePath})))
 
-	store := cookie.NewStore(secret)
 	// Configure default session cookie options, including expiration (MaxAge)
 	sessionOptions := sessions.Options{
 		Path:     basePath,
@@ -219,7 +218,7 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 	if sessionMaxAge, err := s.settingService.GetSessionMaxAge(); err == nil && sessionMaxAge > 0 {
 		sessionOptions.MaxAge = sessionMaxAge * 60 // minutes -> seconds
 	}
-	store.Options(sessionOptions)
+	store := session.NewStore(secret, sessionOptions)
 	engine.Use(sessions.Sessions("3x-ui", store))
 	engine.Use(func(c *gin.Context) {
 		c.Set("base_path", basePath)

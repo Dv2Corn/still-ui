@@ -383,6 +383,7 @@ func TestParseHysteria2_MportEmitsCoreAcceptedMask(t *testing.T) {
 func TestParseShadowsocks(t *testing.T) {
 	modernUser := base64.StdEncoding.EncodeToString([]byte("aes-256-gcm:secretpass"))
 	legacyBody := base64.StdEncoding.EncodeToString([]byte("aes-256-gcm:secretpass@1.2.3.4:8388"))
+	legacyBodyIPv6 := base64.StdEncoding.EncodeToString([]byte("aes-256-gcm:secretpass@[2001:db8::1]:8388"))
 	cases := []struct {
 		name   string
 		link   string
@@ -411,6 +412,22 @@ func TestParseShadowsocks(t *testing.T) {
 			name:   "modern sip002 slash query",
 			link:   "ss://" + modernUser + "@1.2.3.4:8388/?plugin=obfs-local%3Bobfs%3Dhttp#node",
 			host:   "1.2.3.4",
+			port:   8388,
+			method: "aes-256-gcm",
+			pass:   "secretpass",
+		},
+		{
+			name:   "modern ipv6 drops the brackets like url.Hostname",
+			link:   "ss://" + modernUser + "@[2001:db8::1]:8388#node",
+			host:   "2001:db8::1",
+			port:   8388,
+			method: "aes-256-gcm",
+			pass:   "secretpass",
+		},
+		{
+			name:   "legacy ipv6",
+			link:   "ss://" + legacyBodyIPv6 + "#node",
+			host:   "2001:db8::1",
 			port:   8388,
 			method: "aes-256-gcm",
 			pass:   "secretpass",

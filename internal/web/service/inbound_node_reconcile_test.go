@@ -500,3 +500,47 @@ func TestReconcileNode_SaveGrowingSelectionRearmsSweepGuard(t *testing.T) {
 		})
 	}
 }
+
+// A tag dropped from the selection stays as a stale central row, but the node owns it
+// now: its edits are no longer imported. Reconcile after a restart (empty fingerprint
+// cache) pushed the stale copy over the node's edits, or re-created it after the node
+// deleted it.
+func TestReconcileNode_SelectedModeDoesNotPushDeselectedInbounds(t *testing.T) {
+	setupConflictDB(t)
+
+	var mu sync.Mutex
+	var writes []string
+	writeOK := func(w http.ResponseWriter, obj any) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"success": true, "msg": "", "obj": obj})
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/panel/api/inbounds/list", func(w http.ResponseWriter, _ *http.Request) {
+		writeOK(w, []map[string]any{{"id": 1, "tag": "keep"}, {"id": 2, "tag": "deselected"}})
+	})
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		writes = append(writes, r.URL.Path)
+		mu.Unlock()
+		writeOK(w, map[string]any{"id": 9})
+	})
+	ts := httptest.NewServer(mux)
+	t.Cleanup(ts.Close)
+
+	node := reconcileTestNode(t, ts, "desel-node", "selected", []string{"keep"})
+	seedInboundConflictNode(t, "keep", "", 443, model.VLESS, `{"network":"tcp"}`, `{"clients":[]}`, &node.Id)
+	seedInboundConflictNode(t, "deselected", "", 8443, model.VLESS, `{"network":"tcp"}`, `{"clients":[]}`, &node.Id)
+	seedInboundConflictNode(t, "deselected-gone", "", 9443, model.VLESS, `{"network":"tcp"}`, `{"clients":[]}`, &node.Id)
+
+	svc := InboundService{}
+	if err := svc.ReconcileNode(context.Background(), runtime.NewRemote(node, nil), node); err != nil {
+		t.Fatalf("ReconcileNode: %v", err)
+	}
+
+	mu.Lock()
+	got := append([]string(nil), writes...)
+	mu.Unlock()
+	if len(got) != 1 || got[0] != "/panel/api/inbounds/update/1" {
+		t.Fatalf("node writes = %v, want only the selected inbound's update [/panel/api/inbounds/update/1]", got)
+	}
+}

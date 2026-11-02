@@ -151,22 +151,22 @@ func (s *InboundService) addClientTraffic(tx *gorm.DB, traffics []*xray.ClientTr
 	// shared row then carried the node inbound's id (AddClientStat used to use
 	// OnConflict DoNothing and never refreshed it; it now refreshes inbound_id on
 	// conflict, but this filter was removed rather than relying on that ordering).
-	err = tx.Model(xray.ClientTraffic{}).
-		Where("email IN (?)", emails).
-		Order("id").
-		Find(&dbClientTraffics).Error
-	if err != nil {
-		return err
+	// Chunked: Xray reports every client seen since the core started, which can
+	// exceed the database's bound-variable limit in one IN list.
+	for _, batch := range chunkStrings(emails, sqlInChunk) {
+		var rows []*xray.ClientTraffic
+		if err = tx.Model(xray.ClientTraffic{}).
+			Where("email IN (?)", batch).
+			Find(&rows).Error; err != nil {
+			return err
+		}
+		dbClientTraffics = append(dbClientTraffics, rows...)
 	}
+	slices.SortFunc(dbClientTraffics, func(a, b *xray.ClientTraffic) int { return a.Id - b.Id })
 
 	// Avoid empty slice error
 	if len(dbClientTraffics) == 0 {
 		return nil
-	}
-
-	dbClientTraffics, convertedExpiryByEmail, err := s.adjustTraffics(tx, dbClientTraffics)
-	if err != nil {
-		return err
 	}
 
 	// Index by email for O(N) merge.
@@ -175,6 +175,11 @@ func (s *InboundService) addClientTraffic(tx *gorm.DB, traffics []*xray.ClientTr
 		if traffics[i] != nil {
 			trafficByEmail[traffics[i].Email] = traffics[i]
 		}
+	}
+
+	dbClientTraffics, convertedExpiryByEmail, err := s.adjustTraffics(tx, dbClientTraffics, trafficByEmail)
+	if err != nil {
+		return err
 	}
 	now := time.Now().UnixMilli()
 	// Use atomic per-row UPDATE instead of read-modify-write Save. tx.Save
@@ -255,15 +260,21 @@ func canonicalizeClientTraffic(tx *gorm.DB, traffics []*xray.ClientTraffic) ([]*
 	return result, nil
 }
 
-func (s *InboundService) adjustTraffics(tx *gorm.DB, dbClientTraffics []*xray.ClientTraffic) ([]*xray.ClientTraffic, map[string]int64, error) {
+func (s *InboundService) adjustTraffics(tx *gorm.DB, dbClientTraffics []*xray.ClientTraffic, polled map[string]*xray.ClientTraffic) ([]*xray.ClientTraffic, map[string]int64, error) {
 	now := time.Now().UnixMilli()
 
 	// "Start After First Use" stores a negative expiry (the duration). On the
 	// first traffic tick it becomes an absolute deadline of now+duration. Compute
 	// it once per email so every inbound the client is attached to lands on the
 	// same value (recomputing per inbound would skip all but the first one).
+	// Xray reports a zero delta for every counter it holds, so only a poll that
+	// carried traffic for the client counts as its first use.
 	newExpiryByEmail := make(map[string]int64, len(dbClientTraffics))
 	for traffic_index := range dbClientTraffics {
+		t := polled[dbClientTraffics[traffic_index].Email]
+		if t == nil || (t.Up == 0 && t.Down == 0) {
+			continue
+		}
 		if dbClientTraffics[traffic_index].ExpiryTime < 0 {
 			newExpiryByEmail[dbClientTraffics[traffic_index].Email] = now - dbClientTraffics[traffic_index].ExpiryTime
 		}
@@ -280,24 +291,35 @@ func (s *InboundService) adjustTraffics(tx *gorm.DB, dbClientTraffics []*xray.Cl
 	// Resolve the owning inbounds through the client_inbounds link, which is
 	// authoritative. client_traffics.inbound_id goes stale when an inbound is
 	// deleted and recreated, which would leave the negative expiry unconverted.
-	var inboundIds []int
-	err := tx.Table("client_inbounds").
-		Joins("JOIN clients ON clients.id = client_inbounds.client_id").
-		Where("clients.email IN (?)", delayedEmails).
-		Distinct().
-		Pluck("client_inbounds.inbound_id", &inboundIds).Error
-	if err != nil {
-		return nil, nil, err
+	inboundIdSet := make(map[int]struct{})
+	for _, batch := range chunkStrings(delayedEmails, sqlInChunk) {
+		var ids []int
+		err := tx.Table("client_inbounds").
+			Joins("JOIN clients ON clients.id = client_inbounds.client_id").
+			Where("clients.email IN (?)", batch).
+			Distinct().
+			Pluck("client_inbounds.inbound_id", &ids).Error
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, id := range ids {
+			inboundIdSet[id] = struct{}{}
+		}
 	}
-	if len(inboundIds) == 0 {
+	if len(inboundIdSet) == 0 {
 		return dbClientTraffics, nil, nil
 	}
+	inboundIds := slices.Sorted(maps.Keys(inboundIdSet))
 
 	var inbounds []*model.Inbound
-	err = tx.Model(model.Inbound{}).Where("id IN (?)", inboundIds).Find(&inbounds).Error
-	if err != nil {
-		return nil, nil, err
+	for _, batch := range chunkInts(inboundIds, sqlInChunk) {
+		var rows []*model.Inbound
+		if err := tx.Model(model.Inbound{}).Where("id IN (?)", batch).Find(&rows).Error; err != nil {
+			return nil, nil, err
+		}
+		inbounds = append(inbounds, rows...)
 	}
+	var err error
 	for inbound_index := range inbounds {
 		settings := map[string]any{}
 		_ = json.Unmarshal([]byte(inbounds[inbound_index].Settings), &settings)

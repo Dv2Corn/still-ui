@@ -16,6 +16,8 @@ import (
 const (
 	loginUserKey      = "LOGIN_USER"
 	loginEpochKey     = "LOGIN_EPOCH"
+	loginSessionKey   = "LOGIN_SID"
+	loginAtKey        = "LOGIN_AT"
 	apiAuthUserKey    = "api_auth_user"
 	sessionCookieName = "3x-ui"
 )
@@ -32,8 +34,16 @@ func SetLoginUser(c *gin.Context, user *model.User) error {
 	// Anyone can mint the anonymous session this request carried and plant it in a browser,
 	// so nothing in it, the CSRF token above all, outlives the privilege change.
 	s.Clear()
+	id, err := newSessionID()
+	if err != nil {
+		return err
+	}
 	s.Set(loginUserKey, user.Id)
 	s.Set(loginEpochKey, user.LoginEpoch)
+	// Logout revokes this id, so a copy of the cookie dies with it, and the
+	// lifetime counts from this login however often the cookie is saved again.
+	s.Set(loginSessionKey, id)
+	s.Set(loginAtKey, time.Now().Unix())
 	return s.Save()
 }
 
@@ -56,6 +66,15 @@ func GetLoginUser(c *gin.Context) *model.User {
 		return nil
 	}
 	userID, ok := sessionUserID(obj)
+	sid, _ := s.Get(loginSessionKey).(string)
+	if ok && (sid == "" || loginExpired(s.Get(loginAtKey), time.Now()) || sessionRevoked(sid)) {
+		// Logged out, past its lifetime, or minted before sessions carried an id.
+		dropLogin(s)
+		if err := s.Save(); err != nil {
+			logger.Warning("session: failed to drop ended session:", err)
+		}
+		return nil
+	}
 	if !ok {
 		s.Delete(loginUserKey)
 		s.Delete(loginEpochKey)
@@ -162,8 +181,21 @@ func getUserByID(id int) (*model.User, error) {
 	return user, nil
 }
 
+// dropLogin removes the login from a session, keeping anything anonymous in it.
+func dropLogin(s sessions.Session) {
+	s.Delete(loginUserKey)
+	s.Delete(loginEpochKey)
+	s.Delete(loginSessionKey)
+	s.Delete(loginAtKey)
+}
+
 func ClearSession(c *gin.Context) error {
 	s := sessions.Default(c)
+	if sid, ok := s.Get(loginSessionKey).(string); ok {
+		if err := revokeSession(sid, s.Get(loginAtKey)); err != nil {
+			return err
+		}
+	}
 	s.Clear()
 	cookiePath := c.GetString("base_path")
 	if cookiePath == "" {

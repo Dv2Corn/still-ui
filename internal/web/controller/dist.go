@@ -106,18 +106,20 @@ func serveDistPage(c *gin.Context, name string) {
 	}
 
 	if basePath != "/" {
-		body = bytes.ReplaceAll(body, []byte(`src="/assets/`), []byte(`src="`+basePath+`assets/`))
-		body = bytes.ReplaceAll(body, []byte(`href="/assets/`), []byte(`href="`+basePath+`assets/`))
+		attrBase := htmlpkg.EscapeString(basePath)
+		body = bytes.ReplaceAll(body, []byte(`src="/assets/`), []byte(`src="`+attrBase+`assets/`))
+		body = bytes.ReplaceAll(body, []byte(`href="/assets/`), []byte(`href="`+attrBase+`assets/`))
 	}
 
+	// < > & as \u escapes: a literal "</script>" in a string still ends the element.
 	jsEscape := strings.NewReplacer(
 		`\`, `\\`,
 		`"`, `\"`,
 		"\n", `\n`,
 		"\r", `\r`,
-		"<", `<`,
-		">", `>`,
-		"&", `&`,
+		"<", `\u003c`,
+		">", `\u003e`,
+		"&", `\u0026`,
 	)
 	escapedBase := jsEscape.Replace(basePath)
 	csrfToken, err := session.EnsureCSRFToken(c)

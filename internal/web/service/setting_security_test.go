@@ -257,3 +257,47 @@ func TestGetSecret_FallbacksOnEmptyDatabaseSetting(t *testing.T) {
 		t.Fatalf("persisted secret = %q, want %q", persisted, secret)
 	}
 }
+
+// A secret saved in lower case made every later login panic in the TOTP decoder,
+// and one saved empty or not base32 at all turned on a 2FA nobody can pass.
+func TestUpdateAllSettingNormalizesAndValidatesTwoFactorToken(t *testing.T) {
+	setupSettingTestDB(t)
+	s := &SettingService{}
+	// A PostgreSQL test database is shared: start from 2FA off and no secret.
+	if err := s.saveSetting("twoFactorEnable", "false"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.saveSetting("twoFactorToken", ""); err != nil {
+		t.Fatal(err)
+	}
+	enable := func(token string) error {
+		t.Helper()
+		view, err := s.GetAllSettingView()
+		if err != nil {
+			t.Fatal(err)
+		}
+		settings := &view.AllSetting
+		settings.TwoFactorEnable = true
+		settings.TwoFactorToken = token
+		return s.UpdateAllSetting(settings, SecretClears{})
+	}
+
+	for _, bad := range []string{"", "not base32!"} {
+		if err := enable(bad); err == nil {
+			t.Fatalf("2FA turned on with secret %q", bad)
+		}
+		if on, _ := s.GetTwoFactorEnable(); on {
+			t.Fatalf("2FA stored as enabled after refusing secret %q", bad)
+		}
+	}
+
+	if err := enable("jbsw y3dp ehpk 3pxp"); err != nil {
+		t.Fatalf("enable with a lower-case grouped secret: %v", err)
+	}
+	if got, _ := s.GetTwoFactorToken(); got != "JBSWY3DPEHPK3PXP" {
+		t.Fatalf("stored 2FA secret = %q, want the normalized base32 key", got)
+	}
+	if err := s.VerifyTwoFactorCode(gotp.NewDefaultTOTP("JBSWY3DPEHPK3PXP").Now()); err != nil {
+		t.Fatalf("valid code rejected after save: %v", err)
+	}
+}

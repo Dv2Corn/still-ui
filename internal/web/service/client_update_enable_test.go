@@ -2,6 +2,7 @@ package service
 
 import (
 	"testing"
+	"time"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/database"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
@@ -150,5 +151,52 @@ func TestResetTrafficByEmail_NoInbound_LeavesRecordEnableTrue(t *testing.T) {
 
 	if got := recordEnableOf(t, svc, email); !got {
 		t.Fatalf("%s: client_records.enable = false, want true (no-inbound reset re-enable gap)", email)
+	}
+}
+
+// A client that expired and also spent its quota was switched off by the expiry as
+// much as by the quota. A traffic reset brought it back; the next tick disabled it
+// again, removing it from the core each cycle.
+func TestResetTraffic_KeepsAnExpiredDepletedClientOff(t *testing.T) {
+	resets := []struct {
+		name string
+		run  func(svc *ClientService, inboundSvc *InboundService, email string) error
+	}{
+		{"single", func(svc *ClientService, inboundSvc *InboundService, email string) error {
+			_, err := svc.ResetTrafficByEmail(inboundSvc, email)
+			return err
+		}},
+		{"bulk", func(svc *ClientService, inboundSvc *InboundService, email string) error {
+			_, err := svc.BulkResetTraffic(inboundSvc, []string{email})
+			return err
+		}},
+	}
+	for _, reset := range resets {
+		t.Run(reset.name, func(t *testing.T) {
+			setupBulkDB(t)
+			svc := &ClientService{}
+			inboundSvc := &InboundService{}
+
+			email := "expired-depleted@x"
+			expired := time.Now().Add(-time.Hour).UnixMilli()
+			c := model.Client{Email: email, ID: "22222222-2222-2222-2222-222222222222", SubID: email, Enable: false, TotalGB: 30, ExpiryTime: expired}
+			ib := mkInbound(t, 53013, model.VLESS, clientsSettings(t, []model.Client{c}))
+			if err := svc.SyncInbound(nil, ib.Id, []model.Client{c}); err != nil {
+				t.Fatalf("seed linkage: %v", err)
+			}
+			mkTraffic(t, ib.Id, email, 10, 20, 30, expired, false)
+
+			if err := reset.run(svc, inboundSvc, email); err != nil {
+				t.Fatalf("reset: %v", err)
+			}
+
+			tr := trafficOf(t, email)
+			if tr.Up != 0 || tr.Down != 0 {
+				t.Fatalf("expected up/down 0, got up=%d down=%d", tr.Up, tr.Down)
+			}
+			if got := recordEnableOf(t, svc, email); got || tr.Enable {
+				t.Fatalf("expired client re-enabled by a traffic reset: record enable=%v, client_traffics enable=%v", got, tr.Enable)
+			}
+		})
 	}
 }

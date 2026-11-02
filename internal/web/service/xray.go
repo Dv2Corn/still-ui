@@ -194,6 +194,73 @@ func RemoveIndex(s []any, index int) []any {
 	return append(s[:index], s[index+1:]...)
 }
 
+// coreInboundStream is the stream an inbound runs with in the core: the panel-only
+// keys dropped and stored legacy or crashing shapes healed. GetXrayConfig and the
+// direct API pushes both use it, so the core gets one shape either way.
+func coreInboundStream(tag, streamSettings string) (string, error) {
+	// Unmarshal stream JSON
+	var stream map[string]any
+	_ = json.Unmarshal([]byte(streamSettings), &stream)
+
+	// Remove the "settings" field under "tlsSettings" and "realitySettings"
+	tlsSettings, ok1 := stream["tlsSettings"].(map[string]any)
+	realitySettings, ok2 := stream["realitySettings"].(map[string]any)
+	if ok1 || ok2 {
+		if ok1 {
+			delete(tlsSettings, "settings")
+		} else if ok2 {
+			delete(realitySettings, "settings")
+		}
+	}
+
+	delete(stream, "externalProxy")
+
+	// finalmask.tcp + REALITY panics Xray-core on the first connection
+	// (XTLS/Xray-core#6453). AddInbound/UpdateInbound reject this
+	// combination at save time, but a row saved before that guard
+	// existed (upgrade, node sync, restored backup, direct DB edit)
+	// would still crash Xray on the next restart without this — drop
+	// it here too, the same way liftXhttpSessionIDKeys and
+	// HealShadowsocksClientMethods heal other legacy data in place.
+	if len(finalMaskRealityTcpMasks(stream)) > 0 {
+		logger.Warningf("Inbound %q: dropping finalmask, incompatible with REALITY security (crashes Xray-core, see XTLS/Xray-core#6453)", tag)
+		delete(stream, "finalmask")
+	}
+
+	dropEmptyRandPackets(stream["finalmask"])
+
+	if dropped := stripIncompleteXmcMasks(stream); dropped > 0 {
+		logger.Warningf("Inbound %q: dropping %d XMC finalmask mask(s) without complete Minecraft profiles — reconfigure them to restore the obfuscation (see XTLS/Xray-core#6487)", tag, dropped)
+	}
+
+	// A row that skipped the save path can still carry an xdns shape older than 26.10.10.
+	maskcompat.UpgradeLegacyXdns(stream["finalmask"])
+
+	// xray-core v26.6.22 (#6258) renamed the XHTTP session keys and
+	// kept no fallback. Lift legacy sessionPlacement/sessionKey onto the
+	// new names here so inbounds stored before the rename keep working
+	// without the admin re-saving them.
+	liftXhttpSessionIDKeys(stream)
+
+	newStream, err := json.MarshalIndent(stream, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	return string(newStream), nil
+}
+
+// coreClientFlow is the flow a client runs with in the core: Vision only where
+// the inbound's stream can carry it, and the client-side udp443 variant as Vision.
+func coreClientFlow(flow string, flowAllowed bool) string {
+	if !flowAllowed {
+		return ""
+	}
+	if flow == "xtls-rprx-vision-udp443" {
+		return "xtls-rprx-vision"
+	}
+	return flow
+}
+
 // GetXrayConfig retrieves and builds the Xray configuration from settings and inbounds.
 func (s *XrayService) GetXrayConfig() (*xray.Config, error) {
 	templateConfig, err := s.settingService.GetXrayConfigTemplate()
@@ -283,13 +350,7 @@ func (s *XrayService) GetXrayConfig() (*xray.Config, error) {
 			if !c.Enable {
 				continue
 			}
-			flow := c.Flow
-			if flow == "xtls-rprx-vision-udp443" {
-				flow = "xtls-rprx-vision"
-			}
-			if !flowAllowed {
-				flow = ""
-			}
+			flow := coreClientFlow(c.Flow, flowAllowed)
 			entry := map[string]any{"email": c.Email}
 			switch inbound.Protocol {
 			case model.VLESS:
@@ -390,55 +451,11 @@ func (s *XrayService) GetXrayConfig() (*xray.Config, error) {
 		}
 
 		if len(inbound.StreamSettings) > 0 {
-			// Unmarshal stream JSON
-			var stream map[string]any
-			_ = json.Unmarshal([]byte(inbound.StreamSettings), &stream)
-
-			// Remove the "settings" field under "tlsSettings" and "realitySettings"
-			tlsSettings, ok1 := stream["tlsSettings"].(map[string]any)
-			realitySettings, ok2 := stream["realitySettings"].(map[string]any)
-			if ok1 || ok2 {
-				if ok1 {
-					delete(tlsSettings, "settings")
-				} else if ok2 {
-					delete(realitySettings, "settings")
-				}
-			}
-
-			delete(stream, "externalProxy")
-
-			// finalmask.tcp + REALITY panics Xray-core on the first connection
-			// (XTLS/Xray-core#6453). AddInbound/UpdateInbound reject this
-			// combination at save time, but a row saved before that guard
-			// existed (upgrade, node sync, restored backup, direct DB edit)
-			// would still crash Xray on the next restart without this — drop
-			// it here too, the same way liftXhttpSessionIDKeys and
-			// HealShadowsocksClientMethods heal other legacy data in place.
-			if len(finalMaskRealityTcpMasks(stream)) > 0 {
-				logger.Warningf("Inbound %q: dropping finalmask, incompatible with REALITY security (crashes Xray-core, see XTLS/Xray-core#6453)", inbound.Tag)
-				delete(stream, "finalmask")
-			}
-
-			dropEmptyRandPackets(stream["finalmask"])
-
-			if dropped := stripIncompleteXmcMasks(stream); dropped > 0 {
-				logger.Warningf("Inbound %q: dropping %d XMC finalmask mask(s) without complete Minecraft profiles — reconfigure them to restore the obfuscation (see XTLS/Xray-core#6487)", inbound.Tag, dropped)
-			}
-
-			// A row that skipped the save path can still carry an xdns shape older than 26.10.10.
-			maskcompat.UpgradeLegacyXdns(stream["finalmask"])
-
-			// xray-core v26.6.22 (#6258) renamed the XHTTP session keys and
-			// kept no fallback. Lift legacy sessionPlacement/sessionKey onto the
-			// new names here so inbounds stored before the rename keep working
-			// without the admin re-saving them.
-			liftXhttpSessionIDKeys(stream)
-
-			newStream, err := json.MarshalIndent(stream, "", "  ")
+			newStream, err := coreInboundStream(inbound.Tag, inbound.StreamSettings)
 			if err != nil {
 				return nil, err
 			}
-			inbound.StreamSettings = string(newStream)
+			inbound.StreamSettings = newStream
 		}
 
 		if inbound.Protocol == model.Shadowsocks {
@@ -622,8 +639,28 @@ func NodeEgressInboundTag(nodeID int) string {
 	return fmt.Sprintf("node-egress-%d", nodeID)
 }
 
-// nodeEgressBasePort is the first port tried for node egress bridges.
+// nodeEgressBasePort is the port just below the node egress bridges' range.
 const nodeEgressBasePort = 62800
+
+// nodeEgressPortSlots bounds that range to 62801..63800, clear of the API
+// (62789), TUIC (64001..65000) and AmneziaWG (65101..65535) relay ports.
+const nodeEgressPortSlots = 1000
+
+// nodeEgressPort is the first free port of the range for nodeID, wrapping ids
+// past the range; false when every port of it is taken.
+func nodeEgressPort(nodeID int, used map[int]struct{}) (int, bool) {
+	start := 0
+	if nodeID > 0 {
+		start = (nodeID - 1) % nodeEgressPortSlots
+	}
+	for i := 0; i < nodeEgressPortSlots; i++ {
+		port := nodeEgressBasePort + 1 + (start+i)%nodeEgressPortSlots
+		if _, taken := used[port]; !taken {
+			return port, true
+		}
+	}
+	return 0, false
+}
 
 // injectNodeEgresses appends a loopback SOCKS inbound per enabled node that has
 // an OutboundTag, and prepends a routing rule sending that inbound's traffic to
@@ -660,6 +697,12 @@ func injectNodeEgresses(cfg *xray.Config, nodes []*model.Node) {
 			logger.Warning("node egress: inbound tag [", tag, "] already exists, skipping")
 			continue
 		}
+		port, ok := nodeEgressPort(n.Id, used)
+		if !ok {
+			logger.Warning("node egress: no free port left for node [", n.Id, "], skipping")
+			continue
+		}
+		used[port] = struct{}{}
 		usedTags[tag] = struct{}{}
 
 		rule := map[string]any{
@@ -672,15 +715,6 @@ func injectNodeEgresses(cfg *xray.Config, nodes []*model.Node) {
 			rule["outboundTag"] = n.OutboundTag
 		}
 		newRules = append(newRules, rule)
-
-		port := nodeEgressBasePort + n.Id
-		for {
-			if _, taken := used[port]; !taken {
-				break
-			}
-			port++
-		}
-		used[port] = struct{}{}
 
 		cfg.InboundConfigs = append(cfg.InboundConfigs, xray.InboundConfig{
 			Listen:   json_util.RawMessage(`"127.0.0.1"`),
@@ -1475,13 +1509,15 @@ func (s *XrayService) GetBalancersStatus(tags []string) ([]BalancerStatus, error
 		}
 		return statuses, nil
 	}
-	if err := s.xrayAPI.Init(process.GetAPIPort()); err != nil {
+	// A client per call: the controller's XrayService serves concurrent requests.
+	api := xray.XrayAPI{}
+	if err := api.Init(process.GetAPIPort()); err != nil {
 		return nil, err
 	}
-	defer s.xrayAPI.Close()
+	defer api.Close()
 
 	for _, tag := range tags {
-		info, err := s.xrayAPI.GetBalancerInfo(tag)
+		info, err := api.GetBalancerInfo(tag)
 		if err != nil {
 			logger.Debug("get balancer info [", tag, "] failed:", err)
 			statuses = append(statuses, BalancerStatus{Tag: tag})
@@ -1507,11 +1543,12 @@ func (s *XrayService) OverrideBalancer(tag, target string) error {
 	if process == nil || !process.IsRunning() {
 		return ErrXrayNotRunning
 	}
-	if err := s.xrayAPI.Init(process.GetAPIPort()); err != nil {
+	api := xray.XrayAPI{}
+	if err := api.Init(process.GetAPIPort()); err != nil {
 		return err
 	}
-	defer s.xrayAPI.Close()
-	return balancerOverrides.set(process, &s.xrayAPI, tag, target)
+	defer api.Close()
+	return balancerOverrides.set(process, &api, tag, target)
 }
 
 // TestRoute asks the running core which outbound its router picks for the
@@ -1521,11 +1558,12 @@ func (s *XrayService) TestRoute(req xray.RouteTestRequest) (*xray.RouteTestResul
 	if process == nil || !process.IsRunning() {
 		return nil, ErrXrayNotRunning
 	}
-	if err := s.xrayAPI.Init(process.GetAPIPort()); err != nil {
+	api := xray.XrayAPI{}
+	if err := api.Init(process.GetAPIPort()); err != nil {
 		return nil, err
 	}
-	defer s.xrayAPI.Close()
-	return s.xrayAPI.TestRoute(req)
+	defer api.Close()
+	return api.TestRoute(req)
 }
 
 // RestartXray reconciles the running Xray process with the current desired
@@ -1555,6 +1593,9 @@ func (s *XrayService) RestartXray(isForce bool) error {
 		configUnchanged := process.GetConfig().Equals(xrayConfig)
 		if !isForce && configUnchanged && !isNeedXrayRestart.Load() {
 			logger.Debug("It does not need to restart Xray")
+			// The core already serves the desired config (e.g. a refused change was
+			// reverted), so an earlier refusal no longer holds anything back.
+			xrayState.holdBack("")
 			return repairUnavailableTuicRelays(xrayConfig, process.GetAPIPort())
 		}
 		// A config the core cannot bind never replaces one that works: its failed

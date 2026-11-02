@@ -464,3 +464,56 @@ func TestDoFetchSubscriptionLinksUsesTheHostProxy(t *testing.T) {
 		t.Fatalf("proxy saw %d requests, want 1", proxied.Load())
 	}
 }
+
+// A dead provider is asked again only after a backoff: each fetch can take the
+// whole client timeout, and every subscription request of its clients would wait.
+func TestFetchSubscriptionLinksBacksOffAfterFailure(t *testing.T) {
+	allowLoopbackProvider(t)
+	resetSubscriptionCache(t)
+	var requests atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		w.WriteHeader(http.StatusBadGateway)
+	}))
+	defer srv.Close()
+	stale := []string{"vless://stale@example.com:443"}
+	subscriptionCache.Lock()
+	subscriptionCache.m[srv.URL] = subscriptionCacheEntry{links: stale, fetchedAt: time.Now().Add(-subscriptionCacheTTL)}
+	subscriptionCache.Unlock()
+
+	first := fetchSubscriptionLinks(srv.URL)
+	if !first.fetched || first.err == nil || len(first.links) != 1 || first.links[0] != stale[0] {
+		t.Fatalf("first fetch = %+v, want a failed fetch serving the stale links", first)
+	}
+	second := fetchSubscriptionLinks(srv.URL)
+	if second.fetched || len(second.links) != 1 || second.links[0] != stale[0] {
+		t.Fatalf("second fetch = %+v, want the stale links without a new fetch", second)
+	}
+	if got := requests.Load(); got != 1 {
+		t.Fatalf("provider requests = %d, want 1 within the backoff", got)
+	}
+
+	subscriptionCache.Lock()
+	entry := subscriptionCache.m[srv.URL]
+	entry.failedAt = time.Now().Add(-subscriptionFailureBackoff)
+	subscriptionCache.m[srv.URL] = entry
+	subscriptionCache.Unlock()
+	if third := fetchSubscriptionLinks(srv.URL); !third.fetched {
+		t.Fatalf("third fetch = %+v, want a new fetch after the backoff", third)
+	}
+	if got := requests.Load(); got != 2 {
+		t.Fatalf("provider requests = %d, want 2 after the backoff", got)
+	}
+
+	// A provider that never answered is not asked again within the backoff either.
+	deadURL := srv.URL + "/never"
+	if res := fetchSubscriptionLinks(deadURL); !res.fetched || res.err == nil || len(res.links) != 0 {
+		t.Fatalf("dead provider first fetch = %+v", res)
+	}
+	if res := fetchSubscriptionLinks(deadURL); res.fetched || len(res.links) != 0 {
+		t.Fatalf("dead provider second fetch = %+v, want no fetch and no links", res)
+	}
+	if got := requests.Load(); got != 3 {
+		t.Fatalf("provider requests = %d, want 3", got)
+	}
+}
