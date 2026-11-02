@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/netip"
 	"strings"
 
 	"gorm.io/gorm"
@@ -349,6 +350,9 @@ func (s *InboundService) normalizeAmneziaWGSettings(inbound *model.Inbound, old 
 			if err := amneziawgkern.ValidatePeerSubnets(inst); err != nil {
 				return err
 			}
+			if err := amneziaWGKernelSubnetConflict(portCtx, inbound.Id, parsed.Server); err != nil {
+				return err
+			}
 		}
 		if inbound.NodeID != nil {
 			return nil
@@ -363,6 +367,43 @@ func (s *InboundService) normalizeAmneziaWGSettings(inbound *model.Inbound, old 
 		}
 	}
 	return nil
+}
+
+// amneziaWGKernelSubnetConflict refuses a kernel-mode subnet that overlaps
+// another enabled kernel-mode AmneziaWG inbound on the same host: both
+// interfaces get an address in it, the host routes it through the first one,
+// and the second inbound's return traffic is lost. Embedded inbounds each run
+// their own network stack and never conflict.
+func amneziaWGKernelSubnetConflict(ctx portConflictContext, selfID int, server *amneziawg.ServerSettings) error {
+	mine, ok := amneziaWGKernelSubnet(server)
+	if !ok {
+		return nil
+	}
+	for _, other := range ctx.inbounds {
+		if other == nil || other.Protocol != model.AmneziaWG || (selfID != 0 && other.Id == selfID) {
+			continue
+		}
+		var parsed amneziawg.InboundSettings
+		if json.Unmarshal([]byte(other.Settings), &parsed) != nil || parsed.Server == nil || !parsed.Server.KernelMode {
+			continue
+		}
+		if theirs, ok := amneziaWGKernelSubnet(parsed.Server); ok && mine.Overlaps(theirs) {
+			return fmt.Errorf("amneziawg: subnet %s overlaps kernel-mode inbound %q (%s); pick another subnet", mine, other.Tag, theirs)
+		}
+	}
+	return nil
+}
+
+func amneziaWGKernelSubnet(server *amneziawg.ServerSettings) (netip.Prefix, bool) {
+	cidr := server.SubnetCIDR
+	if cidr <= 0 {
+		cidr = 24
+	}
+	p, err := netip.ParsePrefix(fmt.Sprintf("%s/%d", server.SubnetIP, cidr))
+	if err != nil || !p.Addr().Is4() {
+		return netip.Prefix{}, false
+	}
+	return p.Masked(), true
 }
 
 // portConflictContext caches what checkForwardedPortsConflict needs about the
