@@ -1085,3 +1085,36 @@ func TestInjectAmneziawgV6Egress_OutboundBlocksPrivateEgress(t *testing.T) {
 	}
 	t.Fatalf("no outbound tagged %q in %s", amneziawgV6EgressTag(1, "a@x"), cfg.OutboundConfigs)
 }
+
+// A node id past 2735 put its bridge on a port above 65535 (and ids past 1200
+// into the TUIC relay range), so the core refused the whole config.
+func TestInjectNodeEgresses_PortStaysInItsRange(t *testing.T) {
+	for _, tc := range []struct{ id, want int }{
+		{1, nodeEgressBasePort + 1},
+		{nodeEgressPortSlots, nodeEgressBasePort + nodeEgressPortSlots},
+		{nodeEgressPortSlots + 1, nodeEgressBasePort + 1},
+		{3000, nodeEgressBasePort + 1 + (3000-1)%nodeEgressPortSlots},
+	} {
+		cfg := egressTestConfig()
+		injectNodeEgresses(cfg, []*model.Node{{Id: tc.id, Enable: true, OutboundTag: "direct"}})
+		bridge := cfg.InboundConfigs[len(cfg.InboundConfigs)-1]
+		if bridge.Tag != NodeEgressInboundTag(tc.id) || bridge.Port != tc.want {
+			t.Errorf("node %d bridge = %s on port %d, want port %d", tc.id, bridge.Tag, bridge.Port, tc.want)
+		}
+	}
+}
+
+// With every port of the range taken the node gets no bridge and no rule rather
+// than a port outside the range.
+func TestInjectNodeEgresses_FullRangeSkipsTheNode(t *testing.T) {
+	cfg := egressTestConfig()
+	for p := nodeEgressBasePort + 1; p <= nodeEgressBasePort+nodeEgressPortSlots; p++ {
+		cfg.InboundConfigs = append(cfg.InboundConfigs, xray.InboundConfig{Port: p, Protocol: "vless", Tag: fmt.Sprintf("in-%d", p)})
+	}
+	inbounds := len(cfg.InboundConfigs)
+	before := string(cfg.RouterConfig)
+	injectNodeEgresses(cfg, []*model.Node{{Id: 7, Enable: true, OutboundTag: "direct"}})
+	if len(cfg.InboundConfigs) != inbounds || string(cfg.RouterConfig) != before {
+		t.Fatalf("a node without a free port must get neither a bridge nor a rule; last inbound %+v", cfg.InboundConfigs[len(cfg.InboundConfigs)-1])
+	}
+}

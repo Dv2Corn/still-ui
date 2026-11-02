@@ -639,8 +639,28 @@ func NodeEgressInboundTag(nodeID int) string {
 	return fmt.Sprintf("node-egress-%d", nodeID)
 }
 
-// nodeEgressBasePort is the first port tried for node egress bridges.
+// nodeEgressBasePort is the port just below the node egress bridges' range.
 const nodeEgressBasePort = 62800
+
+// nodeEgressPortSlots bounds that range to 62801..63800, clear of the API
+// (62789), TUIC (64001..65000) and AmneziaWG (65101..65535) relay ports.
+const nodeEgressPortSlots = 1000
+
+// nodeEgressPort is the first free port of the range for nodeID, wrapping ids
+// past the range; false when every port of it is taken.
+func nodeEgressPort(nodeID int, used map[int]struct{}) (int, bool) {
+	start := 0
+	if nodeID > 0 {
+		start = (nodeID - 1) % nodeEgressPortSlots
+	}
+	for i := 0; i < nodeEgressPortSlots; i++ {
+		port := nodeEgressBasePort + 1 + (start+i)%nodeEgressPortSlots
+		if _, taken := used[port]; !taken {
+			return port, true
+		}
+	}
+	return 0, false
+}
 
 // injectNodeEgresses appends a loopback SOCKS inbound per enabled node that has
 // an OutboundTag, and prepends a routing rule sending that inbound's traffic to
@@ -677,6 +697,12 @@ func injectNodeEgresses(cfg *xray.Config, nodes []*model.Node) {
 			logger.Warning("node egress: inbound tag [", tag, "] already exists, skipping")
 			continue
 		}
+		port, ok := nodeEgressPort(n.Id, used)
+		if !ok {
+			logger.Warning("node egress: no free port left for node [", n.Id, "], skipping")
+			continue
+		}
+		used[port] = struct{}{}
 		usedTags[tag] = struct{}{}
 
 		rule := map[string]any{
@@ -689,15 +715,6 @@ func injectNodeEgresses(cfg *xray.Config, nodes []*model.Node) {
 			rule["outboundTag"] = n.OutboundTag
 		}
 		newRules = append(newRules, rule)
-
-		port := nodeEgressBasePort + n.Id
-		for {
-			if _, taken := used[port]; !taken {
-				break
-			}
-			port++
-		}
-		used[port] = struct{}{}
 
 		cfg.InboundConfigs = append(cfg.InboundConfigs, xray.InboundConfig{
 			Listen:   json_util.RawMessage(`"127.0.0.1"`),
