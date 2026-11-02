@@ -5,6 +5,7 @@ export type OnlineAPISupport = number;
 export type ProcessState = string;
 export type Protocol = string;
 export type addrFamily = number;
+export type payloadKeys = string[];
 export type staticEgressResolver = string;
 export type trafficLocalApplyAction = number;
 export type transportBits = number;
@@ -867,6 +868,7 @@ export interface Node {
   transitive?: boolean;
   unavailableMetrics?: string[];
   updatedAt: number;
+  upstreamVersion?: string;
   uptimeSecs: number;
   xrayError: string;
   xrayState: string;

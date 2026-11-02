@@ -18,6 +18,9 @@ export type Protocol = z.infer<typeof ProtocolSchema>;
 export const addrFamilySchema = z.number().int();
 export type addrFamily = z.infer<typeof addrFamilySchema>;
 
+export const payloadKeysSchema = z.array(z.string());
+export type payloadKeys = z.infer<typeof payloadKeysSchema>;
+
 export const staticEgressResolverSchema = z.string();
 export type staticEgressResolver = z.infer<typeof staticEgressResolverSchema>;
 
@@ -923,6 +926,7 @@ export const NodeSchema = z.object({
   transitive: z.boolean().optional(),
   unavailableMetrics: z.array(z.string()).optional(),
   updatedAt: z.number().int(),
+  upstreamVersion: z.string().optional(),
   uptimeSecs: z.number().int(),
   xrayError: z.string(),
   xrayState: z.string(),

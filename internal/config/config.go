@@ -17,6 +17,9 @@ import (
 //go:embed version
 var version string
 
+//go:embed upstream_version
+var upstreamVersion string
+
 //go:embed name
 var name string
 
@@ -41,12 +44,19 @@ const (
 	Error   LogLevel = "error"
 )
 
-// GetBaseVersion returns the raw embedded release version of the 3x-ui panel
-// (e.g. "3.4.0"). This is the panel's own version, not the Xray version. For the
-// version a panel advertises/displays (which adds a "dev+<sha>" label on dev
-// builds), use GetPanelVersion.
+// GetBaseVersion returns the raw embedded still-ui release version (e.g. "1.0.0").
+// This is the panel's own version, not the Xray version. For the version a panel
+// advertises/displays (which adds a "dev+<sha>" label on dev builds), use
+// GetPanelVersion.
 func GetBaseVersion() string {
 	return strings.TrimSpace(version)
+}
+
+// GetUpstreamVersion returns the 3x-ui release this build is based on (e.g.
+// "3.11.0"). still-ui numbers its own releases from 1.0.0, so a master that gates
+// node features by 3x-ui release reads this instead of the panel version.
+func GetUpstreamVersion() string {
+	return strings.TrimSpace(upstreamVersion)
 }
 
 // GetName returns the name of the 3x-ui application.

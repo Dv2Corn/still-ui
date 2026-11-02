@@ -110,13 +110,16 @@ type Status struct {
 		Configured bool `json:"configured"`
 		Running    bool `json:"running"`
 	} `json:"amneziawg"`
-	PanelVersion string    `json:"panelVersion"`
-	PanelGuid    string    `json:"panelGuid"`
-	Uptime       uint64    `json:"uptime"`
-	Loads        []float64 `json:"loads"`
-	TcpCount     int       `json:"tcpCount"`
-	UdpCount     int       `json:"udpCount"`
-	NetIO        struct {
+	PanelVersion string `json:"panelVersion"`
+	// UpstreamVersion is the 3x-ui release this still-ui build is based on; a
+	// still-ui master gates node protocols by it.
+	UpstreamVersion string    `json:"upstreamVersion"`
+	PanelGuid       string    `json:"panelGuid"`
+	Uptime          uint64    `json:"uptime"`
+	Loads           []float64 `json:"loads"`
+	TcpCount        int       `json:"tcpCount"`
+	UdpCount        int       `json:"udpCount"`
+	NetIO           struct {
 		Up      uint64 `json:"up"`
 		Down    uint64 `json:"down"`
 		PktUp   uint64 `json:"pktUp"`
@@ -769,6 +772,7 @@ func (s *ServerService) GetStatus(lastStatus *Status) *Status {
 	status.AmneziaWG.Running = amneziawgnet.GetManager().HasRunning() || amneziawgkern.GetManager().HasRunning()
 
 	status.PanelVersion = config.GetPanelVersion()
+	status.UpstreamVersion = config.GetUpstreamVersion()
 	if guid, err := s.settingService.GetPanelGuid(); err == nil {
 		status.PanelGuid = guid
 	}

@@ -960,6 +960,7 @@ export const EXAMPLES: Record<string, unknown> = {
       ""
     ],
     "updatedAt": 1700000000,
+    "upstreamVersion": "3.11.0",
     "uptimeSecs": 86400,
     "xrayError": "",
     "xrayState": "",
