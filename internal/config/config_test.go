@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"testing"
 )
@@ -23,6 +24,20 @@ func TestGetPanelVersion(t *testing.T) {
 	if got := GetPanelVersion(); got != "dev+1d1128cf" {
 		t.Fatalf("dev build (full sha): GetPanelVersion = %q, want %q", got, "dev+1d1128cf")
 	}
+}
+
+func TestEmbeddedVersions(t *testing.T) {
+	for name, v := range map[string]string{"version": GetBaseVersion(), "upstream_version": GetUpstreamVersion()} {
+		if _, ok := versionParts(v); !ok {
+			t.Fatalf("%s = %q, want a plain MAJOR.MINOR.PATCH version", name, v)
+		}
+	}
+}
+
+func versionParts(v string) ([3]int, bool) {
+	var out [3]int
+	n, err := fmt.Sscanf(v, "%d.%d.%d", &out[0], &out[1], &out[2])
+	return out, err == nil && n == 3 && fmt.Sprintf("%d.%d.%d", out[0], out[1], out[2]) == v
 }
 
 func TestGetPortOverride(t *testing.T) {

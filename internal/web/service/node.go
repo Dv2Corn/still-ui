@@ -37,6 +37,7 @@ type HeartbeatPatch struct {
 	LatencyMs          int
 	XrayVersion        string
 	PanelVersion       string
+	UpstreamVersion    string
 	Guid               string
 	CpuPct             float64
 	MemPct             float64
@@ -992,6 +993,7 @@ func (s *NodeService) UpdateHeartbeat(id int, p HeartbeatPatch) error {
 		"latency_ms":          p.LatencyMs,
 		"xray_version":        p.XrayVersion,
 		"panel_version":       p.PanelVersion,
+		"upstream_version":    p.UpstreamVersion,
 		"cpu_pct":             p.CpuPct,
 		"mem_pct":             p.MemPct,
 		"uptime_secs":         p.UptimeSecs,
@@ -1356,10 +1358,11 @@ func (s *NodeService) probe(ctx context.Context, n *model.Node, proxyURL string)
 				State    string `json:"state"`
 				ErrorMsg string `json:"errorMsg"`
 			} `json:"xray"`
-			PanelVersion string `json:"panelVersion"`
-			PanelGuid    string `json:"panelGuid"`
-			Uptime       uint64 `json:"uptime"`
-			NetIO        struct {
+			PanelVersion    string `json:"panelVersion"`
+			UpstreamVersion string `json:"upstreamVersion"`
+			PanelGuid       string `json:"panelGuid"`
+			Uptime          uint64 `json:"uptime"`
+			NetIO           struct {
 				Up   uint64 `json:"up"`
 				Down uint64 `json:"down"`
 			} `json:"netIO"`
@@ -1389,6 +1392,7 @@ func (s *NodeService) probe(ctx context.Context, n *model.Node, proxyURL string)
 	patch.XrayState = o.Xray.State
 	patch.XrayError = o.Xray.ErrorMsg
 	patch.PanelVersion = o.PanelVersion
+	patch.UpstreamVersion = o.UpstreamVersion
 	patch.Guid = o.PanelGuid
 	patch.UptimeSecs = o.Uptime
 	patch.NetUp = o.NetIO.Up

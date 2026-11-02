@@ -856,14 +856,17 @@ type Node struct {
 	// Heartbeat-updated fields. UpdatedAt advances on every probe even when
 	// the row is otherwise unchanged so the UI's "last seen" tooltip is
 	// truthful without us having to read LastHeartbeat separately.
-	Status        string  `json:"status" gorm:"default:unknown" example:"online"` // online|offline|unknown
-	LastHeartbeat int64   `json:"lastHeartbeat" example:"1700000000"`             // unix seconds, 0 = never
-	LatencyMs     int     `json:"latencyMs" example:"42"`
-	XrayVersion   string  `json:"xrayVersion" example:"25.10.31"`
-	PanelVersion  string  `json:"panelVersion" gorm:"column:panel_version" example:"v3.x.x"`
-	CpuPct        float64 `json:"cpuPct" example:"23.5"`
-	MemPct        float64 `json:"memPct" example:"45.1"`
-	UptimeSecs    uint64  `json:"uptimeSecs" example:"86400"`
+	Status        string `json:"status" gorm:"default:unknown" example:"online"` // online|offline|unknown
+	LastHeartbeat int64  `json:"lastHeartbeat" example:"1700000000"`             // unix seconds, 0 = never
+	LatencyMs     int    `json:"latencyMs" example:"42"`
+	XrayVersion   string `json:"xrayVersion" example:"25.10.31"`
+	PanelVersion  string `json:"panelVersion" gorm:"column:panel_version" example:"v3.x.x"`
+	// UpstreamVersion is the 3x-ui release a still-ui node is based on; empty for
+	// 3x-ui nodes and still-ui builds before 1.0.0.
+	UpstreamVersion string  `json:"upstreamVersion,omitempty" gorm:"column:upstream_version" example:"3.11.0"`
+	CpuPct          float64 `json:"cpuPct" example:"23.5"`
+	MemPct          float64 `json:"memPct" example:"45.1"`
+	UptimeSecs      uint64  `json:"uptimeSecs" example:"86400"`
 	// Nil on legacy rows and responses: zero remains a valid measured value.
 	UnavailableMetrics []string `json:"unavailableMetrics,omitempty" gorm:"serializer:json;column:unavailable_metrics"`
 	NetUp              uint64   `json:"netUp" gorm:"column:net_up" example:"1048576"`

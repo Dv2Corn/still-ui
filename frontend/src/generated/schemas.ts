@@ -3764,6 +3764,11 @@ export const SCHEMAS: Record<string, unknown> = {
         "format": "int64",
         "type": "integer"
       },
+      "upstreamVersion": {
+        "description": "UpstreamVersion is the 3x-ui release a still-ui node is based on; empty for\n3x-ui nodes and still-ui builds before 1.0.0.",
+        "example": "3.11.0",
+        "type": "string"
+      },
       "uptimeSecs": {
         "example": 86400,
         "format": "int64",

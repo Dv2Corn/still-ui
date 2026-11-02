@@ -82,15 +82,21 @@ func checkNodeCanHostProtocol(db *gorm.DB, nodeID int, protocol model.Protocol) 
 		return nil
 	}
 	var node model.Node
-	if err := db.Select("id", "name", "panel_version").First(&node, nodeID).Error; err != nil {
+	if err := db.Select("id", "name", "panel_version", "upstream_version").First(&node, nodeID).Error; err != nil {
 		return err
 	}
 	if strings.TrimSpace(node.PanelVersion) == "" {
 		return common.NewErrorf("node %q has not reported its panel version yet; %s inbounds need %s or newer",
 			node.Name, protocol, firstRelease)
 	}
+	// The table holds 3x-ui releases. A still-ui node numbers its own releases from
+	// 1.0.0 and reports the 3x-ui release it is based on separately.
+	base := node.PanelVersion
+	if upstream := strings.TrimSpace(node.UpstreamVersion); upstream != "" {
+		base = upstream
+	}
 	// A dev build reports "dev+<sha>": it tracks main, which carries every protocol.
-	if cmp, ok := version.Compare(node.PanelVersion, firstRelease); ok && cmp < 0 {
+	if cmp, ok := version.Compare(base, firstRelease); ok && cmp < 0 {
 		return common.NewErrorf("node %q runs panel %s; %s inbounds need %s or newer",
 			node.Name, node.PanelVersion, protocol, firstRelease)
 	}
