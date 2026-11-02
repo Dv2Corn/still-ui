@@ -1680,6 +1680,9 @@ func (s *SettingService) UpdateAllSetting(allSetting *entity.AllSetting, clears 
 	default:
 		return errors.New("subscription profile mode must be none, builtin, or custom")
 	}
+	if err := s.normalizeTwoFactorToken(allSetting); err != nil {
+		return err
+	}
 	if err := s.preserveRedactedSecrets(allSetting, clears); err != nil {
 		return err
 	}
@@ -1774,6 +1777,35 @@ func ValidateRegex(pattern string) error {
 	if _, err := regexp.Compile(pattern); err != nil {
 		return common.NewError("Regular expression is invalid:", err)
 	}
+	return nil
+}
+
+// normalizeTwoFactorToken stores a submitted 2FA secret as the TOTP decoder takes
+// it and refuses to turn 2FA on without a base32 one: a lower-case secret made every
+// login panic, an empty one let nobody in. A blank token on an enabled 2FA is the
+// redacted, unchanged secret and is left to preserveRedactedSecrets.
+func (s *SettingService) normalizeTwoFactorToken(allSetting *entity.AllSetting) error {
+	if !allSetting.TwoFactorEnable {
+		return nil
+	}
+	if strings.TrimSpace(allSetting.TwoFactorToken) == "" {
+		enabled, err := s.GetTwoFactorEnable()
+		if err != nil {
+			return err
+		}
+		if enabled {
+			return nil
+		}
+		stored, err := s.GetTwoFactorToken()
+		if err != nil {
+			return err
+		}
+		allSetting.TwoFactorToken = stored
+	}
+	if !totp.ValidSecret(allSetting.TwoFactorToken) {
+		return common.NewError("two-factor secret must be a base32 key")
+	}
+	allSetting.TwoFactorToken = totp.NormalizeSecret(allSetting.TwoFactorToken)
 	return nil
 }
 
