@@ -204,7 +204,7 @@ func TestScriptConfigPreservesCustomBasePaths(t *testing.T) {
 					}
 					wantRestarts := ""
 					if initialize && script == "update.sh" {
-						wantRestarts = "restart x-ui\n"
+						wantRestarts = "restart still-ui\n"
 					}
 					if actual := readScriptState(t, dir, "restarts"); actual != wantRestarts {
 						t.Errorf("path-related restarts = %q, want %q", actual, wantRestarts)
@@ -262,7 +262,7 @@ func TestScriptConfigReadFailureKeepsServiceSetup(t *testing.T) {
 			wantLifecycle, wantServices := "fail2ban\n", ""
 			if script == "install.sh" {
 				wantLifecycle = "unit\nfail2ban\n"
-				wantServices = "daemon-reload\nenable x-ui\nstart x-ui\n"
+				wantServices = "daemon-reload\nenable still-ui\nstart still-ui\n"
 			}
 			for name, want := range map[string]string{
 				"path": "/a/", "username": "admin", "password": "admin", "writes": "",
