@@ -1109,18 +1109,64 @@ install_firewall() {
     # Check if the firewall is inactive
     if ufw status | grep -q "Status: active"; then
         echo "Firewall is already active"
-    else
-        echo "Activating firewall..."
-        # Open the necessary ports
-        ufw allow ssh
-        ufw allow http
-        ufw allow https
-        ufw allow 2053/tcp #webPort
-        ufw allow 2096/tcp #subport
-
-        # Enable the firewall
-        ufw --force enable
+        return 0
     fi
+
+    # Never enable with guessed ports: SSH, the panel and the inbounds rarely
+    # sit on 22/2053/2096, and enabling without them locks the operator out.
+    local ports=() p
+    mapfile -t ports < <(firewall_required_ports | sort -t/ -k1,1n -k2,2 -u)
+    echo "These ports will be allowed before the firewall is enabled:"
+    printf '  %s\n' "${ports[@]}"
+    echo "Inbounds that are not running right now (and kernel-mode AmneziaWG) are not listed;"
+    echo "allow their ports with 'Open Ports' before or after enabling."
+    if ! confirm "Allow these ports and enable the firewall? [y/n]" "n"; then
+        echo "Firewall left disabled."
+        return 0
+    fi
+    echo "Activating firewall..."
+    for p in "${ports[@]}"; do
+        ufw allow "$p"
+    done
+    ufw --force enable
+}
+
+# Prints the TCP ports sshd accepts connections on: its effective configuration
+# (sshd -T, which includes sshd_config.d/*.conf), else the config files, else 22.
+firewall_ssh_ports() {
+    local sshd_bin found=""
+    sshd_bin=$(command -v sshd 2> /dev/null || echo /usr/sbin/sshd)
+    if [[ -x "$sshd_bin" ]]; then
+        found=$("$sshd_bin" -T 2> /dev/null | awk 'tolower($1) == "port" && $2 ~ /^[0-9]+$/ {print $2}')
+    fi
+    if [[ -z "$found" ]]; then
+        found=$(cat /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf 2> /dev/null |
+            awk 'tolower($1) == "port" && $2 ~ /^[0-9]+$/ {print $2}')
+    fi
+    [[ -z "$found" ]] && found=22
+    printf '%s\n' $found | sort -un
+}
+
+# Prints "port/proto" for everything the firewall must keep reachable: SSH,
+# the panel port, HTTP/HTTPS for certificate issuance, and every non-loopback
+# socket sshd, the panel (web, subscription) or its cores listen on right now.
+firewall_required_ports() {
+    local p panel_port
+    for p in $(firewall_ssh_ports); do
+        echo "${p}/tcp"
+    done
+    panel_port=$(${xui_folder}/x-ui setting -show true 2> /dev/null | awk '/^port: [0-9]+$/ {print $2}')
+    [[ -n "$panel_port" ]] && echo "${panel_port}/tcp"
+    echo "80/tcp"
+    echo "443/tcp"
+    command -v ss > /dev/null 2>&1 || return 0
+    ss -Hlntup 2> /dev/null | awk '
+        $0 ~ /users:\(\("(sshd|x-ui|still-ui|xray[^"]*|mtg[^"]*|tuic[^"]*)"/ {
+            port = $5; sub(/.*:/, "", port)
+            host = $5; sub(/:[^:]*$/, "", host)
+            if (host ~ /^(127\.|\[::1\]|::1$|\[::ffff:127\.)/) next
+            if (port ~ /^[0-9]+$/) print port "/" $1
+        }'
 }
 
 open_ports() {
