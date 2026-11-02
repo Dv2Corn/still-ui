@@ -71,10 +71,11 @@ func (t *Tgbot) homeSummary() string {
 	}
 	clients := 0
 	online := 0
-	traffic := int64(0)
+	up, down := int64(0), int64(0)
 	for _, ib := range inbounds {
 		clients += len(ib.ClientStats)
-		traffic += ib.Up + ib.Down
+		up += ib.Up
+		down += ib.Down
 	}
 	if process := xrayProcessOrNil(); process != nil {
 		online = len(process.GetOnlineClients())
@@ -85,8 +86,8 @@ func (t *Tgbot) homeSummary() string {
 	body += t.I18nBot("tgbot.messages.inboundsCount", "Count=="+strconv.Itoa(len(inbounds)))
 	body += t.I18nBot("tgbot.messages.clientsCount", "Count=="+strconv.Itoa(clients))
 	body += t.I18nBot("tgbot.messages.onlinesCount", "Count=="+strconv.Itoa(online))
-	body += t.I18nBot("tgbot.messages.traffic", "Total=="+common.FormatTraffic(traffic),
-		"Upload=="+common.FormatTraffic(traffic), "Download=="+common.FormatTraffic(0))
+	body += t.I18nBot("tgbot.messages.traffic", "Total=="+common.FormatTraffic(up+down),
+		"Upload=="+common.FormatTraffic(up), "Download=="+common.FormatTraffic(down))
 	return body
 }
 
