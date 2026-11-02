@@ -134,9 +134,13 @@ func (j *NodeTrafficSyncJob) Run() {
 	}
 	wg.Wait()
 
-	_, clientsDisabled, err := j.inboundService.AddTraffic(nil, nil)
+	needRestart, clientsDisabled, err := j.inboundService.AddTraffic(nil, nil)
 	if err != nil {
 		logger.Warning("node traffic sync: depletion check failed:", err)
+	}
+	// A local add/remove that failed after the commit is only retried by a restart.
+	if needRestart {
+		j.xrayService.SetToNeedRestart()
 	}
 	if clientsDisabled {
 		if restartOnDisable, settingErr := j.settingService.GetRestartXrayOnClientDisable(); settingErr == nil && restartOnDisable {
