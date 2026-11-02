@@ -241,92 +241,37 @@ func (s *ClientService) AddToGroup(emails []string, group string) (int, error) {
 		affectedEmails = append(affectedEmails, r.Email)
 	}
 
-	tx := db.Begin()
-	var affected int64
-	for _, batch := range chunkStrings(affectedEmails, sqlInChunk) {
-		result := tx.Model(&model.ClientRecord{}).
-			Where("email IN ?", batch).
-			Where("group_name IS NULL OR group_name <> ?", group).
-			UpdateColumn("group_name", group)
-		if result.Error != nil {
-			tx.Rollback()
-			return 0, result.Error
-		}
-		affected += result.RowsAffected
-	}
-
-	var inboundIDs []int
-	inboundIDSeen := make(map[int]struct{})
-	for _, batch := range chunkStrings(affectedEmails, sqlInChunk) {
-		var ids []int
-		if err := tx.Table("client_inbounds").
-			Joins("JOIN clients ON clients.id = client_inbounds.client_id").
-			Where("clients.email IN ?", batch).
-			Distinct("client_inbounds.inbound_id").
-			Pluck("inbound_id", &ids).Error; err != nil {
-			tx.Rollback()
-			return 0, err
-		}
-		for _, id := range ids {
-			if _, ok := inboundIDSeen[id]; !ok {
-				inboundIDSeen[id] = struct{}{}
-				inboundIDs = append(inboundIDs, id)
-			}
-		}
-	}
-
 	emailSet := make(map[string]struct{}, len(affectedEmails))
 	for _, e := range affectedEmails {
 		emailSet[e] = struct{}{}
 	}
 
-	for _, ibID := range inboundIDs {
-		var ib model.Inbound
-		if err := tx.First(&ib, ibID).Error; err != nil {
-			tx.Rollback()
-			return 0, err
-		}
-		var settings map[string]any
-		if err := json.Unmarshal([]byte(ib.Settings), &settings); err != nil {
-			continue
-		}
-		clients, ok := settings["clients"].([]any)
-		if !ok {
-			continue
-		}
-		modified := false
-		for i := range clients {
-			cm, ok := clients[i].(map[string]any)
-			if !ok {
-				continue
+	var affected int64
+	err := commitGroupChange(affectedEmails, func(tx *gorm.DB) error {
+		for _, batch := range chunkStrings(affectedEmails, sqlInChunk) {
+			result := tx.Model(&model.ClientRecord{}).
+				Where("email IN ?", batch).
+				Where("group_name IS NULL OR group_name <> ?", group).
+				UpdateColumn("group_name", group)
+			if result.Error != nil {
+				return result.Error
 			}
-			email, _ := cm["email"].(string)
-			if _, hit := emailSet[email]; !hit {
-				continue
-			}
-			if group == "" {
-				delete(cm, "group")
-			} else {
-				cm["group"] = group
-			}
-			clients[i] = cm
-			modified = true
+			affected += result.RowsAffected
 		}
-		if modified {
-			settings["clients"] = clients
-			newSettings, err := json.Marshal(settings)
-			if err != nil {
-				continue
-			}
-			ib.Settings = string(newSettings)
-			if err := tx.Save(&ib).Error; err != nil {
-				tx.Rollback()
-				return 0, err
-			}
+		return nil
+	}, func(cm map[string]any) bool {
+		email, _ := cm["email"].(string)
+		if _, hit := emailSet[email]; !hit {
+			return false
 		}
-	}
-
-	if err := tx.Commit().Error; err != nil {
+		if group == "" {
+			delete(cm, "group")
+		} else {
+			cm["group"] = group
+		}
+		return true
+	})
+	if err != nil {
 		return 0, err
 	}
 	return int(affected), nil
@@ -355,82 +300,109 @@ func (s *ClientService) replaceGroupValue(oldName, newName string) (int, error) 
 		affectedEmails = append(affectedEmails, r.Email)
 	}
 
-	tx := db.Begin()
-	if err := tx.Model(&model.ClientRecord{}).
-		Where("group_name = ?", oldName).
-		UpdateColumn("group_name", newName).Error; err != nil {
-		tx.Rollback()
+	err := commitGroupChange(affectedEmails, func(tx *gorm.DB) error {
+		return tx.Model(&model.ClientRecord{}).
+			Where("group_name = ?", oldName).
+			UpdateColumn("group_name", newName).Error
+	}, func(cm map[string]any) bool {
+		if g, ok := cm["group"].(string); !ok || g != oldName {
+			return false
+		}
+		if newName == "" {
+			delete(cm, "group")
+		} else {
+			cm["group"] = newName
+		}
+		return true
+	})
+	if err != nil {
 		return 0, err
 	}
+	return len(records), nil
+}
 
+// groupInboundIDs lists the inbounds that carry any of emails.
+func groupInboundIDs(tx *gorm.DB, emails []string) ([]int, error) {
 	var inboundIDs []int
-	inboundIDSeen := make(map[int]struct{})
-	for _, batch := range chunkStrings(affectedEmails, sqlInChunk) {
+	seen := make(map[int]struct{})
+	for _, batch := range chunkStrings(emails, sqlInChunk) {
 		var ids []int
 		if err := tx.Table("client_inbounds").
 			Joins("JOIN clients ON clients.id = client_inbounds.client_id").
 			Where("clients.email IN ?", batch).
 			Distinct("client_inbounds.inbound_id").
 			Pluck("inbound_id", &ids).Error; err != nil {
-			tx.Rollback()
-			return 0, err
+			return nil, err
 		}
 		for _, id := range ids {
-			if _, ok := inboundIDSeen[id]; !ok {
-				inboundIDSeen[id] = struct{}{}
+			if _, ok := seen[id]; !ok {
+				seen[id] = struct{}{}
 				inboundIDs = append(inboundIDs, id)
 			}
 		}
 	}
+	return inboundIDs, nil
+}
 
-	for _, ibID := range inboundIDs {
-		var ib model.Inbound
-		if err := tx.First(&ib, ibID).Error; err != nil {
-			tx.Rollback()
-			return 0, err
+// commitGroupChange runs updateRecords and rewrites the group field (edit) of the
+// clients' entries in their inbounds' settings, in one serialized transaction under
+// the inbounds' mutation locks. Only settings is written, merged onto the committed
+// value, so a traffic tick or client op that commits meanwhile is kept.
+func commitGroupChange(emails []string, updateRecords func(tx *gorm.DB) error, edit func(cm map[string]any) bool) error {
+	lockIDs, err := groupInboundIDs(database.GetDB(), emails)
+	if err != nil {
+		return err
+	}
+	sort.Ints(lockIDs)
+	for _, id := range lockIDs {
+		defer lockInbound(id).Unlock()
+	}
+	return runSerializedTx(func(tx *gorm.DB) error {
+		if err := updateRecords(tx); err != nil {
+			return err
 		}
-		var settings map[string]any
-		if err := json.Unmarshal([]byte(ib.Settings), &settings); err != nil {
-			continue
+		inboundIDs, err := groupInboundIDs(tx, emails)
+		if err != nil {
+			return err
 		}
-		clients, ok := settings["clients"].([]any)
-		if !ok {
-			continue
-		}
-		modified := false
-		for i := range clients {
-			cm, ok := clients[i].(map[string]any)
+		for _, ibID := range inboundIDs {
+			var ib model.Inbound
+			if err := tx.Select("id", "settings").First(&ib, ibID).Error; err != nil {
+				return err
+			}
+			var settings map[string]any
+			if err := json.Unmarshal([]byte(ib.Settings), &settings); err != nil {
+				continue
+			}
+			clients, ok := settings["clients"].([]any)
 			if !ok {
 				continue
 			}
-			if g, ok := cm["group"].(string); ok && g == oldName {
-				if newName == "" {
-					delete(cm, "group")
-				} else {
-					cm["group"] = newName
+			modified := false
+			for i := range clients {
+				cm, ok := clients[i].(map[string]any)
+				if !ok || !edit(cm) {
+					continue
 				}
 				clients[i] = cm
 				modified = true
 			}
-		}
-		if modified {
+			if !modified {
+				continue
+			}
 			settings["clients"] = clients
 			newSettings, err := json.Marshal(settings)
 			if err != nil {
 				continue
 			}
+			base := ib.Settings
 			ib.Settings = string(newSettings)
-			if err := tx.Save(&ib).Error; err != nil {
-				tx.Rollback()
-				return 0, err
+			if err := commitInboundClientSettings(tx, &ib, base); err != nil {
+				return err
 			}
 		}
-	}
-
-	if err := tx.Commit().Error; err != nil {
-		return 0, err
-	}
-	return len(records), nil
+		return nil
+	})
 }
 
 // groupCounters is a group's summed traffic, held within ±TrafficMax.
