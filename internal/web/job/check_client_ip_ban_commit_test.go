@@ -236,7 +236,7 @@ func TestPublishBans_WithholdsAddressesOnlyADatagramVouchesFor(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			setupIntegrationDB(t)
 			db := database.GetDB()
-			// The scan resolves a client to its lowest inbound id, which is this one.
+			// The scan resolves a client to its lowest enabled inbound id, which is this one.
 			inbound := seedLinkedInboundWithClient(t, "inbound-vless", email, 1)
 			if tc.second != nil {
 				tc.second.Tag, tc.second.Port, tc.second.Protocol = "inbound-ss", 4322, model.Shadowsocks
@@ -308,5 +308,41 @@ func TestAcceptsUnverifiedSources(t *testing.T) {
 		if got := acceptsUnverifiedSources(inbound); got != tc.want {
 			t.Errorf("%s: acceptsUnverifiedSources = %v, want %v", tc.name, got, tc.want)
 		}
+	}
+}
+
+// A client that is still attached to an old, disabled inbound with a lower id must be
+// held to its limit on the inbound that serves it; resolving it to the disabled one
+// skipped enforcement entirely.
+func TestProcessObserved_EnforcesOnEnabledInboundWhenLowerIdIsDisabled(t *testing.T) {
+	setupIntegrationDB(t)
+
+	const email = "disabled-first@x"
+	old := seedLinkedInboundWithClient(t, "old-disabled", email, 1)
+	if err := database.GetDB().Model(old).Update("enable", false).Error; err != nil {
+		t.Fatalf("disable old inbound: %v", err)
+	}
+	live := seedInboundOnlyWithClient(t, "live-enabled", email, 1)
+	var client model.ClientRecord
+	if err := database.GetDB().Where("email = ?", email).First(&client).Error; err != nil {
+		t.Fatalf("read client: %v", err)
+	}
+	if err := database.GetDB().Create(&model.ClientInbound{ClientId: client.Id, InboundId: live.Id}).Error; err != nil {
+		t.Fatalf("link live inbound: %v", err)
+	}
+	if old.Id >= live.Id {
+		t.Fatalf("seed order: disabled inbound %d must have the lower id than %d", old.Id, live.Id)
+	}
+
+	now := time.Now().Unix()
+	seedClientIps(t, email, []model.ClientIpEntry{{IP: "198.51.100.30", Timestamp: now - 2}})
+	j := NewCheckClientIpJob()
+	j.processObserved(map[string]map[string]int64{
+		email: {"198.51.100.30": now - 1, "198.51.100.31": now},
+	}, true, true)
+
+	body, _ := os.ReadFile(readIpLimitLogPath())
+	if !contains(string(body), "Email = "+email+" || Disconnecting OLD IP = 198.51.100.30") {
+		t.Fatalf("limitIp=1 with two live IPs was not enforced; 3xipl.log:\n%s", body)
 	}
 }
