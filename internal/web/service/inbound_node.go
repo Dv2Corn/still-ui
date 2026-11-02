@@ -123,8 +123,14 @@ func (s *InboundService) ReconcileNode(ctx context.Context, rt *runtime.Remote, 
 	}
 	prefix := nodeTagPrefix(&nodeID)
 	desiredTags := make(map[string]struct{}, len(inbounds)*2)
+	// A tag dropped from a "selected" node's list keeps its central row, but the
+	// node owns it now: pushing the stale copy would overwrite the node's edits.
+	unmanagedTag := unmanagedTagPredicate(n)
 	var errs []error
 	for _, ib := range inbounds {
+		if unmanagedTag(ib.Tag) {
+			continue
+		}
 		desiredTags[ib.Tag] = struct{}{}
 		// existsOnNode: does the node already report this inbound under any of the
 		// tag forms it may be stored as? If so, an unchanged push can be skipped.
