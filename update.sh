@@ -73,6 +73,9 @@ if _command_exists curl; then
 else
     _fail "ERROR: Command 'curl' not found."
 fi
+# The panel sets XUI_UPDATE_PROXY to its egress bridge's socks5h URL for the GitHub downloads.
+# The IP lookups use plain curl so they still report this server's own address.
+[[ -n "${XUI_UPDATE_PROXY}" ]] && curl_bin="${curl_bin} --proxy ${XUI_UPDATE_PROXY}"
 
 # Check OS and set release variable
 if [[ -f /etc/os-release ]]; then
@@ -173,8 +176,22 @@ config_after_update() {
 
     # Properly detect empty cert by checking if cert: line exists and has content after it
     local existing_cert=$(${xui_folder}/x-ui setting -getCert true 2> /dev/null | grep 'cert:' | awk -F': ' '{print $2}' | tr -d '[:space:]')
-    local existing_port=$(${xui_folder}/x-ui setting -show true | grep -Eo 'port: .+' | awk '{print $2}')
-    local existing_webBasePath=$(${xui_folder}/x-ui setting -show true | grep -Eo 'webBasePath: .+' | awk '{print $2}' | sed 's#^/##')
+    local settings existing_webBasePath
+    if ! settings=$("${xui_folder}/x-ui" setting -show true) ||
+        ! existing_webBasePath=$(printf '%s\n' "$settings" | awk '
+            /^get .* failed, error info:/ { failed = 1 }
+            /^hasDefaultCredential: (true|false)$/ { credentials++ }
+            /^port: [0-9]+$/ { ports++ }
+            /^webBasePath:/ { paths++; sub(/^webBasePath: ?/, ""); path = $0 }
+            END {
+                if (failed || credentials != 1 || ports != 1 || paths != 1 || (path != "" && path !~ /^\//)) exit 1
+                print path
+            }'); then
+        echo -e "${red}Unable to read webBasePath; leaving existing settings unchanged.${plain}" >&2
+        return 1
+    fi
+    existing_webBasePath=${existing_webBasePath#/}
+    local existing_port=$(printf '%s\n' "$settings" | awk '/^port: / {print $2}')
 
     # Get server IP
     local URL_lists=(
@@ -202,9 +219,9 @@ config_after_update() {
         server_ip="${server_ip:-<server-ip>}"
     fi
 
-    # Handle missing/short webBasePath
-    if [[ ${#existing_webBasePath} -lt 4 ]]; then
-        echo -e "${yellow}WebBasePath is missing or too short. Generating a new one...${plain}"
+    # Only an unset or default root path needs initialization.
+    if [[ -z "$existing_webBasePath" ]]; then
+        echo -e "${yellow}WebBasePath is missing or set to root. Generating a new one...${plain}"
         local config_webBasePath=$(gen_random_string 18)
         ${xui_folder}/x-ui setting -webBasePath "${config_webBasePath}"
         existing_webBasePath="${config_webBasePath}"
@@ -672,21 +689,6 @@ _install_xui_service_unit() {
     return 0
 }
 
-# Older tags predate some of these files (x-ui.rc arrived in v2.8.4). Serving
-# main's copy against an old binary is the mismatch this pinning exists to
-# prevent, so probe before the old install is removed and refuse the tag.
-require_repo_files() {
-    local ref="$1" name status
-    shift
-    [[ "${ref}" == "main" ]] && return 0
-    for name in "$@"; do
-        status=$(${curl_bin} -sIL --retry 3 --connect-timeout 15 -o /dev/null -w '%{http_code}' "https://raw.githubusercontent.com/Dv2Corn/still-ui/${ref}/${name}")
-        if [[ "${status}" != "200" ]]; then
-            _fail "ERROR: ${name} is not available for ${ref} (HTTP ${status}). Update to a release that ships it, or to 'dev-latest'. The current installation is untouched."
-        fi
-    done
-}
-
 update_x-ui() {
     cd ${xui_folder%/still-ui}/
 
@@ -700,7 +702,7 @@ update_x-ui() {
     fi
 
     # STILL_UI_ARCHIVE=<path to still-ui-linux-<arch>.tar.gz> updates from a local archive
-    # (an offline server or a test build); x-ui.sh then comes from the same archive.
+    # (an offline server or a test build).
     local local_archive="${STILL_UI_ARCHIVE:-}"
     if [[ -n "${local_archive}" ]]; then
         [[ -s "${local_archive}" ]] || _fail "ERROR: STILL_UI_ARCHIVE=${local_archive} does not exist or is empty"
@@ -722,17 +724,13 @@ update_x-ui() {
             fi
         fi
         echo -e "Got still-ui latest version: ${tag_version}, beginning the installation..."
-        # x-ui.sh, x-ui.rc and the unit files must come from the same release as
-        # the binary; only the rolling dev build tracks main.
+        # x-ui.sh, x-ui.rc and the unit files ship in every still-ui release archive, built
+        # from the same commit as the binary, so nothing is fetched from the repository.
+        # Only the rolling dev build tracks main for the GitHub fallback of the unit files.
         script_ref="${tag_version}"
         if [[ "${tag_version}" == "dev-latest" ]]; then
             script_ref="main"
         fi
-        # The unit files are only fetched when the release tarball lacks them, so
-        # they are checked at that point instead of here.
-        local required_files=("x-ui.sh")
-        [[ $release == "alpine" ]] && required_files+=("x-ui.rc")
-        require_repo_files "${script_ref}" "${required_files[@]}"
         ${curl_bin} -fLRo ${xui_folder}-linux-$(arch).tar.gz https://github.com/Dv2Corn/still-ui/releases/download/${tag_version}/still-ui-linux-$(arch).tar.gz 2> /dev/null
         if [[ $? -ne 0 ]]; then
             _fail "ERROR: Failed to download still-ui, please be sure that your server can access GitHub"
@@ -849,21 +847,14 @@ update_x-ui() {
         chmod +x bin/mtg-linux-$(arch) > /dev/null 2>&1
     fi
 
-    echo -e "${green}Downloading and installing x-ui.sh script...${plain}"
+    # Nothing downloads after the stop: the panel's Xray, and with it any Panel Traffic
+    # Outbound bridge that XUI_UPDATE_PROXY points at, is down from here on.
+    echo -e "${green}Installing x-ui.sh script...${plain}"
     local xui_script_temp="/usr/bin/still-ui-temp.$$"
     rm -f "${xui_script_temp}"
-    if [[ -n "${local_archive}" ]]; then
-        cp -f "${xui_folder}/x-ui.sh" "${xui_script_temp}" > /dev/null 2>&1
-    else
-        ${curl_bin} -fLRo "${xui_script_temp}" "https://raw.githubusercontent.com/Dv2Corn/still-ui/${script_ref}/x-ui.sh" > /dev/null 2>&1
-    fi
-    if [[ $? -ne 0 ]]; then
+    if ! cp -f "${xui_folder}/x-ui.sh" "${xui_script_temp}" > /dev/null 2>&1 || [[ ! -s "${xui_script_temp}" ]]; then
         rm -f "${xui_script_temp}"
-        _fail "ERROR: Failed to download x-ui.sh script, please be sure that your server can access GitHub"
-    fi
-    if [[ ! -s "${xui_script_temp}" ]]; then
-        rm -f "${xui_script_temp}"
-        _fail "ERROR: Downloaded x-ui.sh script is empty, please be sure that your server can access GitHub"
+        _fail "ERROR: The still-ui release archive has no x-ui.sh -- the previous installation has already been removed; try running the update again"
     fi
     mv -f "${xui_script_temp}" /usr/bin/still-ui
     if [[ $? -ne 0 ]]; then
@@ -889,17 +880,12 @@ update_x-ui() {
     "${xui_folder}/x-ui" migrate
 
     if [[ $release == "alpine" ]]; then
-        echo -e "${green}Downloading and installing startup unit x-ui.rc...${plain}"
+        echo -e "${green}Installing startup unit x-ui.rc...${plain}"
         xui_rc_temp="/etc/init.d/still-ui.tmp.$$"
         rm -f "${xui_rc_temp}"
-        ${curl_bin} -fLRo "${xui_rc_temp}" "https://raw.githubusercontent.com/Dv2Corn/still-ui/${script_ref}/x-ui.rc" > /dev/null 2>&1
-        if [[ $? -ne 0 ]]; then
+        if ! cp -f "${xui_folder}/x-ui.rc" "${xui_rc_temp}" > /dev/null 2>&1 || [[ ! -s "${xui_rc_temp}" ]]; then
             rm -f "${xui_rc_temp}"
-            _fail "ERROR: Failed to download startup unit x-ui.rc, please be sure that your server can access GitHub"
-        fi
-        if [[ ! -s "${xui_rc_temp}" ]]; then
-            rm -f "${xui_rc_temp}"
-            _fail "ERROR: Downloaded startup unit x-ui.rc is empty, please be sure that your server can access GitHub"
+            _fail "ERROR: The still-ui release archive has no x-ui.rc -- the previous installation has already been removed; try running the update again"
         fi
         mv -f "${xui_rc_temp}" /etc/init.d/still-ui
         if [[ $? -ne 0 ]]; then
