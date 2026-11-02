@@ -8,6 +8,7 @@ import (
 	"net/netip"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/util/common"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/cronspec"
@@ -274,7 +275,35 @@ func checkIPOrCIDRList(list, message string) error {
 	return nil
 }
 
+// normalizeDomain stores a panel or subscription domain the way it is compared
+// with the Host header: trimmed, lower-case, without the root's trailing dot. A
+// scheme, port, path or inner space could never match, so it is refused.
+func normalizeDomain(name, value string) (string, error) {
+	domain := strings.TrimSuffix(strings.ToLower(strings.TrimSpace(value)), ".")
+	if domain == "" || net.ParseIP(domain) != nil {
+		return domain, nil
+	}
+	if strings.ContainsAny(domain, ":/@[]?#\\") || strings.IndexFunc(domain, unicode.IsSpace) >= 0 {
+		return "", common.NewError(name, " must be a bare host name without scheme, port or path: ", value)
+	}
+	return domain, nil
+}
+
 func (s *AllSetting) CheckValid() error {
+	for _, d := range []struct {
+		name  string
+		value *string
+	}{
+		{"web domain", &s.WebDomain},
+		{"subscription domain", &s.SubDomain},
+	} {
+		domain, err := normalizeDomain(d.name, *d.value)
+		if err != nil {
+			return err
+		}
+		*d.value = domain
+	}
+
 	if s.WebListen != "" {
 		ip := net.ParseIP(s.WebListen)
 		if ip == nil {

@@ -103,3 +103,40 @@ func TestCheckValidSchedules(t *testing.T) {
 		}
 	}
 }
+
+// A domain saved with capitals, a trailing dot or a stray space never matched the
+// Host header; one saved with a scheme, port or path can never match it at all.
+func TestCheckValidNormalizesPanelAndSubDomains(t *testing.T) {
+	base := func() *AllSetting {
+		return &AllSetting{WebPort: 2053, SubPort: 2096}
+	}
+	for in, want := range map[string]string{
+		"":                     "",
+		"panel.example.com":    "panel.example.com",
+		" Panel.Example.COM. ": "panel.example.com",
+		"2001:DB8::1":          "2001:db8::1",
+		"\tsub.example.com\n":  "sub.example.com",
+	} {
+		s := base()
+		s.WebDomain, s.SubDomain = in, in
+		if err := s.CheckValid(); err != nil {
+			t.Errorf("domain %q: unexpected error %v", in, err)
+			continue
+		}
+		if s.WebDomain != want || s.SubDomain != want {
+			t.Errorf("domain %q saved as web %q / sub %q, want %q", in, s.WebDomain, s.SubDomain, want)
+		}
+	}
+	for _, bad := range []string{"https://panel.example.com", "panel.example.com:8443", "panel.example.com/x", "panel example.com", "[2001:db8::1]"} {
+		s := base()
+		s.WebDomain = bad
+		if err := s.CheckValid(); err == nil {
+			t.Errorf("web domain %q: want error, got nil", bad)
+		}
+		s = base()
+		s.SubDomain = bad
+		if err := s.CheckValid(); err == nil {
+			t.Errorf("sub domain %q: want error, got nil", bad)
+		}
+	}
+}
