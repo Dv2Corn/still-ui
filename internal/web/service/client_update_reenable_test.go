@@ -137,6 +137,35 @@ func TestUpdate_KeepsDisabled_ManuallyDisabledNotDepleted(t *testing.T) {
 	assertEnableEverywhere(t, svc, inboundSvc, ib.Id, email, false)
 }
 
+// A client switched off by hand while still live, whose deadline then passed,
+// matches the depletion predicate but was not disabled by the lifecycle job:
+// renewing it must not turn it back on (the rule autoRenewClients follows).
+func TestUpdate_KeepsDisabled_ManuallyDisabledThenExpired(t *testing.T) {
+	setupBulkDB(t)
+	svc := &ClientService{}
+	inboundSvc := &InboundService{}
+
+	now := time.Now().UnixMilli()
+	email := "renew-manual-expired@x"
+	ib := seedRenewableDepletedClient(t, svc, 53111, email, 0, now-2*renewalReenableDay, 0, 0)
+	// The operator's disable stamped the record before the deadline.
+	if err := database.GetDB().Model(&model.ClientRecord{}).Where("email = ?", email).
+		UpdateColumn("updated_at", now-3*renewalReenableDay).Error; err != nil {
+		t.Fatalf("stamp record: %v", err)
+	}
+
+	rec, err := svc.GetRecordByEmail(nil, email)
+	if err != nil {
+		t.Fatalf("GetRecordByEmail: %v", err)
+	}
+	updated := rec.ToClient()
+	updated.ExpiryTime = now + 30*renewalReenableDay
+	if _, err := svc.Update(inboundSvc, rec.Id, *updated, 0); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	assertEnableEverywhere(t, svc, inboundSvc, ib.Id, email, false)
+}
+
 func TestUpdate_ReenablesDepletedClient_SkipsStillDepletedGlobalUsage(t *testing.T) {
 	setupBulkDB(t)
 	svc := &ClientService{}

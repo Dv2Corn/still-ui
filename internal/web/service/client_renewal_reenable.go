@@ -17,11 +17,11 @@ import (
 // operator to flip the enable switch by hand.
 //
 // The check reads as disabled-by-quota only when the enforcement row itself
-// carries the off switch AND matches the production depletion predicate, so a
-// client the operator switched off by hand (or that is simply under quota) is
-// never resurrected. The post-update side is projected from the values this
-// renewal writes — the traffic row's up/down counters are untouched by an
-// update, so only total and expiry move.
+// carries the off switch AND lifecycleDisabledEmails attributes it to the
+// lifecycle job, as the auto-renew does: a client the operator switched off by
+// hand stays off even after its deadline passes. The post-update side is
+// projected from the values this renewal writes — the traffic row's up/down
+// counters are untouched by an update, so only total and expiry move.
 func (s *ClientService) renewalReenables(email string, newTotal, newExpiry int64) bool {
 	db := database.GetDB()
 	var traffic xray.ClientTraffic
@@ -32,13 +32,14 @@ func (s *ClientService) renewalReenables(email string, newTotal, newExpiry int64
 		return false
 	}
 
-	// Was it the quota loop that switched it off, under the same predicate
-	// (including a fresh cross-panel push) the loop itself uses?
-	cond, condArgs := depletedCond(db)
-	var wasDepleted int64
-	if err := db.Model(xray.ClientTraffic{}).
-		Where(cond+" AND email = ?", append(append([]any{}, condArgs...), email)...).
-		Count(&wasDepleted).Error; err != nil || wasDepleted == 0 {
+	// Was it the lifecycle job that switched it off? An expired client counts
+	// only if its record was stamped at or after the deadline; an operator's
+	// earlier disable was not (the same rule autoRenewClients applies).
+	lifecycle, err := lifecycleDisabledEmails(db, []xray.ClientTraffic{traffic})
+	if err != nil {
+		return false
+	}
+	if _, ok := lifecycle[email]; !ok {
 		return false // disabled by hand, not by the quota loop
 	}
 
