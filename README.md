@@ -20,12 +20,12 @@ The name says what we are after: a server you set up once and then leave alone.
 
 ### Already done
 
-- **Partial client edits no longer break clients.** In 3x-ui v3.11.0, updating a client through the API (`/panel/api/clients/update/:email`) with only some of its fields disabled the client and reset `limitIp`, `tgId`, `comment` and other fields that were not in the request. In still-ui every field you do not send stays as it was — keys and client settings, including the AmneziaWG `preSharedKey`, are not lost. An explicit zero or empty value still clears a field.
+- **Partial client edits no longer break clients.** In 3x-ui v3.11.0, updating a client through the API (`/panel/api/clients/update/:email`) with only some of its fields disabled the client (`enable=false`) and reset `limitIp`, `totalGB`, `tgId`, `comment`, `group`, `flow`, the renewal settings (`reset`, `resetMax`) and `limitHwid`. In still-ui a field you do not send is taken from the stored client. An explicit zero or empty value still clears a field. WireGuard/AmneziaWG keys and peer addresses were already kept in v3.11.0; a test pins that.
 - **REALITY uses the `ios` fingerprint by default.** Its ClientHello is about 517 bytes and fits into a single TCP segment. Larger fingerprints (`chrome`, `firefox`) split the ClientHello into two packets, and on mobile networks that drop the second one the connection dies right at the handshake. With `ios` there is nothing to lose. You can still pick any other fingerprint per inbound.
 - **The installer puts a memory cap on the panel.** The service gets systemd limits: `MemoryMax` is 35% of RAM (at least 256 MiB, at most 1 GiB), `MemoryHigh` is 85% of that, and the panel is not allowed to use swap. A runaway panel is restarted by systemd instead of pushing the whole server into swap and freezing it. If the server has no swap and 2 GiB of RAM or less, the installer offers to create a 2 GiB `/swapfile` for the rest of the system.
 - **Xray as a separate service (opt-in).** With `STILL_XRAY_UNIT=on` in `/etc/default/still-ui`, the installer and `still-ui update` run Xray as its own service `still-xray`: an unprivileged user, only `CAP_NET_BIND_SERVICE`, `ProtectSystem=strict`, `Restart=always` and its own memory cap. The panel still adds and removes clients through the Xray API without a restart, and restarts the core only when the inbound structure changes — after checking the config with `xray run -test`; a config that passes the check but does not start is replaced with the last working one. Restarting, updating or crashing the panel no longer drops clients: tested by downloading 20 MB through the VPN with `systemctl restart still-ui` in the middle — the file arrived complete and the Xray process stayed the same. By default Xray stays the panel's child process, as in 3x-ui. The embedded AmneziaWG, MTProto and TUIC still live inside the panel and reconnect when it restarts.
 - **Renewed certificates are picked up automatically.** Xray rereads the certificate files of TLS and Hysteria inbounds by itself once an hour (or every `ocspStapling` seconds). Once a minute the panel does a handshake (TLS, or QUIC for Hysteria) to see which certificate each inbound really serves; if the core has not picked up a renewed file within that time (or the inbound uses `oneTimeLoading`), or the served certificate expires within an hour, only Xray is restarted: by itself with the `still-xray` service, and with Xray inside the panel (the default) only with `STILL_CERT_RESTART=on` in `/etc/default/still-ui`, because that restart drops every client; without it the tag just says the certificate was renewed. The “Certificates” tag on the overview page shows what each inbound serves and until when, and warns in advance (a week ahead, or a quarter of the lifetime for short-lived IP certificates).
-- **Panel memory under connection churn through AmneziaWG.** Every connection through the embedded AmneziaWG allocated two fresh 32 KiB buffers; under a stream of short connections this produced gigabytes of garbage and a panel twice its size. The buffers are now reused. Measured on 3x-ui v3.11.0 (300 AWG and 300 VLESS clients, 200 short connections per second through AWG plus stats and online polling like the UI does, 15 minutes): average panel memory 462 MB (peak 510 MB) → 240 MB (peak 250 MB). There was no unbounded growth on v3.11.0 within that time: memory comes back after the load.
+- **AmneziaWG relay buffers are reused.** Every TCP connection through the embedded AmneziaWG allocated two fresh 32 KiB copy buffers; they now come from a pool. The relay alone: about 69 KB → 2.9 KB allocated per connection. The whole panel on a 2 vCPU / 2 GiB test server, 100 short connections per second through AmneziaWG for 5 minutes, 3 runs per build: panel memory under load 399 → 175 MiB on average, peak 525 → 210 MiB, the same at rest. Method, limits and raw data: [bench/awg-relay-churn](bench/awg-relay-churn/README.md).
 
 ### In progress
 
@@ -44,7 +44,7 @@ bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.
 To install a specific release, pass its tag (tags look like `vX.Y.Z-still.N`):
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh) v3.11.0-still.3
+bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh) v3.11.0-still.4
 ```
 
 To install from a release archive you already downloaded:
@@ -55,7 +55,7 @@ STILL_UI_ARCHIVE=/path/still-ui-linux-amd64.tar.gz bash install.sh
 
 The installer generates a random username, password and panel path and prints them at the end — save them. After that, run `still-ui` to open the management menu: start and stop the service, show or reset the login, change the port, manage certificates and so on. The subcommands are the same as in 3x-ui's `x-ui` script (`still-ui start`, `stop`, `restart`, `status`, `log`, `update`, `legacy`, `uninstall` and others).
 
-Release builds exist for **Linux amd64 and arm64** only. The current release is panel **3.11.0-still.3** with **Xray v26.10.21**.
+Release builds exist for **Linux amd64 and arm64** only. The current release is panel **3.11.0-still.4** with **Xray v26.10.21**.
 
 ### Where things live
 

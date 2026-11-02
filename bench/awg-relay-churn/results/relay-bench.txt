@@ -1,0 +1,21 @@
+go test -run='^$' -bench=PipeBothWaysShortConn -benchmem -count=6 ./internal/amneziawgnet/
+Go 1.27.3 (golang:1.27.3 image), i7-12700H, Linux 6.8.
+
+== 107b7610 (before the fix)
+BenchmarkPipeBothWaysShortConn-20    	    4260	    331463 ns/op	   69117 B/op	      69 allocs/op
+BenchmarkPipeBothWaysShortConn-20    	    3471	    532098 ns/op	   69093 B/op	      69 allocs/op
+BenchmarkPipeBothWaysShortConn-20    	    4418	    625569 ns/op	   69138 B/op	      69 allocs/op
+BenchmarkPipeBothWaysShortConn-20    	    3218	    504072 ns/op	   69040 B/op	      69 allocs/op
+BenchmarkPipeBothWaysShortConn-20    	    4251	    370714 ns/op	   69116 B/op	      69 allocs/op
+BenchmarkPipeBothWaysShortConn-20    	    4077	    393079 ns/op	   69040 B/op	      69 allocs/op
+
+== b638e494 (the fix)
+BenchmarkPipeBothWaysShortConn-20    	    3542	    304111 ns/op	    2985 B/op	      69 allocs/op
+BenchmarkPipeBothWaysShortConn-20    	    5830	    236470 ns/op	    2926 B/op	      69 allocs/op
+BenchmarkPipeBothWaysShortConn-20    	    6190	    215304 ns/op	    2923 B/op	      69 allocs/op
+BenchmarkPipeBothWaysShortConn-20    	    7233	    242535 ns/op	    2901 B/op	      69 allocs/op
+BenchmarkPipeBothWaysShortConn-20    	    5781	    217656 ns/op	    2914 B/op	      69 allocs/op
+BenchmarkPipeBothWaysShortConn-20    	    6782	    172947 ns/op	    2884 B/op	      69 allocs/op
+
+The benchmark file (internal/amneziawgnet/relay_alloc_bench_test.go) was copied unchanged into both trees.
+ns/op includes opening two loopback TCP pairs per iteration and is noisy; only B/op is a claim here.
