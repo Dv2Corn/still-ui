@@ -1,6 +1,7 @@
 package service
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -8,6 +9,8 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/database"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 	"github.com/mhsanaei/3x-ui/v3/internal/xray"
+
+	"gorm.io/gorm"
 )
 
 func seedClientRow(t *testing.T, email string, inboundId int, up, down, total int64) {
@@ -353,5 +356,47 @@ func TestDisableInvalidClientsSurvivesAnInboundWithBrokenSettings(t *testing.T) 
 	db.Where("tag = ?", "local").First(&bob)
 	if !strings.Contains(bob.Settings, `"enable":false`) {
 		t.Fatalf("local inbound settings = %s, want bob disabled", bob.Settings)
+	}
+}
+
+// Xray reports a row for every client seen since the core started; one IN list with a
+// bound variable per email overran SQLite's limit, so every poll failed and the traffic
+// (already subtracted from Xray's counters) was lost, and with it renew/disable/quota.
+func TestAddClientTrafficPastTheSQLVariableLimit(t *testing.T) {
+	db := initTrafficTestDB(t)
+	const n = 33000
+	if err := db.Create(&model.Inbound{UserId: 1, Tag: "big", Port: 41100, Protocol: model.VLESS, Enable: true, Settings: `{"clients":[]}`}).Error; err != nil {
+		t.Fatalf("seed inbound: %v", err)
+	}
+	for _, stmt := range []string{
+		// Every client is "start after first use", so the delayed-start lookup binds them all too.
+		`WITH RECURSIVE seq(i) AS (SELECT 1 UNION ALL SELECT i+1 FROM seq WHERE i < ?)
+		 INSERT INTO client_traffics (inbound_id, email, enable, expiry_time, up, down) SELECT 1, 'c' || i, true, -86400000, 0, 0 FROM seq`,
+		`WITH RECURSIVE seq(i) AS (SELECT 1 UNION ALL SELECT i+1 FROM seq WHERE i < ?)
+		 INSERT INTO clients (email, enable, sub_id, expiry_time) SELECT 'c' || i, true, 's' || i, -86400000 FROM seq`,
+	} {
+		if err := db.Exec(stmt, n).Error; err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+	}
+	if err := db.Exec(`INSERT INTO client_inbounds (client_id, inbound_id) SELECT id, 1 FROM clients`).Error; err != nil {
+		t.Fatalf("link clients: %v", err)
+	}
+	traffics := make([]*xray.ClientTraffic, n)
+	for i := range traffics {
+		traffics[i] = &xray.ClientTraffic{Email: "c" + strconv.Itoa(i+1), Up: 1, Down: 2}
+	}
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		return (&InboundService{}).addClientTraffic(tx, traffics)
+	}); err != nil {
+		t.Fatalf("addClientTraffic: %v", err)
+	}
+	var sum struct{ Up, Down, Started int64 }
+	if err := db.Raw(`SELECT COALESCE(SUM(up),0) AS up, COALESCE(SUM(down),0) AS down,
+		SUM(CASE WHEN expiry_time > 0 THEN 1 ELSE 0 END) AS started FROM client_traffics`).Scan(&sum).Error; err != nil {
+		t.Fatalf("sum: %v", err)
+	}
+	if sum.Up != n || sum.Down != 2*n || sum.Started != n {
+		t.Fatalf("after poll up=%d down=%d started=%d, want %d, %d, %d", sum.Up, sum.Down, sum.Started, n, 2*n, n)
 	}
 }
