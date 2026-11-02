@@ -232,7 +232,8 @@ type AllSettingView struct {
 
 func pathHasForbiddenChar(s string) bool {
 	for _, r := range s {
-		if r == '\\' || r == ' ' || r < 0x20 || r == 0x7f {
+		// Quotes and angle brackets would break the HTML the panel injects the path into.
+		if r == '\\' || r == ' ' || r < 0x20 || r == 0x7f || r == '"' || r == '\'' || r == '<' || r == '>' {
 			return true
 		}
 	}
