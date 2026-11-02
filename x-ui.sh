@@ -2621,7 +2621,8 @@ EOF
     # TCP and UDP port (including all Xray inbounds, e.g. UDP-based Hysteria2), so
     # IP-limit keeps working for inbounds added later without regenerating these files.
     local ssh_ports
-    ssh_ports=$(grep -oP '^[[:space:]]*Port[[:space:]]+\K[0-9]+' /etc/ssh/sshd_config 2>/dev/null | paste -sd, -)
+    # sshd -T and sshd_config.d/*.conf too: a Port set in a drop-in was missed.
+    ssh_ports=$(firewall_ssh_ports | paste -sd, -)
     [[ -z "${ssh_ports}" ]] && ssh_ports="22"
     local panel_port
     panel_port=$(${xui_folder}/x-ui setting -show true 2>/dev/null | grep -Eo 'port: .+' | awk '{print $2}')
