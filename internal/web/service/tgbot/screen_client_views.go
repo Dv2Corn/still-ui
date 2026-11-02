@@ -28,11 +28,12 @@ func qrPNG(content string, size int) ([]byte, error) {
 // QR) all redraw the same tracked message, so none leaves the previous behind.
 
 // clientScreenBody is the shared header of every per-client screen: a user who
-// tapped through four levels still sees which client they are on.
+// tapped through four levels still sees which client they are on. title is bot
+// text (I18nBot or clientInfoMsg output), already escaped where values entered it.
 func (t *Tgbot) clientScreenBody(email, title string) string {
 	body := "<b>" + html.EscapeString(email) + "</b>\n"
 	if title != "" {
-		body += html.EscapeString(title) + "\n\n"
+		body += title + "\n\n"
 	}
 	return body
 }

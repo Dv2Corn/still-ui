@@ -187,7 +187,8 @@ func (t *Tgbot) depleteReport() string {
 	body += t.I18nBot("tgbot.messages.disabled", "Disabled=="+strconv.Itoa(disabledClients))
 	body += t.I18nBot("tgbot.messages.depleteSoon", "Deplete=="+strconv.Itoa(exhaustedClients))
 	if clientLines.Len() > 0 {
-		body += "\n" + html.EscapeString(clientLines.String())
+		// clientInfoMsg output is bot HTML, its values already escaped once.
+		body += "\n" + clientLines.String()
 	}
 	body += t.I18nBot("tgbot.messages.refreshedOn", "Time=="+time.Now().Format("2006-01-02 15:04:05"))
 	return body
