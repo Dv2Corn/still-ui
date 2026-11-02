@@ -20,12 +20,12 @@
 
 ### 已完成
 
-- **部分修改客户端不再把客户端改坏。** 在 3x-ui v3.11.0 中，通过 API（`/panel/api/clients/update/:email`）更新客户端时如果只提交部分字段，客户端会被禁用，请求中没有的 `limitIp`、`tgId`、`comment` 等字段也会被清零。在 still-ui 中，未提交的字段一律保持原值——密钥和客户端设置（包括 AmneziaWG 的 `preSharedKey`）都不会丢失。显式提交 0 或空值仍然会清空对应字段。
+- **部分修改客户端不再把客户端改坏。** 在 3x-ui v3.11.0 中，通过 API（`/panel/api/clients/update/:email`）更新客户端时如果只提交部分字段，客户端会被禁用（`enable=false`），`limitIp`、`totalGB`、`tgId`、`comment`、`group`、`flow`、续期设置（`reset`、`resetMax`）和 `limitHwid` 会被清零。在 still-ui 中，请求里没有的字段取自已保存的客户端。显式提交 0 或空值仍然会清空对应字段。WireGuard/AmneziaWG 的密钥和对端地址在 v3.11.0 中本来就会保留，有测试保证这一点。
 - **REALITY 默认指纹改为 `ios`。** 它的 ClientHello 约 517 字节，可以完整放进一个 TCP 分段。较大的指纹（`chrome`、`firefox`）会把 ClientHello 拆成两个包；在会丢掉第二个包的移动运营商网络上，连接会直接断在握手阶段。用 `ios` 就不存在这个问题。每个入站仍然可以自行选择其他指纹。
 - **安装脚本为面板设置内存上限。** 服务会获得 systemd 限制：`MemoryMax` 为内存的 35%（最少 256 MiB，最多 1 GiB），`MemoryHigh` 为其 85%，并且禁止面板使用 swap。面板内存失控时由 systemd 重启它，而不是把整台服务器拖进 swap 直至卡死。如果服务器没有 swap 且内存不超过 2 GiB，安装脚本会提议为系统其余部分创建一个 2 GiB 的 `/swapfile`。
 - **Xray 作为独立服务（可选开启）。** 在 `/etc/default/still-ui` 中设置 `STILL_XRAY_UNIT=on` 后，安装脚本和 `still-ui update` 会把 Xray 作为独立服务 `still-xray` 运行：非特权用户、只有 `CAP_NET_BIND_SERVICE`、`ProtectSystem=strict`、`Restart=always`，并有自己的内存上限。面板仍通过 Xray API 增删客户端而无需重启，只有入站结构变化时才重启内核——且先用 `xray run -test` 检查配置；通过检查却启动失败的配置会被换回上一个可用配置。重启、升级或面板崩溃都不再断开客户端：已验证在通过 VPN 下载 20 MB 的过程中执行 `systemctl restart still-ui`，文件完整到达，Xray 进程未变。默认情况下 Xray 仍和 3x-ui 一样是面板的子进程。内置的 AmneziaWG、MTProto 和 TUIC 仍运行在面板内部，面板重启时会重新连接。
 - **自动加载续期后的证书。** Xray 每小时（或每 `ocspStapling` 秒）会自行重新读取 TLS 和 Hysteria 入站的证书文件。面板每分钟通过握手（TLS，Hysteria 用 QUIC）检查每个入站实际提供的证书；如果续期后内核在该时间内没有加载新文件（或入站使用 `oneTimeLoading`），或者正在提供的证书将在一小时内过期，只重启 Xray：使用 `still-xray` 服务时自动重启；Xray 在面板内运行（默认）时，只有在 `/etc/default/still-ui` 中设置 `STILL_CERT_RESTART=on` 才会重启，因为这种重启会断开所有客户端；未设置时标签只显示证书已续期。概览页上的“证书”标签显示每个入站提供的证书及其有效期，并提前警告（提前一周；对于 IP 上的短期证书则提前其有效期的四分之一）。
-- **AmneziaWG 大量连接下的面板内存。** 经内置 AmneziaWG 的每个连接都会新分配两个 32 KiB 缓冲区；在大量短连接下这会产生数 GB 的垃圾，面板内存翻倍。现在缓冲区会被复用。在 3x-ui v3.11.0 上测量（300 个 AWG 和 300 个 VLESS 客户端，经 AWG 每秒 200 个短连接，并像界面一样轮询统计和在线状态，15 分钟）：面板平均内存 462 MB（峰值 510 MB）→ 240 MB（峰值 250 MB）。在此期间 v3.11.0 没有无限增长：负载结束后内存会回落。
+- **AmneziaWG 转发缓冲区复用。** 经内置 AmneziaWG 的每个 TCP 连接都会新分配两个 32 KiB 复制缓冲区；现在改为从池中获取。仅转发部分：每个连接的分配约 69 KB → 2.9 KB。整个面板在 2 vCPU / 2 GiB 测试服务器上，经 AmneziaWG 每秒 100 个短连接、持续 5 分钟、每个构建 3 次：负载下面板平均内存 399 → 175 MiB，峰值 525 → 210 MiB，空闲时相同。方法、限制和原始数据：[bench/awg-relay-churn](bench/awg-relay-churn/README.md)。
 
 ### 进行中
 
@@ -44,7 +44,7 @@ bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.
 如需安装指定版本，在末尾加上版本标签（标签格式为 `vX.Y.Z-still.N`）：
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh) v3.11.0-still.3
+bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh) v3.11.0-still.4
 ```
 
 使用已下载的发行版压缩包安装：
@@ -55,7 +55,7 @@ STILL_UI_ARCHIVE=/path/still-ui-linux-amd64.tar.gz bash install.sh
 
 安装脚本会随机生成用户名、密码和面板访问路径，并在结束时显示出来，请妥善保存。之后运行 `still-ui` 即可打开管理菜单：启动和停止服务、查看或重置登录信息、修改端口、管理证书等。子命令与 3x-ui 的 `x-ui` 脚本相同：`still-ui start`、`stop`、`restart`、`status`、`log`、`update`、`legacy`、`uninstall` 等。
 
-发行版只提供 **Linux amd64 和 arm64** 的构建。当前版本：面板 **3.11.0-still.3**，内置 **Xray v26.10.21**。
+发行版只提供 **Linux amd64 和 arm64** 的构建。当前版本：面板 **3.11.0-still.4**，内置 **Xray v26.10.21**。
 
 ### 文件位置
 
