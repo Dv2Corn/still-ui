@@ -1,4 +1,3 @@
-import { RealityStreamSettingsSchema } from '@/schemas/protocols/security/reality';
 import { TlsStreamSettingsSchema } from '@/schemas/protocols/security/tls';
 
 function defaultCertificate(): Record<string, unknown> {
@@ -49,22 +48,4 @@ export function createHysteriaTlsSettingsWithDefaultCert(): Record<string, unkno
   tls.settings = settings;
 
   return tls;
-}
-
-// still-ui: uTLS fingerprint a NEW REALITY inbound starts with. The "ios"
-// ClientHello is ~517 bytes and fits one TCP segment; chrome/firefox send
-// ~1800 bytes, and mobile networks that drop the second segment of the
-// handshake stall the connection before it starts. Existing inbounds keep
-// whatever they already store -- only the initial value changes.
-export const DEFAULT_REALITY_FINGERPRINT = 'ios';
-
-export function createRealitySettingsForNewInbound(): Record<string, unknown> {
-  const reality = RealityStreamSettingsSchema.parse({}) as Record<string, unknown>;
-  const settings =
-    reality.settings && typeof reality.settings === 'object' && !Array.isArray(reality.settings)
-      ? { ...(reality.settings as Record<string, unknown>) }
-      : {};
-  settings.fingerprint = DEFAULT_REALITY_FINGERPRINT;
-  reality.settings = settings;
-  return reality;
 }
