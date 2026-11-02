@@ -1691,8 +1691,19 @@ ssl_cert_issue_for_ip() {
             ;;
     esac
 
-    # Create certificate directory
+    # Create certificate directory. A failed run removes only what it created:
+    # a re-issue must not delete the certificate the panel is serving now, nor
+    # the acme.sh state that keeps renewing it.
     certPath="/root/cert/ip"
+    local ip_cert_created=() p
+    for p in ~/.acme.sh/"${server_ip}" ~/.acme.sh/"${server_ip}_ecc" "$certPath"; do
+        [[ -e "$p" ]] || ip_cert_created+=("$p")
+    done
+    if [[ -n "$ipv6_addr" ]]; then
+        for p in ~/.acme.sh/"${ipv6_addr}" ~/.acme.sh/"${ipv6_addr}_ecc"; do
+            [[ -e "$p" ]] || ip_cert_created+=("$p")
+        done
+    fi
     mkdir -p "$certPath"
 
     # Build domain arguments
@@ -1755,10 +1766,7 @@ ssl_cert_issue_for_ip() {
     if [ $? -ne 0 ]; then
         LOGE "Failed to issue certificate for IP: ${server_ip}"
         LOGE "Make sure port ${WebPort} is open and the server is accessible from the internet"
-        # Cleanup acme.sh data for both IPv4 and IPv6 if specified
-        rm -rf ~/.acme.sh/${server_ip} ~/.acme.sh/${server_ip}_ecc 2> /dev/null
-        [[ -n "$ipv6_addr" ]] && rm -rf ~/.acme.sh/${ipv6_addr} ~/.acme.sh/${ipv6_addr}_ecc 2> /dev/null
-        rm -rf ${certPath} 2> /dev/null
+        [[ ${#ip_cert_created[@]} -gt 0 ]] && rm -rf "${ip_cert_created[@]}" 2> /dev/null
         return 1
     else
         LOGI "Certificate issued successfully for IP: ${server_ip}"
@@ -1775,10 +1783,7 @@ ssl_cert_issue_for_ip() {
     # Verify certificate files exist (don't rely on exit code - reloadcmd failure causes non-zero)
     if [[ ! -f "${certPath}/fullchain.pem" || ! -f "${certPath}/privkey.pem" ]]; then
         LOGE "Certificate files not found after installation"
-        # Cleanup acme.sh data for both IPv4 and IPv6 if specified
-        rm -rf ~/.acme.sh/${server_ip} ~/.acme.sh/${server_ip}_ecc 2> /dev/null
-        [[ -n "$ipv6_addr" ]] && rm -rf ~/.acme.sh/${ipv6_addr} ~/.acme.sh/${ipv6_addr}_ecc 2> /dev/null
-        rm -rf ${certPath} 2> /dev/null
+        [[ ${#ip_cert_created[@]} -gt 0 ]] && rm -rf "${ip_cert_created[@]}" 2> /dev/null
         return 1
     fi
 
