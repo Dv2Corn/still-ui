@@ -210,16 +210,18 @@ func buildUAPIConfig(inst amneziawg.Instance, opts DeviceOptions) (string, error
 	}
 
 	for _, p := range inst.Peers {
+		// A row saved before keys were validated is skipped, not fatal: an
+		// error here kept every other client's change off the device.
 		pubHex, err := wireguard.KeyToHex(p.PublicKey)
+		if err != nil || pubHex == "" {
+			continue
+		}
+		pskHex, err := wireguard.KeyToHex(p.PresharedKey)
 		if err != nil {
-			return "", fmt.Errorf("peer %q: invalid public key: %w", p.Email, err)
+			continue
 		}
 		fmt.Fprintf(&b, "public_key=%s\n", pubHex)
-		if p.PresharedKey != "" {
-			pskHex, err := wireguard.KeyToHex(p.PresharedKey)
-			if err != nil {
-				return "", fmt.Errorf("peer %q: invalid preshared key: %w", p.Email, err)
-			}
+		if pskHex != "" {
 			fmt.Fprintf(&b, "preshared_key=%s\n", pskHex)
 		}
 		for _, allowedIP := range p.AllowedIPs {

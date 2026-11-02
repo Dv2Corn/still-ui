@@ -26,7 +26,7 @@ func testInstance() amneziawg.Instance {
 		},
 		Peers: []amneziawg.Peer{
 			{Email: "alice", PublicKey: "peerAPublicKeyBase64ValueForTestsPadding000=", AllowedIPs: []string{"10.8.1.2/32"}},
-			{Email: "bob", PublicKey: "peerBPublicKeyBase64ValueForTestsPadding000=", AllowedIPs: []string{"10.8.1.3/32"}, PresharedKey: "pskBase64ValueForTestingOnlyPaddingXXXXXXX="},
+			{Email: "bob", PublicKey: "peerBPublicKeyBase64ValueForTestsPadding000=", AllowedIPs: []string{"10.8.1.3/32"}, PresharedKey: "pskBase64ValueForTestingOnlyPaddingXXXXXXXX="},
 		},
 	}
 }
@@ -46,7 +46,7 @@ func TestRenderEmitsOnlySetconfKeys(t *testing.T) {
 		"ContentPaddingAddition = 14-47\n",
 		"RandomTrailers = on\n", "DisableCookies = on\n",
 		"# alice\nPublicKey = peerAPublicKeyBase64ValueForTestsPadding000=\nAllowedIPs = 10.8.1.2/32\n",
-		"PresharedKey = pskBase64ValueForTestingOnlyPaddingXXXXXXX=\n",
+		"PresharedKey = pskBase64ValueForTestingOnlyPaddingXXXXXXXX=\n",
 	} {
 		if !strings.Contains(conf, want) {
 			t.Errorf("rendered config lacks %q:\n%s", want, conf)
@@ -251,5 +251,27 @@ func TestOwnershipGrammarRefusesForeignConfigs(t *testing.T) {
 		if validOwnedConfig(body, name) {
 			t.Errorf("%s: ownership grammar accepted a config Render never writes", label)
 		}
+	}
+}
+
+// One client saved with a malformed key must not take the inbound down: awg
+// syncconf rejects the whole file, so no other client change applied any more.
+func TestRenderSkipsPeerWithMalformedKey(t *testing.T) {
+	inst := testInstance()
+	inst.Peers = append(inst.Peers,
+		amneziawg.Peer{Email: "badpub", PublicKey: "not-a-key", AllowedIPs: []string{"10.8.1.4/32"}},
+		amneziawg.Peer{Email: "badpsk", PublicKey: "peerCPublicKeyBase64ValueForTestsPadding000=", PresharedKey: "short=", AllowedIPs: []string{"10.8.1.5/32"}},
+	)
+	conf, err := Render(inst)
+	if err != nil {
+		t.Fatalf("Render: %v", err)
+	}
+	for _, bad := range []string{"badpub", "not-a-key", "badpsk", "short="} {
+		if strings.Contains(conf, bad) {
+			t.Fatalf("malformed peer %q reached the config:\n%s", bad, conf)
+		}
+	}
+	if !strings.Contains(conf, "# alice\n") || !strings.Contains(conf, "# bob\n") {
+		t.Fatalf("valid peers were dropped:\n%s", conf)
 	}
 }

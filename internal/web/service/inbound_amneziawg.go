@@ -275,6 +275,11 @@ func (s *InboundService) normalizeAmneziaWGSettings(inbound *model.Inbound, old 
 	if err != nil {
 		return err
 	}
+	var oldParsed amneziawg.InboundSettings
+	if strings.TrimSpace(oldSettings) != "" {
+		_ = json.Unmarshal([]byte(oldSettings), &oldParsed)
+	}
+	oldClients := oldParsed.Clients
 	for i := range parsed.Clients {
 		c := &parsed.Clients[i]
 		if err := s.amneziaWGForwardedPortsConflict(portCtx, c); err != nil {
@@ -288,6 +293,9 @@ func (s *InboundService) normalizeAmneziaWGSettings(inbound *model.Inbound, old 
 		}
 		if err := amneziawg.ValidateConfigValue("preSharedKey", c.PreSharedKey); err != nil {
 			return fmt.Errorf("amneziawg: client %q: %w", c.Email, err)
+		}
+		if err := validateAmneziaWGClientKeys(c, storedAmneziaWGClient(oldClients, c.Email)); err != nil {
+			return err
 		}
 		// AllowedIPs lands verbatim in a rendered [Peer] block, so a newline here
 		// re-opens an [Interface] section whose PostUp runs as root once the

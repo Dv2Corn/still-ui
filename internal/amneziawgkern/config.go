@@ -128,6 +128,11 @@ func Render(inst amneziawg.Instance) (string, error) {
 		if p.PublicKey == "" || len(p.AllowedIPs) == 0 {
 			continue
 		}
+		// awg syncconf rejects the whole file for one malformed key, which
+		// froze every other client of this inbound; skip a pre-validation row.
+		if amneziawg.ValidatePeerKey("publicKey", p.PublicKey) != nil || amneziawg.ValidatePeerKey("presharedKey", p.PresharedKey) != nil {
+			continue
+		}
 		b.WriteString("\n[Peer]\n")
 		if p.Email != "" {
 			fmt.Fprintf(&b, "# %s\n", p.Email)

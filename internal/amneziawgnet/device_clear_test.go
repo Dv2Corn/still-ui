@@ -122,3 +122,24 @@ func TestInPlaceReconfigurePartialHClearDoesNotOverlapStaleValue(t *testing.T) {
 		t.Fatalf("device did not take h1=1/h2=100:\n%s", dump)
 	}
 }
+
+// One malformed client key used to fail the whole UAPI config, so the inbound
+// kept its old peer list forever: new clients never connected, removed ones stayed.
+func TestBuildUAPIConfigSkipsPeerWithMalformedKey(t *testing.T) {
+	inst := clearTestInstance(t)
+	good := inst.Peers[0]
+	inst.Peers = append(inst.Peers,
+		amneziawg.Peer{Email: "badpub", PublicKey: "not-a-key", AllowedIPs: []string{"10.209.0.3/32"}},
+		amneziawg.Peer{Email: "badpsk", PublicKey: good.PublicKey[:43] + "=", PresharedKey: "short", AllowedIPs: []string{"10.209.0.4/32"}},
+	)
+	conf, err := buildUAPIConfig(inst, DeviceOptions{})
+	if err != nil {
+		t.Fatalf("one bad peer failed the whole inbound: %v", err)
+	}
+	if n := strings.Count(conf, "public_key="); n != 1 {
+		t.Fatalf("want only the valid peer, got %d peers:\n%s", n, conf)
+	}
+	if strings.Contains(conf, "10.209.0.3/32") || strings.Contains(conf, "10.209.0.4/32") {
+		t.Fatalf("malformed peers reached the device:\n%s", conf)
+	}
+}

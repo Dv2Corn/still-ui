@@ -366,6 +366,24 @@ func validateHeaderProtectionKey(v string) error {
 	return nil
 }
 
+// ValidatePeerKey accepts blank (no key) or a WireGuard key as written in an
+// AmneziaWG config file: standard base64 of exactly 32 bytes. One malformed
+// client key used to fail the whole inbound's device config on every tick,
+// so no client change applied any more; it is now refused at save time.
+func ValidatePeerKey(field, v string) error {
+	if v == "" {
+		return nil
+	}
+	if err := ValidateConfigValue(field, v); err != nil {
+		return err
+	}
+	key, err := base64.StdEncoding.DecodeString(v)
+	if err != nil || len(key) != 32 {
+		return fmt.Errorf("invalid %s: must be a base64-encoded 32-byte key", field)
+	}
+	return nil
+}
+
 // ValidateIPv6Subnet rejects a malformed subnet before it's saved. A blank
 // value is only valid when IPv6 itself is disabled.
 func ValidateIPv6Subnet(enabled bool, subnet string) error {

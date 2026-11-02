@@ -45,7 +45,7 @@ func TestUpdateByEmailJSONKeepsOmittedFields(t *testing.T) {
 
 	seed := model.Client{
 		Email: "full@awg", Enable: true,
-		PrivateKey: "client-private", PublicKey: "client-public",
+		PrivateKey: "client-private", PublicKey: awgValidPeerKey,
 		PreSharedKey: partialTestPSK,
 		AllowedIPs:   []string{"10.8.1.8/32"},
 		LimitIP:      3, TotalGB: 50 << 30, ExpiryTime: 1700000000000,
