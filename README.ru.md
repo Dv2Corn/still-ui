@@ -44,7 +44,7 @@ bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.
 Поставить конкретный выпуск — добавьте его тег (теги вида `vX.Y.Z-still.N`):
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh) v3.11.0-still.4
+bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh) v1.0.0
 ```
 
 Из уже скачанного архива выпуска:
@@ -55,7 +55,7 @@ STILL_UI_ARCHIVE=/path/still-ui-linux-amd64.tar.gz bash install.sh
 
 Установщик сам придумает логин, пароль и путь к панели и покажет их в конце — сохраните. Дальше команда `still-ui` открывает меню управления: запуск и остановка, просмотр и сброс входа, смена порта, сертификаты и прочее. Подкоманды те же, что у скрипта `x-ui` в 3x-ui: `still-ui start`, `stop`, `restart`, `status`, `log`, `update`, `legacy`, `uninstall` и другие.
 
-Сборки выпуска есть только под **Linux amd64 и arm64**. Текущий выпуск — панель **3.11.0-still.4** с **Xray v26.10.21**.
+Сборки выпуска есть только под **Linux amd64 и arm64**. Текущий выпуск — still-ui **1.0.0** на основе 3x-ui 3.11.0, с **Xray v26.10.21**.
 
 ### Что где лежит
 
