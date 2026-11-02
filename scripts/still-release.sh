@@ -20,7 +20,7 @@
 # $STILL_RELEASE_CACHE (default ~/.cache/still-release).
 set -euo pipefail
 
-XRAY_VERSION="${XRAY_VERSION:-v26.10.21}"
+XRAY_VERSION="${XRAY_VERSION:-v26.10.31}"
 
 die() { echo "still-release: $*" >&2; exit 1; }
 
