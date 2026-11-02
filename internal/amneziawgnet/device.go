@@ -3,6 +3,7 @@ package amneziawgnet
 import (
 	"fmt"
 	"net/netip"
+	"strconv"
 	"strings"
 
 	"github.com/amnezia-vpn/amneziawg-go/v3/device"
@@ -32,7 +33,8 @@ type DeviceOptions struct {
 	// (or a bare integer), amneziawg-go's own UintRange.FromString grammar
 	// (confirmed directly against v3.0.3's device/uapi.go -- all six share
 	// the identical parser). Empty leaves that one field at amneziawg-go's
-	// own default.
+	// own default (sent as an explicit "0", so clearing a field also resets a
+	// running device).
 	ContentPaddingAddition string
 	RekeyAfterTime         string
 	RekeyTimeout           string
@@ -181,8 +183,8 @@ func hostAddresses(addresses []string) ([]netip.Addr, error) {
 
 // buildUAPIConfig renders inst (plus opts' AWG 3.0 fields) as a WireGuard
 // UAPI "set" configuration string -- private_key/listen_port/jc.../s1-s4/
-// h1-h4/i1-i5 device lines, the AWG 3.0 device lines when opts asks for them,
-// then one public_key/preshared_key/allowed_ip block per peer. Field names
+// h1-h4/i1-i5 device lines, the AWG 3.0/3.1 device lines (all of them, blanks
+// as explicit defaults -- see writeDeviceObfuscationLines), then one public_key/preshared_key/allowed_ip block per peer. Field names
 // and format match amneziawg-go v3.0.3's device/uapi.go exactly (confirmed
 // against its real source during Phase 0 spiking, not just its docs).
 func buildUAPIConfig(inst amneziawg.Instance, opts DeviceOptions) (string, error) {
@@ -203,50 +205,9 @@ func buildUAPIConfig(inst amneziawg.Instance, opts DeviceOptions) (string, error
 	if err := amneziawg.ValidateHandshakePreamble(inst.Obfuscation); err != nil {
 		return "", err
 	}
-	o := inst.Obfuscation
-	fmt.Fprintf(&b, "jc=%d\njmin=%d\njmax=%d\n", o.Jc, o.Jmin, o.Jmax)
-	fmt.Fprintf(&b, "s1=%d\ns2=%d\ns3=%d\ns4=%d\n", o.S1, o.S2, o.S3, o.S4)
-	writeOptionalLine(&b, "h1", o.H1)
-	writeOptionalLine(&b, "h2", o.H2)
-	writeOptionalLine(&b, "h3", o.H3)
-	writeOptionalLine(&b, "h4", o.H4)
-	writeOptionalLine(&b, "i1", o.I1)
-	writeOptionalLine(&b, "i2", o.I2)
-	writeOptionalLine(&b, "i3", o.I3)
-	writeOptionalLine(&b, "i4", o.I4)
-	writeOptionalLine(&b, "i5", o.I5)
-
-	// An omitted line means "unchanged" to amneziawg-go, so a cleared key can
-	// only reach a live device as the all-zero one that disables the feature.
-	hpHex := strings.Repeat("0", 64)
-	if opts.HeaderProtectionKey != "" {
-		var err error
-		hpHex, err = wireguard.KeyToHex(opts.HeaderProtectionKey)
-		if err != nil {
-			return "", fmt.Errorf("invalid header protection key: %w", err)
-		}
+	if err := writeDeviceObfuscationLines(&b, inst.Obfuscation, opts); err != nil {
+		return "", err
 	}
-	fmt.Fprintf(&b, "header_protection_key=%s\n", hpHex)
-	if opts.ContentPaddingAddition != "" {
-		fmt.Fprintf(&b, "content_padding_addition=%s\n", opts.ContentPaddingAddition)
-	}
-	if opts.RekeyAfterTime != "" {
-		fmt.Fprintf(&b, "rekey_after_time=%s\n", opts.RekeyAfterTime)
-	}
-	if opts.RekeyTimeout != "" {
-		fmt.Fprintf(&b, "rekey_timeout=%s\n", opts.RekeyTimeout)
-	}
-	if opts.RejectAfterTime != "" {
-		fmt.Fprintf(&b, "reject_after_time=%s\n", opts.RejectAfterTime)
-	}
-	if opts.KeepaliveTimeout != "" {
-		fmt.Fprintf(&b, "keepalive_timeout=%s\n", opts.KeepaliveTimeout)
-	}
-	if opts.MaxHandshakeAttempts != "" {
-		fmt.Fprintf(&b, "max_handshake_attempts=%s\n", opts.MaxHandshakeAttempts)
-	}
-	fmt.Fprintf(&b, "random_trailers=%t\n", opts.RandomTrailers)
-	fmt.Fprintf(&b, "disable_cookies=%t\n", opts.DisableCookies)
 
 	for _, p := range inst.Peers {
 		pubHex, err := wireguard.KeyToHex(p.PublicKey)
@@ -269,13 +230,52 @@ func buildUAPIConfig(inst amneziawg.Instance, opts DeviceOptions) (string, error
 	return b.String(), nil
 }
 
-// writeOptionalLine writes a "name=v" UAPI line only when v is set -- used for
-// h1-h4 and i1-i5, whose empty value means "let amneziawg-go fall back to its
-// own default," mirroring how internal/amneziawg's generateServerConfig
-// treats the same optional fields.
-func writeOptionalLine(b *strings.Builder, name, v string) {
+// writeDeviceObfuscationLines renders the device-wide obfuscation, AWG 3.0
+// and 3.1 lines shared by the inbound and outbound builders. Every line is
+// written on every call: amneziawg-go starts an IpcSet from the device's
+// current values, so an omitted line means "keep the old value", not "use the
+// default". A field cleared in the panel therefore has to be sent as its
+// explicit default, or an in-place reconfigure keeps the stale value that a
+// freshly built device (and every newly downloaded client config) no longer has.
+func writeDeviceObfuscationLines(b *strings.Builder, o amneziawg.Obfuscation31, opts DeviceOptions) error {
+	fmt.Fprintf(b, "jc=%d\njmin=%d\njmax=%d\n", o.Jc, o.Jmin, o.Jmax)
+	fmt.Fprintf(b, "s1=%d\ns2=%d\ns3=%d\ns4=%d\n", o.S1, o.S2, o.S3, o.S4)
+	// A blank Hn is WireGuard's own message type n, amneziawg-go's default.
+	for i, h := range []string{o.H1, o.H2, o.H3, o.H4} {
+		writeLineOrDefault(b, fmt.Sprintf("h%d", i+1), h, strconv.Itoa(i+1))
+	}
+	// An empty "iN=" clears that signature packet (newObfChain("") is nil).
+	for i, spec := range []string{o.I1, o.I2, o.I3, o.I4, o.I5} {
+		fmt.Fprintf(b, "i%d=%s\n", i+1, spec)
+	}
+
+	// A cleared key can only reach a live device as the all-zero one that
+	// disables the feature.
+	hpHex := strings.Repeat("0", 64)
+	if opts.HeaderProtectionKey != "" {
+		var err error
+		hpHex, err = wireguard.KeyToHex(opts.HeaderProtectionKey)
+		if err != nil {
+			return fmt.Errorf("invalid header protection key: %w", err)
+		}
+	}
+	fmt.Fprintf(b, "header_protection_key=%s\n", hpHex)
+	// "0" is amneziawg-go's zero UintRange: padding off, built-in timings.
+	writeLineOrDefault(b, "content_padding_addition", opts.ContentPaddingAddition, "0")
+	writeLineOrDefault(b, "rekey_after_time", opts.RekeyAfterTime, "0")
+	writeLineOrDefault(b, "rekey_timeout", opts.RekeyTimeout, "0")
+	writeLineOrDefault(b, "reject_after_time", opts.RejectAfterTime, "0")
+	writeLineOrDefault(b, "keepalive_timeout", opts.KeepaliveTimeout, "0")
+	writeLineOrDefault(b, "max_handshake_attempts", opts.MaxHandshakeAttempts, "0")
+	fmt.Fprintf(b, "random_trailers=%t\n", opts.RandomTrailers)
+	fmt.Fprintf(b, "disable_cookies=%t\n", opts.DisableCookies)
+	return nil
+}
+
+// writeLineOrDefault writes "name=v", or "name=def" when v is blank.
+func writeLineOrDefault(b *strings.Builder, name, v, def string) {
 	if v == "" {
-		return
+		v = def
 	}
 	fmt.Fprintf(b, "%s=%s\n", name, v)
 }

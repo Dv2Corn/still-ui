@@ -456,7 +456,8 @@ func validateUintRange(v string, minAllowed int64) error {
 }
 
 // validateHNoOverlap mirrors amneziawg-go's "headers must not overlap" (device/uapi.go).
-// A blank Hn is never sent, so the engine keeps its default: WireGuard's own type n.
+// A blank Hn is sent to the engine as WireGuard's own type n (amneziawgnet's
+// writeDeviceObfuscationLines), so it is checked as n here.
 func validateHNoOverlap(hs [4]string) error {
 	var lo, hi [4]int64
 	for i, h := range hs {
