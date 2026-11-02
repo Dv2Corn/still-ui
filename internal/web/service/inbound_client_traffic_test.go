@@ -153,6 +153,67 @@ func TestAdjustTraffics_DelayedStartConvertsDespiteStaleInboundId(t *testing.T) 
 	}
 }
 
+// Xray reports a zero delta for every counter it holds, so a client re-armed for
+// "start after first use" whose counter already exists showed up on every poll.
+// Its period must start on traffic, not on the first poll after it was re-armed.
+func TestAdjustTraffics_DelayedStartWaitsForTraffic(t *testing.T) {
+	dbDir := t.TempDir()
+	t.Setenv("XUI_DB_FOLDER", dbDir)
+	dbtest.InitDB(t, filepath.Join(dbDir, "x-ui.db"))
+
+	db := database.GetDB()
+
+	const email = "rearmed-user"
+	const uid = "ce8d33df-3a64-4f10-8f9b-91c3a8e0d002"
+	const sevenDays = int64(7 * 86400000)
+
+	client := model.Client{Email: email, ID: uid, Auth: uid, Enable: true, ExpiryTime: -sevenDays}
+	inbound := &model.Inbound{
+		Tag: "vless-rearmed", Enable: true, Port: 45002, Protocol: model.VLESS,
+		StreamSettings: `{"network":"tcp","security":"reality"}`,
+		Settings:       clientsSettings(t, []model.Client{client}),
+	}
+	if err := db.Create(inbound).Error; err != nil {
+		t.Fatalf("create inbound: %v", err)
+	}
+	svc := InboundService{}
+	if err := svc.clientService.SyncInbound(db, inbound.Id, []model.Client{client}); err != nil {
+		t.Fatalf("SyncInbound: %v", err)
+	}
+	if err := db.Create(&xray.ClientTraffic{InboundId: inbound.Id, Email: email, Enable: true, ExpiryTime: -sevenDays}).Error; err != nil {
+		t.Fatalf("create traffic row: %v", err)
+	}
+
+	if err := svc.addClientTraffic(db, []*xray.ClientTraffic{{Email: email}}); err != nil {
+		t.Fatalf("addClientTraffic: %v", err)
+	}
+	var row xray.ClientTraffic
+	if err := db.Model(xray.ClientTraffic{}).Where("email = ?", email).First(&row).Error; err != nil {
+		t.Fatalf("reload traffic row: %v", err)
+	}
+	if row.ExpiryTime != -sevenDays {
+		t.Fatalf("a zero-traffic poll started the period: expiry = %d, want %d", row.ExpiryTime, -sevenDays)
+	}
+	reloaded, err := svc.GetInbound(inbound.Id)
+	if err != nil {
+		t.Fatalf("GetInbound: %v", err)
+	}
+	if cs, err := svc.GetClients(reloaded); err != nil || len(cs) != 1 || cs[0].ExpiryTime != -sevenDays {
+		t.Fatalf("inbound settings after a zero-traffic poll = %#v, %v; want expiry %d", cs, err, -sevenDays)
+	}
+
+	before := time.Now().UnixMilli()
+	if err := svc.addClientTraffic(db, []*xray.ClientTraffic{{Email: email, Down: 1}}); err != nil {
+		t.Fatalf("addClientTraffic: %v", err)
+	}
+	if err := db.Model(xray.ClientTraffic{}).Where("email = ?", email).First(&row).Error; err != nil {
+		t.Fatalf("reload traffic row: %v", err)
+	}
+	if row.ExpiryTime < before+sevenDays-5000 || row.ExpiryTime > before+sevenDays+5000 {
+		t.Fatalf("first traffic did not start the period: expiry = %d, want ~%d", row.ExpiryTime, before+sevenDays)
+	}
+}
+
 // TestAddClientTraffic_ExpiryWriteOnlyForConvertedClients locks in that the
 // delayed-start persistence pass touches only clients adjustTraffics actually
 // converted this poll: the delayed client's negative expiry becomes an absolute
