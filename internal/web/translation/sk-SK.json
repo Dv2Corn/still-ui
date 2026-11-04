@@ -2533,7 +2533,7 @@
       "neverReported": "ešte sa neozvala",
       "stale": "Bez hlásení",
       "rotateToken": "Nový token",
-      "rotateConfirm": "Vydať nový token? Súčasný okamžite prestane fungovať.",
+      "rotateConfirm": "Vydať nový token? Súčasný okamžite prestane fungovať. Klient sondy dostane aj nové kľúče, takže stará konfigurácia ani odkaz sa už nepripoja.",
       "clientNote": "Pripája sa ako klient spravovaný panelom {email}. Tohto klienta neupravujte ani nemažte; nemá limit prenosu ani času.",
       "noResults": "Zatiaľ žiadne výsledky",
       "tokenTitle": "Token sondy",

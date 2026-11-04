@@ -2533,7 +2533,7 @@
       "neverReported": "尚未回報",
       "stale": "沒有回報",
       "rotateToken": "新權杖",
-      "rotateConfirm": "要簽發新權杖嗎？目前的權杖會立即失效。",
+      "rotateConfirm": "要簽發新權杖嗎？目前的權杖會立即失效。探針的用戶端也會換用新金鑰，舊的設定或連結將無法再連線。",
       "clientNote": "以面板管理的用戶端 {email} 連線。請勿編輯或刪除該用戶端；它沒有流量和時間限制。",
       "noResults": "尚無結果",
       "tokenTitle": "探針權杖",

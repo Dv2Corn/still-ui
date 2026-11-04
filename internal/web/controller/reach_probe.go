@@ -119,7 +119,13 @@ func (a *ReachProbeController) rotateToken(c *gin.Context) {
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
 		return
 	}
-	token, err := a.probeService.RotateToken(id)
+	token, needRestart, err := a.probeService.RotateToken(id)
+	if needRestart {
+		a.xrayService.SetToNeedRestart()
+	}
+	if needRestart || err == nil {
+		notifyClientsChanged()
+	}
 	if err != nil {
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
 		return

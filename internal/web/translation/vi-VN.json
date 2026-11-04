@@ -2533,7 +2533,7 @@
       "neverReported": "chưa gửi báo cáo",
       "stale": "Không báo cáo",
       "rotateToken": "Mã mới",
-      "rotateConfirm": "Cấp mã mới? Mã hiện tại sẽ ngừng hoạt động ngay.",
+      "rotateConfirm": "Cấp mã mới? Mã hiện tại sẽ ngừng hoạt động ngay. Máy khách của đầu dò cũng nhận khóa mới, nên cấu hình hoặc liên kết cũ sẽ không kết nối được nữa.",
       "clientNote": "Kết nối bằng máy khách do bảng điều khiển quản lý {email}. Đừng sửa hay xóa máy khách đó; nó không có giới hạn lưu lượng hay thời hạn.",
       "noResults": "Chưa có kết quả",
       "tokenTitle": "Mã thăm dò",

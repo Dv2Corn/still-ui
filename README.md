@@ -141,7 +141,7 @@ Every interval (10 minutes by default) the agent fetches its job from the panel,
 
 The **Probes** page shows the last result of every endpoint, its uptime over 7 days and an hourly history strip; a probe that has not reported for three intervals is marked "Not reporting". The Telegram bot sends an alert when an endpoint fails twice in a row, when it works again, and when a probe goes silent: turn on the "Reachability probes" events in **Panel Settings → Telegram**.
 
-The probe token opens only the two agent routes (`<base path>probe/v1/job` and `probe/v1/report`), nothing under `/panel/api`; the panel stores only its SHA-256, and a job holds only the probe client's own credentials. **New token** or deleting the probe revokes it at once. WireGuard, AmneziaWG, TUIC and MTProto inbounds are not probed yet.
+The probe token opens only the two agent routes (`<base path>probe/v1/job` and `probe/v1/report`), nothing under `/panel/api`; the panel stores only its SHA-256, and a job holds only the probe client's own credentials. **New token** revokes the old token and also gives the probe client new keys, so a leaked agent config or link stops working; a disabled or deleted probe has no client at all. WireGuard, AmneziaWG, TUIC and MTProto inbounds are not probed yet.
 
 ## Check your panel
 

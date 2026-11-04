@@ -2533,7 +2533,7 @@
       "neverReported": "ainda não enviou relatório",
       "stale": "Sem relatórios",
       "rotateToken": "Novo token",
-      "rotateConfirm": "Emitir um novo token? O atual para de funcionar imediatamente.",
+      "rotateConfirm": "Emitir um novo token? O atual para de funcionar imediatamente. O cliente da sonda também recebe chaves novas, então uma configuração ou link antigo deixa de conectar.",
       "clientNote": "Conecta como o cliente gerenciado pelo painel {email}. Não edite nem exclua esse cliente; ele não tem limite de tráfego nem de tempo.",
       "noResults": "Ainda sem resultados",
       "tokenTitle": "Token da sonda",

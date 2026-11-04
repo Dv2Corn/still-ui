@@ -103,7 +103,7 @@ func TestReachProbeTokenIsHashedAndScopedToEnabledProbe(t *testing.T) {
 	if _, err := f.svc.Authenticate(created.Token + "x"); !errors.Is(err, ErrReachProbeUnauthorized) {
 		t.Fatalf("wrong token: %v", err)
 	}
-	newToken, err := f.svc.RotateToken(row.Id)
+	newToken, _, err := f.svc.RotateToken(row.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,6 +143,80 @@ func TestReachProbeCreateMakesAMarkedUnlimitedClient(t *testing.T) {
 	database.GetDB().Model(&model.ClientRecord{}).Where("email = ?", rec.Email).Count(&left)
 	if left != 0 {
 		t.Fatal("deleting the probe left its client behind")
+	}
+}
+
+func countProbeClientRecords(t *testing.T, email string) int64 {
+	t.Helper()
+	var n int64
+	if err := database.GetDB().Model(&model.ClientRecord{}).Where("email = ?", email).Count(&n).Error; err != nil {
+		t.Fatal(err)
+	}
+	return n
+}
+
+func TestReachProbeRotateAndDisableRevokeVPNAccess(t *testing.T) {
+	f := newProbeFixture(t)
+	created, row := f.create(t, "home-1")
+	email := created.Probe.ClientEmail
+	first := lookupClientRecord(t, email)
+
+	if _, _, err := f.svc.RotateToken(row.Id); err != nil {
+		t.Fatal(err)
+	}
+	second := lookupClientRecord(t, email)
+	if second.UUID == first.UUID || second.SubID == first.SubID {
+		t.Fatalf("rotation kept the old credentials: uuid %q sub %q", second.UUID, second.SubID)
+	}
+	if settingsHoldUUID(t, &InboundService{}, f.inb.Id, first.UUID) {
+		t.Fatal("the rotated-out UUID is still in the inbound")
+	}
+	if !settingsHoldUUID(t, &InboundService{}, f.inb.Id, second.UUID) {
+		t.Fatal("the new probe client is not in the inbound")
+	}
+
+	off, on := false, true
+	if _, err := f.svc.Update(row.Id, ReachProbeInput{Name: "home-1", Enabled: &off, InboundIds: []int{f.inb.Id}}); err != nil {
+		t.Fatal(err)
+	}
+	if countProbeClientRecords(t, email) != 0 || settingsHoldUUID(t, &InboundService{}, f.inb.Id, second.UUID) {
+		t.Fatal("a disabled probe still has a working client")
+	}
+	if _, _, err := f.svc.RotateToken(row.Id); err != nil {
+		t.Fatalf("rotating a disabled probe: %v", err)
+	}
+	if countProbeClientRecords(t, email) != 0 {
+		t.Fatal("rotating a disabled probe brought its client back")
+	}
+
+	if _, err := f.svc.Update(row.Id, ReachProbeInput{Name: "home-1", Enabled: &on, InboundIds: []int{f.inb.Id}}); err != nil {
+		t.Fatal(err)
+	}
+	third := lookupClientRecord(t, email)
+	if !third.Enable || third.UUID == second.UUID || !settingsHoldUUID(t, &InboundService{}, f.inb.Id, third.UUID) {
+		t.Fatalf("re-enabled probe client: %+v", third)
+	}
+
+	if _, err := f.svc.Delete(row.Id); err != nil {
+		t.Fatal(err)
+	}
+	if countProbeClientRecords(t, email) != 0 || settingsHoldUUID(t, &InboundService{}, f.inb.Id, third.UUID) {
+		t.Fatal("deleting the probe left its client behind")
+	}
+}
+
+func TestReachProbeToleratesAClientDeletedByHand(t *testing.T) {
+	f := newProbeFixture(t)
+	created, row := f.create(t, "home-1")
+	if _, err := (&ClientService{}).DeleteByEmail(&InboundService{}, created.Probe.ClientEmail, false); err != nil {
+		t.Fatal(err)
+	}
+	off := false
+	if _, err := f.svc.Update(row.Id, ReachProbeInput{Name: "home-1", Enabled: &off, InboundIds: []int{f.inb.Id}}); err != nil {
+		t.Fatalf("disabling a probe whose client is gone: %v", err)
+	}
+	if _, err := f.svc.Delete(row.Id); err != nil {
+		t.Fatalf("deleting a probe whose client is gone: %v", err)
 	}
 }
 

@@ -2533,7 +2533,7 @@
       "neverReported": "has not reported yet",
       "stale": "Not reporting",
       "rotateToken": "New token",
-      "rotateConfirm": "Issue a new token? The current one stops working at once.",
+      "rotateConfirm": "Issue a new token? The current one stops working at once. The probe's client also gets new keys, so an old config or link no longer connects.",
       "clientNote": "Connects as the panel-managed client {email}. Do not edit or delete that client; it has no traffic or time limit.",
       "noResults": "No results yet",
       "tokenTitle": "Probe token",

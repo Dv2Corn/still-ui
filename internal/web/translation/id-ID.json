@@ -2533,7 +2533,7 @@
       "neverReported": "belum melapor",
       "stale": "Tidak melapor",
       "rotateToken": "Token baru",
-      "rotateConfirm": "Terbitkan token baru? Token saat ini langsung berhenti berfungsi.",
+      "rotateConfirm": "Terbitkan token baru? Token saat ini langsung berhenti berfungsi. Klien probe juga mendapat kunci baru, jadi konfigurasi atau tautan lama tidak bisa tersambung lagi.",
       "clientNote": "Terhubung sebagai klien yang dikelola panel {email}. Jangan ubah atau hapus klien itu; klien ini tanpa batas trafik maupun waktu.",
       "noResults": "Belum ada hasil",
       "tokenTitle": "Token probe",

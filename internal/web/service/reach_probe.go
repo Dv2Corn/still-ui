@@ -331,7 +331,15 @@ func (s *ReachProbeService) Update(id int, in ReachProbeInput) (bool, error) {
 	if in.Enabled != nil {
 		enabled = *in.Enabled
 	}
-	needRestart, err := s.syncClient(row, in.InboundIds)
+	// A disabled probe keeps no client at all, so its old link stops working;
+	// enabling it again issues a client with fresh credentials.
+	var needRestart bool
+	if enabled {
+		row.Name = in.Name
+		needRestart, err = s.syncClient(row, in.InboundIds)
+	} else {
+		needRestart, err = s.dropClient(row)
+	}
 	if err != nil {
 		return needRestart, err
 	}
@@ -435,8 +443,8 @@ func (s *ReachProbeService) Delete(id int) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	needRestart, err := s.clientService.DeleteByEmail(&s.inboundService, row.ClientEmail, false)
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+	needRestart, err := s.dropClient(row)
+	if err != nil {
 		return needRestart, err
 	}
 	err = database.GetDB().Transaction(func(tx *gorm.DB) error {
@@ -451,18 +459,51 @@ func (s *ReachProbeService) Delete(id int) (bool, error) {
 	return needRestart, err
 }
 
-// RotateToken issues a new token; the previous one stops working at once.
-func (s *ReachProbeService) RotateToken(id int) (string, error) {
-	if _, err := s.get(id); err != nil {
-		return "", err
+// dropClient removes the probe's client from every inbound; a client that is
+// already gone is not an error.
+func (s *ReachProbeService) dropClient(row *model.ReachProbe) (bool, error) {
+	rec, err := s.clientService.GetRecordByEmail(nil, row.ClientEmail)
+	if err == nil {
+		return s.clientService.Delete(&s.inboundService, rec.Id, false)
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, err
+	}
+	// No record; delete stray copies left in inbound settings, if any.
+	ids, err := s.clientService.findInboundIdsByClientEmail(row.ClientEmail)
+	if err != nil || len(ids) == 0 {
+		return false, err
+	}
+	return s.clientService.DeleteByEmail(&s.inboundService, row.ClientEmail, false)
+}
+
+// RotateToken revokes everything an old probe config could use: it issues a
+// new token and replaces the probe client, so the previous UUID, password and
+// subscription stop working too. The agent picks the new client up from its
+// next job. The returned bool asks the caller to schedule an Xray reconcile.
+func (s *ReachProbeService) RotateToken(id int) (string, bool, error) {
+	row, err := s.get(id)
+	if err != nil {
+		return "", false, err
+	}
+	needRestart, err := s.dropClient(row)
+	if err != nil {
+		return "", needRestart, err
+	}
+	if row.Enabled {
+		again, err := s.syncClient(row, row.InboundIds)
+		needRestart = needRestart || again
+		if err != nil {
+			return "", needRestart, err
+		}
 	}
 	token := random.Seq(reachProbeTokenLength)
-	err := database.GetDB().Model(&model.ReachProbe{}).Where("id = ?", id).
+	err = database.GetDB().Model(&model.ReachProbe{}).Where("id = ?", id).
 		Update("token_hash", crypto.HashTokenSHA256(token)).Error
 	if err != nil {
-		return "", err
+		return "", needRestart, err
 	}
-	return token, nil
+	return token, needRestart, nil
 }
 
 func (s *ReachProbeService) get(id int) (*model.ReachProbe, error) {

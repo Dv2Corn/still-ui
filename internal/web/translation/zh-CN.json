@@ -2533,7 +2533,7 @@
       "neverReported": "尚未报告",
       "stale": "无报告",
       "rotateToken": "新令牌",
-      "rotateConfirm": "要签发新令牌吗？当前令牌会立即失效。",
+      "rotateConfirm": "要签发新令牌吗？当前令牌会立即失效。探针的客户端也会换用新密钥，旧的配置或链接将无法再连接。",
       "clientNote": "以面板管理的客户端 {email} 连接。请勿编辑或删除该客户端；它没有流量和时间限制。",
       "noResults": "暂无结果",
       "tokenTitle": "探针令牌",

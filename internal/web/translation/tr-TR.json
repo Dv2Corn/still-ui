@@ -2533,7 +2533,7 @@
       "neverReported": "henüz rapor göndermedi",
       "stale": "Rapor yok",
       "rotateToken": "Yeni anahtar",
-      "rotateConfirm": "Yeni anahtar oluşturulsun mu? Mevcut anahtar hemen çalışmaz olur.",
+      "rotateConfirm": "Yeni anahtar oluşturulsun mu? Mevcut anahtar hemen çalışmaz olur. Yoklama istemcisi de yeni anahtarlar alır; eski yapılandırma veya bağlantı artık bağlanmaz.",
       "clientNote": "Panelin yönettiği {email} istemcisi olarak bağlanır. Bu istemciyi düzenlemeyin veya silmeyin; trafik ya da süre sınırı yoktur.",
       "noResults": "Henüz sonuç yok",
       "tokenTitle": "Yoklayıcı anahtarı",
