@@ -183,7 +183,8 @@ Release archives are built by GitHub Actions from the tagged commit ([release wo
 | `still-ui-linux-<arch>.tar.gz` | the archive `install.sh` and `still-ui update` download |
 | `still-ui-linux-<arch>.tar.gz.sha256` | its checksum; the installer checks it |
 | `still-ui-linux-<arch>.tar.gz.spdx.json` | SBOM (SPDX): every file in the archive with its sha256, and the Go modules inside `x-ui`, `xray` and `mtg` |
-| `SHA256SUMS` | checksums of the archives and SBOMs |
+| `still-probe-linux-<arch>.tar.gz` (+ `.sha256`) | the reachability probe agent that `scripts/still-probe-install.sh` downloads; attested like the panel archives |
+| `SHA256SUMS` | checksums of the archives, SBOMs and probe archives |
 
 Download and check the checksums (replace `v1.5.0` with the release you install):
 

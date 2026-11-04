@@ -171,7 +171,8 @@ still-ui uninstall
 | `still-ui-linux-<arch>.tar.gz` | آرشیوی که `install.sh` و `still-ui update` دانلود می‌کنند |
 | `still-ui-linux-<arch>.tar.gz.sha256` | checksum آن؛ نصب‌کننده آن را بررسی می‌کند |
 | `still-ui-linux-<arch>.tar.gz.spdx.json` | SBOM (SPDX): همهٔ فایل‌های آرشیو با sha256 هر کدام، و ماژول‌های Go درون `x-ui`، `xray` و `mtg` |
-| `SHA256SUMS` | checksum آرشیوها و SBOMها |
+| `still-probe-linux-<arch>.tar.gz` (+ `.sha256`) | عامل بررسی دسترس‌پذیری که `scripts/still-probe-install.sh` دانلودش می‌کند؛ مانند آرشیوهای پنل attestation دارد |
+| `SHA256SUMS` | checksum آرشیوها، SBOMها و آرشیوهای عامل بررسی |
 
 دانلود و بررسی checksumها (به‌جای `v1.5.0` نسخه‌ای را بگذارید که نصب می‌کنید):
 

@@ -183,7 +183,8 @@ BitTorrent, зашифрованный внутри дополнительног
 | `still-ui-linux-<arch>.tar.gz` | архив, который скачивают `install.sh` и `still-ui update` |
 | `still-ui-linux-<arch>.tar.gz.sha256` | его контрольная сумма, установщик её проверяет |
 | `still-ui-linux-<arch>.tar.gz.spdx.json` | SBOM (SPDX): все файлы архива с их sha256 и модули Go внутри `x-ui`, `xray` и `mtg` |
-| `SHA256SUMS` | контрольные суммы архивов и SBOM |
+| `still-probe-linux-<arch>.tar.gz` (+ `.sha256`) | агент проверки доступности, его скачивает `scripts/still-probe-install.sh`; подписан так же, как архивы панели |
+| `SHA256SUMS` | контрольные суммы архивов, SBOM и архивов агента проверки |
 
 Скачать и проверить суммы (вместо `v1.5.0` — выпуск, который ставите):
 
