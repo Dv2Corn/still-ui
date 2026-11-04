@@ -133,6 +133,13 @@ def inbounds():
         "streamSettings": {"network": "hysteria", "security": "tls", "tlsSettings": dict(tls, alpn=["h3"]),
                            "hysteriaSettings": {"version": 2, "udpIdleTimeout": 60}},
     }
+    # Only on request (--only post-migration): the inbound a test adds after
+    # the migration, which a rollback must not carry back to 3x-ui.
+    yield "post-migration", {
+        "port": 24440, "protocol": "vmess",
+        "settings": {"clients": [client(1, "pm", id=str(uuid.uuid4()), security="auto")]},
+        "streamSettings": {"network": "tcp", "security": "none", "tcpSettings": {"header": {"type": "none"}}},
+    }
     server_priv, server_pub = wg_keypair()
     awg_clients = []
     for i in (1, 2):
@@ -181,7 +188,7 @@ def main():
     listed = call("/panel/api/inbounds/list").get("obj") or []
     taken = {ib.get("port") for ib in listed}
     for name, ib in inbounds():
-        if ib["port"] in taken or (ONLY and name not in ONLY):
+        if ib["port"] in taken or (ONLY and name not in ONLY) or (name == "post-migration" and name not in ONLY):
             continue
         body = {"up": 0, "down": 0, "total": 0, "remark": name, "enable": True, "expiryTime": 0, "listen": "",
                 "port": ib["port"], "protocol": ib["protocol"], "settings": json.dumps(ib["settings"]),

@@ -385,7 +385,18 @@ pg_run() { # command args...
 
 pg_dump_db() { pg_run pg_dump --no-owner "$@"; }
 
-pg_restore_db() { pg_run pg_restore --no-owner --clean --if-exists --single-transaction "$@"; }
+# pg_restore needs the target database named on its command line (it does
+# not take PGDATABASE as one); the name is no secret, the rest stays in PG*.
+_pg_restore_into_env_db() {
+    local db="${PGDATABASE:-${PGUSER:-}}"
+    [[ -n "$db" ]] || {
+        err "No database name in the PostgreSQL settings."
+        return 1
+    }
+    pg_restore --no-owner --clean --if-exists --single-transaction -d "$db" "$@"
+}
+
+pg_restore_db() { pg_run _pg_restore_into_env_db "$@"; }
 
 # make_backup: everything a rollback needs, before anything changes.
 make_backup() {

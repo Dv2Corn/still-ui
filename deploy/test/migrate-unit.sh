@@ -86,6 +86,12 @@ expect "host, user, database, sslmode handed over" equals "$(grep -cE '^PG(HOST|
 expect_not "XUI_DB_DSN not passed on to pg_dump" grep -q '^XUI_DB_DSN=' "$test_dir/env"
 expect_not "only PG* names are exported" grep -q NOTPG "$test_dir/env"
 expect "the DSN stays in this shell" equals "$XUI_DB_DSN" 'postgres://xui:p%40ss%20w0rd@127.0.0.1/xui?sslmode=disable'
+sed -e 's/pg_dump/pg_restore/' "$test_dir/bin/pg_dump" > "$test_dir/bin/pg_restore"
+chmod 755 "$test_dir/bin/pg_restore"
+PATH="$test_dir/bin:$PATH" pg_restore_db "$test_dir/in.pgdump"
+expect "pg_restore gets the database by name only" equals "$(tail -n +2 "$test_dir/argv" | tr '\n' ' ')" \
+    "--no-owner --clean --if-exists --single-transaction -d xui $test_dir/in.pgdump "
+expect "pg_restore gets the password in PGPASSWORD" grep -q '^PGPASSWORD=p@ss' "$test_dir/env"
 PG_ENV_FILE=""
 expect_not "no pg.env, no pg_dump" pg_dump_db -Fc
 unset XUI_DB_DSN

@@ -237,8 +237,11 @@ run_case() { # ct image tag mode
         fi
         check "$ct" "3x-ui files untouched" "(cd / && sha256sum --quiet -c /root/t/xui-files.sha256)"
 
-        # A client added in still-ui must not leak back into 3x-ui: rollback
-        # restores the database 3x-ui stopped with, and keeps still-ui's.
+        # An inbound added in still-ui must not leak back into 3x-ui: the
+        # rollback restores the database 3x-ui stopped with (with PostgreSQL,
+        # still-ui changed that very database) and keeps still-ui's aside.
+        check "$ct" "an inbound can be added in still-ui" \
+            "python3 /root/t/test-migrate-seed.py http://127.0.0.1:$PANEL_PORT/$BASE_PATH $USER_NAME $USER_PASS --only post-migration | grep -q '\"created\": \[\"post-migration\"\]'"
         in_ct "$ct" "STILL_UI_MIGRATE_YES=1 still-ui migrate-rollback" > "$LOG_DIR/rollback.log" 2>&1
         rc=$?
         sed 's/^/  | /' "$LOG_DIR/rollback.log" | grep -E 'ok  |running again|differs|FAIL|finished' | head -n 10
