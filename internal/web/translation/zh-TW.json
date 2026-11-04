@@ -126,7 +126,8 @@
     "openMenu": "開啟選單",
     "pinSidebar": "固定側邊欄",
     "unpinSidebar": "取消固定側邊欄",
-    "subFormats": "Sub Formats"
+    "subFormats": "Sub Formats",
+    "probes": "探針"
   },
   "pages": {
     "login": {
@@ -1859,7 +1860,11 @@
       "subHostSortMode": "訂閱節點排序",
       "subHostSortInbound": "入站順序（預設）",
       "subHostSortHosts": "主機順序",
-      "subHostSortModeDesc": "跨入站使用主機頁面中的排序。此設定決定伺服器輸出順序；用戶端應用程式仍可能自行排序。"
+      "subHostSortModeDesc": "跨入站使用主機頁面中的排序。此設定決定伺服器輸出順序；用戶端應用程式仍可能自行排序。",
+      "eventGroupProbe": "可達性探針",
+      "eventProbeDown": "入站無法連線",
+      "eventProbeUp": "入站已恢復",
+      "eventProbeStale": "探針無回應"
     },
     "xray": {
       "save": "儲存",
@@ -2513,6 +2518,64 @@
         "badVlessRoute": "請輸入 0 到 65535 之間的單一數字"
       },
       "dragToReorder": "拖曳以重新排列 {name}"
+    },
+    "probes": {
+      "title": "可達性探針",
+      "intro": "探針是一個小型代理程式，可執行在目標國家境內的任何 Linux 機器上：家用伺服器、樹莓派或便宜的本地 VPS。它每隔幾分鐘像真實用戶端一樣透過你的入站連線，下載一個測試檔案，並把結果回報到這裡。",
+      "alertsHint": "警報透過 Telegram 機器人傳送：請在 面板設定 → Telegram 中開啟可達性探針事件。",
+      "addProbe": "新增探針",
+      "editProbe": "編輯探針",
+      "empty": "還沒有探針。新增一個，並在受審查網路內的機器上執行安裝指令。",
+      "minutes": "分鐘",
+      "directCheck": "直連檢查（不經 VPN）",
+      "history7d": "7 天",
+      "lastReport": "最近回報 {time}",
+      "neverReported": "尚未回報",
+      "stale": "沒有回報",
+      "rotateToken": "新權杖",
+      "rotateConfirm": "要簽發新權杖嗎？目前的權杖會立即失效。",
+      "clientNote": "以面板管理的用戶端 {email} 連線。請勿編輯或刪除該用戶端；它沒有流量和時間限制。",
+      "noResults": "尚無結果",
+      "tokenTitle": "探針權杖",
+      "tokenOnce": "請立即複製權杖：面板只儲存其雜湊值，無法再次顯示。",
+      "installCommand": "在探針機器上安裝（Linux，以 root 身分）：",
+      "installHint": "此指令會安裝代理程式、Xray 和 systemd 計時器，並執行第一次檢查。",
+      "token": "權杖",
+      "deleteConfirm": "刪除探針「{name}」？",
+      "deleteHint": "其權杖將失效，其用戶端將從入站中移除，歷史紀錄將被刪除。",
+      "fields": {
+        "name": "名稱",
+        "inbounds": "入站",
+        "testUrl": "測試 URL",
+        "directUrl": "直連 URL",
+        "interval": "間隔",
+        "target": "接入點",
+        "lastCheck": "最近檢查",
+        "latency": "首位元組 / 總計",
+        "uptime": "7 天可用率"
+      },
+      "hints": {
+        "name": "探針所在位置，例如 home-mobile",
+        "inbounds": "可探測 VLESS、VMess、Trojan、Shadowsocks 和 Hysteria 入站",
+        "testUrl": "透過每個入站下載。請使用大於約 100 KB 的檔案：有些審查系統只在最初幾 KB 之後才切斷連線。",
+        "directUrl": "選填：也在不經 VPN 的情況下存取，例如你的網站或訂閱頁面"
+      },
+      "errors": {
+        "name": "名稱：1 到 64 個字元，不能包含 < > &",
+        "inbounds": "請至少選擇一個入站",
+        "url": "請輸入 http:// 或 https:// 網址",
+        "interval": "1 到 1440 分鐘"
+      },
+      "status": {
+        "ok": "正常",
+        "fail": "無法連線",
+        "flaky": "失敗一次",
+        "unknown": "無資料"
+      },
+      "toasts": {
+        "saved": "探針已儲存",
+        "deleted": "探針已刪除"
+      }
     }
   },
   "tgbot": {
@@ -2641,7 +2704,11 @@
       "qrLegendJSON": "{{ .Code }}. JSON 訂閱",
       "qrLegendLink": "{{ .Code }}. 應用程式連結 {{ .App }}",
       "backupFailed": "無法讀取資料庫，未傳送備份。",
-      "privateOnly": "🤖 此機器人僅在私聊中運作。請在私訊中開啟它。"
+      "privateOnly": "🤖 此機器人僅在私聊中運作。請在私訊中開啟它。",
+      "eventProbeDown": "探針 {{ .Probe }}：{{ .Target }} 無法連線",
+      "eventProbeUp": "探針 {{ .Probe }}：{{ .Target }} 已恢復連線",
+      "eventProbeBack": "探針 {{ .Probe }} 已恢復回報",
+      "eventProbeStale": "探針 {{ .Probe }} 已 {{ .Minutes }} 分鐘未回報"
     },
     "buttons": {
       "closeKeyboard": "❌ 關閉鍵盤",

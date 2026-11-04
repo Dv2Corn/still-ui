@@ -1929,6 +1929,59 @@ export const sections: readonly Section[] = [
   },
 
   {
+    id: 'probes',
+    title: 'Reachability probes',
+    description:
+      'External agents that test the inbounds from inside a censored network (cmd/still-probe). These endpoints manage the probes; the agents use probe/v1/job and probe/v1/report under the panel base path with their own Bearer token, which opens nothing under /panel/api.',
+    endpoints: [
+      {
+        method: 'GET',
+        path: '/panel/api/probes/list',
+        summary: 'Every probe with the latest state of each tested endpoint and its 7-day uptime.',
+        responseSchema: 'ReachProbeView',
+        responseSchemaArray: true,
+      },
+      {
+        method: 'GET',
+        path: '/panel/api/probes/history/:id',
+        summary: "One probe's results of the last seven days, oldest first.",
+        params: [{ name: 'id', in: 'path', type: 'number', desc: 'Probe ID.' }],
+        responseSchema: 'ReachHistoryPoint',
+        responseSchemaArray: true,
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/probes/add',
+        summary:
+          'Create a probe and the panel-managed client it connects as. The response carries the plaintext token once; only its hash is stored.',
+        body: '{\n  "name": "home-1",\n  "inboundIds": [1],\n  "testUrl": "https://speed.cloudflare.com/__down?bytes=262144",\n  "directUrl": "",\n  "intervalSec": 600\n}',
+        responseSchema: 'ReachProbeCreated',
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/probes/update/:id',
+        summary:
+          "Change a probe's settings; its client is attached to the chosen inbounds and detached from the rest.",
+        params: [{ name: 'id', in: 'path', type: 'number', desc: 'Probe ID.' }],
+        body: '{\n  "name": "home-1",\n  "enabled": true,\n  "inboundIds": [1, 2],\n  "testUrl": "https://speed.cloudflare.com/__down?bytes=262144",\n  "directUrl": "",\n  "intervalSec": 600\n}',
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/probes/del/:id',
+        summary: 'Revoke a probe: its token stops working, its client and its history are deleted.',
+        params: [{ name: 'id', in: 'path', type: 'number', desc: 'Probe ID.' }],
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/probes/rotateToken/:id',
+        summary: 'Issue a new token for a probe; the previous one stops working at once.',
+        params: [{ name: 'id', in: 'path', type: 'number', desc: 'Probe ID.' }],
+        response: '{\n  "success": true,\n  "obj": { "token": "new-token-string" }\n}',
+      },
+    ],
+  },
+
+  {
     id: 'backup',
     title: 'Backup',
     description: 'Operations that interact with the configured Telegram bot.',

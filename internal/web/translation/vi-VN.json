@@ -126,7 +126,8 @@
     "openMenu": "Mở menu",
     "pinSidebar": "Ghim thanh bên",
     "unpinSidebar": "Bỏ ghim thanh bên",
-    "subFormats": "Sub Formats"
+    "subFormats": "Sub Formats",
+    "probes": "Thăm dò"
   },
   "pages": {
     "login": {
@@ -1859,7 +1860,11 @@
       "subHostSortMode": "Thứ tự nút đăng ký",
       "subHostSortInbound": "Thứ tự kết nối vào (mặc định)",
       "subHostSortHosts": "Thứ tự máy chủ",
-      "subHostSortModeDesc": "Theo thứ tự trên trang Máy chủ giữa các kết nối vào. Thiết lập này quyết định thứ tự do máy chủ xuất ra; ứng dụng khách có thể tự sắp xếp lại."
+      "subHostSortModeDesc": "Theo thứ tự trên trang Máy chủ giữa các kết nối vào. Thiết lập này quyết định thứ tự do máy chủ xuất ra; ứng dụng khách có thể tự sắp xếp lại.",
+      "eventGroupProbe": "Thăm dò khả năng truy cập",
+      "eventProbeDown": "Inbound không truy cập được",
+      "eventProbeUp": "Inbound truy cập lại được",
+      "eventProbeStale": "Thăm dò im lặng"
     },
     "xray": {
       "importRules": "Nhập quy tắc",
@@ -2513,6 +2518,64 @@
         "badVlessRoute": "Nhập một số duy nhất từ 0 đến 65535"
       },
       "dragToReorder": "Kéo để sắp xếp lại {name}"
+    },
+    "probes": {
+      "title": "Thăm dò khả năng truy cập",
+      "intro": "Thăm dò là một tác tử nhỏ chạy trên bất kỳ máy Linux nào bên trong quốc gia bạn quan tâm: máy chủ tại nhà, Raspberry Pi hoặc một VPS nội địa giá rẻ. Cứ vài phút nó lại kết nối qua các inbound của bạn như một máy khách thật, tải một tệp thử và gửi kết quả về đây.",
+      "alertsHint": "Cảnh báo được gửi qua bot Telegram: hãy bật các sự kiện thăm dò khả năng truy cập trong Cài đặt bảng điều khiển → Telegram.",
+      "addProbe": "Thêm thăm dò",
+      "editProbe": "Sửa thăm dò",
+      "empty": "Chưa có thăm dò nào. Hãy thêm một thăm dò và chạy lệnh cài đặt trên một máy trong mạng bị kiểm duyệt.",
+      "minutes": "phút",
+      "directCheck": "Kiểm tra trực tiếp (không VPN)",
+      "history7d": "7 ngày",
+      "lastReport": "báo cáo gần nhất {time}",
+      "neverReported": "chưa gửi báo cáo",
+      "stale": "Không báo cáo",
+      "rotateToken": "Mã mới",
+      "rotateConfirm": "Cấp mã mới? Mã hiện tại sẽ ngừng hoạt động ngay.",
+      "clientNote": "Kết nối bằng máy khách do bảng điều khiển quản lý {email}. Đừng sửa hay xóa máy khách đó; nó không có giới hạn lưu lượng hay thời hạn.",
+      "noResults": "Chưa có kết quả",
+      "tokenTitle": "Mã thăm dò",
+      "tokenOnce": "Hãy sao chép mã ngay: bảng điều khiển chỉ lưu giá trị băm và không thể hiển thị lại.",
+      "installCommand": "Cài đặt trên máy thăm dò (Linux, quyền root):",
+      "installHint": "Lệnh này cài tác tử cùng Xray và bộ hẹn giờ systemd, rồi chạy lần kiểm tra đầu tiên.",
+      "token": "Mã",
+      "deleteConfirm": "Xóa thăm dò \"{name}\"?",
+      "deleteHint": "Mã của nó ngừng hoạt động, máy khách của nó bị gỡ khỏi các inbound và lịch sử bị xóa.",
+      "fields": {
+        "name": "Tên",
+        "inbounds": "Inbound",
+        "testUrl": "URL thử",
+        "directUrl": "URL trực tiếp",
+        "interval": "Khoảng thời gian",
+        "target": "Điểm truy cập",
+        "lastCheck": "Lần kiểm tra cuối",
+        "latency": "Byte đầu / tổng",
+        "uptime": "Khả dụng 7 ngày"
+      },
+      "hints": {
+        "name": "Nơi thăm dò chạy, ví dụ home-mobile",
+        "inbounds": "Có thể thăm dò các inbound VLESS, VMess, Trojan, Shadowsocks và Hysteria",
+        "testUrl": "Được tải qua từng inbound. Hãy dùng tệp lớn hơn khoảng 100 KB: một số hệ thống kiểm duyệt chỉ cắt kết nối sau vài kilobyte đầu.",
+        "directUrl": "Tùy chọn: cũng mở không qua VPN, ví dụ trang web hoặc trang đăng ký của bạn"
+      },
+      "errors": {
+        "name": "Tên: 1 đến 64 ký tự, không chứa < > &",
+        "inbounds": "Chọn ít nhất một inbound",
+        "url": "Nhập URL http:// hoặc https://",
+        "interval": "Từ 1 đến 1440 phút"
+      },
+      "status": {
+        "ok": "Bình thường",
+        "fail": "Không truy cập được",
+        "flaky": "Lỗi một lần",
+        "unknown": "Không có dữ liệu"
+      },
+      "toasts": {
+        "saved": "Đã lưu thăm dò",
+        "deleted": "Đã xóa thăm dò"
+      }
     }
   },
   "tgbot": {
@@ -2641,7 +2704,11 @@
       "qrLegendJSON": "{{ .Code }}. Gói đăng ký JSON",
       "qrLegendLink": "{{ .Code }}. Liên kết ứng dụng {{ .App }}",
       "backupFailed": "Không đọc được cơ sở dữ liệu; không có bản sao lưu nào được gửi.",
-      "privateOnly": "🤖 Bot này chỉ hoạt động trong trò chuyện riêng. Hãy mở nó trong tin nhắn trực tiếp."
+      "privateOnly": "🤖 Bot này chỉ hoạt động trong trò chuyện riêng. Hãy mở nó trong tin nhắn trực tiếp.",
+      "eventProbeDown": "Thăm dò {{ .Probe }}: KHÔNG truy cập được {{ .Target }}",
+      "eventProbeUp": "Thăm dò {{ .Probe }}: {{ .Target }} truy cập lại được",
+      "eventProbeBack": "Thăm dò {{ .Probe }} đã gửi báo cáo trở lại",
+      "eventProbeStale": "Thăm dò {{ .Probe }} đã {{ .Minutes }} phút không gửi báo cáo"
     },
     "buttons": {
       "closeKeyboard": "❌ Đóng Bàn Phím",

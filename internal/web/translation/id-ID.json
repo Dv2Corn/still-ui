@@ -126,7 +126,8 @@
     "openMenu": "Buka menu",
     "pinSidebar": "Sematkan bilah sisi",
     "unpinSidebar": "Lepas sematan bilah sisi",
-    "subFormats": "Sub Formats"
+    "subFormats": "Sub Formats",
+    "probes": "Probe"
   },
   "pages": {
     "login": {
@@ -1859,7 +1860,11 @@
       "subHostSortMode": "Urutan node langganan",
       "subHostSortInbound": "Urutan inbound (bawaan)",
       "subHostSortHosts": "Urutan host",
-      "subHostSortModeDesc": "Mengikuti urutan di halaman Host untuk semua inbound. Ini menentukan urutan keluaran server; aplikasi klien dapat menerapkan urutan sendiri."
+      "subHostSortModeDesc": "Mengikuti urutan di halaman Host untuk semua inbound. Ini menentukan urutan keluaran server; aplikasi klien dapat menerapkan urutan sendiri.",
+      "eventGroupProbe": "Probe keterjangkauan",
+      "eventProbeDown": "Inbound tidak terjangkau",
+      "eventProbeUp": "Inbound terjangkau lagi",
+      "eventProbeStale": "Probe diam"
     },
     "xray": {
       "save": "Simpan",
@@ -2513,6 +2518,64 @@
         "badVlessRoute": "Masukkan satu angka antara 0 dan 65535"
       },
       "dragToReorder": "Seret untuk mengurutkan ulang {name}"
+    },
+    "probes": {
+      "title": "Probe keterjangkauan",
+      "intro": "Probe adalah agen kecil yang Anda jalankan di mesin Linux mana pun di dalam negara yang Anda pedulikan: server rumah, Raspberry Pi, atau VPS lokal yang murah. Setiap beberapa menit probe terhubung melalui inbound Anda seperti klien sungguhan, mengunduh file uji, lalu melaporkan hasilnya ke sini.",
+      "alertsHint": "Peringatan dikirim lewat bot Telegram: aktifkan peristiwa probe keterjangkauan di Pengaturan Panel → Telegram.",
+      "addProbe": "Tambah probe",
+      "editProbe": "Edit probe",
+      "empty": "Belum ada probe. Tambahkan satu dan jalankan perintah instalasi di mesin di dalam jaringan yang disensor.",
+      "minutes": "mnt",
+      "directCheck": "Cek langsung (tanpa VPN)",
+      "history7d": "7 hari",
+      "lastReport": "laporan terakhir {time}",
+      "neverReported": "belum melapor",
+      "stale": "Tidak melapor",
+      "rotateToken": "Token baru",
+      "rotateConfirm": "Terbitkan token baru? Token saat ini langsung berhenti berfungsi.",
+      "clientNote": "Terhubung sebagai klien yang dikelola panel {email}. Jangan ubah atau hapus klien itu; klien ini tanpa batas trafik maupun waktu.",
+      "noResults": "Belum ada hasil",
+      "tokenTitle": "Token probe",
+      "tokenOnce": "Salin token sekarang: panel hanya menyimpan hash-nya dan tidak bisa menampilkannya lagi.",
+      "installCommand": "Instal di mesin probe (Linux, sebagai root):",
+      "installHint": "Perintah ini memasang agen bersama Xray dan timer systemd, lalu menjalankan pengecekan pertama.",
+      "token": "Token",
+      "deleteConfirm": "Hapus probe \"{name}\"?",
+      "deleteHint": "Tokennya berhenti berfungsi, kliennya dilepas dari inbound, dan riwayatnya dihapus.",
+      "fields": {
+        "name": "Nama",
+        "inbounds": "Inbound",
+        "testUrl": "URL uji",
+        "directUrl": "URL langsung",
+        "interval": "Interval",
+        "target": "Titik akses",
+        "lastCheck": "Cek terakhir",
+        "latency": "Byte pertama / total",
+        "uptime": "Ketersediaan, 7 hari"
+      },
+      "hints": {
+        "name": "Lokasi probe, misalnya home-mobile",
+        "inbounds": "Inbound VLESS, VMess, Trojan, Shadowsocks, dan Hysteria dapat diuji",
+        "testUrl": "Diunduh melalui setiap inbound. Gunakan file lebih besar dari sekitar 100 KB: sebagian sensor memutus koneksi hanya setelah beberapa kilobyte pertama.",
+        "directUrl": "Opsional: juga dibuka tanpa VPN, misalnya situs atau halaman langganan Anda"
+      },
+      "errors": {
+        "name": "Nama: 1 sampai 64 karakter, tanpa < > &",
+        "inbounds": "Pilih minimal satu inbound",
+        "url": "Masukkan URL http:// atau https://",
+        "interval": "1 sampai 1440 menit"
+      },
+      "status": {
+        "ok": "OK",
+        "fail": "Tidak terjangkau",
+        "flaky": "Gagal sekali",
+        "unknown": "Tidak ada data"
+      },
+      "toasts": {
+        "saved": "Probe disimpan",
+        "deleted": "Probe dihapus"
+      }
     }
   },
   "tgbot": {
@@ -2641,7 +2704,11 @@
       "qrLegendJSON": "{{ .Code }}. Langganan JSON",
       "qrLegendLink": "{{ .Code }}. Tautan aplikasi {{ .App }}",
       "backupFailed": "Tidak dapat membaca basis data; tidak ada cadangan yang dikirim.",
-      "privateOnly": "🤖 Bot ini hanya berfungsi di obrolan pribadi. Silakan buka di pesan langsung."
+      "privateOnly": "🤖 Bot ini hanya berfungsi di obrolan pribadi. Silakan buka di pesan langsung.",
+      "eventProbeDown": "Probe {{ .Probe }}: {{ .Target }} TIDAK terjangkau",
+      "eventProbeUp": "Probe {{ .Probe }}: {{ .Target }} terjangkau lagi",
+      "eventProbeBack": "Probe {{ .Probe }} kembali melapor",
+      "eventProbeStale": "Probe {{ .Probe }} tidak melapor selama {{ .Minutes }} menit"
     },
     "buttons": {
       "closeKeyboard": "❌ Tutup Papan Ketik",

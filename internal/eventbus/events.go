@@ -23,6 +23,11 @@ const (
 
 	// Security
 	EventLoginAttempt EventType = "login.attempt"
+
+	// External reachability probes (reports from an agent inside a censored network)
+	EventProbeDown  EventType = "probe.down"
+	EventProbeUp    EventType = "probe.up"
+	EventProbeStale EventType = "probe.stale"
 )
 
 // Event is the unit of information flowing through the bus.
@@ -62,4 +67,14 @@ type LoginEventData struct {
 type SystemMetricData struct {
 	Percent   float64 // current usage percentage
 	Threshold int     // configured threshold
+}
+
+// ProbeHealthData carries one probe target's verdict. Target is empty when the
+// event is about the probe agent itself (stale, or reporting again).
+type ProbeHealthData struct {
+	Probe     string
+	Target    string
+	Error     string
+	LatencyMs int
+	SilentFor int // minutes without a report, for probe.stale
 }

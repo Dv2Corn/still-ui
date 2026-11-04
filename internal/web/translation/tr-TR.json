@@ -126,7 +126,8 @@
     "openMenu": "Menüyü aç",
     "pinSidebar": "Kenar çubuğunu sabitle",
     "unpinSidebar": "Kenar çubuğu sabitlemesini kaldır",
-    "subFormats": "Abonelik Formatları"
+    "subFormats": "Abonelik Formatları",
+    "probes": "Yoklayıcılar"
   },
   "pages": {
     "login": {
@@ -1859,7 +1860,11 @@
       "subHostSortMode": "Abonelik düğümü sıralaması",
       "subHostSortInbound": "Gelen bağlantı sırası (varsayılan)",
       "subHostSortHosts": "Ana bilgisayar sırası",
-      "subHostSortModeDesc": "Farklı gelen bağlantılarda Ana Bilgisayarlar sayfasının sırasını izler. Sunucunun çıktı sırasını belirler; istemci uygulamaları kendi sıralamalarını uygulayabilir."
+      "subHostSortModeDesc": "Farklı gelen bağlantılarda Ana Bilgisayarlar sayfasının sırasını izler. Sunucunun çıktı sırasını belirler; istemci uygulamaları kendi sıralamalarını uygulayabilir.",
+      "eventGroupProbe": "Erişilebilirlik yoklayıcıları",
+      "eventProbeDown": "Gelen bağlantıya erişilemiyor",
+      "eventProbeUp": "Gelen bağlantı yeniden erişilebilir",
+      "eventProbeStale": "Yoklayıcı sessiz"
     },
     "xray": {
       "save": "Kaydet",
@@ -2513,6 +2518,64 @@
         "badVlessRoute": "0 ile 65535 arasında tek bir sayı girin"
       },
       "dragToReorder": "{name} öğesini yeniden sıralamak için sürükleyin"
+    },
+    "probes": {
+      "title": "Erişilebilirlik yoklayıcıları",
+      "intro": "Yoklayıcı, ilgilendiğiniz ülkenin içindeki herhangi bir Linux makinede çalıştırdığınız küçük bir ajandır: ev sunucusu, Raspberry Pi ya da ucuz yerel bir VPS. Birkaç dakikada bir gelen bağlantılarınız üzerinden gerçek bir istemci gibi bağlanır, bir test dosyası indirir ve sonucu buraya bildirir.",
+      "alertsHint": "Uyarılar Telegram botu ile gelir: Panel Ayarları → Telegram bölümünde erişilebilirlik yoklayıcısı olaylarını açın.",
+      "addProbe": "Yoklayıcı ekle",
+      "editProbe": "Yoklayıcıyı düzenle",
+      "empty": "Henüz yoklayıcı yok. Bir tane ekleyin ve kurulum komutunu sansürlü ağdaki bir makinede çalıştırın.",
+      "minutes": "dk",
+      "directCheck": "Doğrudan kontrol (VPN'siz)",
+      "history7d": "7 gün",
+      "lastReport": "son rapor {time}",
+      "neverReported": "henüz rapor göndermedi",
+      "stale": "Rapor yok",
+      "rotateToken": "Yeni anahtar",
+      "rotateConfirm": "Yeni anahtar oluşturulsun mu? Mevcut anahtar hemen çalışmaz olur.",
+      "clientNote": "Panelin yönettiği {email} istemcisi olarak bağlanır. Bu istemciyi düzenlemeyin veya silmeyin; trafik ya da süre sınırı yoktur.",
+      "noResults": "Henüz sonuç yok",
+      "tokenTitle": "Yoklayıcı anahtarı",
+      "tokenOnce": "Anahtarı şimdi kopyalayın: panel yalnızca özetini saklar ve tekrar gösteremez.",
+      "installCommand": "Yoklayıcı makineye kurulum (Linux, root olarak):",
+      "installHint": "Komut ajanı Xray ve bir systemd zamanlayıcısı ile kurar, ardından ilk kontrolü çalıştırır.",
+      "token": "Anahtar",
+      "deleteConfirm": "\"{name}\" yoklayıcısı silinsin mi?",
+      "deleteHint": "Anahtarı çalışmaz olur, istemcisi gelen bağlantılardan kaldırılır ve geçmişi silinir.",
+      "fields": {
+        "name": "Ad",
+        "inbounds": "Gelen bağlantılar",
+        "testUrl": "Test URL'si",
+        "directUrl": "Doğrudan URL",
+        "interval": "Aralık",
+        "target": "Uç nokta",
+        "lastCheck": "Son kontrol",
+        "latency": "İlk bayt / toplam",
+        "uptime": "Erişilebilirlik, 7 gün"
+      },
+      "hints": {
+        "name": "Yoklayıcının çalıştığı yer, örneğin home-mobile",
+        "inbounds": "VLESS, VMess, Trojan, Shadowsocks ve Hysteria gelen bağlantıları yoklanabilir",
+        "testUrl": "Her gelen bağlantı üzerinden indirilir. Yaklaşık 100 KB'tan büyük bir dosya kullanın: bazı sansür sistemleri bağlantıyı ancak ilk kilobaytlardan sonra keser.",
+        "directUrl": "İsteğe bağlı: VPN olmadan da açılır, örneğin web siteniz veya abonelik sayfanız"
+      },
+      "errors": {
+        "name": "Ad: 1 ile 64 karakter arası, < > & olmadan",
+        "inbounds": "En az bir gelen bağlantı seçin",
+        "url": "http:// veya https:// ile başlayan bir URL girin",
+        "interval": "1 ile 1440 dakika arası"
+      },
+      "status": {
+        "ok": "Çalışıyor",
+        "fail": "Erişilemiyor",
+        "flaky": "Bir kez başarısız",
+        "unknown": "Veri yok"
+      },
+      "toasts": {
+        "saved": "Yoklayıcı kaydedildi",
+        "deleted": "Yoklayıcı silindi"
+      }
     }
   },
   "tgbot": {
@@ -2641,7 +2704,11 @@
       "qrLegendJSON": "{{ .Code }}. JSON abonelik",
       "qrLegendLink": "{{ .Code }}. Uygulama bağlantısı {{ .App }}",
       "backupFailed": "Veritabanı okunamadı; yedek gönderilmedi.",
-      "privateOnly": "🤖 Bu bot yalnızca özel sohbette çalışır. Lütfen doğrudan mesajda açın."
+      "privateOnly": "🤖 Bu bot yalnızca özel sohbette çalışır. Lütfen doğrudan mesajda açın.",
+      "eventProbeDown": "Yoklayıcı {{ .Probe }}: {{ .Target }} ERİŞİLEMİYOR",
+      "eventProbeUp": "Yoklayıcı {{ .Probe }}: {{ .Target }} yeniden erişilebilir",
+      "eventProbeBack": "Yoklayıcı {{ .Probe }} yeniden rapor gönderiyor",
+      "eventProbeStale": "Yoklayıcı {{ .Probe }} {{ .Minutes }} dakikadır rapor göndermedi"
     },
     "buttons": {
       "closeKeyboard": "❌ Klavyeyi Kapat",
