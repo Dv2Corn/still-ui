@@ -131,6 +131,38 @@ jobs:
           query=$(printf '%s' "$TITLE" | tr -c '[:alnum:][:space:]._-' ' ' | cut -c1-200)
           gh issue list -R "$REPO" --state all --limit 30 --search "$query" --json number,title,state,body,labels > .analyst/similar-issues.json || echo '[]' > .analyst/similar-issues.json
           git log --date=short --format='%h %ad %s' -n 5000 > .analyst/git-log.txt
+      # Claude Code will not start without bubblewrap while
+      # CLAUDE_CODE_SUBPROCESS_ENV_SCRUB is on. The action installs it itself
+      # only when allowed_non_write_users is set, and a maintainer's request
+      # leaves that empty, so every `@claude review` failed before it began
+      # (runs 41928316466, 41929214244). This mirrors the action's own step at
+      # the pinned SHA ("Install subprocess isolation dependencies").
+      - name: Install bubblewrap for subprocess isolation
+        if: steps.credentials.outputs.ready == 'true'
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          for i in 1 2 3; do
+            if timeout 120 sudo apt-get update -qq \
+              && timeout 120 sudo apt-get install -y -qq --no-install-recommends bubblewrap socat; then
+              break
+            fi
+            if [ "$i" = 3 ]; then
+              echo "::error::Could not install bubblewrap; Claude Code would refuse to start."
+              exit 1
+            fi
+            echo "apt-get attempt ${i} failed; retrying."
+            sleep 5
+          done
+          # Ubuntu 24.04 lets AppArmor deny the unprivileged user namespaces
+          # bwrap needs. The hosted runner is thrown away after this job.
+          if [ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+          if ! bwrap --ro-bind / / --unshare-all true; then
+            echo "::error::bubblewrap is installed but cannot isolate a process on this runner; Claude Code would refuse to start."
+            exit 1
+          fi
       - uses: anthropics/claude-code-action@c0949c50a78c1ec8ce2647db36629b870e715d0c # v1.0.268
         id: analyze
         if: steps.credentials.outputs.ready == 'true'
