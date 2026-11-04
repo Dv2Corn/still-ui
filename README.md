@@ -123,6 +123,17 @@ systemctl enable --now x-ui
 
 This was tested with a 3x-ui v3.11.0 database. A database from a newer 3x-ui release may not open in still-ui.
 
+## Check your panel
+
+[xui-doctor](https://github.com/Dv2Corn/xui-doctor) is a small read-only checker for still-ui and 3x-ui. It looks at the Xray core version, REALITY and TLS settings, open ports, clients and panel security, and prints what to fix. It changes nothing on the server.
+
+```bash
+go install github.com/Dv2Corn/xui-doctor/cmd/xui-doctor@latest
+XUI_API_TOKEN=<token> xui-doctor check --url https://<server>:<port>/<base path>/
+```
+
+Exit code 0 means no problems, 1 means warnings, 2 means something critical. Add `--json` for scripts.
+
 ## Donate
 
 If still-ui saves you time, you can support its development:
