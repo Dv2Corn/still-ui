@@ -625,9 +625,10 @@ Xray and checks the pinned sums), `cleanup_caches.yml`, `claude-pr-review.yml` (
 only - it changes no code), `claude-issue-analyst.yml` (issue triage). A maintainer re-runs
 them with a comment starting `@claude review` on a PR or `@claude analyze` on an issue.
 Runs that someone other than a maintainer starts (a new issue, the reporter's reply, a fork's
-PR) pass a quota gate first (`.github/scripts/claude_gate.py`): 2 per author and 15 in all per
-24 h across both workflows, one at a time, with fewer turns. A run over a limit is skipped
-quietly; maintainer requests are never limited.
+PR) pass a quota gate first (`.github/scripts/claude_gate.py`): 2 model runs per author and
+15 in all per 24 h across both workflows, at most 2 at once, with fewer turns; runs that spent
+nothing do not count. A run over a limit is skipped quietly; maintainer requests are never
+limited. The gate reads earlier runs by their `run-name:` title, so keep that format in sync.
 
 ---
 

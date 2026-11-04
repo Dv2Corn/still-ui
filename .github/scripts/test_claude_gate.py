@@ -23,203 +23,329 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import claude_gate  # noqa: E402
 
 REPO = "owner/repo"
-WORKFLOWS = ["claude-issue-analyst.yml", "claude-pr-review.yml"]
+WORKFLOWS = {"analyst": "claude-issue-analyst.yml", "review": "claude-pr-review.yml"}
+FILE = {v: k for k, v in WORKFLOWS.items()}
+MODEL = {"analyst": "analyze", "review": "review"}
 MODEL_JOBS = ["analyze", "review"]
 NOW = dt.datetime(2026, 11, 5, 12, 0, tzinfo=dt.timezone.utc)
-CURRENT = 1000
 
 
-def issue_event(login="stranger", association="NONE"):
-    return {"action": "opened", "issue": {"number": 7, "user": {"login": login}, "author_association": association}}
+def issue_event(login="stranger", association="NONE", number=7):
+    return {"action": "opened", "issue": {"number": number, "user": {"login": login}, "author_association": association}}
 
 
-def pr_event(login="stranger", association="FIRST_TIME_CONTRIBUTOR"):
-    return {"action": "opened", "pull_request": {"number": 8, "user": {"login": login}, "author_association": association}}
+def pr_event(login="stranger", association="FIRST_TIME_CONTRIBUTOR", number=8):
+    return {"action": "opened", "pull_request": {"number": number, "user": {"login": login}, "author_association": association}}
 
 
-def comment_event(login, association, issue_author="stranger"):
+def comment_event(login, association, number=7, issue_author="stranger"):
     return {
         "action": "created",
-        "issue": {"number": 7, "user": {"login": issue_author}, "author_association": "NONE"},
+        "issue": {"number": number, "user": {"login": issue_author}, "author_association": "NONE"},
         "comment": {"user": {"login": login}, "author_association": association},
     }
 
 
-class FakeAPI:
-    """Serves workflow runs and their jobs; records every path asked for."""
+def title(kind, number, login=None):
+    who = f"outsider {login}" if login else "maintainer"
+    return f"Claude {kind} #{number} ({who})"
 
-    def __init__(self, runs_by_workflow=None, jobs_by_run=None, fail=False):
-        self.runs = runs_by_workflow or {}
-        self.jobs = jobs_by_run or {}
+
+class FakeAPI:
+    """Workflow runs and their jobs, served like the REST API; records every GET."""
+
+    def __init__(self, fail=False):
+        self.runs: dict[str, list[dict]] = {wf: [] for wf in WORKFLOWS.values()}
+        self.jobs: dict[int, list[dict]] = {}
         self.fail = fail
         self.calls: list[str] = []
+        self.next_id = 100
 
+    # -- building state ------------------------------------------------------
+    def add(self, kind, number, login, state="spent", status="completed", run_id=None, display=None, jobs=None):
+        """state: spent | refused (gate ran, model skipped) | skipped (whole run) |
+        cancelled-early (model cancelled before it started) | active | unlisted."""
+        run_id = run_id or self.next_id
+        self.next_id = max(self.next_id, run_id) + 1
+        conclusion = None if status != "completed" else ("skipped" if state == "skipped" else "success")
+        run = {
+            "id": run_id,
+            "status": status,
+            "conclusion": conclusion,
+            "display_title": display if display is not None else title(kind, number, login),
+            "actor": {"login": login or "Dv2Corn"},
+        }
+        self.runs[WORKFLOWS[kind]].append(run)
+        model = MODEL[kind]
+        if jobs is not None:
+            self.jobs[run_id] = jobs
+        elif state == "skipped":
+            self.jobs[run_id] = [{"name": "gate", "status": "completed", "conclusion": "skipped"}]
+        elif state == "spent":
+            self.jobs[run_id] = [
+                {"name": "gate", "status": "completed", "conclusion": "success"},
+                {"name": model, "status": "completed", "conclusion": "success", "steps": [{"name": "Set up job"}]},
+            ]
+        elif state == "refused":
+            self.jobs[run_id] = [
+                {"name": "gate", "status": "completed", "conclusion": "success"},
+                {"name": model, "status": "completed", "conclusion": "skipped", "steps": []},
+            ]
+        elif state == "cancelled-early":
+            self.jobs[run_id] = [
+                {"name": "gate", "status": "completed", "conclusion": "success"},
+                {"name": model, "status": "completed", "conclusion": "cancelled", "steps": []},
+            ]
+        elif state == "active":
+            self.jobs[run_id] = [
+                {"name": "gate", "status": "completed", "conclusion": "success"},
+                {"name": model, "status": "queued", "conclusion": None},
+            ]
+        elif state == "unlisted":
+            self.jobs[run_id] = []
+        return run_id
+
+    # -- serving -------------------------------------------------------------
     def __call__(self, path: str) -> dict:
         self.calls.append(path)
         if self.fail:
             raise urllib.error.URLError("boom")
-        if "/actions/workflows/" in path:
-            wf = path.split("/actions/workflows/")[1].split("/")[0]
-            page = int(urllib.parse.parse_qs(urllib.parse.urlsplit(path).query)["page"][0])
-            runs = self.runs.get(wf, [])
-            return {"workflow_runs": runs[(page - 1) * 100 : page * 100]}
-        run_id = int(path.split("/actions/runs/")[1].split("/")[0])
+        parts = urllib.parse.urlsplit(path)
+        q = urllib.parse.parse_qs(parts.query)
+        if "/actions/workflows/" in parts.path:
+            wf = parts.path.split("/actions/workflows/")[1].split("/")[0]
+            runs = sorted(self.runs[wf], key=lambda r: -r["id"])  # newest first, like GitHub
+            if "status" in q:
+                st = q["status"][0]
+                runs = [r for r in runs if r["status"] == st or r["conclusion"] == st]
+            runs = runs[: claude_gate.LIST_LIMIT]  # GitHub's ceiling with created=
+            page, per = int(q["page"][0]), int(q["per_page"][0])
+            return {"total_count": len(self.runs[wf]) if "status" not in q else len(runs), "workflow_runs": runs[(page - 1) * per : page * per]}
+        run_id = int(parts.path.split("/actions/runs/")[1].split("/")[0])
         return {"jobs": self.jobs.get(run_id, [])}
 
-
-def finished_outsider_run(run_id, login, model="analyze", model_conclusion="success"):
-    run = {"id": run_id, "status": "completed", "conclusion": "success", "actor": {"login": login}}
-    jobs = [
-        {"name": f"gate (outsider {login})", "status": "completed", "conclusion": "success"},
-        {"name": model, "status": "completed", "conclusion": model_conclusion},
-        {"name": "post", "status": "completed", "conclusion": "success"},
-    ]
-    return run, jobs
+    def job_lookups(self):
+        return [c for c in self.calls if c.endswith("jobs?per_page=100")]
 
 
-def build(*entries):
-    """entries: (workflow, run, jobs) -> FakeAPI."""
-    runs, jobs = {}, {}
-    for wf, run, run_jobs in entries:
-        runs.setdefault(wf, []).append(run)
-        jobs[run["id"]] = run_jobs
-    return FakeAPI(runs, jobs)
-
-
-def decide(event, api, run_id=CURRENT, limits=None):
-    return claude_gate.decide(event, api, REPO, run_id, WORKFLOWS, MODEL_JOBS, limits or claude_gate.Limits(), now=NOW)
+def decide(event, api, run_id=None, kind=None, limits=None):
+    kind = kind or ("review" if "pull_request" in event else "analyst")
+    run_id = run_id or api.next_id + 1000
+    return claude_gate.decide(
+        event, api, REPO, run_id, kind, WORKFLOWS, MODEL_JOBS, limits or claude_gate.Limits(), now=NOW, retry_delay=0
+    )
 
 
 class GateTest(unittest.TestCase):
+    # -- the basic decisions ---------------------------------------------------
     def test_under_quota_runs(self):
-        run, jobs = finished_outsider_run(10, "stranger")
-        d = decide(issue_event(), build((WORKFLOWS[0], run, jobs)))
+        api = FakeAPI()
+        api.add("analyst", 1, "stranger")
+        d = decide(issue_event(), api)
         self.assertTrue(d.run)
         self.assertTrue(d.outsider)
         self.assertEqual(d.reason, "under-quota")
         self.assertEqual(d.counts["author"], 1)
 
     def test_at_author_quota_skips_across_both_workflows(self):
-        a, aj = finished_outsider_run(10, "stranger", "analyze")
-        b, bj = finished_outsider_run(11, "Stranger", "review")  # logins are case-insensitive
-        d = decide(pr_event(), build((WORKFLOWS[0], a, aj), (WORKFLOWS[1], b, bj)))
+        api = FakeAPI()
+        api.add("analyst", 1, "stranger")
+        api.add("review", 2, "Stranger")  # logins are case-insensitive
+        d = decide(pr_event(), api)
         self.assertFalse(d.run)
         self.assertEqual(d.reason, "author-quota")
-        self.assertEqual(d.counts["author"], 2)
 
     def test_reporter_reply_counts_as_outsider(self):
-        a, aj = finished_outsider_run(10, "stranger")
-        b, bj = finished_outsider_run(11, "stranger")
-        d = decide(comment_event("stranger", "NONE"), build((WORKFLOWS[0], a, aj), (WORKFLOWS[0], b, bj)))
+        api = FakeAPI()
+        api.add("analyst", 1, "stranger")
+        api.add("analyst", 2, "stranger")
+        d = decide(comment_event("stranger", "NONE"), api)
         self.assertFalse(d.run)
         self.assertEqual(d.reason, "author-quota")
 
     def test_maintainer_runs_without_api_calls(self):
-        a, aj = finished_outsider_run(10, "Dv2Corn")
-        b, bj = finished_outsider_run(11, "Dv2Corn")
         for event in (
             comment_event("Dv2Corn", "OWNER"),  # @claude analyze / @claude review
             comment_event("helper", "COLLABORATOR"),
             issue_event("Dv2Corn", "OWNER"),
             pr_event("member", "MEMBER"),
         ):
-            api = build((WORKFLOWS[0], a, aj), (WORKFLOWS[0], b, bj))
+            api = FakeAPI()
+            api.add("analyst", 1, "Dv2Corn")
             d = decide(event, api)
             self.assertTrue(d.run, event)
             self.assertFalse(d.outsider)
             self.assertEqual(api.calls, [])
 
     def test_repository_cap_skips(self):
-        entries = []
+        api = FakeAPI()
         for i in range(15):
-            run, jobs = finished_outsider_run(100 + i, f"user{i}")
-            entries.append((WORKFLOWS[i % 2], run, jobs))
-        d = decide(issue_event("newcomer"), build(*entries))
+            api.add(["analyst", "review"][i % 2], i, f"user{i}")
+        d = decide(issue_event("newcomer"), api)
         self.assertFalse(d.run)
         self.assertEqual(d.reason, "repository-cap")
-        self.assertEqual(d.counts["repository"], 15)
 
     def test_below_repository_cap_runs(self):
-        entries = []
+        api = FakeAPI()
         for i in range(14):
-            run, jobs = finished_outsider_run(100 + i, f"user{i}")
-            entries.append((WORKFLOWS[0], run, jobs))
-        self.assertTrue(decide(issue_event("newcomer"), build(*entries)).run)
-
-    def test_maintainer_and_skipped_runs_do_not_count(self):
-        maint = {"id": 20, "status": "completed", "conclusion": "success", "actor": {"login": "Dv2Corn"}}
-        maint_jobs = [
-            {"name": "gate (maintainer)", "status": "completed", "conclusion": "success"},
-            {"name": "review", "status": "completed", "conclusion": "success"},
-        ]
-        refused, refused_jobs = finished_outsider_run(21, "stranger", "analyze", "skipped")  # gate said no
-        filtered = {"id": 22, "status": "completed", "conclusion": "success", "actor": {"login": "stranger"}}
-        filtered_jobs = [{"name": "gate (outsider stranger)", "status": "completed", "conclusion": "skipped"}]
-        all_skipped = {"id": 23, "status": "completed", "conclusion": "skipped", "actor": {"login": "stranger"}}
-        api = build(
-            (WORKFLOWS[1], maint, maint_jobs),
-            (WORKFLOWS[0], refused, refused_jobs),
-            (WORKFLOWS[0], filtered, filtered_jobs),
-            (WORKFLOWS[0], all_skipped, []),
-        )
-        d = decide(issue_event(), api)
-        self.assertTrue(d.run)
-        self.assertEqual(d.counts, {"author": 0, "repository": 0, "in_flight": 0})
-        self.assertFalse(any("/runs/23/jobs" in c for c in api.calls), "a skipped run needs no job lookup")
-
-    def test_later_and_current_runs_are_ignored(self):
-        a, aj = finished_outsider_run(CURRENT, "stranger")
-        b, bj = finished_outsider_run(CURRENT + 5, "stranger")
-        self.assertTrue(decide(issue_event(), build((WORKFLOWS[0], a, aj), (WORKFLOWS[0], b, bj))).run)
-
-    def test_runs_in_flight_count_and_cap_concurrency(self):
-        pending = {"id": 30, "status": "in_progress", "conclusion": None, "actor": {"login": "x"}}
-        pending_jobs = [
-            {"name": "gate (outsider x)", "status": "completed", "conclusion": "success"},
-            {"name": "analyze", "status": "queued", "conclusion": None},
-        ]
-        brand_new = {"id": 31, "status": "queued", "conclusion": None, "actor": {"login": "y"}}
-        d = decide(pr_event("z"), build((WORKFLOWS[0], pending, pending_jobs), (WORKFLOWS[1], brand_new, [])))
-        self.assertFalse(d.run)
-        self.assertEqual(d.reason, "busy")
-        self.assertEqual(d.counts["in_flight"], 2)
-
-    def test_unlisted_gate_counts_against_its_actor(self):
-        brand_new = {"id": 31, "status": "queued", "conclusion": None, "triggering_actor": {"login": "stranger"}}
-        a, aj = finished_outsider_run(10, "stranger")
-        d = decide(issue_event(), build((WORKFLOWS[0], brand_new, []), (WORKFLOWS[0], a, aj)))
-        self.assertFalse(d.run)
-        self.assertEqual(d.reason, "author-quota")
+            api.add("analyst", i, f"user{i}")
+        self.assertTrue(decide(issue_event("newcomer"), api).run)
 
     def test_api_error_fails_closed(self):
         d = decide(issue_event(), FakeAPI(fail=True))
         self.assertFalse(d.run)
         self.assertTrue(d.reason.startswith("api-error"))
 
-    def test_too_many_runs_fails_closed(self):
-        entries = []
-        for i in range(claude_gate.MAX_JOB_LOOKUPS + 1):
-            run = {"id": 100 + i, "status": "completed", "conclusion": "success", "actor": {"login": "u"}}
-            entries.append((WORKFLOWS[0], run, []))
-        d = decide(issue_event(), build(*entries))
+    def test_api_error_in_a_job_lookup_fails_closed(self):
+        api = FakeAPI()
+        api.add("analyst", 1, "someone")
+        real = api.__call__
+
+        def flaky(path):
+            if "/jobs" in path:
+                raise urllib.error.HTTPError(path, 502, "Bad Gateway", {}, None)
+            return real(path)
+
+        d = claude_gate.decide(issue_event(), flaky, REPO, 10_000, "analyst", WORKFLOWS, MODEL_JOBS, claude_gate.Limits(), now=NOW, retry_delay=0)
         self.assertFalse(d.run)
         self.assertTrue(d.reason.startswith("api-error"))
 
-    def test_window_and_pagination(self):
-        entries = []
-        for i in range(150):
-            run = {"id": 100 + i, "status": "completed", "conclusion": "skipped", "actor": {"login": "u"}}
-            entries.append((WORKFLOWS[0], run, []))
-        api = build(*entries)
-        self.assertTrue(decide(issue_event(), api).run)
-        listed = [c for c in api.calls if "/actions/workflows/" in c]
-        self.assertIn("created=%3E%3D2026-11-04T12%3A00%3A00Z", listed[0])
-        self.assertEqual(len([c for c in listed if WORKFLOWS[0] in c]), 2)
+    # -- runs that spent nothing never count -----------------------------------
+    def test_200_comment_runs_that_spent_nothing_do_not_block_an_outsider(self):
+        api = FakeAPI()
+        for i in range(100):  # every comment triggers both workflows
+            api.add("analyst", i, f"chatter{i % 7}", state="skipped")
+            api.add("review", i, f"chatter{i % 7}", state="skipped")
+        d = decide(issue_event("newcomer"), api)
+        self.assertTrue(d.run)
+        self.assertEqual(d.reason, "under-quota")
+        self.assertEqual(api.job_lookups(), [], "a wholly skipped run needs no job lookup")
 
+    def test_refused_and_cancelled_before_start_do_not_count(self):
+        api = FakeAPI()
+        for _ in range(5):
+            api.add("analyst", 1, "stranger", state="refused")
+            api.add("review", 2, "stranger", state="cancelled-early")
+        api.add("review", 3, None)  # a maintainer's finished run
+        d = decide(issue_event(), api)
+        self.assertTrue(d.run)
+        self.assertEqual(d.counts["author"], 0)
+        self.assertEqual(d.counts["repository"], 0)
+
+    def test_61_issues_from_one_author(self):
+        """Replays 61 issues one by one: the author gets 2 runs, then only
+        refusals, the refusals do not pile up into a ceiling, and the next
+        outsider still gets a run."""
+        api = FakeAPI()
+        allowed = 0
+        for n in range(1, 62):
+            run_id = api.next_id
+            d = decide(issue_event("flooder", number=n), api, run_id=run_id)
+            allowed += d.run
+            api.add("analyst", n, "flooder", state="spent" if d.run else "refused", run_id=run_id)
+        self.assertEqual(allowed, 2)
+        api.calls.clear()
+        d = decide(issue_event("someone-else", number=99), api)
+        self.assertTrue(d.run)
+        self.assertEqual(d.reason, "under-quota")
+        # Only the flooder's two spending runs needed a look at their jobs.
+        self.assertEqual(len(api.job_lookups()), 2)
+
+    def test_listing_past_github_limit_falls_back_to_status_queries(self):
+        api = FakeAPI()
+        api.add("analyst", 1, "stranger")
+        api.add("analyst", 2, "stranger")
+        for i in range(1100):  # pushes the two spending runs past the 1000-run ceiling
+            api.add("analyst", 3, "chatter", state="skipped")
+        d = decide(issue_event(), api)
+        self.assertFalse(d.run)
+        self.assertEqual(d.reason, "author-quota")
+        self.assertTrue(any("status=success" in c for c in api.calls))
+
+    # -- runs in flight -----------------------------------------------------------
+    def test_two_outsider_runs_in_flight_are_busy(self):
+        api = FakeAPI()
+        api.add("analyst", 1, "x", state="active", status="in_progress")
+        api.add("review", 2, "y", state="active", status="in_progress")
+        d = decide(issue_event("z", number=3), api)
+        self.assertFalse(d.run)
+        self.assertEqual(d.reason, "busy")
+
+    def test_in_flight_comment_run_that_will_skip_does_not_count(self):
+        api = FakeAPI()
+        for i in range(5):
+            api.add("analyst", i, "chatter", state="skipped", status="in_progress")
+        self.assertTrue(decide(issue_event("z", number=3), api).run)
+
+    def test_unlisted_jobs_charge_the_author_not_the_repository(self):
+        api = FakeAPI()
+        api.add("analyst", 1, "stranger")
+        api.add("analyst", 2, "stranger", state="unlisted", status="queued")
+        d = decide(issue_event(number=5), api)
+        self.assertFalse(d.run)
+        self.assertEqual(d.reason, "author-quota")
+        for i in range(5):
+            api.add("analyst", 10 + i, f"chatter{i}", state="unlisted", status="queued")
+        d = decide(issue_event("newcomer", number=20), api)
+        self.assertTrue(d.run)
+        self.assertEqual(d.counts["repository"], 1)
+
+    # -- the per-item concurrency group ---------------------------------------
+    def test_outsider_never_queues_third_on_an_item(self):
+        api = FakeAPI()
+        api.add("analyst", 7, None, state="active", status="in_progress")  # a maintainer's run
+        api.add("analyst", 7, "stranger", state="active", status="in_progress")
+        d = decide(comment_event("stranger", "NONE", number=7), api)
+        self.assertFalse(d.run)
+        self.assertIn(d.reason, ("item-busy", "busy"))
+        api2 = FakeAPI()
+        api2.add("analyst", 7, None, state="active", status="in_progress")
+        api2.add("analyst", 7, None, state="active", status="in_progress")
+        d = decide(comment_event("stranger", "NONE", number=7), api2)
+        self.assertFalse(d.run)
+        self.assertEqual(d.reason, "item-busy")
+        self.assertEqual(api2.job_lookups(), [], "a maintainer's run is never looked up")
+
+    def test_one_run_on_the_item_still_lets_an_outsider_queue(self):
+        api = FakeAPI()
+        api.add("analyst", 7, None, state="active", status="in_progress")
+        self.assertTrue(decide(comment_event("stranger", "NONE", number=7), api).run)
+
+    def test_same_number_in_the_other_workflow_is_another_item(self):
+        api = FakeAPI()
+        api.add("review", 7, None, state="active", status="in_progress")
+        api.add("review", 7, None, state="active", status="in_progress")
+        self.assertTrue(decide(issue_event(number=7), api).run)
+
+    def test_outsider_yields_to_a_later_maintainer_run_on_the_item(self):
+        api = FakeAPI()
+        mine = api.next_id
+        api.next_id += 1
+        api.add("analyst", 7, None, state="active", status="queued", run_id=mine + 1)
+        d = decide(comment_event("stranger", "NONE", number=7), api, run_id=mine)
+        self.assertFalse(d.run)
+        self.assertEqual(d.reason, "item-busy")
+
+    def test_later_outsider_runs_are_ignored(self):
+        api = FakeAPI()
+        mine = api.next_id
+        api.next_id += 1
+        api.add("analyst", 1, "stranger", run_id=mine + 1)
+        api.add("analyst", 2, "stranger", run_id=mine + 2)
+        self.assertTrue(decide(issue_event(), api, run_id=mine).run)
+
+    def test_runs_from_before_the_gate_are_ignored(self):
+        api = FakeAPI()
+        api.add("review", 1, "x", display="docs: something")
+        api.add("review", 2, "x", display="fix: another")
+        self.assertTrue(decide(pr_event("x"), api).run)
+        self.assertEqual(api.job_lookups(), [])
+
+    # -- plumbing -------------------------------------------------------------------
     def test_main_writes_outputs_and_stays_green(self):
-        a, aj = finished_outsider_run(10, "stranger")
-        b, bj = finished_outsider_run(11, "stranger")
-        api = build((WORKFLOWS[0], a, aj), (WORKFLOWS[1], b, bj))
+        api = FakeAPI()
+        api.add("analyst", 1, "stranger")
+        api.add("review", 2, "stranger")
         with tempfile.TemporaryDirectory() as tmp:
             event_path = Path(tmp, "event.json")
             event_path.write_text(json.dumps(issue_event()))
@@ -229,9 +355,10 @@ class GateTest(unittest.TestCase):
                 "GITHUB_OUTPUT": str(out),
                 "GITHUB_STEP_SUMMARY": str(summary),
                 "GITHUB_REPOSITORY": REPO,
-                "GITHUB_RUN_ID": str(CURRENT),
-                "WORKFLOWS": ",".join(WORKFLOWS),
-                "MODEL_JOBS": ",".join(MODEL_JOBS),
+                "GITHUB_RUN_ID": "100000",
+                "KIND": "analyst",
+                "WORKFLOWS": "analyst=claude-issue-analyst.yml,review=claude-pr-review.yml",
+                "MODEL_JOBS": "analyze,review",
             }
             with mock.patch.dict(os.environ, env), mock.patch.object(claude_gate, "github_fetch", lambda *_: api):
                 buf = io.StringIO()
@@ -242,11 +369,24 @@ class GateTest(unittest.TestCase):
             self.assertIn("::notice::No automatic Claude run", buf.getvalue())
             self.assertIn("already had 2 automatic Claude runs", summary.read_text())
 
-    def test_gate_name_pattern_matches_workflow_names(self):
-        self.assertIsNone(claude_gate.GATE_NAME.match("gate (outsider )"))
-        self.assertEqual(claude_gate.GATE_NAME.match("gate (outsider a-b1)").group("login"), "a-b1")
-        self.assertIsNone(claude_gate.GATE_NAME.match("gate (maintainer)").group("login"))
-        self.assertIsNone(claude_gate.GATE_NAME.match("gate (outsider x) extra"))
+    def test_title_pattern(self):
+        t = claude_gate.TITLE
+        self.assertEqual(t.match("Claude analyst #12 (outsider a-b1)").group("login"), "a-b1")
+        self.assertEqual(t.match("Claude review #3 (outsider renovate[bot])").group("login"), "renovate[bot]")
+        self.assertIsNone(t.match("Claude review #3 (maintainer)").group("login"))
+        for bad in ("Claude analyst #12 (outsider )", "Claude analyst #12 (outsider x) y", "Claude other #1 (maintainer)", "x Claude analyst #1 (maintainer)"):
+            self.assertIsNone(t.match(bad), bad)
+
+    def test_workflow_titles_match_the_pattern(self):
+        """The `run-name:` of both workflows, rendered for each kind of author, parses."""
+        root = Path(__file__).resolve().parents[1] / "workflows"
+        for wf, kind in FILE.items():
+            text = (root / wf).read_text()
+            self.assertIn(f"Claude {kind} #${{{{", text)
+            line = next(ln for ln in text.splitlines() if ln.strip().startswith("(${{ contains(fromJSON("))
+            self.assertIn("&& 'maintainer' || format('outsider {0}'", line)
+            self.assertIn("github.event.comment.author_association || github.event.pull_request.author_association || github.event.issue.author_association", line)
+            self.assertIn("github.event.comment.user.login || github.event.pull_request.user.login || github.event.issue.user.login", line)
 
 
 if __name__ == "__main__":

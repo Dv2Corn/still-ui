@@ -1,4 +1,9 @@
 name: Claude PR Review
+# The gate reads earlier runs by this title: keep the format the same in both
+# Claude workflows and in .github/scripts/claude_gate.py (TITLE).
+run-name: >-
+  Claude review #${{ github.event.pull_request.number || github.event.issue.number }}
+  (${{ contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association || github.event.pull_request.author_association || github.event.issue.author_association) && 'maintainer' || format('outsider {0}', github.event.comment.user.login || github.event.pull_request.user.login || github.event.issue.user.login) }})
 
 on:
   issue_comment:
@@ -13,14 +18,15 @@ jobs:
   # Holds no Claude secret, only a read-only token. A fork's pull request
   # spends the owner's subscription with no maintainer in the loop, so a run
   # for a pull request whose author is not a maintainer is capped here: 2
-  # automatic runs per author and 15 for all outsiders in 24 h across this
-  # workflow and claude-issue-analyst.yml, and 2 running or waiting at once.
-  # A run over a limit ends here, green, and posts nothing; `@claude review`
-  # from a maintainer is never limited. The job name is what the next gate
-  # reads to tell outsider runs from maintainer runs, so keep it identical in
-  # both workflows.
+  # model runs per author and 15 for all outsiders in 24 h across this
+  # workflow and claude-issue-analyst.yml, 2 running or waiting at once, and
+  # none queued where it could cancel a maintainer's waiting run. Only runs
+  # whose model job started count. A run over a limit ends here, green, and
+  # posts nothing; `@claude review` from a maintainer is never limited. This
+  # `if:` is the relevance check: any other comment leaves a wholly skipped
+  # run, which the gate ignores for free.
   gate:
-    name: gate (${{ contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association || github.event.pull_request.author_association || github.event.issue.author_association) && 'maintainer' || format('outsider {0}', github.event.comment.user.login || github.event.pull_request.user.login || github.event.issue.user.login) }})
+    name: gate
     if: >-
       (github.event_name == 'pull_request_target'
        && github.event.pull_request.user.type != 'Bot'
@@ -48,7 +54,8 @@ jobs:
         id: quota
         env:
           GH_TOKEN: ${{ github.token }}
-          WORKFLOWS: claude-issue-analyst.yml,claude-pr-review.yml
+          KIND: review
+          WORKFLOWS: analyst=claude-issue-analyst.yml,review=claude-pr-review.yml
           MODEL_JOBS: analyze,review
         run: python3 .github/scripts/claude_gate.py
 
@@ -127,10 +134,12 @@ jobs:
     if: needs.prepare.outputs.done != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    # Outsider runs of both Claude workflows share one group, so they run one
-    # at a time; a maintainer's run keeps a group of its own pull request.
+    # Every run of one pull request queues in one group. A group keeps one
+    # pending run and the newest arrival cancels it; the gate never lets an
+    # outsider run be that arrival over a maintainer's, and caps outsider runs
+    # across pull requests.
     concurrency:
-      group: ${{ needs.gate.outputs.outsider == 'true' && 'claude-outsider' || format('claude-review-{0}', github.event.pull_request.number || github.event.issue.number) }}
+      group: claude-review-${{ github.event.pull_request.number || github.event.issue.number }}
       cancel-in-progress: false
     # The Claude secrets live in this environment, not at repository level.
     environment: claude

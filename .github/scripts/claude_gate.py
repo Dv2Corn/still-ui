@@ -6,28 +6,37 @@ The Claude workflows spend the owner's subscription. An issue, a reply under
 maintainer starts a run with no maintainer in the loop, so those runs are
 capped here, in a job that holds no Claude secret and only a read-only token:
 
-- each outsider gets at most PER_AUTHOR automatic runs in WINDOW_HOURS,
-  across every workflow in WORKFLOWS;
-- all outsiders together get at most REPO_CAP runs in that window;
-- at most IN_FLIGHT_CAP outsider runs are running or waiting at once (one
-  running, one pending: a GitHub concurrency group keeps no longer queue).
+- each outsider gets at most PER_AUTHOR model runs in WINDOW_HOURS, across
+  both Claude workflows;
+- all outsiders together get at most REPO_CAP model runs in that window;
+- at most IN_FLIGHT_CAP outsider model runs are running or waiting at once;
+- an outsider run never queues behind two runs of the same issue or pull
+  request, nor behind a maintainer's run created after it: the per-item
+  concurrency group keeps one pending run, and the newest arrival cancels it,
+  so this keeps an outsider from cancelling a maintainer's waiting run.
 
 Maintainers (OWNER, MEMBER, COLLABORATOR) are never limited, and neither is
 an `@claude review` / `@claude analyze` request, which only they can make.
 
-Earlier runs are classified by the name of their gate job, which the
-workflows set from the event: `gate (maintainer)` or `gate (outsider LOGIN)`.
-Only runs created before this one count, so two gates started at the same
-moment cannot both take the last slot. Anything that cannot be classified
-counts as an outsider run, and an API error refuses the run: the gate fails
-closed and still exits 0, so the workflow stays green.
+Only a run whose model job started counts. Runs that spent nothing never use
+up anything: a comment that triggered nothing (the whole run is `skipped`),
+a run the gate refused (its model job is `skipped`), a model job cancelled
+before it started. Earlier runs are classified by their title, which both
+workflows set with `run-name:` from the event:
+`Claude <analyst|review> #<number> (maintainer|outsider <login>)`.
+Their jobs are looked up only where the title cannot settle it, and never
+for an author who already used up the quota, or once the repository cap is
+reached: from then on every later outsider run was refused.
+
+Only an API error refuses a run without a count (fail closed); the script
+still exits 0, so the workflow stays green.
 
 Environment: GH_TOKEN, GITHUB_REPOSITORY, GITHUB_RUN_ID, GITHUB_EVENT_PATH,
-GITHUB_OUTPUT (optional), GITHUB_API_URL (optional), WORKFLOWS (comma list of
-workflow file names), MODEL_JOBS (comma list of the job names that run the
-model). The limits can be overridden with PER_AUTHOR, REPO_CAP,
-IN_FLIGHT_CAP and WINDOW_HOURS. `--dry-run` prints the decision instead of
-writing it to GITHUB_OUTPUT.
+GITHUB_OUTPUT and GITHUB_STEP_SUMMARY (optional), GITHUB_API_URL (optional),
+KIND (`analyst` or `review`: this workflow), WORKFLOWS (`kind=file` pairs,
+comma separated), MODEL_JOBS (the model job names, comma separated). The
+limits can be overridden with PER_AUTHOR, REPO_CAP, IN_FLIGHT_CAP and
+WINDOW_HOURS. `--dry-run` prints the decision without writing outputs.
 """
 
 from __future__ import annotations
@@ -37,23 +46,27 @@ import json
 import os
 import re
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections import Counter
 from dataclasses import dataclass, field
-from typing import Callable, Iterable
+from typing import Callable
 
 MAINTAINERS = frozenset({"OWNER", "MEMBER", "COLLABORATOR"})
-GATE_NAME = re.compile(r"^gate \((?:maintainer|outsider (?P<login>[A-Za-z0-9-]{1,39}))\)$")
-
-# Hard ceilings on the API calls one gate makes. Beyond them the window is
-# busier than any honest day on this repository, so the run is refused.
-MAX_RUNS_LISTED = 300
-MAX_JOB_LOOKUPS = 60
-
-
-class GateError(Exception):
-    """The GitHub API could not answer; the caller refuses the run."""
+TITLE = re.compile(
+    r"^Claude (?P<kind>analyst|review) #(?P<number>[0-9]{1,10}) "
+    r"\((?:maintainer|outsider (?P<login>[A-Za-z0-9-]{1,39}(?:\[bot\])?))\)$"
+)
+# GitHub returns at most 1000 runs for a query with `created=`. Past that the
+# listing switches to one query per status that is not `skipped`, so a flood
+# of comments that triggered nothing cannot hide the runs that spent.
+LIST_LIMIT = 1000
+SPENDING_STATUSES = (
+    "queued", "requested", "waiting", "pending", "in_progress",
+    "success", "failure", "cancelled", "timed_out",
+)
 
 
 @dataclass
@@ -73,12 +86,14 @@ class Decision:
     counts: dict = field(default_factory=dict)
 
 
+Fetch = Callable[[str], dict]
+
+
 def event_author(event: dict) -> tuple[str, str]:
     """(login, author_association) of whoever the run acts for.
 
-    The order matches the workflows' gate job name: a comment first (a
-    reporter's reply or a maintainer's request), then the pull request, then
-    the issue.
+    The order matches the workflows' `run-name:`: a comment first (a reporter's
+    reply or a maintainer's request), then the pull request, then the issue.
     """
     for key in ("comment", "pull_request", "issue"):
         obj = event.get(key)
@@ -87,56 +102,62 @@ def event_author(event: dict) -> tuple[str, str]:
     return "", ""
 
 
-Fetch = Callable[[str], dict]
+def event_number(event: dict) -> str:
+    for key in ("pull_request", "issue"):
+        obj = event.get(key)
+        if isinstance(obj, dict) and obj.get("number") is not None:
+            return str(obj["number"])
+    return ""
 
 
-def list_runs(fetch: Fetch, repo: str, workflows: Iterable[str], since: str) -> list[dict]:
+def _list(fetch: Fetch, base: str) -> tuple[list[dict], bool]:
+    """Every run of one query, and whether GitHub held some back."""
     runs: list[dict] = []
+    page = 1
+    while True:
+        data = fetch(f"{base}&per_page=100&page={page}")
+        batch = data.get("workflow_runs") or []
+        runs.extend(batch)
+        total = int(data.get("total_count", len(runs)))
+        if len(batch) < 100 or len(runs) >= total:
+            return runs, False
+        if len(runs) >= LIST_LIMIT:
+            return runs, True
+        page += 1
+
+
+def list_runs(fetch: Fetch, repo: str, workflow: str, since: str) -> list[dict]:
     created = urllib.parse.quote(f">={since}", safe="")
-    for wf in workflows:
-        page = 1
-        while True:
-            data = fetch(f"/repos/{repo}/actions/workflows/{wf}/runs?per_page=100&page={page}&created={created}")
-            batch = data.get("workflow_runs") or []
-            runs.extend(batch)
-            if len(runs) > MAX_RUNS_LISTED:
-                raise GateError(f"more than {MAX_RUNS_LISTED} Claude workflow runs in the window")
-            if len(batch) < 100:
-                break
-            page += 1
-    return runs
+    base = f"/repos/{repo}/actions/workflows/{workflow}/runs?created={created}"
+    runs, truncated = _list(fetch, base)
+    if not truncated:
+        return runs
+    seen: dict[int, dict] = {}
+    for status in SPENDING_STATUSES:
+        part, more = _list(fetch, f"{base}&status={status}")
+        if more:
+            print(f"::warning::More than {LIST_LIMIT} '{status}' runs of {workflow} in the window; counting the newest.")
+        for run in part:
+            seen[int(run["id"])] = run
+    return list(seen.values())
 
 
-def classify(run: dict, jobs: list[dict], model_jobs: frozenset) -> tuple[bool, str, bool, bool]:
-    """(is_outsider_candidate, login, counts_against_quota, in_flight)."""
-    completed = run.get("status") == "completed"
-    gate = next((j for j in jobs if str(j.get("name", "")).startswith("gate")), None)
-    if gate is None:
-        if completed:
-            return False, "", False, False
-        # A run so new its jobs are not listed yet: count it, conservatively,
-        # as an outsider run by whoever triggered it.
-        login = str((run.get("triggering_actor") or run.get("actor") or {}).get("login") or "")
-        return True, login, True, True
-    if gate.get("conclusion") == "skipped":
-        return False, "", False, False
-    m = GATE_NAME.match(str(gate.get("name", "")))
-    if m and not m.group("login"):
-        return False, "", False, False  # a maintainer's run
-    if m:
-        login = m.group("login")
-    else:
-        login = str((run.get("triggering_actor") or run.get("actor") or {}).get("login") or "")
+def model_state(jobs: list[dict], model_jobs: frozenset, completed: bool) -> str:
+    """'none' (spent nothing), 'active' (running or still to run) or 'spent'."""
+    gate = next((j for j in jobs if j.get("name") == "gate"), None)
+    if gate is not None and gate.get("conclusion") == "skipped":
+        return "none"
     model = next((j for j in jobs if j.get("name") in model_jobs), None)
     if model is None:
-        if completed:
-            return True, login, False, False  # the gate stopped it, or it failed first
-        return True, login, True, True
+        return "none" if completed else "active"
     if model.get("status") != "completed":
-        return True, login, True, True
-    if model.get("conclusion") == "skipped":
-        return True, login, False, False
-    return True, login, True, False
+        return "active"
+    conclusion = model.get("conclusion")
+    if conclusion == "skipped":
+        return "none"
+    if conclusion == "cancelled" and not model.get("steps"):
+        return "none"  # cancelled while it waited for its group
+    return "spent"
 
 
 def decide(
@@ -144,41 +165,95 @@ def decide(
     fetch: Fetch,
     repo: str,
     run_id: int,
-    workflows: list[str],
+    kind: str,
+    workflows: dict[str, str],
     model_jobs: list[str],
     limits: Limits,
     now: dt.datetime | None = None,
+    retry_delay: float = 5.0,
 ) -> Decision:
     login, association = event_author(event)
     if association in MAINTAINERS:
         return Decision(True, False, "maintainer", login)
+    me = login.lower()
+    item = (kind, event_number(event))
     now = now or dt.datetime.now(dt.timezone.utc)
     since = (now - dt.timedelta(hours=limits.window_hours)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    jobs_of = lambda rid: fetch(f"/repos/{repo}/actions/runs/{rid}/jobs?per_page=100").get("jobs") or []  # noqa: E731
+    models = frozenset(model_jobs)
+
+    per_author: Counter = Counter()
+    total = flying = item_active = lookups = 0
+    later_maintainer = False
     try:
-        runs = list_runs(fetch, repo, workflows, since)
-        earlier = [r for r in runs if int(r.get("id", 0)) < run_id and r.get("conclusion") != "skipped"]
-        earlier.sort(key=lambda r: int(r["id"]), reverse=True)
-        if len(earlier) > MAX_JOB_LOOKUPS:
-            raise GateError(f"more than {MAX_JOB_LOOKUPS} active Claude workflow runs in the window")
-        mine = total = flying = 0
-        for run in earlier:
-            jobs = fetch(f"/repos/{repo}/actions/runs/{run['id']}/jobs?per_page=100").get("jobs") or []
-            outsider, who, counted, in_flight = classify(run, jobs, frozenset(model_jobs))
-            if not (outsider and counted):
+        runs: list[dict] = []
+        for wf in workflows.values():
+            runs.extend(list_runs(fetch, repo, wf, since))
+        runs = [r for r in runs if r.get("conclusion") != "skipped" and int(r.get("id", 0)) != run_id]
+        runs.sort(key=lambda r: int(r["id"]))
+        for run in runs:
+            m = TITLE.match(str(run.get("display_title") or ""))
+            completed = run.get("status") == "completed"
+            if int(run["id"]) > run_id:
+                # A maintainer's run on this item created after this one would
+                # be cancelled if this one queued behind it.
+                if m and not m.group("login") and not completed and (m.group("kind"), m.group("number")) == item:
+                    later_maintainer = True
                 continue
+            if m is None:
+                if completed:
+                    continue  # a run from before the gate existed
+                who = str((run.get("triggering_actor") or run.get("actor") or {}).get("login") or "").lower()
+                per_author[who] += 1  # not classifiable yet: charge whoever started it
+                continue
+            run_item = (m.group("kind"), m.group("number"))
+            who = (m.group("login") or "").lower()
+            if not who:
+                # A maintainer's run: never counted, but it holds its item.
+                if not completed and run_item == item:
+                    item_active += 1
+                continue
+            if per_author[who] >= limits.per_author:
+                continue  # the gate refused it: its author was already at the quota
+            if total >= limits.repo_cap:
+                break  # every later outsider run was refused by the cap as well
+            lookups += 1
+            jobs = jobs_of(run["id"])
+            if completed:
+                if model_state(jobs, models, True) == "spent":
+                    per_author[who] += 1
+                    total += 1
+                continue
+            # Still running: it is either about to end having spent nothing, or holds a slot.
+            if not jobs and retry_delay:
+                time.sleep(retry_delay)
+                lookups += 1
+                jobs = jobs_of(run["id"])
+            if not jobs:
+                # Jobs not listed yet: charge the author and the item, not the
+                # repository, so a burst of comments cannot make others wait.
+                per_author[who] += 1
+                if run_item == item:
+                    item_active += 1
+                continue
+            if model_state(jobs, models, False) == "none":
+                continue
+            per_author[who] += 1
             total += 1
-            flying += in_flight
-            if who.lower() == login.lower():
-                mine += 1
-    except (GateError, urllib.error.URLError, OSError, ValueError, KeyError, TypeError) as exc:
+            flying += 1
+            if run_item == item:
+                item_active += 1
+    except (urllib.error.URLError, OSError, ValueError, KeyError, TypeError) as exc:
         return Decision(False, True, f"api-error: {exc}", login)
-    counts = {"author": mine, "repository": total, "in_flight": flying}
-    if mine >= limits.per_author:
+    counts = {"author": per_author[me], "repository": total, "in_flight": flying, "item": item_active, "job_lookups": lookups}
+    if per_author[me] >= limits.per_author:
         return Decision(False, True, "author-quota", login, counts)
     if total >= limits.repo_cap:
         return Decision(False, True, "repository-cap", login, counts)
     if flying >= limits.in_flight:
         return Decision(False, True, "busy", login, counts)
+    if item_active >= 2 or later_maintainer:
+        return Decision(False, True, "item-busy", login, counts)
     return Decision(True, True, "under-quota", login, counts)
 
 
@@ -205,6 +280,15 @@ def env_int(name: str, default: int) -> int:
     return int(value) if value else default
 
 
+def parse_workflows(value: str) -> dict[str, str]:
+    pairs = {}
+    for part in value.split(","):
+        kind, _, wf = part.strip().partition("=")
+        if kind and wf:
+            pairs[kind] = wf
+    return pairs
+
+
 def main(argv: list[str]) -> int:
     dry_run = "--dry-run" in argv
     with open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8") as fh:
@@ -220,7 +304,8 @@ def main(argv: list[str]) -> int:
         github_fetch(os.environ.get("GITHUB_API_URL", "https://api.github.com"), os.environ.get("GH_TOKEN", "")),
         os.environ["GITHUB_REPOSITORY"],
         int(os.environ["GITHUB_RUN_ID"]),
-        [w.strip() for w in os.environ["WORKFLOWS"].split(",") if w.strip()],
+        os.environ["KIND"],
+        parse_workflows(os.environ["WORKFLOWS"]),
         [j.strip() for j in os.environ["MODEL_JOBS"].split(",") if j.strip()],
         limits,
     )
@@ -242,7 +327,8 @@ def main(argv: list[str]) -> int:
             "author-quota": f"its author already had {limits.per_author} automatic Claude runs in {limits.window_hours} h",
             "repository-cap": f"outsiders already had {limits.repo_cap} automatic Claude runs in {limits.window_hours} h",
             "busy": f"{limits.in_flight} outsider Claude runs are already running or waiting",
-        }.get(decision.reason, "the run quota could not be checked, so it was refused")
+            "item-busy": "other Claude runs on this issue or pull request are already running or waiting",
+        }.get(decision.reason, "the GitHub API did not answer, so the run quota could not be checked")
         print(f"::notice::No automatic Claude run: {limit}. A maintainer can still ask for one.")
         step_summary = os.environ.get("GITHUB_STEP_SUMMARY")
         if step_summary:
