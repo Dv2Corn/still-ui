@@ -110,6 +110,50 @@ still-ui uninstall
 > [!WARNING]
 > `still-ui uninstall` also deletes the database in `/etc/still-ui`, just like 3x-ui does. Copy `/etc/still-ui/x-ui.db` somewhere safe first if you might need your inbounds and clients again.
 
+## Verify a release
+
+Release archives are built by GitHub Actions from the tagged commit ([release workflow](.github/workflows/release.yml)), not on a developer's machine, and every archive comes with a signed [build provenance attestation](https://docs.github.com/actions/security-for-github-actions/using-artifact-attestations). Releases up to and including 1.4.0 were built by hand with `scripts/still-release.sh` and have only the `.sha256` files.
+
+| File | What it is |
+| --- | --- |
+| `still-ui-linux-<arch>.tar.gz` | the archive `install.sh` and `still-ui update` download |
+| `still-ui-linux-<arch>.tar.gz.sha256` | its checksum; the installer checks it |
+| `still-ui-linux-<arch>.tar.gz.spdx.json` | SBOM (SPDX): every file in the archive with its sha256, and the Go modules inside `x-ui`, `xray` and `mtg` |
+| `SHA256SUMS` | checksums of the archives and SBOMs |
+
+Download and check the checksums (replace `v1.5.0` with the release you install):
+
+```bash
+gh release download v1.5.0 -R Dv2Corn/still-ui -p 'still-ui-linux-amd64.tar.gz*' -p SHA256SUMS
+sha256sum -c SHA256SUMS --ignore-missing
+```
+
+Check that the archive was built by this repository's release workflow from that tag (needs the [GitHub CLI](https://cli.github.com/)):
+
+```bash
+gh attestation verify still-ui-linux-amd64.tar.gz -R Dv2Corn/still-ui \
+  --signer-workflow Dv2Corn/still-ui/.github/workflows/release.yml --source-ref refs/tags/v1.5.0
+```
+
+The SBOM is attested too:
+
+```bash
+gh attestation verify still-ui-linux-amd64.tar.gz -R Dv2Corn/still-ui --predicate-type https://spdx.dev/Document/v2.3
+```
+
+The Xray core inside the archive can be rebuilt bit for bit. On a Linux host with git and docker:
+
+```bash
+tar -xzf still-ui-linux-amd64.tar.gz still-ui/bin/xray-linux-amd64
+sha256sum still-ui/bin/xray-linux-amd64
+git clone https://github.com/Dv2Corn/still-ui && cd still-ui && git checkout v1.5.0
+scripts/xray-build/build.sh /tmp/xray-out amd64 arm64
+```
+
+`build.sh` prints the sums of the binaries it built and fails if they differ from the ones pinned in it; the sum of `xray-linux-amd64` from the archive must be the same. The [Xray reproducible build](.github/workflows/xray-reproducible.yml) workflow does this on every change to the recipe and once a week, on an x86_64 and an arm64 runner. What the patch changes: [scripts/xray-build](scripts/xray-build/README.md).
+
+The archive as a whole is not bit-for-bit reproducible: the panel binary is linked with the C toolchain current at build time, and the geo files and `mtg` are the latest releases of their projects at that moment. The provenance attestation is what ties the archive to the commit and the workflow run.
+
 ## Moving from 3x-ui
 
 If the installer finds `/etc/x-ui/x-ui.db`, it offers to copy that database into still-ui and stop x-ui. Without a terminal (cloud-init and similar), set `STILL_UI_IMPORT_3XUI=yes` to accept. Your panel login, API access, inbounds and clients carry over; clients do not need new links. 3x-ui's own files are left untouched.

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# still-ui: build Linux release archives locally, without GitHub Actions.
+# still-ui: build Linux release archives. .github/workflows/release.yml runs
+# this on a version tag; it works the same on any Linux x86_64 host.
 #
 #   scripts/still-release.sh <output-dir> [amd64 arm64 ...]
 #
@@ -14,7 +15,7 @@
 #   still-ui/x-ui.service.*       systemd units (debian/arch/rhel)
 #   still-ui/bin/xray-linux-<arch>, mtg-linux-<arch>, geo*.dat
 #
-# Mirrors .github/workflows/release.yml: frontend with Node from .nvmrc, Go from
+# Frontend with Node from .nvmrc, Go from
 # go.mod, Bootlin musl cross toolchains, geo files and mtg-multi from their
 # latest releases. Xray is not downloaded: scripts/xray-build/build.sh builds
 # Xray-core v26.10.31 with still-ui's REALITY patch from source, pinned by

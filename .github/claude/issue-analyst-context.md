@@ -12,15 +12,40 @@ Where they disagree with it, they win and this file is the thing to fix.
 which answer "which file owns X" in one hop; grepping blind wastes turns on a
 question it already answers.
 
+## still-ui, not 3x-ui
+
+This repository is still-ui, an independent fork of MHSanaei/3x-ui. Reports
+about still-ui belong here; a problem that is the same in plain 3x-ui is still
+answered here, but say when the fix belongs upstream.
+
+- Own version numbers: `internal/config/version` (still-ui, from 1.0.0;
+  tags `vX.Y.Z`) and `internal/config/upstream_version` (the 3x-ui release it
+  is based on). A reporter's "3x-ui version" may be either; ask which only if
+  it matters.
+- Releases are Linux amd64 and arm64 archives only, built by
+  `.github/workflows/release.yml` with `scripts/still-release.sh`. still-ui
+  publishes no Windows build and no Docker image.
+- It ships its own Xray core: v26.10.31 built from source with one REALITY
+  patch that accepts a Client Hello without an X25519MLKEM768 key share
+  (the `ios` fingerprint, sing-box clients). Recipe and pinned sums:
+  `scripts/xray-build/README.md`. Switching to an official Xray from the panel
+  brings back the official behaviour; `still-ui update` restores the still-ui
+  build.
+- Names on the server: service `still-ui`, command `still-ui` (the `x-ui`
+  menu script installed under that name), program `/usr/local/still-ui`,
+  database `/etc/still-ui/x-ui.db`, logs `/var/log/still-ui`, settings
+  `/etc/default/still-ui`. The optional separate Xray service is
+  `still-xray`. README.md describes them.
+
 ## Stack
 
-3x-ui is an open-source web control panel for managing Xray-core servers.
+still-ui, like 3x-ui, is an open-source web control panel for managing Xray-core servers.
 
 - Backend: Go 1.27, module `github.com/mhsanaei/3x-ui/v3`, Gin and GORM.
 - It runs Xray-core as a managed child process (`internal/xray/process.go`) and
   imports `github.com/xtls/xray-core` for config types and the gRPC
-  stats/handler/router API. The release the panel BUNDLES is pinned in
-  `DockerInit.sh`; the version it COMPILES against is pinned in `go.mod`, and
+  stats/handler/router API. The core the panel BUNDLES is still-ui's own
+  build, pinned in `scripts/xray-build/build.sh`; the version it COMPILES against is pinned in `go.mod`, and
   the two are not always the same.
 - MTProto inbounds run a SECOND managed child, the `mtg-multi` binary (a
   multi-secret mtg fork, panel-side code in `internal/mtproto/`), one process
@@ -169,20 +194,22 @@ test that cannot fail is invisible to CI. `make verify` is the local gate.
 
 ## Support facts reporters get wrong
 
-- Linux install: `bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh)`
+- Linux install: `bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh)`
 - Install generates a RANDOM username, password and web base path — never
-  admin/admin. The `x-ui` menu on the server shows or resets them.
+  admin/admin. The `still-ui` menu on the server shows or resets them.
 - The installer service environment file is DISTRO-DEPENDENT:
-  `/etc/default/x-ui` (Debian/Ubuntu), `/etc/conf.d/x-ui` (Arch),
-  `/etc/sysconfig/x-ui` (RHEL/Fedora). Naming the wrong one means the reporter's
+  `/etc/default/still-ui` (Debian/Ubuntu), `/etc/conf.d/still-ui` (Arch,
+  Alpine), `/etc/sysconfig/still-ui` (RHEL/Fedora). Naming the wrong one means the reporter's
   edit is silently never read by systemd — a common cause of "I set the variable
   and nothing happened".
-- Windows is supported. There the database sits next to the executable, not in
-  `/etc` — never quote the Linux path to a Windows user.
+- still-ui releases no Windows build; the code still runs on Windows when
+  built from source, and there the database sits next to the executable, not
+  in `/etc` — never quote the Linux path to a Windows user.
 - SQLite to PostgreSQL: `x-ui migrate-db --dsn "postgres://..."`, then set
-  `XUI_DB_TYPE`/`XUI_DB_DSN` in that file and `systemctl restart x-ui`. The
+  `XUI_DB_TYPE`/`XUI_DB_DSN` in that file and `systemctl restart still-ui`. The
   source SQLite file is left in place.
-- Docker image `ghcr.io/mhsanaei/3x-ui`; PostgreSQL profile
+- still-ui publishes no Docker image; the Dockerfile and `docker-compose.yml`
+  build one locally. PostgreSQL profile
   `docker compose --profile postgres up -d`. Fail2ban IP-limit enforcement needs
   `NET_ADMIN` + `NET_RAW` (compose grants them; a bare `docker run` must add
   `--cap-add=NET_ADMIN --cap-add=NET_RAW`).
