@@ -329,6 +329,14 @@ func TestNodeResetDeliveryDoesNotHoldTheRequestBehindASilentNode(t *testing.T) {
 		t.Fatalf("create node: %v", err)
 	}
 	mgr.SetRuntimeOverride(node.Id, &stallingResetRuntime{})
+	// The delivery keeps running in the background until its push timeout and holds the
+	// node's delivery lock until then. Wait for it, so a later test that reuses this node
+	// id (every test starts a fresh database) does not find the lock taken.
+	t.Cleanup(func() {
+		lock, _ := nodeResetDeliveryLocks.LoadOrStore(node.Id, &sync.Mutex{})
+		lock.(*sync.Mutex).Lock()
+		lock.(*sync.Mutex).Unlock()
+	})
 	ib := nodeInbound(t, node.Id, 41912, []model.Client{{Email: "held", ID: "11111111-1111-1111-1111-1111111111ab", Enable: true}})
 	if err := (&InboundService{}).AddClientStat(database.GetDB(), ib.Id, &model.Client{Email: "held", Enable: true}); err != nil {
 		t.Fatalf("AddClientStat: %v", err)
