@@ -10,10 +10,10 @@ capped here, in a job that holds no Claude secret and only a read-only token:
   both Claude workflows;
 - all outsiders together get at most REPO_CAP model runs in that window;
 - at most IN_FLIGHT_CAP outsider model runs are running or waiting at once;
-- an outsider run never queues behind two runs of the same issue or pull
-  request, nor behind a maintainer's run created after it: the per-item
-  concurrency group keeps one pending run, and the newest arrival cancels it,
-  so this keeps an outsider from cancelling a maintainer's waiting run.
+- an outsider run never arrives third in its issue's or pull request's
+  outsider group: a concurrency group keeps one pending run and the newest
+  arrival cancels it. Maintainer runs queue in a group of their own, which no
+  outsider run can join, so an outsider never cancels a maintainer's run.
 
 Maintainers (OWNER, MEMBER, COLLABORATOR) are never limited, and neither is
 an `@claude review` / `@claude analyze` request, which only they can make.
@@ -28,7 +28,9 @@ Their jobs are looked up only where the title cannot settle it, and never
 for an author who already used up the quota, or once the repository cap is
 reached: from then on every later outsider run was refused.
 
-Only an API error refuses a run without a count (fail closed); the script
+An API error refuses the run without a count (fail closed), and so does a
+status query GitHub still truncates at 1000 runs: outsider runs are capped at
+15 a day, so that many spending runs means abuse or an anomaly. The script
 still exits 0, so the workflow stays green.
 
 Environment: GH_TOKEN, GITHUB_REPOSITORY, GITHUB_RUN_ID, GITHUB_EVENT_PATH,
@@ -61,12 +63,17 @@ TITLE = re.compile(
 )
 # GitHub returns at most 1000 runs for a query with `created=`. Past that the
 # listing switches to one query per status that is not `skipped`, so a flood
-# of comments that triggered nothing cannot hide the runs that spent.
+# of comments that triggered nothing cannot hide the runs that spent; if one
+# of those is truncated too, the runs cannot be counted and the gate refuses.
 LIST_LIMIT = 1000
 SPENDING_STATUSES = (
     "queued", "requested", "waiting", "pending", "in_progress",
     "success", "failure", "cancelled", "timed_out",
 )
+
+
+class GateError(Exception):
+    """The runs could not be counted; the caller refuses the run."""
 
 
 @dataclass
@@ -136,7 +143,7 @@ def list_runs(fetch: Fetch, repo: str, workflow: str, since: str) -> list[dict]:
     for status in SPENDING_STATUSES:
         part, more = _list(fetch, f"{base}&status={status}")
         if more:
-            print(f"::warning::More than {LIST_LIMIT} '{status}' runs of {workflow} in the window; counting the newest.")
+            raise GateError(f"more than {LIST_LIMIT} '{status}' runs of {workflow} in the window")
         for run in part:
             seen[int(run["id"])] = run
     return list(seen.values())
@@ -184,7 +191,6 @@ def decide(
 
     per_author: Counter = Counter()
     total = flying = item_active = lookups = 0
-    later_maintainer = False
     try:
         runs: list[dict] = []
         for wf in workflows.values():
@@ -192,14 +198,10 @@ def decide(
         runs = [r for r in runs if r.get("conclusion") != "skipped" and int(r.get("id", 0)) != run_id]
         runs.sort(key=lambda r: int(r["id"]))
         for run in runs:
+            if int(run["id"]) > run_id:
+                continue
             m = TITLE.match(str(run.get("display_title") or ""))
             completed = run.get("status") == "completed"
-            if int(run["id"]) > run_id:
-                # A maintainer's run on this item created after this one would
-                # be cancelled if this one queued behind it.
-                if m and not m.group("login") and not completed and (m.group("kind"), m.group("number")) == item:
-                    later_maintainer = True
-                continue
             if m is None:
                 if completed:
                     continue  # a run from before the gate existed
@@ -209,10 +211,7 @@ def decide(
             run_item = (m.group("kind"), m.group("number"))
             who = (m.group("login") or "").lower()
             if not who:
-                # A maintainer's run: never counted, but it holds its item.
-                if not completed and run_item == item:
-                    item_active += 1
-                continue
+                continue  # a maintainer's run: never counted, and in a group of its own
             if per_author[who] >= limits.per_author:
                 continue  # the gate refused it: its author was already at the quota
             if total >= limits.repo_cap:
@@ -243,7 +242,7 @@ def decide(
             flying += 1
             if run_item == item:
                 item_active += 1
-    except (urllib.error.URLError, OSError, ValueError, KeyError, TypeError) as exc:
+    except (GateError, urllib.error.URLError, OSError, ValueError, KeyError, TypeError) as exc:
         return Decision(False, True, f"api-error: {exc}", login)
     counts = {"author": per_author[me], "repository": total, "in_flight": flying, "item": item_active, "job_lookups": lookups}
     if per_author[me] >= limits.per_author:
@@ -252,7 +251,7 @@ def decide(
         return Decision(False, True, "repository-cap", login, counts)
     if flying >= limits.in_flight:
         return Decision(False, True, "busy", login, counts)
-    if item_active >= 2 or later_maintainer:
+    if item_active >= 2:
         return Decision(False, True, "item-busy", login, counts)
     return Decision(True, True, "under-quota", login, counts)
 
@@ -327,7 +326,7 @@ def main(argv: list[str]) -> int:
             "author-quota": f"its author already had {limits.per_author} automatic Claude runs in {limits.window_hours} h",
             "repository-cap": f"outsiders already had {limits.repo_cap} automatic Claude runs in {limits.window_hours} h",
             "busy": f"{limits.in_flight} outsider Claude runs are already running or waiting",
-            "item-busy": "other Claude runs on this issue or pull request are already running or waiting",
+            "item-busy": "two outsider Claude runs on this issue or pull request are already running or waiting",
         }.get(decision.reason, "the GitHub API did not answer, so the run quota could not be checked")
         print(f"::notice::No automatic Claude run: {limit}. A maintainer can still ask for one.")
         step_summary = os.environ.get("GITHUB_STEP_SUMMARY")

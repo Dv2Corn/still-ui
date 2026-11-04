@@ -24,7 +24,7 @@ jobs:
   # owner's subscription with no maintainer in the loop, so it is capped
   # here: 2 model runs per author and 15 for all outsiders in 24 h across
   # this workflow and claude-pr-review.yml, 2 running or waiting at once, and
-  # none queued where it could cancel a maintainer's waiting run. Only runs
+  # none arriving third in its item's outsider queue. Only runs
   # whose model job started count. A run over a limit ends here, green, and
   # posts nothing. This `if:` is the relevance check: a comment that matches
   # none of it leaves a wholly skipped run, which the gate ignores for free.
@@ -71,12 +71,12 @@ jobs:
     timeout-minutes: 40
     # The Claude secrets live in this environment, not at repository level.
     environment: claude
-    # Every run of one issue queues in one group, so a later analysis sees the
-    # earlier one's answer. A group keeps one pending run and the newest
-    # arrival cancels it; the gate never lets an outsider run be that arrival
-    # over a maintainer's, and caps outsider runs across issues.
+    # A group keeps one pending run and the newest arrival cancels it, so
+    # outsider runs queue in a group of their own: no outsider arrival can
+    # cancel a maintainer's run. The two may overlap on one issue; `post`
+    # then leaves labels, title and state to whichever run started last.
     concurrency:
-      group: claude-issue-${{ github.event.issue.number }}
+      group: ${{ needs.gate.outputs.outsider == 'true' && format('claude-issue-{0}-outsider', github.event.issue.number) || format('claude-issue-{0}', github.event.issue.number) }}
       cancel-in-progress: false
     permissions:
       contents: read
@@ -352,10 +352,15 @@ jobs:
         run: |
           echo "skipped=true" >> "$GITHUB_OUTPUT"
           echo "::warning::No analysis of #${ISSUE}: the Claude credential was refused, so this issue was not examined."
+      # An outsider's run and a maintainer's run on one issue sit in different
+      # concurrency groups, so they can overlap. Each reply carries its run id;
+      # labels, title and state are applied only by the newest run to post,
+      # and only against the issue as it is now.
       - name: Post the reply and apply its labels, title and state
         if: steps.refused.outputs.skipped != 'true'
         env:
           DIR: ${{ runner.temp }}/analyst
+          TITLE_AT_START: ${{ github.event.issue.title }}
         run: |
           set -euo pipefail
           body="$DIR/comment.md"
@@ -371,7 +376,13 @@ jobs:
             echo "::error::The reply for #${ISSUE} is over 65000 bytes; nothing was posted."
             exit 1
           fi
-          gh issue comment "$ISSUE" -R "$REPO" --body-file "$body"
+          # The run marker is the workflow's, never the model's: drop any copy
+          # the reply carries, then put this run's id above the closing marker.
+          reply="$RUNNER_TEMP/reply.md"
+          { grep -vE '^[[:space:]]*<!-- claude-issue:run [0-9]+ -->[[:space:]]*$' "$body" | sed '$d'
+            printf '<!-- claude-issue:run %s -->\n<!-- claude-issue:analyst -->\n' "$GITHUB_RUN_ID"
+          } > "$reply"
+          gh issue comment "$ISSUE" -R "$REPO" --body-file "$reply"
 
           actions="$DIR/actions.json"
           [ -s "$actions" ] || exit 0
@@ -379,23 +390,38 @@ jobs:
             echo "::warning::actions.json is not a JSON object; labels, title and state left as they are."
             exit 0
           fi
+          newest=$(gh api "repos/${REPO}/issues/${ISSUE}/comments" --paginate \
+            --jq '.[] | select(.user.login == "github-actions[bot]") | .body | split("\n")[] | select(test("^<!-- claude-issue:run [0-9]+ -->\r?$")) | capture("(?<n>[0-9]+)").n' \
+            | sort -n | tail -n 1)
+          if [ -n "$newest" ] && [ "$newest" -gt "$GITHUB_RUN_ID" ]; then
+            echo "::notice::Run ${newest} started after this one and already replied on #${ISSUE}; its labels, title and state stand."
+            exit 0
+          fi
+          gh issue view "$ISSUE" -R "$REPO" --json labels,title,state > "$RUNNER_TEMP/issue-now.json"
+          jq -r '.labels[].name' "$RUNNER_TEMP/issue-now.json" > "$RUNNER_TEMP/labels-now.txt"
           gh label list -R "$REPO" --limit 500 --json name --jq '.[].name' > "$RUNNER_TEMP/labels.txt"
           for op in add remove; do
             jq -r --arg k "${op}_labels" '.[$k] // [] | if type == "array" then .[] | strings else empty end' "$actions" \
               | while IFS= read -r label; do
-                  if grep -qxF -- "$label" "$RUNNER_TEMP/labels.txt"; then
-                    gh issue edit "$ISSUE" -R "$REPO" "--${op}-label" "$label"
-                  else
+                  if ! grep -qxF -- "$label" "$RUNNER_TEMP/labels.txt"; then
                     echo "::warning::Label '${label}' does not exist; not applied."
+                  elif [ "$op" = add ] && grep -qxF -- "$label" "$RUNNER_TEMP/labels-now.txt"; then
+                    :
+                  elif [ "$op" = remove ] && ! grep -qxF -- "$label" "$RUNNER_TEMP/labels-now.txt"; then
+                    :
+                  else
+                    gh issue edit "$ISSUE" -R "$REPO" "--${op}-label" "$label"
                   fi
                 done
           done
           title=$(jq -r '.title // empty | strings' "$actions")
           if [ -n "$title" ]; then
-            if [ "${#title}" -le 256 ] && [ "$(printf '%s' "$title" | wc -l)" -eq 0 ]; then
-              gh issue edit "$ISSUE" -R "$REPO" --title "$title"
-            else
+            if [ "${#title}" -gt 256 ] || [ "$(printf '%s' "$title" | wc -l)" -ne 0 ]; then
               echo "::warning::The proposed title is multi-line or over 256 characters; not applied."
+            elif [ "$(jq -r .title "$RUNNER_TEMP/issue-now.json")" != "$TITLE_AT_START" ]; then
+              echo "::notice::The title changed while this run worked; leaving it as it is."
+            else
+              gh issue edit "$ISSUE" -R "$REPO" --title "$title"
             fi
           fi
           close=$(jq -r '.close // empty | strings' "$actions")
@@ -404,6 +430,8 @@ jobs:
             "not planned"|"completed")
               if [ "$TRIGGER" = maintainer_request ]; then
                 echo "::notice::A maintainer request leaves the issue state alone; not closing."
+              elif [ "$(jq -r .state "$RUNNER_TEMP/issue-now.json")" != OPEN ]; then
+                echo "::notice::#${ISSUE} is no longer open; not closing."
               else
                 gh issue close "$ISSUE" -R "$REPO" --reason "$close"
               fi

@@ -118,9 +118,10 @@ class FakeAPI:
             if "status" in q:
                 st = q["status"][0]
                 runs = [r for r in runs if r["status"] == st or r["conclusion"] == st]
+            total = len(runs)
             runs = runs[: claude_gate.LIST_LIMIT]  # GitHub's ceiling with created=
             page, per = int(q["page"][0]), int(q["per_page"][0])
-            return {"total_count": len(self.runs[wf]) if "status" not in q else len(runs), "workflow_runs": runs[(page - 1) * per : page * per]}
+            return {"total_count": total, "workflow_runs": runs[(page - 1) * per : page * per]}
         run_id = int(parts.path.split("/actions/runs/")[1].split("/")[0])
         return {"jobs": self.jobs.get(run_id, [])}
 
@@ -290,41 +291,50 @@ class GateTest(unittest.TestCase):
         self.assertTrue(d.run)
         self.assertEqual(d.counts["repository"], 1)
 
-    # -- the per-item concurrency group ---------------------------------------
-    def test_outsider_never_queues_third_on_an_item(self):
+    def test_truncated_status_listing_fails_closed(self):
         api = FakeAPI()
-        api.add("analyst", 7, None, state="active", status="in_progress")  # a maintainer's run
-        api.add("analyst", 7, "stranger", state="active", status="in_progress")
-        d = decide(comment_event("stranger", "NONE", number=7), api)
+        for i in range(claude_gate.LIST_LIMIT + 1):
+            api.add("analyst", i, f"user{i}", state="refused")  # finished runs: conclusion success
+        for i in range(100):
+            api.add("analyst", 5000, "chatter", state="skipped")
+        d = decide(issue_event("newcomer"), api)
         self.assertFalse(d.run)
-        self.assertIn(d.reason, ("item-busy", "busy"))
-        api2 = FakeAPI()
-        api2.add("analyst", 7, None, state="active", status="in_progress")
-        api2.add("analyst", 7, None, state="active", status="in_progress")
-        d = decide(comment_event("stranger", "NONE", number=7), api2)
+        self.assertTrue(d.reason.startswith("api-error"), d.reason)
+        self.assertIn("'success'", d.reason)
+
+    # -- the per-item outsider group -------------------------------------------
+    def test_outsider_never_arrives_third_in_its_item_group(self):
+        api = FakeAPI()
+        api.add("analyst", 7, "x", state="active", status="in_progress")
+        api.add("analyst", 7, "y", state="active", status="queued")
+        d = decide(comment_event("stranger", "NONE", number=7), api, limits=claude_gate.Limits(in_flight=5))
         self.assertFalse(d.run)
         self.assertEqual(d.reason, "item-busy")
-        self.assertEqual(api2.job_lookups(), [], "a maintainer's run is never looked up")
+        self.assertEqual(d.counts["item"], 2)
+
+    def test_maintainer_runs_do_not_hold_the_outsider_group(self):
+        api = FakeAPI()
+        api.add("analyst", 7, None, state="active", status="in_progress")
+        api.add("analyst", 7, None, state="active", status="queued")
+        mine = api.next_id
+        api.next_id += 1
+        api.add("analyst", 7, None, state="active", status="queued", run_id=mine + 1)  # created after this one
+        d = decide(comment_event("stranger", "NONE", number=7), api, run_id=mine)
+        self.assertTrue(d.run)
+        self.assertEqual(d.counts["item"], 0)
+        self.assertEqual(api.job_lookups(), [], "a maintainer's run is never looked up")
 
     def test_one_run_on_the_item_still_lets_an_outsider_queue(self):
         api = FakeAPI()
-        api.add("analyst", 7, None, state="active", status="in_progress")
+        api.add("analyst", 7, "x", state="active", status="in_progress")
         self.assertTrue(decide(comment_event("stranger", "NONE", number=7), api).run)
 
     def test_same_number_in_the_other_workflow_is_another_item(self):
         api = FakeAPI()
-        api.add("review", 7, None, state="active", status="in_progress")
-        api.add("review", 7, None, state="active", status="in_progress")
-        self.assertTrue(decide(issue_event(number=7), api).run)
-
-    def test_outsider_yields_to_a_later_maintainer_run_on_the_item(self):
-        api = FakeAPI()
-        mine = api.next_id
-        api.next_id += 1
-        api.add("analyst", 7, None, state="active", status="queued", run_id=mine + 1)
-        d = decide(comment_event("stranger", "NONE", number=7), api, run_id=mine)
-        self.assertFalse(d.run)
-        self.assertEqual(d.reason, "item-busy")
+        api.add("review", 7, "x", state="active", status="in_progress")
+        api.add("review", 7, "y", state="active", status="in_progress")
+        d = decide(issue_event(number=7), api, limits=claude_gate.Limits(in_flight=5))
+        self.assertTrue(d.run)
 
     def test_later_outsider_runs_are_ignored(self):
         api = FakeAPI()
