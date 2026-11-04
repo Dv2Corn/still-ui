@@ -200,6 +200,7 @@ Katkılarınızı her zaman bekliyoruz. Bir sorun (issue) açmadan veya pull req
 
 - [terraform-provider-3x-ui](https://github.com/batonogov/terraform-provider-threexui) (Lisans: **MIT**): _Gelen bağlantılarnı, kullanıcıları, panel ayarlarını ve Xray yapılandırmasını Terraform / OpenTofu ile kod olarak (as code) yönetin._
 - [3X-UI Manager](https://github.com/yukh975/3X-UI-Manager) (Lisans: **MIT**): _3x-ui için yerel Android istemcisi — kontrol paneli, gelen bağlantılar, QR ile paylaşımlı kullanıcılar, düğümler ve çoklu panel yönetimi. F-Droid'de mevcut._
+- [xui-doctor](https://github.com/Dv2Corn/xui-doctor) (Lisans: **MIT**): _Panel için salt okunur sağlık denetimi — Xray çekirdek sürümü ve REALITY istemci uyumluluğu, TLS sertifikaları, portlar, kullanıcılar ve panel güvenliği; her bulgu için bir çözüm. Sunucuda hiçbir şeyi değiştirmez._
 
 ## Projeyi Destekleyin
 

@@ -200,6 +200,7 @@ Tools and integrations built by the community around 3x-ui.
 
 - [terraform-provider-3x-ui](https://github.com/batonogov/terraform-provider-threexui) (License: **MIT**): _Manage inbounds, clients, panel settings, and Xray configuration as code with Terraform / OpenTofu._
 - [3X-UI Manager](https://github.com/yukh975/3X-UI-Manager) (License: **MIT**): _Native Android client for 3x-ui — dashboard, inbounds, clients with QR sharing, nodes and multi-panel management. Available on F-Droid._
+- [xui-doctor](https://github.com/Dv2Corn/xui-doctor) (License: **MIT**): _Read-only health check for a panel — Xray core version and REALITY client compatibility, TLS certificates, ports, clients and panel security, with a fix for each finding. Changes nothing on the server._
 
 ## Support project
 
