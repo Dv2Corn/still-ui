@@ -99,6 +99,9 @@ func runScriptConfig(t *testing.T, script, path string, defaults bool, mode stri
 		"path": path, "username": username, "password": password,
 		"default": fmt.Sprint(defaults), "port": "54321", "x-ui": settingsCLIMock,
 		"writes": "", "path-writes": "", "restarts": "", "lifecycle": "", "migrations": "", "x-ui.service": "test unit",
+		// The release archive ships the unit; install.sh installs it from there
+		// and never downloads one.
+		"x-ui.service.debian": "test unit",
 	} {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(value), 0o700); err != nil {
 			t.Fatal(err)
@@ -113,7 +116,6 @@ red= green= yellow= blue= plain=
 xui_folder=$TEST_SETTINGS_DIR
 xui_service=$TEST_SETTINGS_DIR
 tag_version=test
-script_ref=main
 NONINTERACTIVE=1
 release=ubuntu
 SSL_SCHEME=https

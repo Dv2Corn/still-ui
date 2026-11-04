@@ -244,8 +244,8 @@ still-ui migrate-rollback
 2. 复制只显示一次、带有令牌的安装命令，在探针机器上以 root 身份运行（amd64 或 arm64，需要 systemd）：
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/Dv2Corn/still-ui/main/scripts/still-probe-install.sh) \
-    --panel 'https://<server>:<port>/<base path>/' --token '<token>'
+STILL_PROBE_TOKEN='<token>' bash <(curl -fsSL https://raw.githubusercontent.com/Dv2Corn/still-ui/main/scripts/still-probe-install.sh) \
+    --panel 'https://<server>:<port>/<base path>/'
 ```
 
 安装脚本会从 still-ui 最新发行版下载 `still-probe-linux-<arch>.tar.gz` 并核对其 sha256，把代理程序安装到 `/usr/local/still-probe`，把配置安装到 `/etc/still-probe/config.json`（root:still-probe 0640），并安装一个 systemd 定时器，然后执行第一次检查。面板使用自签名证书时加上 `--pin <sha256>`，要卸载全部内容则使用 `--uninstall`。

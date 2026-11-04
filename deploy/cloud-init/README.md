@@ -1,6 +1,6 @@
-# 3x-ui via cloud-init
+# still-ui via cloud-init
 
-A single [`cloud-init.yaml`](cloud-init.yaml) user-data file that installs 3x-ui
+A single [`cloud-init.yaml`](cloud-init.yaml) user-data file that installs still-ui
 non-interactively on a fresh Ubuntu/Debian VM and generates **unique random
 credentials per instance**. It works on any cloud-init platform.
 
@@ -8,16 +8,18 @@ credentials per instance**. It works on any cloud-init platform.
 
 1. The VM boots a stock Ubuntu/Debian cloud image.
 2. cloud-init writes and runs `/opt/xui-bootstrap.sh`, which exports
-   `XUI_NONINTERACTIVE=1` and pipes the project's `install.sh` into `bash`.
+   `XUI_NONINTERACTIVE=1`, downloads still-ui's `install.sh` and runs it. The
+   installer downloads the latest still-ui release and refuses the archive
+   unless its published `.sha256` matches.
 3. `install.sh` runs end-to-end with **zero prompts**, picking secure random
    values for any credential you didn't pin.
-4. The generated credentials are written to `/etc/x-ui/install-result.env`
+4. The generated credentials are written to `/etc/still-ui/install-result.env`
    (mode 600), echoed to the **serial console**, and appended to `/etc/motd`.
 
 Retrieve them after boot with either:
 
 ```bash
-sudo cat /etc/x-ui/install-result.env     # over SSH
+sudo cat /etc/still-ui/install-result.env     # over SSH
 ```
 
 …or read the provider's **serial console** output (handy before you have SSH).

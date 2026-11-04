@@ -1,8 +1,13 @@
 package panel
 
 import (
+	"bufio"
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -29,8 +34,8 @@ import (
 type PanelService struct{}
 
 // PanelUpdateInfo contains the current and latest available panel versions.
-// On the dev channel the version fields carry a "dev+<sha>" label and the commit
-// fields hold the short SHAs that drive the update-available decision.
+// Channel is always "stable": still-ui publishes no dev builds. The commit
+// fields are kept for API compatibility and stay empty.
 type PanelUpdateInfo struct {
 	Channel         string `json:"channel"`
 	CurrentVersion  string `json:"currentVersion"`
@@ -41,12 +46,16 @@ type PanelUpdateInfo struct {
 }
 
 const (
-	panelUpdaterURL      = "https://raw.githubusercontent.com/" + config.ReleaseRepo + "/main/update.sh"
+	// releaseDownloadBase is where release files live: <base>/<tag>/<name>.
+	// The updater is a release file listed in that release's SHA256SUMS, so
+	// the script that runs as root is the one the release build published and
+	// attested, never a branch head.
+	releaseDownloadBase  = "https://github.com/" + config.ReleaseRepo + "/releases/download"
+	panelUpdaterName     = "update.sh"
+	releaseSumsName      = "SHA256SUMS"
 	maxPanelUpdaterBytes = 2 << 20
+	maxReleaseSumsBytes  = 64 << 10
 	maxPanelReleaseBytes = 2 << 20
-	// devReleaseTag is the fixed-tag rolling pre-release the CI force-moves to the
-	// newest main commit; the dev update channel installs from it.
-	devReleaseTag = "dev-latest"
 
 	updateStatePending = "pending"
 	updateStateSuccess = "success"
@@ -68,7 +77,13 @@ type PanelUpdateStatus struct {
 	FinishedAt int64  `json:"finishedAt" example:"1735689612"`
 }
 
-var releaseCommitRegex = regexp.MustCompile(`(?i)commit=([0-9a-f]{7,40})`)
+// releaseTagRegex accepts still-ui release tags (v1.5.0, v3.11.0-still.5).
+// The tag ends up in a URL and in update.sh's environment.
+var releaseTagRegex = regexp.MustCompile(`^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$`)
+
+// ErrDevChannelUnavailable is returned for a dev-channel update: still-ui
+// publishes no rolling dev build, every update installs a release.
+var ErrDevChannelUnavailable = errors.New("still-ui publishes no dev builds; the panel updates to the latest release")
 
 // updateMu guards updateRunning/updateStarted/updateRunID/updatePID, which
 // stop a second self-update from launching while one is still in flight (two
@@ -127,13 +142,10 @@ func (s *PanelService) RestartPanel(delay time.Duration) error {
 	return nil
 }
 
-// GetUpdateInfo checks GitHub for the latest 3x-ui release. When the dev channel
-// is enabled on a dev build it compares commits against the rolling dev release;
-// otherwise it compares versions against the latest stable tag.
+// GetUpdateInfo checks GitHub for the latest still-ui release and compares
+// it with the running version. A dev-channel setting left on by an older
+// release is ignored: still-ui publishes no dev builds.
 func (s *PanelService) GetUpdateInfo() (*PanelUpdateInfo, error) {
-	if devChannelActive() {
-		return getDevUpdateInfo()
-	}
 	latest, err := fetchLatestPanelVersion()
 	if err != nil {
 		return nil, err
@@ -147,50 +159,20 @@ func (s *PanelService) GetUpdateInfo() (*PanelUpdateInfo, error) {
 	}, nil
 }
 
-// devChannelActive reports whether self-update should track the rolling dev
-// release. It is driven solely by the opt-in setting so the panel can
-// cross-grade a stable build onto the dev channel once the user enables it;
-// nothing updates without an explicit user action, so an unattended stable
-// binary with the toggle off stays on the stable channel.
-func devChannelActive() bool {
-	enabled, err := (&service.SettingService{}).GetDevChannelEnable()
-	return err == nil && enabled
-}
-
-// getDevUpdateInfo compares the running commit against the commit recorded in the
-// rolling dev release.
-func getDevUpdateInfo() (*PanelUpdateInfo, error) {
-	release, err := fetchPanelRelease(devReleaseTag)
-	if err != nil {
-		return nil, err
-	}
-	latestCommit := extractReleaseCommit(release)
-	if latestCommit == "" {
-		return nil, fmt.Errorf("dev release commit is unknown")
-	}
-	currentCommit := config.GetBuildCommit()
-	return &PanelUpdateInfo{
-		Channel:         "dev",
-		CurrentVersion:  config.GetPanelVersion(),
-		CurrentCommit:   shortCommit(currentCommit),
-		LatestCommit:    shortCommit(latestCommit),
-		LatestVersion:   "dev+" + shortCommit(latestCommit),
-		UpdateAvailable: !commitsEqual(currentCommit, latestCommit),
-	}, nil
-}
-
-// StartUpdate starts the official updater using this panel's own channel
-// setting. Returns the run ID to pass to GetUpdateStatus so the caller can
-// tell this run's result apart from a stale one.
+// StartUpdate starts the official updater for the latest release. Returns the
+// run ID to pass to GetUpdateStatus so the caller can tell this run's result
+// apart from a stale one.
 func (s *PanelService) StartUpdate() (int64, error) {
-	return s.startUpdate(devChannelActive())
+	return s.startUpdate()
 }
 
-// StartUpdateChannel runs the updater against an explicitly chosen channel,
-// overriding the local dev-channel setting. Used by the master node updater so
-// a node can be moved to the dev channel from the central panel.
+// StartUpdateChannel is what the master node updater calls on a node. Only
+// the stable channel exists; a dev request is refused before anything runs.
 func (s *PanelService) StartUpdateChannel(dev bool) (int64, error) {
-	return s.startUpdate(dev)
+	if dev {
+		return 0, ErrDevChannelUnavailable
+	}
+	return s.startUpdate()
 }
 
 // GetUpdateStatus reports the outcome of the most recently launched panel
@@ -214,7 +196,7 @@ func (s *PanelService) GetUpdateStatus() *PanelUpdateStatus {
 	return &status
 }
 
-func (s *PanelService) startUpdate(useDev bool) (int64, error) {
+func (s *PanelService) startUpdate() (int64, error) {
 	runID := time.Now().UnixNano()
 	if !acquireUpdateSlot(runID) {
 		return 0, fmt.Errorf("a panel update is already in progress")
@@ -235,7 +217,15 @@ func (s *PanelService) startUpdate(useDev bool) (int64, error) {
 		return 0, fmt.Errorf("bash is required to run the panel updater: %w", err)
 	}
 
-	scriptPath, err := downloadPanelUpdater()
+	// The updater of the release it installs: update.sh from that release,
+	// checked against the release's SHA256SUMS, and XUI_UPDATE_TAG makes it
+	// install that same release.
+	updateTag, err := fetchLatestPanelVersion()
+	if err != nil {
+		return 0, fmt.Errorf("find the latest release: %w", err)
+	}
+	client := (&service.SettingService{}).NewProxiedHTTPClient(30 * time.Second)
+	scriptPath, err := downloadPanelUpdater(context.Background(), client, releaseDownloadBase, updateTag)
 	if err != nil {
 		return 0, err
 	}
@@ -243,10 +233,6 @@ func (s *PanelService) startUpdate(useDev bool) (int64, error) {
 	statusFile := config.GetUpdateStatusFilePath()
 
 	mainFolder, serviceFolder := resolveUpdateFolders()
-	updateTag := ""
-	if useDev {
-		updateTag = devReleaseTag
-	}
 	updateScript := fmt.Sprintf("set -e; trap 'rm -f %s' EXIT; %s %s", shellQuote(scriptPath), shellQuote(bash), shellQuote(scriptPath))
 	runIDEnv := "XUI_UPDATE_RUN_ID=" + strconv.FormatInt(runID, 10)
 	statusFileEnv := "XUI_UPDATE_STATUS_FILE=" + statusFile
@@ -378,43 +364,51 @@ func releaseUpdateSlot() {
 	updateMu.Unlock()
 }
 
-func downloadPanelUpdater() (string, error) {
-	client := (&service.SettingService{}).NewProxiedHTTPClient(15 * time.Second)
-	req, reqErr := http.NewRequestWithContext(context.Background(), http.MethodGet, panelUpdaterURL, nil)
-	if reqErr != nil {
-		return "", fmt.Errorf("download panel updater: %w", reqErr)
+// downloadPanelUpdater downloads update.sh of release tag from base and
+// returns the path of a 0700 temp file holding it. The script must match the
+// sha256 the release's SHA256SUMS lists for it; a missing SHA256SUMS, a
+// missing entry or a mismatch refuse the update and leave no file behind.
+func downloadPanelUpdater(ctx context.Context, client *http.Client, base, tag string) (string, error) {
+	if !releaseTagRegex.MatchString(tag) {
+		return "", fmt.Errorf("download panel updater: %q is not a release tag", tag)
 	}
-	resp, err := client.Do(req)
+	releaseBase := strings.TrimRight(base, "/") + "/" + tag + "/"
+
+	sums, err := fetchReleaseFile(ctx, client, releaseBase+releaseSumsName, maxReleaseSumsBytes)
+	if err != nil {
+		return "", fmt.Errorf("download %s of %s: %w; refusing to run an unverified updater", releaseSumsName, tag, err)
+	}
+	want, ok := releaseFileSum(sums, panelUpdaterName)
+	if !ok {
+		return "", fmt.Errorf("%s of %s does not list %s; refusing to run an unverified updater", releaseSumsName, tag, panelUpdaterName)
+	}
+
+	script, err := fetchReleaseFile(ctx, client, releaseBase+panelUpdaterName, maxPanelUpdaterBytes)
 	if err != nil {
 		return "", fmt.Errorf("download panel updater: %w", err)
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("download panel updater: unexpected HTTP %d", resp.StatusCode)
+	if len(script) == 0 {
+		return "", fmt.Errorf("panel updater download is empty")
+	}
+	sum := sha256.Sum256(script)
+	if got := hex.EncodeToString(sum[:]); got != want {
+		return "", fmt.Errorf("panel updater checksum mismatch: %s of %s lists %s, the download is %s", releaseSumsName, tag, want, got)
 	}
 
-	file, err := os.CreateTemp("", "3x-ui-update-*.sh")
+	file, err := os.CreateTemp("", "still-ui-update-*.sh")
 	if err != nil {
 		return "", err
 	}
 	path := file.Name()
-	ok := false
+	ok = false
 	defer func() {
 		_ = file.Close()
 		if !ok {
 			_ = os.Remove(path)
 		}
 	}()
-
-	n, err := io.Copy(file, io.LimitReader(resp.Body, maxPanelUpdaterBytes+1))
-	if err != nil {
+	if _, err := file.Write(script); err != nil {
 		return "", fmt.Errorf("write panel updater: %w", err)
-	}
-	if n == 0 {
-		return "", fmt.Errorf("panel updater download is empty")
-	}
-	if n > maxPanelUpdaterBytes {
-		return "", fmt.Errorf("panel updater exceeds %d bytes", maxPanelUpdaterBytes)
 	}
 	if err := file.Chmod(0o700); err != nil {
 		return "", err
@@ -423,24 +417,66 @@ func downloadPanelUpdater() (string, error) {
 	return path, nil
 }
 
+// fetchReleaseFile GETs url and returns its body, refusing anything but
+// HTTP 200 and bodies over limit bytes.
+func fetchReleaseFile(ctx context.Context, client *http.Client, url string, limit int64) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected HTTP %d", resp.StatusCode)
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, limit+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(body)) > limit {
+		return nil, fmt.Errorf("larger than %d bytes", limit)
+	}
+	return body, nil
+}
+
+// releaseFileSum returns the sha256 a SHA256SUMS file (sha256sum format,
+// "<hex>  <name>" or "<hex> *<name>") lists for name.
+func releaseFileSum(sums []byte, name string) (string, bool) {
+	sc := bufio.NewScanner(bytes.NewReader(sums))
+	for sc.Scan() {
+		fields := strings.Fields(sc.Text())
+		if len(fields) != 2 || strings.TrimPrefix(fields[1], "*") != name {
+			continue
+		}
+		sum := strings.ToLower(fields[0])
+		if len(sum) != sha256.Size*2 {
+			return "", false
+		}
+		if _, err := hex.DecodeString(sum); err != nil {
+			return "", false
+		}
+		return sum, true
+	}
+	return "", false
+}
+
 func fetchLatestPanelVersion() (string, error) {
-	release, err := fetchPanelRelease("")
+	release, err := fetchLatestPanelRelease()
 	if err != nil {
 		return "", err
 	}
-	if release.TagName == "" {
-		return "", fmt.Errorf("latest panel release tag is empty")
+	if !releaseTagRegex.MatchString(release.TagName) {
+		return "", fmt.Errorf("latest panel release tag %q is not a release tag", release.TagName)
 	}
 	return release.TagName, nil
 }
 
-// fetchPanelRelease fetches a release from GitHub. An empty tag resolves the
-// latest stable release; a non-empty tag (e.g. dev-latest) resolves that tag.
-func fetchPanelRelease(tag string) (*service.Release, error) {
+// fetchLatestPanelRelease fetches the latest stable release from GitHub.
+func fetchLatestPanelRelease() (*service.Release, error) {
 	url := "https://api.github.com/repos/" + config.ReleaseRepo + "/releases/latest"
-	if tag != "" {
-		url = "https://api.github.com/repos/" + config.ReleaseRepo + "/releases/tags/" + tag
-	}
 	client := (&service.SettingService{}).NewProxiedHTTPClient(10 * time.Second)
 	req, reqErr := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
 	if reqErr != nil {
@@ -460,54 +496,6 @@ func fetchPanelRelease(tag string) (*service.Release, error) {
 		return nil, err
 	}
 	return &release, nil
-}
-
-// extractReleaseCommit reads the build commit recorded in the dev release: first
-// the `commit=<sha>` marker the CI writes into the body, falling back to the
-// tag's target commit.
-func extractReleaseCommit(release *service.Release) string {
-	if m := releaseCommitRegex.FindStringSubmatch(release.Body); m != nil {
-		return strings.ToLower(m[1])
-	}
-	if isCommitSHA(release.TargetCommitish) {
-		return strings.ToLower(release.TargetCommitish)
-	}
-	return ""
-}
-
-func isCommitSHA(s string) bool {
-	s = strings.TrimSpace(s)
-	if len(s) < 7 || len(s) > 40 {
-		return false
-	}
-	for _, r := range s {
-		if (r < '0' || r > '9') && (r < 'a' || r > 'f') && (r < 'A' || r > 'F') {
-			return false
-		}
-	}
-	return true
-}
-
-func shortCommit(sha string) string {
-	sha = strings.TrimSpace(sha)
-	if len(sha) > 8 {
-		return sha[:8]
-	}
-	return sha
-}
-
-// commitsEqual compares a short (injected) commit against a full release commit
-// by prefix, so an 8-char build stamp matches the 40-char release SHA.
-func commitsEqual(a, b string) bool {
-	a = strings.ToLower(strings.TrimSpace(a))
-	b = strings.ToLower(strings.TrimSpace(b))
-	if a == "" || b == "" {
-		return false
-	}
-	if len(a) > len(b) {
-		a, b = b, a
-	}
-	return strings.HasPrefix(b, a)
 }
 
 func resolveUpdateFolders() (string, string) {

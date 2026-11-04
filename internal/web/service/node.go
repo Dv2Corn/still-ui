@@ -938,8 +938,12 @@ type NodeUpdateResult struct {
 
 // UpdatePanels triggers the official self-updater on each given node. Only
 // enabled, online nodes are eligible — an offline node can't be reached, so it
-// is reported as skipped rather than silently dropped.
+// is reported as skipped rather than silently dropped. Nodes update to the
+// latest release; still-ui publishes no dev builds, so dev is refused.
 func (s *NodeService) UpdatePanels(ids []int, dev bool) ([]NodeUpdateResult, error) {
+	if dev {
+		return nil, fmt.Errorf("still-ui publishes no dev builds; nodes update to the latest release")
+	}
 	mgr := runtime.GetManager()
 	if mgr == nil {
 		return nil, fmt.Errorf("runtime manager unavailable")

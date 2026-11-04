@@ -128,8 +128,86 @@ before_show_menu() {
     show_menu
 }
 
+# --- scripts from a release -----------------------------------------------
+# The installer, the updater and the menu run as root, so they come from a
+# still-ui release, never from a branch: the script and the release's
+# SHA256SUMS are downloaded and the script runs only when its sum is listed
+# there. A missing SHA256SUMS, a missing entry or a mismatch refuse to run.
+still_release_repo="Dv2Corn/still-ui"
+
+# still_latest_tag prints the tag of the latest still-ui release.
+still_latest_tag() {
+    local url tag
+    url=$(curl -sSLI -o /dev/null -w '%{url_effective}' --retry 3 --retry-delay 3 --connect-timeout 15 --max-time 60 "https://github.com/${still_release_repo}/releases/latest" 2> /dev/null)
+    tag=${url##*/tag/}
+    if [[ "$tag" == "$url" || -z "$tag" || "$tag" == "latest" ]]; then
+        tag=$(curl -Ls --retry 3 --connect-timeout 15 --max-time 60 "https://api.github.com/repos/${still_release_repo}/releases/latest" | grep '"tag_name":' | head -n 1 | sed -E 's/.*"([^"]+)".*/\1/')
+    fi
+    [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]] || return 1
+    echo "$tag"
+}
+
+# still_sha256_of NAME SUMS_FILE prints the sha256 that SUMS_FILE (sha256sum
+# format) lists for NAME.
+still_sha256_of() {
+    awk -v n="$1" '($2 == n || $2 == "*" n) && $1 ~ /^[0-9a-f]+$/ && length($1) == 64 {print $1; exit}' "$2"
+}
+
+# still_release_script TAG NAME DIR downloads NAME from release TAG into DIR
+# and checks it against that release's SHA256SUMS. Messages go to stderr.
+still_release_script() {
+    local tag="$1" name="$2" dir="$3" base want got
+    [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]] || {
+        echo -e "${red}[ERR] Not a release tag: ${tag}${plain}" >&2
+        return 1
+    }
+    base="${STILL_RELEASE_DOWNLOAD_BASE:-https://github.com/${still_release_repo}/releases/download}/${tag}"
+    if ! curl -fsSL --retry 3 --retry-delay 3 --connect-timeout 15 --max-time 120 -o "${dir}/${name}" "${base}/${name}" || [[ ! -s "${dir}/${name}" ]]; then
+        echo -e "${red}[ERR] Could not download ${name} of still-ui ${tag} (${base}/${name})${plain}" >&2
+        return 1
+    fi
+    if ! curl -fsSL --retry 3 --retry-delay 3 --connect-timeout 15 --max-time 60 -o "${dir}/SHA256SUMS" "${base}/SHA256SUMS" || [[ ! -s "${dir}/SHA256SUMS" ]]; then
+        echo -e "${red}[ERR] Could not download SHA256SUMS of still-ui ${tag}; refusing to run an unverified ${name}${plain}" >&2
+        return 1
+    fi
+    want=$(still_sha256_of "$name" "${dir}/SHA256SUMS")
+    got=$(sha256sum "${dir}/${name}" | awk '{print $1}')
+    if [[ -z "$want" ]]; then
+        echo -e "${red}[ERR] SHA256SUMS of still-ui ${tag} does not list ${name}; refusing to run it${plain}" >&2
+        return 1
+    fi
+    if [[ "$want" != "$got" ]]; then
+        echo -e "${red}[ERR] Checksum mismatch for ${name} of still-ui ${tag}: SHA256SUMS lists ${want}, the download is ${got}; refusing to run it${plain}" >&2
+        return 1
+    fi
+    echo -e "${green}[INF] ${name} of still-ui ${tag} matches its SHA256SUMS (${got})${plain}" >&2
+}
+
+# still_run_release_script TAG NAME [ARGS...] runs a verified script of
+# release TAG (empty TAG: the latest release) with XUI_UPDATE_TAG=TAG, so
+# update.sh installs the same release its script came from.
+still_run_release_script() {
+    local tag="$1" name="$2" dir rc
+    shift 2
+    if [[ -z "$tag" ]]; then
+        tag=$(still_latest_tag) || {
+            LOGE "Could not find the latest still-ui release; check that this server can reach GitHub"
+            return 1
+        }
+    fi
+    dir=$(mktemp -d) || return 1
+    if ! still_release_script "$tag" "$name" "$dir"; then
+        rm -rf "$dir"
+        return 1
+    fi
+    XUI_UPDATE_TAG="$tag" bash "${dir}/${name}" "$@"
+    rc=$?
+    rm -rf "$dir"
+    return "$rc"
+}
+
 install() {
-    bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh)
+    still_run_release_script "" install.sh
     if [[ $? == 0 ]]; then
         if [[ $# == 0 ]]; then
             start
@@ -148,99 +226,58 @@ update() {
         fi
         return 0
     fi
-    bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/update.sh)
+    still_run_release_script "" update.sh
     if [[ $? == 0 ]]; then
         LOGI "Update is complete, Panel has automatically restarted "
         before_show_menu
     fi
 }
 
-# still-ui: run migrate.sh (3x-ui -> still-ui, and back). The rollback prefers
-# the copy kept in the backup folder, so it also works offline.
+# still-ui: run migrate.sh (3x-ui -> still-ui, and back). It is the copy the
+# installed release put in ${xui_folder}; the rollback also finds the copy kept
+# in the backup folder, so it works offline. Nothing is downloaded.
 still_migrate() {
-    local script="${xui_folder}/migrate.sh" tmp="" rc
+    local script="${xui_folder}/migrate.sh"
     if [[ "$1" == "migrate-rollback" && ! -f "$script" ]]; then
         script=$(ls -1d /root/still-ui-migrate-*/migrate.sh 2> /dev/null | sort -r | head -n 1)
     fi
     if [[ -z "$script" || ! -f "$script" ]]; then
-        tmp=$(mktemp) || return 1
-        if ! curl -fsSL -o "$tmp" https://raw.githubusercontent.com/Dv2Corn/still-ui/main/migrate.sh; then
-            rm -f "$tmp"
-            LOGE "Could not download migrate.sh"
-            return 1
-        fi
-        script="$tmp"
+        LOGE "No migrate.sh in ${xui_folder}. Update still-ui first, or run: bash <(curl -Ls https://raw.githubusercontent.com/${still_release_repo}/main/install.sh) $1"
+        return 1
     fi
     bash "$script" "$@"
-    rc=$?
-    [[ -n "$tmp" ]] && rm -f "$tmp"
-    return "$rc"
 }
 
+# still-ui publishes no rolling dev build; the entry stays so the menu numbers
+# do not move.
 update_dev() {
-    confirm "This will update still-ui to the latest DEV commit (the rolling 'dev-latest' build, not a stable release). Your data is preserved. Continue?" "y"
-    if [[ $? != 0 ]]; then
-        LOGE "Cancelled"
-        if [[ $# == 0 ]]; then
-            before_show_menu
-        fi
-        return 0
-    fi
-    # XUI_UPDATE_TAG tells update.sh to install the dev-latest pre-release
-    # instead of the latest stable tag.
-    XUI_UPDATE_TAG="dev-latest" bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/update.sh)
-    if [[ $? == 0 ]]; then
-        LOGI "Dev update is complete, Panel has automatically restarted "
+    LOGE "still-ui publishes no dev build. Use 'Update' (still-ui update) to install the latest release."
+    if [[ $# == 0 ]]; then
         before_show_menu
     fi
+    return 1
 }
 
-replace_xui_script() {
-    local url="$1"
-    local use_if_modified_since="$2"
-    local temp_file="/usr/bin/still-ui-temp.$$"
-
-    rm -f "$temp_file"
-    if [[ "$use_if_modified_since" == "true" ]]; then
-        curl -fLRo "$temp_file" -z /usr/bin/still-ui "$url"
-    else
-        curl -fLRo "$temp_file" "$url"
-    fi
-    if [[ $? != 0 ]]; then
-        rm -f "$temp_file"
-        return 1
-    fi
-
-    if [[ ! -s "$temp_file" ]]; then
-        rm -f "$temp_file"
-        # -z above means "not modified since /usr/bin/still-ui" rather than a
-        # real failure, so an empty download here is success, not an error.
-        [[ "$use_if_modified_since" == "true" ]] && return 0
-        return 1
-    fi
-
-    mv -f "$temp_file" /usr/bin/still-ui
-    if [[ $? != 0 ]]; then
-        rm -f "$temp_file"
-        return 1
-    fi
-    # The move already landed the new script; a transient chmod failure here
-    # shouldn't make callers think the whole replace failed.
-    chmod +x /usr/bin/still-ui
-    return 0
-}
-
-# The menu must match the installed panel, so update it from that release's
-# tag; fall back to main only when no script is published for the version.
-installed_script_url() {
-    local ver
+# The menu must match the installed panel: it is the x-ui.sh of the installed
+# release, checked against that release's SHA256SUMS. Releases that do not
+# publish x-ui.sh as a release file use the copy the installed release
+# archive put in ${xui_folder} (it was checked by its archive checksum).
+install_release_menu() {
+    local ver dir src="" rc=1 temp_file="/usr/bin/still-ui-temp.$$"
     ver=$("${xui_folder}/x-ui" -v 2> /dev/null | tr -d '[:space:]')
-    if [[ "$ver" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-still\.[0-9]+)?$ ]] && curl -fsIL -o /dev/null "https://raw.githubusercontent.com/Dv2Corn/still-ui/v${ver}/x-ui.sh"; then
-        echo "https://raw.githubusercontent.com/Dv2Corn/still-ui/v${ver}/x-ui.sh"
-    else
-        echo -e "${yellow}No x-ui.sh published for the installed version (${ver:-unknown}), using main${plain}" >&2
-        echo "https://raw.githubusercontent.com/Dv2Corn/still-ui/main/x-ui.sh"
+    dir=$(mktemp -d) || return 1
+    if [[ -n "$ver" ]] && still_release_script "v${ver}" x-ui.sh "$dir"; then
+        src="${dir}/x-ui.sh"
+    elif [[ -s "${xui_folder}/x-ui.sh" ]]; then
+        echo -e "${yellow}Using the menu of the installed release (${xui_folder}/x-ui.sh)${plain}" >&2
+        src="${xui_folder}/x-ui.sh"
     fi
+    if [[ -n "$src" ]] && cp -f "$src" "$temp_file" && chmod 755 "$temp_file" && mv -f "$temp_file" /usr/bin/still-ui; then
+        rc=0
+    fi
+    rm -f "$temp_file"
+    rm -rf "$dir"
+    return "$rc"
 }
 
 update_menu() {
@@ -254,7 +291,7 @@ update_menu() {
         return 0
     fi
 
-    if replace_xui_script "$(installed_script_url)" "false"; then
+    if install_release_menu; then
         chmod +x ${xui_folder}/x-ui.sh
         echo -e "${green}Update successful. The panel has automatically restarted.${plain}"
         exit 0
@@ -272,8 +309,11 @@ legacy_version() {
         echo "Panel version cannot be empty. Exiting."
         exit 1
     fi
-    # Use the entered panel version in the download link
-    install_command="bash <(curl -Ls "https://raw.githubusercontent.com/Dv2Corn/still-ui/v$tag_version/install.sh") v$tag_version"
+    tag_version="v${tag_version#v}"
+    if [[ ! "$tag_version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
+        echo "${tag_version} is not a panel version. Exiting."
+        exit 1
+    fi
 
     # A release without still-xray would start a second Xray next to the unit; one that has it
     # sets the unit up again during the install.
@@ -281,7 +321,9 @@ legacy_version() {
         systemctl disable --now still-xray > /dev/null 2>&1
     fi
     echo "Downloading and installing panel version $tag_version..."
-    eval $install_command
+    # The installer of the latest release installs the requested version from
+    # that version's checksum-verified archive.
+    still_run_release_script "" install.sh "$tag_version"
 }
 
 # Function to handle the deletion of the script file
@@ -890,7 +932,7 @@ enable_bbr() {
 }
 
 update_shell() {
-    if replace_xui_script "$(installed_script_url)" "true"; then
+    if install_release_menu; then
         LOGI "Upgrade script succeeded, Please rerun the script"
         before_show_menu
     else
@@ -3658,7 +3700,7 @@ show_usage() {
 │  ${blue}still-ui log${plain}                   - Check logs                       │
 │  ${blue}still-ui banlog${plain}                - Check Fail2ban ban logs          │
 │  ${blue}still-ui update${plain}                - Update                           │
-│  ${blue}still-ui update-dev${plain}            - Update to Dev channel (latest)   │
+│  ${blue}still-ui update-dev${plain}            - Dev channel (not published)      │
 │  ${blue}still-ui update-all-geofiles${plain}   - Update all geo files             │
 │  ${blue}still-ui migrateDB [file]${plain}      - Convert .db <-> .dump (SQLite)   │
 │  ${blue}still-ui backup${plain}                - Take a local backup now          │
@@ -3679,7 +3721,7 @@ show_menu() {
 │────────────────────────────────────────────────│
 │  ${green}1.${plain} Install                                   │
 │  ${green}2.${plain} Update                                    │
-│  ${green}3.${plain} Update to Dev Channel (latest commit)     │
+│  ${green}3.${plain} Dev Channel (not published)               │
 │  ${green}4.${plain} Update Menu                               │
 │  ${green}5.${plain} Legacy Version                            │
 │  ${green}6.${plain} Uninstall                                 │
