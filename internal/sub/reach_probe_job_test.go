@@ -38,7 +38,7 @@ func TestReachProbeJobUsesSubscriptionLinkOfProbeClientOnly(t *testing.T) {
 	}
 
 	probes := &service.ReachProbeService{}
-	created, _, err := probes.Create(service.ReachProbeInput{Name: "home-1", InboundIds: []int{ib.Id}})
+	created, _, err := probes.Create(service.ReachProbeInput{Name: "home-1", InboundIds: []int{ib.Id}}, "panel.example.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +50,7 @@ func TestReachProbeJobUsesSubscriptionLinkOfProbeClientOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	job, err := probes.BuildJob(row, "panel.example.com")
+	job, err := probes.BuildJob(row)
 	if err != nil {
 		t.Fatal(err)
 	}

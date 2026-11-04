@@ -52,7 +52,7 @@ func newProbeFixture(t *testing.T) *probeFixture {
 
 func (f *probeFixture) create(t *testing.T, name string) (*ReachProbeCreated, *model.ReachProbe) {
 	t.Helper()
-	created, _, err := f.svc.Create(ReachProbeInput{Name: name, InboundIds: []int{f.inb.Id}})
+	created, _, err := f.svc.Create(ReachProbeInput{Name: name, InboundIds: []int{f.inb.Id}}, "panel.example.com")
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -115,7 +115,7 @@ func TestReachProbeTokenIsHashedAndScopedToEnabledProbe(t *testing.T) {
 	}
 	off := false
 	in := ReachProbeInput{Name: "home-1", Enabled: &off, InboundIds: []int{f.inb.Id}}
-	if _, err := f.svc.Update(row.Id, in); err != nil {
+	if _, err := f.svc.Update(row.Id, in, "panel.example.com"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.svc.Authenticate(newToken); !errors.Is(err, ErrReachProbeUnauthorized) {
@@ -176,7 +176,7 @@ func TestReachProbeRotateAndDisableRevokeVPNAccess(t *testing.T) {
 	}
 
 	off, on := false, true
-	if _, err := f.svc.Update(row.Id, ReachProbeInput{Name: "home-1", Enabled: &off, InboundIds: []int{f.inb.Id}}); err != nil {
+	if _, err := f.svc.Update(row.Id, ReachProbeInput{Name: "home-1", Enabled: &off, InboundIds: []int{f.inb.Id}}, "panel.example.com"); err != nil {
 		t.Fatal(err)
 	}
 	if countProbeClientRecords(t, email) != 0 || settingsHoldUUID(t, &InboundService{}, f.inb.Id, second.UUID) {
@@ -189,7 +189,7 @@ func TestReachProbeRotateAndDisableRevokeVPNAccess(t *testing.T) {
 		t.Fatal("rotating a disabled probe brought its client back")
 	}
 
-	if _, err := f.svc.Update(row.Id, ReachProbeInput{Name: "home-1", Enabled: &on, InboundIds: []int{f.inb.Id}}); err != nil {
+	if _, err := f.svc.Update(row.Id, ReachProbeInput{Name: "home-1", Enabled: &on, InboundIds: []int{f.inb.Id}}, "panel.example.com"); err != nil {
 		t.Fatal(err)
 	}
 	third := lookupClientRecord(t, email)
@@ -212,7 +212,7 @@ func TestReachProbeToleratesAClientDeletedByHand(t *testing.T) {
 		t.Fatal(err)
 	}
 	off := false
-	if _, err := f.svc.Update(row.Id, ReachProbeInput{Name: "home-1", Enabled: &off, InboundIds: []int{f.inb.Id}}); err != nil {
+	if _, err := f.svc.Update(row.Id, ReachProbeInput{Name: "home-1", Enabled: &off, InboundIds: []int{f.inb.Id}}, "panel.example.com"); err != nil {
 		t.Fatalf("disabling a probe whose client is gone: %v", err)
 	}
 	if _, err := f.svc.Delete(row.Id); err != nil {
@@ -234,7 +234,7 @@ func TestReachProbeRejectsWhatTheAgentCannotDo(t *testing.T) {
 		"empty name":           {Name: "  ", InboundIds: []int{f.inb.Id}},
 	}
 	for name, in := range cases {
-		if _, _, err := f.svc.Create(in); err == nil {
+		if _, _, err := f.svc.Create(in, "panel.example.com"); err == nil {
 			t.Errorf("%s: accepted", name)
 		}
 	}
@@ -249,7 +249,7 @@ func TestReachProbeJobCarriesOnlyTheProbeClient(t *testing.T) {
 	f := newProbeFixture(t)
 	created, row := f.create(t, "home-1")
 	rec := lookupClientRecord(t, created.Probe.ClientEmail)
-	job, err := f.svc.BuildJob(row, "panel.example.com")
+	job, err := f.svc.BuildJob(row)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -277,14 +277,14 @@ func TestReachProbeJobCarriesOnlyTheProbeClient(t *testing.T) {
 func TestReachProbeIngestAlertsOnTransitionsOnly(t *testing.T) {
 	f := newProbeFixture(t)
 	_, row := f.create(t, "home-1")
-	job, _ := f.svc.BuildJob(row, "panel.example.com")
+	job, _ := f.svc.BuildJob(row)
 	key := job.Targets[0].Key
 
 	report := func(ok bool, errText string) {
 		t.Helper()
 		row, _ = f.svc.get(row.Id)
 		f.now = f.now.Add(10 * time.Minute)
-		n, err := f.svc.Ingest(row, "panel.example.com", &ReachReport{
+		n, err := f.svc.Ingest(row, &ReachReport{
 			AgentVersion: "1.5.0",
 			Results: []ReachReportResult{
 				{Key: key, Ok: ok, Error: errText, TtfbMs: 120, TotalMs: 900, Bytes: 262144},
@@ -335,7 +335,7 @@ func TestReachProbeIngestRefusesOversizedReports(t *testing.T) {
 	f := newProbeFixture(t)
 	_, row := f.create(t, "home-1")
 	results := make([]ReachReportResult, reachProbeMaxTargets+1)
-	if _, err := f.svc.Ingest(row, "panel.example.com", &ReachReport{Results: results}); !errors.Is(err, ErrReachReportTooLarge) {
+	if _, err := f.svc.Ingest(row, &ReachReport{Results: results}); !errors.Is(err, ErrReachReportTooLarge) {
 		t.Fatalf("got %v", err)
 	}
 }
@@ -345,7 +345,7 @@ func TestReachProbeIngestPrunesOldHistory(t *testing.T) {
 	_, row := f.create(t, "home-1")
 	old := model.ReachProbeResult{ProbeId: row.Id, TargetKey: "x", At: f.now.Add(-8 * 24 * time.Hour).UnixMilli()}
 	database.GetDB().Create(&old)
-	if _, err := f.svc.Ingest(row, "panel.example.com", &ReachReport{}); err != nil {
+	if _, err := f.svc.Ingest(row, &ReachReport{}); err != nil {
 		t.Fatal(err)
 	}
 	var n int64
@@ -361,7 +361,7 @@ func TestReachProbeStaleAlertsOnceAndAnnouncesReturn(t *testing.T) {
 	if err := f.svc.CheckStale(); err != nil || len(f.events) != 0 {
 		t.Fatalf("a probe that never reported was called stale: %v %+v", err, f.events)
 	}
-	if _, err := f.svc.Ingest(row, "panel.example.com", &ReachReport{}); err != nil {
+	if _, err := f.svc.Ingest(row, &ReachReport{}); err != nil {
 		t.Fatal(err)
 	}
 	f.now = f.now.Add(29 * time.Minute)
@@ -379,7 +379,7 @@ func TestReachProbeStaleAlertsOnceAndAnnouncesReturn(t *testing.T) {
 		t.Fatalf("silent for %d min", d.SilentFor)
 	}
 	row, _ = f.svc.get(row.Id)
-	if _, err := f.svc.Ingest(row, "panel.example.com", &ReachReport{}); err != nil {
+	if _, err := f.svc.Ingest(row, &ReachReport{}); err != nil {
 		t.Fatal(err)
 	}
 	if len(f.events) != 2 || f.events[1].Type != eventbus.EventProbeUp || f.events[1].Data.(*eventbus.ProbeHealthData).Target != "" {
@@ -392,7 +392,7 @@ func TestReachProbeUpdateMovesTheClient(t *testing.T) {
 	created, row := f.create(t, "home-1")
 	other := mkInbound(t, 24445, model.Trojan, `{"clients":[]}`)
 	in := ReachProbeInput{Name: "home-2", InboundIds: []int{other.Id}, IntervalSec: 300}
-	if _, err := f.svc.Update(row.Id, in); err != nil {
+	if _, err := f.svc.Update(row.Id, in, "panel.example.com"); err != nil {
 		t.Fatal(err)
 	}
 	rec := lookupClientRecord(t, created.Probe.ClientEmail)
@@ -403,5 +403,155 @@ func TestReachProbeUpdateMovesTheClient(t *testing.T) {
 	row, _ = f.svc.get(row.Id)
 	if row.Name != "home-2" || row.IntervalSec != 300 || len(row.InboundIds) != 1 || row.InboundIds[0] != other.Id || !row.Enabled {
 		t.Fatalf("row %+v", row)
+	}
+}
+
+// hostLinkProvider builds the probe client's link for the host it is asked for, as the real
+// subscription builder does when no inbound address is set.
+type hostLinkProvider struct{ fakeSubLinkProvider }
+
+func (hostLinkProvider) LinksForClient(host string, inbound *model.Inbound, email string) []string {
+	rec := &model.ClientRecord{}
+	if err := database.GetDB().Where("email = ?", email).First(rec).Error; err != nil {
+		return nil
+	}
+	return []string{"vless://" + rec.UUID + "@" + host + ":443?type=tcp&security=none#" + inbound.Remark}
+}
+
+func jobKeys(t *testing.T, f *probeFixture, id int) []string {
+	t.Helper()
+	row, err := f.svc.get(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	job, err := f.svc.BuildJob(row)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keys := []string{}
+	for _, tg := range job.Targets {
+		keys = append(keys, tg.Key)
+	}
+	return keys
+}
+
+// STILL-PROBE-1: the job is built for the address the admin saved the probe from; a loopback
+// address (an SSH tunnel) does not replace it, a real one does.
+func TestReachProbeJobUsesTheSavedPanelHost(t *testing.T) {
+	f := newProbeFixture(t)
+	RegisterSubLinkProvider(hostLinkProvider{})
+	_, row := f.create(t, "home-1")
+	want := strconv.Itoa(f.inb.Id) + "@panel.example.com:443"
+	if keys := jobKeys(t, f, row.Id); len(keys) != 1 || keys[0] != want {
+		t.Fatalf("job keys %v, want [%s]", keys, want)
+	}
+	in := ReachProbeInput{Name: "home-1", InboundIds: []int{f.inb.Id}}
+	for _, tunnel := range []string{"127.0.0.1", "localhost", "::1", "0.0.0.0", "", "bad host!"} {
+		if _, err := f.svc.Update(row.Id, in, tunnel); err != nil {
+			t.Fatal(err)
+		}
+		if keys := jobKeys(t, f, row.Id); keys[0] != want {
+			t.Fatalf("saving from %q moved the job to %v", tunnel, keys)
+		}
+	}
+	if _, err := f.svc.Update(row.Id, in, "vpn2.example.com"); err != nil {
+		t.Fatal(err)
+	}
+	if keys := jobKeys(t, f, row.Id); keys[0] != strconv.Itoa(f.inb.Id)+"@vpn2.example.com:443" {
+		t.Fatalf("a real address did not replace the saved one: %v", keys)
+	}
+	// A configured public host wins, as in subscriptions.
+	setSetting(t, "webDomain", "cfg.example.com")
+	if keys := jobKeys(t, f, row.Id); keys[0] != strconv.Itoa(f.inb.Id)+"@cfg.example.com:443" {
+		t.Fatalf("the web domain is not used: %v", keys)
+	}
+}
+
+// A probe without any address refuses jobs and reports with a clear error instead of trusting the
+// agent; the Probes page gives it the admin's address.
+func TestReachProbeWithoutAddressRefusesUntilAdopted(t *testing.T) {
+	f := newProbeFixture(t)
+	RegisterSubLinkProvider(hostLinkProvider{})
+	created, _, err := f.svc.Create(ReachProbeInput{Name: "old", InboundIds: []int{f.inb.Id}}, "127.0.0.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	row, _ := f.svc.Authenticate(created.Token)
+	if _, err := f.svc.BuildJob(row); !errors.Is(err, ErrReachProbeNoHost) {
+		t.Fatalf("BuildJob = %v, want ErrReachProbeNoHost", err)
+	}
+	if _, err := f.svc.Ingest(row, &ReachReport{}); !errors.Is(err, ErrReachProbeNoHost) {
+		t.Fatalf("Ingest = %v, want ErrReachProbeNoHost", err)
+	}
+	if err := f.svc.AdoptPanelHost("localhost"); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.svc.AdoptPanelHost("panel.example.com"); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.svc.AdoptPanelHost("other.example.com"); err != nil {
+		t.Fatal(err)
+	}
+	if keys := jobKeys(t, f, row.Id); keys[0] != strconv.Itoa(f.inb.Id)+"@panel.example.com:443" {
+		t.Fatalf("adopted host %v, want the first real one only", keys)
+	}
+}
+
+// However many keys a token invents, a probe keeps at most reachProbeMaxTargets alert states, and
+// the ones of its current job survive.
+func TestReachProbeTargetsStayCapped(t *testing.T) {
+	f := newProbeFixture(t)
+	_, row := f.create(t, "home-1")
+	for i := range reachProbeMaxTargets + 10 {
+		st := model.ReachProbeTarget{ProbeId: row.Id, TargetKey: strconv.Itoa(f.inb.Id) + "@x" + strconv.Itoa(i) + ".example:443", Status: ReachStatusOk}
+		if err := database.GetDB().Create(&st).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	key := strconv.Itoa(f.inb.Id) + "@vpn.example.com:443"
+	if _, err := f.svc.Ingest(row, &ReachReport{Results: []ReachReportResult{{Key: key, Ok: true}}}); err != nil {
+		t.Fatal(err)
+	}
+	var n, kept int64
+	database.GetDB().Model(&model.ReachProbeTarget{}).Where("probe_id = ?", row.Id).Count(&n)
+	database.GetDB().Model(&model.ReachProbeTarget{}).Where("probe_id = ? AND target_key = ?", row.Id, key).Count(&kept)
+	if n > reachProbeMaxTargets || kept != 1 {
+		t.Fatalf("%d targets (cap %d), current target kept %d", n, reachProbeMaxTargets, kept)
+	}
+}
+
+// The hourly cleanup drops results older than the history of probes that went silent too, and
+// the targets nothing has checked within it.
+func TestReachProbePruneHistoryDropsOldRowsAndOrphanTargets(t *testing.T) {
+	f := newProbeFixture(t)
+	_, row := f.create(t, "home-1")
+	db := database.GetDB()
+	old := f.now.Add(-8 * 24 * time.Hour).UnixMilli()
+	recent := f.now.Add(-time.Hour).UnixMilli()
+	for _, r := range []model.ReachProbeResult{
+		{ProbeId: row.Id, TargetKey: "orphan", At: old},
+		{ProbeId: row.Id, TargetKey: "live", At: old},
+		{ProbeId: row.Id, TargetKey: "live", At: recent},
+	} {
+		if err := db.Create(&r).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, key := range []string{"orphan", "live"} {
+		if err := db.Create(&model.ReachProbeTarget{ProbeId: row.Id, TargetKey: key, Status: ReachStatusOk}).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := f.svc.PruneHistory(); err != nil {
+		t.Fatal(err)
+	}
+	var results, oldLeft, targets int64
+	db.Model(&model.ReachProbeResult{}).Count(&results)
+	db.Model(&model.ReachProbeResult{}).Where("at < ?", f.now.Add(-reachProbeHistory).UnixMilli()).Count(&oldLeft)
+	db.Model(&model.ReachProbeTarget{}).Where("probe_id = ?", row.Id).Count(&targets)
+	var live int64
+	db.Model(&model.ReachProbeTarget{}).Where("target_key = ?", "live").Count(&live)
+	if results != 1 || oldLeft != 0 || targets != 1 || live != 1 {
+		t.Fatalf("after cleanup: %d results (%d old), %d targets (live %d); want 1, 0, 1, 1", results, oldLeft, targets, live)
 	}
 }

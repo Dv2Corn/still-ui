@@ -17,10 +17,13 @@ type ReachProbe struct {
 	AgentVersion string `gorm:"column:agent_version;not null;default:''"`
 	StaleAlerted bool   `gorm:"column:stale_alerted;not null;default:false"`
 	CreatedAt    int64  `gorm:"autoCreateTime:milli"`
+	// PanelHost is the panel address the admin used when saving the probe; jobs are built for it,
+	// never for the Host header an agent sends.
+	PanelHost string `gorm:"column:panel_host;not null;default:''"`
 }
 
 // ReachProbeResult is one check of one target by one probe; At is unix ms.
-// Rows older than the history window are pruned when the probe reports.
+// Rows older than the history window are pruned when the probe reports and by the hourly cleanup.
 type ReachProbeResult struct {
 	Id        int    `gorm:"primaryKey;autoIncrement"`
 	ProbeId   int    `gorm:"column:probe_id;not null;index:idx_reach_results_probe_at,priority:1"`

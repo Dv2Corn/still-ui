@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/mhsanaei/3x-ui/v3/internal/logger"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/service"
 )
 
@@ -27,6 +28,10 @@ func NewReachProbeController(g *gin.RouterGroup) *ReachProbeController {
 }
 
 func (a *ReachProbeController) list(c *gin.Context) {
+	// Probes saved before the panel kept its address get the one the admin uses now.
+	if err := a.probeService.AdoptPanelHost(resolveHost(c)); err != nil {
+		logger.Warning("reach probe: storing the panel address:", err)
+	}
 	probes, err := a.probeService.List()
 	if err != nil {
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
@@ -55,7 +60,7 @@ func (a *ReachProbeController) add(c *gin.Context) {
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
 		return
 	}
-	created, needRestart, err := a.probeService.Create(in)
+	created, needRestart, err := a.probeService.Create(in, resolveHost(c))
 	if needRestart {
 		a.xrayService.SetToNeedRestart()
 	}
@@ -81,7 +86,7 @@ func (a *ReachProbeController) update(c *gin.Context) {
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
 		return
 	}
-	needRestart, err := a.probeService.Update(id, in)
+	needRestart, err := a.probeService.Update(id, in, resolveHost(c))
 	if needRestart {
 		a.xrayService.SetToNeedRestart()
 		notifyClientsChanged()
