@@ -33,9 +33,9 @@
 #     still-ui's REALITY patch from source, pinned by commit, Go version and
 #     sha256 (see scripts/xray-build/README.md).
 # The geo files are data that has to stay current, so they come from the
-# latest release of their repositories; the build prints the release URL and
-# sha256 of each one, and the SBOM (scripts/still-sbom.sh) records every file
-# of the archive with its sha256.
+# latest release of their repositories; the build prints the repository, tag
+# and sha256 of each one, and the SBOM (scripts/still-sbom.sh) records every
+# file of the archive with its sha256.
 # Downloads and the Go caches are kept in $STILL_RELEASE_CACHE (default
 # ~/.cache/still-release); cached downloads are checked again on every build.
 set -euo pipefail
@@ -183,20 +183,23 @@ for arch in "${ARCHES[@]}"; do
     chmod 755 "$pkg/bin/mtg-linux-$arch"
 
     # Geo files are data that has to stay current, so they are not pinned:
-    # each comes from the latest release of its repository. The release URL
-    # and sha256 of each go to the build log, and the SBOM lists them too.
-    while read -r geo_name geo_url; do
-        geo_final=$(curl -fsSL --retry 5 -o "$pkg/bin/$geo_name" -w '%{url_effective}' "$geo_url") ||
-            die "download failed: $geo_url"
-        [[ -s "$pkg/bin/$geo_name" ]] || die "empty download: $geo_url"
-        echo "still-release: geo $arch $geo_name $(sha256sum "$pkg/bin/$geo_name" | cut -d' ' -f1) $geo_final"
+    # each comes from the latest release of its repository, resolved to a tag
+    # first. The repository, tag and sha256 of each go to the build log, and
+    # the SBOM lists every file with its sha256.
+    while read -r geo_name geo_repo geo_asset; do
+        geo_tag=$(curl -fsS --retry 5 -o /dev/null -w '%{redirect_url}' "https://github.com/${geo_repo}/releases/latest" | sed -n 's#.*/releases/tag/##p')
+        [[ -n "$geo_tag" ]] || die "could not resolve the latest release of ${geo_repo}"
+        curl -fsSL --retry 5 -o "$pkg/bin/$geo_name" "https://github.com/${geo_repo}/releases/download/${geo_tag}/${geo_asset}" ||
+            die "download failed: ${geo_repo}@${geo_tag}/${geo_asset}"
+        [[ -s "$pkg/bin/$geo_name" ]] || die "empty download: ${geo_repo}@${geo_tag}/${geo_asset}"
+        echo "still-release: geo $arch $geo_name $(sha256sum "$pkg/bin/$geo_name" | cut -d' ' -f1) ${geo_repo}@${geo_tag}/${geo_asset}"
     done <<'GEO'
-geoip.dat https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat
-geosite.dat https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat
-geoip_IR.dat https://github.com/chocolate4u/Iran-v2ray-rules/releases/latest/download/geoip.dat
-geosite_IR.dat https://github.com/chocolate4u/Iran-v2ray-rules/releases/latest/download/geosite.dat
-geoip_RU.dat https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/latest/download/geoip.dat
-geosite_RU.dat https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/latest/download/geosite.dat
+geoip.dat Loyalsoldier/v2ray-rules-dat geoip.dat
+geosite.dat Loyalsoldier/v2ray-rules-dat geosite.dat
+geoip_IR.dat chocolate4u/Iran-v2ray-rules geoip.dat
+geosite_IR.dat chocolate4u/Iran-v2ray-rules geosite.dat
+geoip_RU.dat runetfreedom/russia-v2ray-rules-dat geoip.dat
+geosite_RU.dat runetfreedom/russia-v2ray-rules-dat geosite.dat
 GEO
 
     # Reachability probe agent: static, standard library only, shipped with the same Xray.
