@@ -33,14 +33,11 @@ describe('panel update modal', () => {
       <PanelUpdateModal
         open
         info={{
-          channel: 'dev',
-          currentVersion: 'dev+old',
-          latestVersion: 'dev+new',
-          currentCommit: 'old',
-          latestCommit: 'new',
+          channel: 'stable',
+          currentVersion: '1.5.0',
+          latestVersion: 'v1.6.0',
           updateAvailable: true,
         }}
-        devChannelEnable
         onClose={onClose}
         onBusy={onBusy}
       />,
@@ -56,7 +53,25 @@ describe('panel update modal', () => {
     expect(HttpUtil.post).toHaveBeenCalledWith('/panel/api/server/updatePanel');
     expect(onBusy).toHaveBeenCalledWith({
       busy: true,
-      tip: 'Installation is in progress, please do not refresh this page (dev+new)',
+      tip: 'Installation is in progress, please do not refresh this page (v1.6.0)',
     });
+  });
+
+  it('offers no dev channel', () => {
+    renderWithProviders(
+      <PanelUpdateModal
+        open
+        info={{
+          channel: 'stable',
+          currentVersion: '1.5.0',
+          latestVersion: 'v1.6.0',
+          updateAvailable: true,
+        }}
+        onClose={vi.fn()}
+        onBusy={vi.fn()}
+      />,
+    );
+    expect(screen.queryByRole('switch')).toBeNull();
+    expect(screen.queryByText('Dev channel')).toBeNull();
   });
 });

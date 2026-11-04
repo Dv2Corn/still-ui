@@ -345,11 +345,14 @@ jobs:
           shellcheck --severity=style DockerInit.sh DockerEntrypoint.sh deploy/test/smoke-noninteractive.sh deploy/test/installer-panel-port.sh \
             scripts/still-release.sh scripts/still-sbom.sh scripts/xray-build/build.sh
           shellcheck --severity=style migrate.sh deploy/test/migrate-unit.sh scripts/test-migrate.sh
+          shellcheck --severity=style scripts/still-probe-install.sh deploy/test/release-scripts.sh
           shellcheck --severity=error install.sh update.sh x-ui.sh
       - name: Installer panel port regression tests
         run: bash deploy/test/installer-panel-port.sh
       - name: migrate.sh unit tests
         run: bash deploy/test/migrate-unit.sh
+      - name: Release script checksum gates
+        run: bash deploy/test/release-scripts.sh
 
   frontend:
     runs-on: ubuntu-latest

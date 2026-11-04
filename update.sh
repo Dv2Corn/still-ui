@@ -128,11 +128,57 @@ _stage_update_archive() {
         [[ -s "${update_stage_dir}/still-ui/${f}" ]] ||
             _fail "ERROR: The still-ui release archive has no ${f}; the running panel was not touched"
     done
-    if [[ $release == "alpine" && ! -s "${update_stage_dir}/still-ui/x-ui.rc" ]]; then
-        _fail "ERROR: The still-ui release archive has no x-ui.rc; the running panel was not touched"
+    # The service unit comes from the archive too (never from the repository).
+    case "${release}" in
+        alpine) f=x-ui.rc ;;
+        ubuntu | debian | armbian) f=x-ui.service.debian ;;
+        arch | manjaro | parch) f=x-ui.service.arch ;;
+        *) f=x-ui.service.rhel ;;
+    esac
+    if [[ ! -s "${update_stage_dir}/still-ui/${f}" && ! -s "${update_stage_dir}/still-ui/still-ui.service" ]]; then
+        _fail "ERROR: The still-ui release archive has no ${f}; the running panel was not touched"
     fi
     rm -rf "${update_stage_dir}"
     update_stage_dir=""
+}
+
+# _verify_update_checksum ARCHIVE SIDECAR_URL: every still-ui release
+# publishes <asset>.sha256 next to each archive. The update stops unless that
+# file downloads and matches: a missing sidecar (HTTP 404), a failed download
+# or a mismatch all abort it (and remove the archive) before the running
+# panel is touched.
+_verify_update_checksum() {
+    local archive="$1" url="$2" code expected actual
+    rm -f "${archive}.sha256"
+    code=$(${curl_bin} -sL --retry 3 --retry-delay 3 --connect-timeout 15 --max-time 60 -o "${archive}.sha256" -w '%{http_code}' "${url}" 2> /dev/null)
+    if [[ "${code}" != "200" ]]; then
+        rm -f "${archive}.sha256" "${archive}"
+        if [[ "${code}" == "404" ]]; then
+            _fail "ERROR: No checksum is published for $(basename "${archive}") (${url}: HTTP 404); refusing to install an unverified archive"
+        fi
+        _fail "ERROR: Failed to download the checksum for $(basename "${archive}") (HTTP ${code}); refusing to install an unverified archive"
+    fi
+    expected=$(awk 'NR == 1 {print $1}' "${archive}.sha256")
+    actual=$(sha256sum "${archive}" | awk '{print $1}')
+    rm -f "${archive}.sha256"
+    if [[ ! "${expected}" =~ ^[0-9a-f]{64}$ || "${expected}" != "${actual}" ]]; then
+        rm -f "${archive}"
+        _fail "ERROR: Checksum mismatch for $(basename "${archive}"): expected ${expected:-<none>}, got ${actual}"
+    fi
+    echo -e "${green}Checksum verified: ${actual}${plain}"
+}
+
+# _check_update_tag TAG: the release update.sh is asked to install
+# (XUI_UPDATE_TAG). Empty means the latest release. still-ui publishes no
+# rolling dev build, and anything but a release tag is refused.
+_check_update_tag() {
+    if [[ "$1" == "dev-latest" || "$1" == "dev" ]]; then
+        _fail "ERROR: still-ui publishes no dev build; update to the latest release instead (turn the dev channel off)"
+    fi
+    if [[ -n "$1" && ! "$1" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
+        _fail "ERROR: XUI_UPDATE_TAG=$1 is not a release tag (vX.Y.Z)"
+    fi
+    return 0
 }
 
 # Copies every file the update removes or overwrites, so a failure after the
@@ -851,8 +897,11 @@ update_x-ui() {
     else
         echo -e "${green}Downloading new still-ui version...${plain}"
 
-        # XUI_UPDATE_TAG lets the panel target a specific release tag (e.g. the
-        # rolling dev-latest pre-release). Empty keeps the default latest-stable flow.
+        # XUI_UPDATE_TAG names the release to install: the panel updater and the
+        # still-ui menu set it to the release whose update.sh they checked
+        # against its SHA256SUMS. Empty keeps the default latest-stable flow.
+        # still-ui publishes no rolling dev build.
+        _check_update_tag "${XUI_UPDATE_TAG}"
         if [[ -n "${XUI_UPDATE_TAG}" ]]; then
             tag_version="${XUI_UPDATE_TAG}"
             echo -e "${green}Using update tag: ${tag_version}${plain}"
@@ -865,11 +914,6 @@ update_x-ui() {
         echo -e "Got still-ui latest version: ${tag_version}, beginning the installation..."
         # x-ui.sh, x-ui.rc and the unit files ship in every still-ui release archive, built
         # from the same commit as the binary, so nothing is fetched from the repository.
-        # Only the rolling dev build tracks main for the GitHub fallback of the unit files.
-        script_ref="${tag_version}"
-        if [[ "${tag_version}" == "dev-latest" ]]; then
-            script_ref="main"
-        fi
         ${curl_bin} -fLRo ${xui_folder}-linux-$(arch).tar.gz https://github.com/Dv2Corn/still-ui/releases/download/${tag_version}/still-ui-linux-$(arch).tar.gz 2> /dev/null
         if [[ $? -ne 0 ]]; then
             _fail "ERROR: Failed to download still-ui, please be sure that your server can access GitHub"
@@ -878,28 +922,8 @@ update_x-ui() {
             rm ${xui_folder}-linux-$(arch).tar.gz -f > /dev/null 2>&1
             _fail "ERROR: Downloaded still-ui release archive is empty, please be sure that your server can access GitHub"
         fi
-        # Releases publish <asset>.sha256 next to each archive. A mismatch or a
-        # failed sidecar download aborts the update; only a 404 (releases
-        # predating the sidecar) is tolerated with a warning.
-        archive="${xui_folder}-linux-$(arch).tar.gz"
-        rm -f "${archive}.sha256"
-        sidecar_code=$(${curl_bin} -sL --retry 3 --retry-delay 3 --connect-timeout 15 --max-time 60 -o "${archive}.sha256" -w '%{http_code}' "https://github.com/Dv2Corn/still-ui/releases/download/${tag_version}/still-ui-linux-$(arch).tar.gz.sha256" 2> /dev/null)
-        if [[ "${sidecar_code}" == "200" ]]; then
-            expected_sha256=$(awk 'NR == 1 {print $1}' "${archive}.sha256")
-            actual_sha256=$(sha256sum "${archive}" | awk '{print $1}')
-            rm -f "${archive}.sha256"
-            if [[ ! "${expected_sha256}" =~ ^[0-9a-f]{64}$ || "${expected_sha256}" != "${actual_sha256}" ]]; then
-                rm -f "${archive}"
-                _fail "ERROR: Checksum mismatch for $(basename "${archive}"): expected ${expected_sha256:-<none>}, got ${actual_sha256}"
-            fi
-            echo -e "${green}Checksum verified: ${actual_sha256}${plain}"
-        elif [[ "${sidecar_code}" == "404" ]]; then
-            rm -f "${archive}.sha256"
-            echo -e "${yellow}No checksum published for this release, skipping verification${plain}"
-        else
-            rm -f "${archive}.sha256" "${archive}"
-            _fail "ERROR: Failed to download the checksum for still-ui-linux-$(arch).tar.gz (HTTP ${sidecar_code})"
-        fi
+        _verify_update_checksum "${xui_folder}-linux-$(arch).tar.gz" \
+            "https://github.com/Dv2Corn/still-ui/releases/download/${tag_version}/still-ui-linux-$(arch).tar.gz.sha256"
     fi
 
     if [[ -e ${xui_folder}/ ]]; then
@@ -1075,25 +1099,10 @@ update_x-ui() {
                     ;;
             esac
 
-            # If service file not found in tar.gz, download from GitHub
+            # The archive was checked for the unit before the stop
+            # (_stage_update_archive); the units are never fetched from GitHub.
             if [ "$service_installed" = false ]; then
-                echo -e "${yellow}Service files not found in tar.gz, downloading from GitHub...${plain}"
-                case "${release}" in
-                    ubuntu | debian | armbian)
-                        service_unit_url="https://raw.githubusercontent.com/Dv2Corn/still-ui/${script_ref}/x-ui.service.debian"
-                        ;;
-                    arch | manjaro | parch)
-                        service_unit_url="https://raw.githubusercontent.com/Dv2Corn/still-ui/${script_ref}/x-ui.service.arch"
-                        ;;
-                    *)
-                        service_unit_url="https://raw.githubusercontent.com/Dv2Corn/still-ui/${script_ref}/x-ui.service.rhel"
-                        ;;
-                esac
-
-                if ! _install_xui_service_unit "$service_unit_url" "true"; then
-                    echo -e "${red}Failed to install still-ui.service from GitHub (${script_ref}) -- the release tarball did not ship one either${plain}"
-                    exit 1
-                fi
+                _fail "ERROR: Failed to install the systemd unit from the release archive"
             fi
         fi
         chown root:root ${xui_service}/still-ui.service > /dev/null 2>&1

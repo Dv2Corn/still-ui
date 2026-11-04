@@ -11,21 +11,80 @@ import (
 	"testing"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/config"
+	"github.com/mhsanaei/3x-ui/v3/internal/web/service"
 
 	"github.com/gin-gonic/gin"
 )
 
-// newPanelUpdateTestEngine registers only updatePanel/getUpdateStatus directly
-// on the controller's zero value, bypassing NewServerController's cron/metrics
-// setup (unrelated to these two handlers, and unnecessary weight for a unit
-// test). Callers must set up a DB first (newHostTestDB(t)) since StartUpdate
-// reads the dev-channel setting before doing anything else.
+// newPanelUpdateTestEngine registers only the update handlers directly on the
+// controller's zero value, bypassing NewServerController's cron/metrics setup
+// (unrelated to these handlers, and unnecessary weight for a unit test).
+// Callers must set up a DB first (newHostTestDB(t)).
 func newPanelUpdateTestEngine() *gin.Engine {
 	a := &ServerController{}
 	engine := gin.New()
 	engine.GET("/panel/api/server/getUpdateStatus", a.getUpdateStatus)
 	engine.POST("/panel/api/server/updatePanel", a.updatePanel)
+	engine.POST("/panel/api/server/setUpdateChannel", a.setUpdateChannel)
 	return engine
+}
+
+func postPanelUpdateForm(t *testing.T, engine *gin.Engine, path string, form url.Values) hostEnvelope {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	w := httptest.NewRecorder()
+	engine.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("POST %s: status %d, body=%s", path, w.Code, w.Body.String())
+	}
+	var env hostEnvelope
+	if err := json.Unmarshal(w.Body.Bytes(), &env); err != nil {
+		t.Fatalf("POST %s: decode envelope: %v body=%s", path, err, w.Body.String())
+	}
+	return env
+}
+
+// still-ui publishes no dev builds: a dev update (the master node updater of
+// an older release sends dev=true) is refused before anything is downloaded
+// or run, on any OS.
+func TestUpdatePanel_DevChannelRefused(t *testing.T) {
+	newHostTestDB(t)
+	engine := newPanelUpdateTestEngine()
+	env := postPanelUpdateForm(t, engine, "/panel/api/server/updatePanel", url.Values{"dev": {"true"}})
+	if env.Success {
+		t.Fatal("updatePanel with dev=true: success = true, want false")
+	}
+	if !strings.Contains(env.Msg, "no dev builds") {
+		t.Fatalf("updatePanel with dev=true: msg = %q, want the dev-channel refusal", env.Msg)
+	}
+	if len(env.Obj) != 0 && string(env.Obj) != "null" {
+		t.Fatalf("refused update must not carry an obj/runId: got %s", env.Obj)
+	}
+}
+
+// The dev channel cannot be switched on any more; switching it off (a setting
+// an older release may have left on) still works.
+func TestSetUpdateChannel_OnlyStable(t *testing.T) {
+	newHostTestDB(t)
+	engine := newPanelUpdateTestEngine()
+	settings := &service.SettingService{}
+	if err := settings.SetDevChannelEnable(true); err != nil {
+		t.Fatal(err)
+	}
+
+	env := postPanelUpdateForm(t, engine, "/panel/api/server/setUpdateChannel", url.Values{"dev": {"true"}})
+	if env.Success {
+		t.Fatal("setUpdateChannel dev=true: success = true, want false")
+	}
+
+	env = postPanelUpdateForm(t, engine, "/panel/api/server/setUpdateChannel", url.Values{"dev": {"false"}})
+	if !env.Success {
+		t.Fatalf("setUpdateChannel dev=false: success = false (%s), want true", env.Msg)
+	}
+	if on, err := settings.GetDevChannelEnable(); err != nil || on {
+		t.Fatalf("dev channel after switching it off = %v, %v; want false", on, err)
+	}
 }
 
 func doPanelUpdateReq(t *testing.T, engine *gin.Engine, method, path string) hostEnvelope {

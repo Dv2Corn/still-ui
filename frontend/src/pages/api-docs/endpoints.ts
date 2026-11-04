@@ -680,13 +680,13 @@ export const sections: readonly Section[] = [
         method: 'POST',
         path: '/panel/api/server/updatePanel',
         summary:
-          'Self-update the panel to the latest version. The server restarts on success. Bearer-token callers need admin or node-admin scope.',
+          'Self-update the panel to the latest release. The panel runs update.sh of that release only if its sha256 is listed in the release SHA256SUMS. The server restarts on success. Bearer-token callers need admin or node-admin scope.',
         params: [
           {
             name: 'dev',
             in: 'body (form)',
             type: 'boolean',
-            desc: "Override this run's channel. Omit to use the panel's configured channel.",
+            desc: 'Kept for older master panels. still-ui publishes no dev builds: true is refused.',
             optional: true,
           },
         ],
@@ -696,16 +696,16 @@ export const sections: readonly Section[] = [
         method: 'POST',
         path: '/panel/api/server/setUpdateChannel',
         summary:
-          'Toggle the panel update channel between stable and the rolling per-commit dev release. Only effective on dev builds.',
+          'Set the panel update channel. still-ui publishes no dev builds, so only the stable channel exists: dev=false switches off a dev setting left by an older release, dev=true is refused.',
         params: [
           {
             name: 'dev',
             in: 'body (form)',
             type: 'boolean',
-            desc: 'true = dev channel, false = stable.',
+            desc: 'Must be false.',
           },
         ],
-        body: 'dev=true',
+        body: 'dev=false',
       },
       {
         method: 'POST',
@@ -1840,7 +1840,7 @@ export const sections: readonly Section[] = [
         method: 'POST',
         path: '/panel/api/nodes/updatePanel',
         summary:
-          'Trigger the official panel self-updater on each given node (downloads the latest release and restarts). Only enabled, online nodes are updated; offline/disabled ones are reported as skipped. Set "dev": true to move the nodes to the rolling per-commit dev channel instead of the latest stable release. Returns a per-node result list.',
+          'Trigger the official panel self-updater on each given node (downloads the latest release and restarts). Only enabled, online nodes are updated; offline/disabled ones are reported as skipped. "dev": true is refused (still-ui publishes no dev builds). Returns a per-node result list.',
         body: '{\n  "ids": [1, 2, 3],\n  "dev": false\n}',
         response:
           '{\n  "success": true,\n  "obj": [\n    { "id": 1, "name": "de-1", "ok": true },\n    { "id": 2, "name": "fr-1", "ok": false, "error": "node is offline" }\n  ]\n}',

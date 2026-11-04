@@ -8,8 +8,11 @@ function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
+// The token goes to the installer through its environment (STILL_PROBE_TOKEN),
+// not its command line: other local users can read a command line (ps,
+// /proc/<pid>/cmdline), but not another user's environment.
 export function probeInstallCommand(panelUrl: string, token: string): string {
-  return `bash <(curl -fsSL ${PROBE_INSTALL_SCRIPT}) --panel ${shellQuote(panelUrl)} --token ${shellQuote(token)}`;
+  return `STILL_PROBE_TOKEN=${shellQuote(token)} bash <(curl -fsSL ${PROBE_INSTALL_SCRIPT}) --panel ${shellQuote(panelUrl)}`;
 }
 
 export type ProbeBucket = 'ok' | 'fail' | 'mixed' | 'none';
