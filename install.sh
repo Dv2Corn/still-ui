@@ -239,15 +239,21 @@ _still_size_mib() {
     esac
 }
 
-# still-xray (opt-in, STILL_XRAY_UNIT=on in the env file or the environment): Xray runs as a
-# systemd unit of its own, under an unprivileged user, so a restart, update or crash of the
-# panel never drops a client. Without it Xray is the panel's child process, as in 3x-ui.
+# still-xray: Xray runs as a systemd unit of its own, under an unprivileged user, so a restart,
+# update or crash of the panel never drops a client. It is the default wherever systemd runs
+# (STILL_XRAY_UNIT unset): an existing install moves over on its next update, unless its config
+# needs what the unit's sandbox does not give (`x-ui xray-unit-check` lists it; Xray then stays
+# inside the panel and the reasons are printed). STILL_XRAY_UNIT=off keeps Xray the panel's
+# child process, as in 3x-ui; STILL_XRAY_UNIT=on forces the unit. Docker images have no
+# systemd and always keep the child process.
 # STILL_XRAY_MEMORY_MAX (e.g. 1G, default half the RAM within 256M..4G) caps the core.
 _still_xray_unit() {
     local env_file setting template unit temp_file xray_bin bin_dir dropin_dir dropin
-    local mem_kb max_mb gomem_mb
+    local mem_kb max_mb gomem_mb check_out check_rc net_admin current
     [[ -n "${xui_service:-}" ]] || return 0
     command -v systemctl > /dev/null 2>&1 || return 0
+    # systemctl without systemd as PID 1 (some containers) cannot run a unit.
+    [[ -d /run/systemd/system ]] || return 0
     case "${release}" in
         ubuntu | debian | armbian) env_file="/etc/default/still-ui" ;;
         arch | manjaro | parch | alpine) env_file="/etc/conf.d/still-ui" ;;
@@ -259,15 +265,49 @@ _still_xray_unit() {
     fi
     template="${xui_folder}/still-xray.service"
     xray_bin=$(ls "${xui_folder}"/bin/xray-linux-* 2> /dev/null | head -n 1)
+    case "$setting" in
+        on | off | auto) ;;
+        "") setting=auto ;;
+        *)
+            echo -e "${yellow}Ignoring STILL_XRAY_UNIT=${setting}: use on, off or leave it unset.${plain}"
+            setting=auto
+            ;;
+    esac
+    if [[ "$setting" == "auto" && -s "$template" && -x "$xray_bin" ]]; then
+        net_admin=""
+        grep -qs 'CAP_NET_ADMIN' "${xui_service}"/still-xray.service.d/*.conf && net_admin="-net-admin"
+        if "${xui_folder}/x-ui" xray-unit-check -h 2>&1 | grep -q -- '-net-admin'; then
+            check_out=$("${xui_folder}/x-ui" xray-unit-check ${net_admin} 2>&1)
+            check_rc=$?
+        else
+            # An older release without the check: it cannot vouch for its config, so nothing moves.
+            check_out="this release has no xray-unit-check"
+            check_rc=2
+        fi
+        case "$check_rc" in
+            0) setting=on ;;
+            3)
+                echo -e "${yellow}Xray stays inside the panel process: the still-xray service cannot run this config yet.${plain}"
+                printf '%s\n' "$check_out" | sed 's/^/  - /'
+                echo -e "${yellow}Fix that and run still-ui update again to move Xray to its own service, or set STILL_XRAY_UNIT=off in ${env_file} to keep it here.${plain}"
+                setting=off
+                ;;
+            *)
+                # The check itself failed: keep whatever mode this install already runs.
+                current=$(sed -n 's/^[[:space:]]*\(export[[:space:]]\+\)\?XUI_XRAY_UNIT=["'"'"']\?\([^"'"'"' ]*\).*/\2/p' "$env_file" 2> /dev/null | tail -n 1)
+                echo -e "${yellow}Could not check the Xray config for the still-xray service (${check_out:-exit ${check_rc}}); keeping the current mode.${plain}"
+                if [[ -n "$current" ]]; then setting=on; else setting=off; fi
+                ;;
+        esac
+    fi
     if [[ "$setting" != "on" || ! -s "$template" || ! -x "$xray_bin" ]]; then
         _still_env_set "$env_file" XUI_XRAY_UNIT ""
         if systemctl is-enabled still-xray > /dev/null 2>&1; then
             systemctl disable --now still-xray > /dev/null 2>&1
         fi
-        echo -e "${yellow}Xray runs inside the panel process, as in 3x-ui. STILL_XRAY_UNIT=on in ${env_file} runs it as its own service still-xray.${plain}"
+        echo -e "${yellow}Xray runs inside the panel process, as in 3x-ui: restarting or updating the panel drops clients.${plain}"
         return 0
     fi
-    _still_env_set "$env_file" STILL_XRAY_UNIT on || return 1
     bin_dir="${xui_folder}/bin"
     if ! id still-xray > /dev/null 2>&1; then
         useradd --system --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin --user-group still-xray > /dev/null 2>&1 \
