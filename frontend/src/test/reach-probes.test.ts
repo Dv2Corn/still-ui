@@ -6,7 +6,13 @@ describe('probeInstallCommand', () => {
   it('quotes the panel URL and token so a shell cannot split or expand them', () => {
     const cmd = probeInstallCommand("https://panel.example.com:2053/a'b$(id)/", 'tok$en');
     expect(cmd).toContain(`--panel 'https://panel.example.com:2053/a'\\''b$(id)/'`);
-    expect(cmd).toContain(`--token 'tok$en'`);
+    expect(cmd).toContain(`STILL_PROBE_TOKEN='tok$en' bash `);
+  });
+
+  it('keeps the token out of the installer arguments', () => {
+    const cmd = probeInstallCommand('https://panel.example.com/', 'secret48');
+    expect(cmd).not.toContain('--token');
+    expect(cmd.indexOf('secret48')).toBeLessThan(cmd.indexOf('bash'));
   });
 });
 

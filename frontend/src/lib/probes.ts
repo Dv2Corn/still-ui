@@ -8,8 +8,10 @@ function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
+// The token travels in the environment, not in argv: a command-line argument is visible to
+// every user of the probe box in `ps` while the installer runs.
 export function probeInstallCommand(panelUrl: string, token: string): string {
-  return `bash <(curl -fsSL ${PROBE_INSTALL_SCRIPT}) --panel ${shellQuote(panelUrl)} --token ${shellQuote(token)}`;
+  return `STILL_PROBE_TOKEN=${shellQuote(token)} bash <(curl -fsSL ${PROBE_INSTALL_SCRIPT}) --panel ${shellQuote(panelUrl)}`;
 }
 
 export type ProbeBucket = 'ok' | 'fail' | 'mixed' | 'none';
