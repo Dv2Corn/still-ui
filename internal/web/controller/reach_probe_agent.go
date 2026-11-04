@@ -44,28 +44,30 @@ func agentError(c *gin.Context, status int, msg string) {
 	c.AbortWithStatusJSON(status, gin.H{"error": msg})
 }
 
+// authenticate checks the token before the per-address limit: only failures are counted and
+// limited, so a valid token is never held back by other users of the same address (mobile CGNAT,
+// a proxy, the VPN's own exit). The token is looked up by its SHA-256 hash, never compared as text.
 func (a *ReachProbeAgentController) authenticate(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	ip := getRemoteIp(c)
-	if !a.limiter.allowIP(ip) {
-		agentError(c, http.StatusTooManyRequests, "too many failed attempts")
-		return
+	var probe *model.ReachProbe
+	err := service.ErrReachProbeUnauthorized
+	if token, ok := strings.CutPrefix(c.GetHeader("Authorization"), "Bearer "); ok {
+		probe, err = a.probeService.Authenticate(token)
 	}
-	token, ok := strings.CutPrefix(c.GetHeader("Authorization"), "Bearer ")
-	if !ok {
-		a.limiter.failIP(ip)
-		agentError(c, http.StatusUnauthorized, "unauthorized")
-		return
-	}
-	probe, err := a.probeService.Authenticate(token)
 	if err != nil {
-		if errors.Is(err, service.ErrReachProbeUnauthorized) {
-			a.limiter.failIP(ip)
-			agentError(c, http.StatusUnauthorized, "unauthorized")
+		if !errors.Is(err, service.ErrReachProbeUnauthorized) {
+			logger.Warning("reach probe: authenticate:", err)
+			agentError(c, http.StatusInternalServerError, "internal error")
 			return
 		}
-		logger.Warning("reach probe: authenticate:", err)
-		agentError(c, http.StatusInternalServerError, "internal error")
+		blocked := !a.limiter.allowIP(ip)
+		a.limiter.failIP(ip)
+		if blocked {
+			agentError(c, http.StatusTooManyRequests, "too many failed attempts")
+			return
+		}
+		agentError(c, http.StatusUnauthorized, "unauthorized")
 		return
 	}
 	if !a.limiter.allowProbe(probe.Id) {
@@ -83,7 +85,11 @@ func agentProbe(c *gin.Context) *model.ReachProbe {
 }
 
 func (a *ReachProbeAgentController) job(c *gin.Context) {
-	job, err := a.probeService.BuildJob(agentProbe(c), resolveHost(c))
+	job, err := a.probeService.BuildJob(agentProbe(c))
+	if errors.Is(err, service.ErrReachProbeNoHost) {
+		agentError(c, http.StatusConflict, err.Error())
+		return
+	}
 	if err != nil {
 		logger.Warning("reach probe: build job:", err)
 		agentError(c, http.StatusInternalServerError, "internal error")
@@ -105,8 +111,12 @@ func (a *ReachProbeAgentController) report(c *gin.Context) {
 		agentError(c, http.StatusBadRequest, "malformed report")
 		return
 	}
-	stored, err := a.probeService.Ingest(agentProbe(c), resolveHost(c), &report)
+	stored, err := a.probeService.Ingest(agentProbe(c), &report)
 	if err != nil {
+		if errors.Is(err, service.ErrReachProbeNoHost) {
+			agentError(c, http.StatusConflict, err.Error())
+			return
+		}
 		if errors.Is(err, service.ErrReachReportTooLarge) {
 			agentError(c, http.StatusBadRequest, err.Error())
 			return

@@ -162,7 +162,57 @@ var (
 	ErrReachProbeUnauthorized = errors.New("probe token is not valid")
 	ErrReachReportTooLarge    = fmt.Errorf("a report may hold at most %d results", reachProbeMaxTargets)
 	errReachProbeNotFound     = errors.New("probe not found")
+	// ErrReachProbeNoHost: no address to build the probe's links for. The agent's own Host header
+	// is never used, or one token could mint targets without bound.
+	ErrReachProbeNoHost = errors.New("the probe has no panel address: set the subscription or web domain in the panel settings, or open the probe on the Probes page and save it")
 )
+
+// reachProbeMaxHostLen bounds a stored panel host (a DNS name is at most 253 bytes).
+const reachProbeMaxHostLen = 253
+
+// reachPanelHost returns host when it can be told to a probe on another network: not empty, not
+// loopback or a wildcard address, only host-name characters. Anything else is "".
+func reachPanelHost(host string) string {
+	host = strings.TrimSpace(host)
+	if host == "" || len(host) > reachProbeMaxHostLen || strings.EqualFold(host, "localhost") {
+		return ""
+	}
+	if strings.ContainsFunc(host, func(r rune) bool { return !reachHostRune(r) }) {
+		return ""
+	}
+	if ip := net.ParseIP(strings.Trim(host, "[]")); ip != nil && (ip.IsLoopback() || ip.IsUnspecified()) {
+		return ""
+	}
+	return host
+}
+
+// reachHostRune reports whether r may appear in a host name or an IP literal.
+func reachHostRune(r rune) bool {
+	switch {
+	case r == '.', r == '-', r == ':', r == '[', r == ']':
+		return true
+	case r >= utf8.RuneSelf:
+		return false
+	}
+	return unicode.IsLetter(r) || unicode.IsDigit(r)
+}
+
+// jobHost is the address the probe's links are built for: the configured public host
+// (subscription domain, then web domain) as for subscriptions, else the address the admin saved
+// the probe from. Never the request of the agent.
+func (s *ReachProbeService) jobHost(row *model.ReachProbe) (string, error) {
+	settings := SettingService{}
+	if d, err := settings.GetSubDomain(); err == nil && reachPanelHost(d) != "" {
+		return reachPanelHost(d), nil
+	}
+	if d, err := settings.GetWebDomain(); err == nil && reachPanelHost(d) != "" {
+		return reachPanelHost(d), nil
+	}
+	if h := reachPanelHost(row.PanelHost); h != "" {
+		return h, nil
+	}
+	return "", ErrReachProbeNoHost
+}
 
 func (s *ReachProbeService) clock() time.Time {
 	if s.now != nil {
@@ -256,9 +306,10 @@ func unmarshalReachStream(raw string) map[string]any {
 	return stream
 }
 
-// Create stores a new probe and the client it connects as. The returned bool
-// asks the caller to schedule an Xray reconcile, as client creation does.
-func (s *ReachProbeService) Create(in ReachProbeInput) (*ReachProbeCreated, bool, error) {
+// Create stores a new probe and the client it connects as. panelHost is the panel address the
+// admin is using; the probe's links are built for it. The returned bool asks the caller to
+// schedule an Xray reconcile, as client creation does.
+func (s *ReachProbeService) Create(in ReachProbeInput, panelHost string) (*ReachProbeCreated, bool, error) {
 	if err := s.validateReachInput(&in); err != nil {
 		return nil, false, err
 	}
@@ -294,6 +345,7 @@ func (s *ReachProbeService) Create(in ReachProbeInput) (*ReachProbeCreated, bool
 		TestURL:     in.TestUrl,
 		DirectURL:   in.DirectUrl,
 		IntervalSec: in.IntervalSec,
+		PanelHost:   reachPanelHost(panelHost),
 	}
 	if err := db.Create(row).Error; err != nil {
 		if again, delErr := s.clientService.DeleteByEmail(&s.inboundService, email, false); delErr != nil {
@@ -310,8 +362,9 @@ func (s *ReachProbeService) Create(in ReachProbeInput) (*ReachProbeCreated, bool
 	return &ReachProbeCreated{Probe: *view, Token: token}, needRestart, nil
 }
 
-// Update changes a probe's settings and moves its client to the chosen inbounds.
-func (s *ReachProbeService) Update(id int, in ReachProbeInput) (bool, error) {
+// Update changes a probe's settings and moves its client to the chosen inbounds. A usable
+// panelHost replaces the stored one; a loopback one (an SSH tunnel) keeps it.
+func (s *ReachProbeService) Update(id int, in ReachProbeInput, panelHost string) (bool, error) {
 	if err := s.validateReachInput(&in); err != nil {
 		return false, err
 	}
@@ -343,12 +396,16 @@ func (s *ReachProbeService) Update(id int, in ReachProbeInput) (bool, error) {
 	if err != nil {
 		return needRestart, err
 	}
+	host := row.PanelHost
+	if h := reachPanelHost(panelHost); h != "" {
+		host = h
+	}
 	err = db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Model(&model.ReachProbe{Id: id}).
-			Select("name", "enabled", "inbound_ids", "test_url", "direct_url", "interval_sec", "stale_alerted").
+			Select("name", "enabled", "inbound_ids", "test_url", "direct_url", "interval_sec", "stale_alerted", "panel_host").
 			Updates(&model.ReachProbe{
 				Name: in.Name, Enabled: enabled, InboundIds: in.InboundIds, TestURL: in.TestUrl,
-				DirectURL: in.DirectUrl, IntervalSec: in.IntervalSec, StaleAlerted: false,
+				DirectURL: in.DirectUrl, IntervalSec: in.IntervalSec, StaleAlerted: false, PanelHost: host,
 			}).Error; err != nil {
 			return err
 		}
@@ -534,6 +591,16 @@ func (s *ReachProbeService) Authenticate(token string) (*model.ReachProbe, error
 	return row, nil
 }
 
+// AdoptPanelHost gives probes saved before the panel kept their address the one the admin is
+// using now; probes that have one keep it.
+func (s *ReachProbeService) AdoptPanelHost(panelHost string) error {
+	host := reachPanelHost(panelHost)
+	if host == "" {
+		return nil
+	}
+	return database.GetDB().Model(&model.ReachProbe{}).Where("panel_host = ?", "").Update("panel_host", host).Error
+}
+
 func (s *ReachProbeService) List() ([]ReachProbeView, error) {
 	var rows []*model.ReachProbe
 	if err := database.GetDB().Order("id asc").Find(&rows).Error; err != nil {
@@ -645,8 +712,12 @@ func (s *ReachProbeService) History(id int) ([]ReachHistoryPoint, error) {
 
 // BuildJob renders the probe client's share links for every chosen inbound,
 // the same links a subscription would hand out, and converts each to an
-// Xray outbound. host is the panel host the agent called, as for "copy link".
-func (s *ReachProbeService) BuildJob(row *model.ReachProbe, host string) (*ReachProbeJob, error) {
+// Xray outbound. The links are built for jobHost, never for the agent's request.
+func (s *ReachProbeService) BuildJob(row *model.ReachProbe) (*ReachProbeJob, error) {
+	host, err := s.jobHost(row)
+	if err != nil {
+		return nil, err
+	}
 	job := &ReachProbeJob{
 		Probe:       row.Name,
 		IntervalSec: row.IntervalSec,
@@ -783,14 +854,14 @@ func stepReachTarget(st *model.ReachProbeTarget, ok bool, nowMs int64) reachTran
 
 // Ingest stores an agent's report. Results for targets that are not in the
 // probe's current job are dropped, so a token can only describe its own checks.
-func (s *ReachProbeService) Ingest(row *model.ReachProbe, host string, report *ReachReport) (int, error) {
+func (s *ReachProbeService) Ingest(row *model.ReachProbe, report *ReachReport) (int, error) {
 	if report == nil {
 		return 0, common.NewError("empty report")
 	}
 	if len(report.Results) > reachProbeMaxTargets {
 		return 0, ErrReachReportTooLarge
 	}
-	job, err := s.BuildJob(row, host)
+	job, err := s.BuildJob(row)
 	if err != nil {
 		return 0, err
 	}
@@ -868,6 +939,9 @@ func (s *ReachProbeService) Ingest(row *model.ReachProbe, host string, report *R
 		}).Error; err != nil {
 			return err
 		}
+		if err := capReachTargetsTx(tx, row.Id, known); err != nil {
+			return err
+		}
 		return tx.Where("probe_id = ? AND at < ?", row.Id, now.Add(-reachProbeHistory).UnixMilli()).
 			Delete(&model.ReachProbeResult{}).Error
 	})
@@ -878,6 +952,41 @@ func (s *ReachProbeService) Ingest(row *model.ReachProbe, host string, report *R
 		s.emit(e)
 	}
 	return stored, nil
+}
+
+// capReachTargetsTx keeps a probe at no more than reachProbeMaxTargets alert states: past the
+// cap, the states of targets that are not in the current job go (a job never holds more).
+func capReachTargetsTx(tx *gorm.DB, probeID int, known map[string]ReachJobTarget) error {
+	var count int64
+	if err := tx.Model(&model.ReachProbeTarget{}).Where("probe_id = ?", probeID).Count(&count).Error; err != nil {
+		return err
+	}
+	if count <= reachProbeMaxTargets {
+		return nil
+	}
+	keys := make([]string, 0, len(known))
+	for k := range known {
+		keys = append(keys, k)
+	}
+	q := tx.Where("probe_id = ?", probeID)
+	if len(keys) > 0 {
+		q = q.Where("target_key NOT IN ?", keys)
+	}
+	return q.Delete(&model.ReachProbeTarget{}).Error
+}
+
+// PruneHistory deletes results older than the seven-day history of every probe, also of probes
+// that stopped reporting (Ingest prunes only the reporting one), and the alert states of targets
+// with no result left in that window: a target nobody checks for a week is an orphan.
+func (s *ReachProbeService) PruneHistory() error {
+	since := s.clock().Add(-reachProbeHistory).UnixMilli()
+	return database.GetDB().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("at < ?", since).Delete(&model.ReachProbeResult{}).Error; err != nil {
+			return err
+		}
+		return tx.Where("NOT EXISTS (SELECT 1 FROM reach_probe_results r WHERE r.probe_id = reach_probe_targets.probe_id AND r.target_key = reach_probe_targets.target_key)").
+			Delete(&model.ReachProbeTarget{}).Error
+	})
 }
 
 func clampInt(v, lo, hi int) int {

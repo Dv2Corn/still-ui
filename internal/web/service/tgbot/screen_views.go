@@ -11,6 +11,7 @@ import (
 
 	"github.com/mhsanaei/3x-ui/v3/internal/logger"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/common"
+	"github.com/mhsanaei/3x-ui/v3/internal/web/service"
 	"github.com/mhsanaei/3x-ui/v3/internal/xray"
 
 	"github.com/mymmrac/telego"
@@ -251,29 +252,28 @@ func (t *Tgbot) screenCommands(chatID int64, isAdmin bool) {
 }
 
 // sendBackupScreen delivers the backup and summary as ONE message (file plus
-// caption); a summary too long for a caption is sent after the file.
+// caption); a summary too long for a caption is sent after the file. The copy
+// is encrypted exactly as a scheduled one (service.PrepareChatBackup), and only
+// an admin chat receives it.
 func (t *Tgbot) sendBackupScreen(chatID int64) {
-	dbData, err := t.serverService.GetDb()
-	if err != nil {
-		logger.Error("Error in getting db backup:", err)
+	if !checkAdmin(chatID) {
+		logger.Warning("Backup asked for in chat ", chatID, ", which is not a Telegram admin chat: not sent")
+		return
 	}
 	summary := t.I18nBot("tgbot.messages.hostname", "Hostname=="+hostname)
 	summary += t.I18nBot("tgbot.messages.backupTime", "Time=="+time.Now().Format("2006-01-02 15:04:05"))
 
-	if dbData == nil {
-		t.sendNotice(chatID, summary)
+	b, err := service.PrepareChatBackup(&t.serverService)
+	if err != nil {
+		logger.Error("Cannot prepare the backup for Telegram: ", err)
+		t.sendNotice(chatID, summary+t.backupFailureText(err))
 		return
 	}
 	// The summary and the depletion list share the file's caption: one message
 	// carries the backup and what it is for.
-	body := summary + "\n\n" + t.depleteReport()
+	body := t.backupBody(b.Encrypted)
 	caption := trimCaption(body, botCaptionLimit)
-	if t.sendDocumentWithCaption(chatID, dbData, t.serverService.BackupFilename(""), caption) {
-		// The generated config travels with the DB on both backup paths: an
-		// operator restoring from the file would otherwise lose it silently.
-		if config, err := os.ReadFile(xray.GetConfigPath()); err == nil {
-			t.sendDocumentWithCaption(chatID, config, "config.json", "")
-		}
+	if t.deliverBackup(chatID, b, caption) {
 		if rest := strings.TrimSpace(strings.TrimPrefix(body, caption)); rest != "" {
 			// Rare: the summary outgrew a caption. The file already landed.
 			t.sendNotice(chatID, rest)

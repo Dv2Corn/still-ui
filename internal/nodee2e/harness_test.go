@@ -49,14 +49,27 @@ type panel struct {
 	logOut *os.File
 }
 
+// handedOut holds every port freePort returned. An inbound that is off, or
+// whose Xray has not started yet, holds no socket, so the kernel may offer
+// its port again; a second inbound on it is then refused as a duplicate
+// (CI 04.11.2026: "port 36551 (tcp) already used by inbound #3").
+var handedOut sync.Map
+
 func freePort(t *testing.T) int {
 	t.Helper()
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("free port: %v", err)
+	for range 100 {
+		l, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatalf("free port: %v", err)
+		}
+		port := l.Addr().(*net.TCPAddr).Port
+		l.Close()
+		if _, taken := handedOut.LoadOrStore(port, true); !taken {
+			return port
+		}
 	}
-	defer l.Close()
-	return l.Addr().(*net.TCPAddr).Port
+	t.Fatal("free port: no port that was not handed out before")
+	return 0
 }
 
 func (p *panel) env() []string {

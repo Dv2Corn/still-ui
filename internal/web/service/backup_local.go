@@ -237,24 +237,6 @@ func pgDumpToFile(dst string) error {
 	return nil
 }
 
-// EncryptForTelegram encrypts data to the backup recipients when any are set; ok is false
-// (data returned as is) when backups are not encrypted.
-func (s *LocalBackupService) EncryptForTelegram(data []byte) (out []byte, ok bool, err error) {
-	text, err := s.settingService.GetBackupAgeRecipients()
-	if err != nil {
-		return nil, false, err
-	}
-	recipients, err := backup.ParseRecipients(text)
-	if err != nil {
-		return nil, false, err
-	}
-	if len(recipients) == 0 {
-		return data, false, nil
-	}
-	out, err = backup.EncryptBytes(data, recipients)
-	return out, err == nil, err
-}
-
 // RestoreResult says what a restore replaced and where the previous database was kept.
 type RestoreResult struct {
 	Kind     string // "sqlite" or "postgres"

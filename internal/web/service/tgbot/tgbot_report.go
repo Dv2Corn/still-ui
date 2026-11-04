@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"html"
 	"net"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/mhsanaei/3x-ui/v3/internal/backup"
 	"github.com/mhsanaei/3x-ui/v3/internal/config"
 	"github.com/mhsanaei/3x-ui/v3/internal/eventbus"
 	"github.com/mhsanaei/3x-ui/v3/internal/logger"
@@ -97,59 +97,79 @@ func (t *Tgbot) sendReport(chatID int64, body string) {
 	}
 }
 
-// backupSummary is the caption that travels with a scheduled backup.
-func (t *Tgbot) backupSummary() string {
-	summary := t.I18nBot("tgbot.messages.hostname", "Hostname=="+hostname)
-	summary += t.I18nBot("tgbot.messages.backupTime", "Time=="+time.Now().Format("2006-01-02 15:04:05"))
-	return trimCaption(summary+"\n\n"+t.depleteReport(), botCaptionLimit)
+// backupFileGap spaces the files of one backup: Telegram throttles bursts to one chat.
+var backupFileGap = 500 * time.Millisecond
+
+// backupBody is the text that travels with a backup: host and time, a warning when the copy is
+// not encrypted (so the admin knows what landed in the chat and how to change it), and the
+// depletion list. The warning comes before the list so a trimmed caption keeps it.
+func (t *Tgbot) backupBody(encrypted bool) string {
+	body := t.I18nBot("tgbot.messages.hostname", "Hostname=="+hostname)
+	body += t.I18nBot("tgbot.messages.backupTime", "Time=="+time.Now().Format("2006-01-02 15:04:05"))
+	if !encrypted {
+		body += t.I18nBot("tgbot.messages.backupNotEncrypted")
+	}
+	if deplete := t.depleteReport(); deplete != "" {
+		body += "\n\n" + deplete
+	}
+	return body
 }
 
-// SendBackupToAdmins sends the database and, when it exists, the generated Xray
-// config to admin chats. A failed DB read is reported, not sent silently.
+// backupFailureText says why no backup was sent.
+func (t *Tgbot) backupFailureText(err error) string {
+	if errors.Is(err, service.ErrChatBackupEncrypt) || errors.Is(err, service.ErrChatBackupPlain) {
+		return t.I18nBot("tgbot.messages.backupEncryptFailed")
+	}
+	return t.I18nBot("tgbot.messages.backupFailed")
+}
+
+// deliverBackup posts one backup to one chat; it reports whether the database file landed.
+// Every backup the bot sends goes through here, and this is the only caller of
+// sendDocumentWithCaption (TestBackupBytesLeaveOnlyThroughDeliverBackup): the chat must be a
+// configured admin chat, and service.CheckChatBackup refuses a plain file while encryption keys
+// are set, whichever path built it.
+func (t *Tgbot) deliverBackup(chatID int64, b *service.ChatBackup, caption string) bool {
+	if !checkAdmin(chatID) {
+		logger.Warning("Not sending a backup to chat ", chatID, ": it is not a Telegram admin chat")
+		return false
+	}
+	if _, err := service.CheckChatBackup(b); err != nil {
+		logger.Error("Not sending the backup to Telegram: ", err)
+		return false
+	}
+	for i, f := range b.Files {
+		if i == 0 {
+			if !t.sendDocumentWithCaption(chatID, f.Data, f.Name, caption) {
+				return false
+			}
+			continue
+		}
+		time.Sleep(backupFileGap)
+		t.sendDocumentWithCaption(chatID, f.Data, f.Name, "")
+	}
+	return true
+}
+
+// SendBackupToAdmins sends the database and, when it exists, the generated Xray config to the
+// admin chats, encrypted when backup encryption keys are set. A failure is reported, not
+// replaced by a plain copy.
 func (t *Tgbot) SendBackupToAdmins() {
 	if !t.IsRunning() {
 		return
 	}
-	dbData, err := t.serverService.GetDb()
+	b, err := service.PrepareChatBackup(&t.serverService)
+	caption := ""
 	if err != nil {
-		logger.Error("Error in getting db backup: ", err)
-	}
-	dbFilename := t.serverService.BackupFilename("")
-	config, configErr := os.ReadFile(xray.GetConfigPath())
-	if configErr != nil {
-		logger.Warning("Cannot read the Xray config for the backup: ", configErr)
-	}
-	// With backup encryption keys set, neither file leaves the server in the clear.
-	if dbData != nil {
-		backups := &service.LocalBackupService{}
-		enc, encrypted, encErr := backups.EncryptForTelegram(dbData)
-		switch {
-		case encErr != nil:
-			logger.Error("Cannot encrypt the backup for Telegram, not sending it: ", encErr)
-			dbData = nil
-		case encrypted:
-			dbData, dbFilename = enc, dbFilename+".age"
-			if configErr == nil {
-				if config, _, configErr = backups.EncryptForTelegram(config); configErr != nil {
-					logger.Error("Cannot encrypt the Xray config for Telegram, not sending it: ", configErr)
-				}
-			}
-		}
-	}
-	configName := "config.json"
-	if strings.HasSuffix(dbFilename, ".age") {
-		configName += ".age"
+		logger.Error("Cannot prepare the backup for Telegram: ", err)
+	} else {
+		caption = trimCaption(t.backupBody(b.Encrypted), botCaptionLimit)
 	}
 	admins := adminSnapshot()
 	for i, adminId := range admins {
-		if dbData == nil {
-			t.sendNotice(adminId, t.I18nBot("tgbot.messages.backupFailed"))
+		if err != nil {
+			t.sendNotice(adminId, t.backupFailureText(err))
 		} else {
-			t.sendDocumentWithCaption(adminId, dbData, dbFilename, t.backupSummary())
-			time.Sleep(500 * time.Millisecond)
-			if configErr == nil {
-				t.sendDocumentWithCaption(adminId, config, configName, "")
-			}
+			t.deliverBackup(adminId, b, caption)
 		}
 		// Add delay between sends to avoid Telegram rate limits
 		if i < len(admins)-1 {
@@ -375,10 +395,13 @@ func (t *Tgbot) notifyExhausted() {
 }
 
 // SendBackupFile sends a scheduled local backup (already encrypted) to every admin chat; it
-// fails only when no admin received it.
+// fails only when no admin received it. A plain file is refused: those never leave the server.
 func (t *Tgbot) SendBackupFile(name string, data []byte) error {
 	if !t.IsRunning() {
 		return service.ErrTelegramOff
+	}
+	if !backup.IsEncrypted(data) {
+		return service.ErrChatBackupPlain
 	}
 	admins := adminSnapshot()
 	if len(admins) == 0 {
@@ -386,9 +409,10 @@ func (t *Tgbot) SendBackupFile(name string, data []byte) error {
 	}
 	caption := t.I18nBot("tgbot.messages.hostname", "Hostname=="+hostname) +
 		t.I18nBot("tgbot.messages.backupTime", "Time=="+time.Now().Format("2006-01-02 15:04:05"))
+	b := &service.ChatBackup{Files: []service.ChatBackupFile{{Name: name, Data: data}}, Encrypted: true}
 	sent := 0
 	for i, adminID := range admins {
-		if t.sendDocumentWithCaption(adminID, data, name, trimCaption(caption, botCaptionLimit)) {
+		if t.deliverBackup(adminID, b, trimCaption(caption, botCaptionLimit)) {
 			sent++
 		}
 		if i < len(admins)-1 {
