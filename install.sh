@@ -1439,6 +1439,13 @@ prompt_and_setup_ssl() {
 
 config_after_install() {
     local settings existing_webBasePath
+    if [[ "${STILL_UI_MIGRATING:-}" == "1" ]]; then
+        # migrate.sh moved a 3x-ui database in: its login, base path, port and
+        # certificates must stay exactly as they are, so none of the first-run
+        # setup applies; only the schema migration does.
+        ${xui_folder}/x-ui migrate
+        return
+    fi
     if ! settings=$("${xui_folder}/x-ui" setting -show true) ||
         ! existing_webBasePath=$(printf '%s\n' "$settings" | awk '
             /^get .* failed, error info:/ { failed = 1 }
@@ -2307,14 +2314,7 @@ install_x-ui() {
     chmod +x /usr/bin/still-ui
     mkdir -p /var/log/still-ui
     _still_import_3xui
-    if [[ "${STILL_UI_MIGRATING:-}" == "1" ]]; then
-        # migrate.sh moved a 3x-ui database in: its login, base path, port and
-        # certificates must stay exactly as they are, so none of the first-run
-        # setup applies; only the schema migration does.
-        ${xui_folder}/x-ui migrate
-    else
-        config_after_install
-    fi
+    config_after_install
 
     # Etckeeper compatibility
     if [ -d "/etc/.git" ]; then

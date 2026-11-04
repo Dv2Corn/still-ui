@@ -349,33 +349,43 @@ backup_db() { # name
     if [[ "$XUI_DB_TYPE" == "sqlite" ]]; then
         migrate_cli backup -src "$XUI_DB" -dst "${BK}/$1.db" > /dev/null || return 1
     else
-        pg_dump_dsn -Fc -f "${BK}/$1.pgdump" || return 1
+        pg_dump_db -Fc -f "${BK}/$1.pgdump" || return 1
         pg_restore --list "${BK}/$1.pgdump" > /dev/null || return 1
     fi
 }
 
-# libpq reads the password from PGPASSWORD, so it never shows in ps.
-pg_split_dsn() {
-    PG_DSN_NOPASS="$XUI_DB_DSN"
-    PG_PASS=""
-    if [[ "$XUI_DB_DSN" =~ ^(postgres(ql)?://[^:/@]+):([^@]*)@(.*)$ ]]; then
-        PG_DSN_NOPASS="${BASH_REMATCH[1]}@${BASH_REMATCH[4]}"
-        PG_PASS=$(printf '%b' "${BASH_REMATCH[3]//%/\\x}")
-    elif [[ "$XUI_DB_DSN" =~ (^|[[:space:]])password=([^[:space:]]*) ]]; then
-        PG_PASS="${BASH_REMATCH[2]}"
-        PG_DSN_NOPASS="${XUI_DB_DSN/password=${PG_PASS}/}"
-    fi
+# PostgreSQL: the DSN never goes on a command line, where every local user
+# could read its password in ps. "x-ui migrate-3xui pgenv" parses it with the
+# panel driver's rules into libpq variables (refusing anything it cannot map),
+# saved 0600 in PG_ENV_FILE; pg_run exports them with the shell builtin and
+# runs pg_dump/pg_restore with no connection argument at all.
+PG_ENV_FILE=""
+
+pg_load_env() { # file
+    (umask 077 && migrate_cli pgenv > "$1") ||
+        die "Cannot hand 3x-ui's PostgreSQL DSN to pg_dump without putting it on the command line (see above); nothing was changed."
+    PG_ENV_FILE="$1"
 }
 
-pg_dump_dsn() {
-    pg_split_dsn
-    PGPASSWORD="$PG_PASS" pg_dump --no-owner -d "$PG_DSN_NOPASS" "$@"
+pg_run() { # command args...
+    [[ -n "$PG_ENV_FILE" && -f "$PG_ENV_FILE" ]] || {
+        err "No PostgreSQL connection settings (pg.env) to run $1 with."
+        return 1
+    }
+    (
+        local name value
+        unset XUI_DB_DSN PGSERVICE PGSERVICEFILE PGHOST PGHOSTADDR PGPORT PGDATABASE PGUSER PGPASSWORD PGPASSFILE PGSSLMODE
+        while IFS=$'\t' read -r name value; do
+            [[ "$name" =~ ^PG[A-Z_]+$ ]] || continue
+            export "${name}=${value}"
+        done < "$PG_ENV_FILE"
+        "$@"
+    )
 }
 
-pg_restore_dsn() {
-    pg_split_dsn
-    PGPASSWORD="$PG_PASS" pg_restore --no-owner --clean --if-exists --single-transaction -d "$PG_DSN_NOPASS" "$@"
-}
+pg_dump_db() { pg_run pg_dump --no-owner "$@"; }
+
+pg_restore_db() { pg_run pg_restore --no-owner --clean --if-exists --single-transaction "$@"; }
 
 # make_backup: everything a rollback needs, before anything changes.
 make_backup() {
@@ -392,6 +402,10 @@ make_backup() {
     chmod 700 "$BK"
     info "Backing up 3x-ui to ${BK} ..."
 
+    if [[ "$XUI_DB_TYPE" == "postgres" ]]; then
+        cp "$PG_ENV_FILE" "${BK}/pg.env" || die "Could not keep the PostgreSQL settings in ${BK}."
+        PG_ENV_FILE="${BK}/pg.env"
+    fi
     backup_db x-ui || die "Database backup failed; nothing was changed."
     # 3x-ui is running and rewrites bin/config.json (and logs) at will: GNU
     # tar exits 1 for "file changed as we read it", which is fine here. The
@@ -488,20 +502,28 @@ stop_xui() {
 }
 
 hand_db_to_still_ui() {
-    local f dst_env
+    local f dst_env tmp
     if [[ "$XUI_DB_TYPE" == "sqlite" ]]; then
         install -d -m 700 "$STILL_DB_DIR" || return 1
-        cp "${BK}/x-ui.at-stop.db" "${STILL_DB_DIR}/x-ui.db" || return 1
+        # Created 0600: the database holds the login, client keys and tokens.
+        (umask 077 && cp "${BK}/x-ui.at-stop.db" "${STILL_DB_DIR}/x-ui.db") || return 1
         chmod 600 "${STILL_DB_DIR}/x-ui.db"
         f="$(dirname "$XUI_DB")/node_token_key.json"
         [[ -f "$f" ]] && cp -a "$f" "${STILL_DB_DIR}/"
     fi
     if [[ -n "$XUI_ENV_FILE" ]]; then
         dst_env="${XUI_ENV_FILE%/x-ui}/still-ui"
-        # 3x-ui's folders must not follow: still-ui keeps its own, and an
-        # XUI_DB_FOLDER pointing at /etc/x-ui would open 3x-ui's database.
-        grep -Ev '^[[:space:]]*(export[[:space:]]+)?XUI_(DB_FOLDER|BIN_FOLDER|LOG_FOLDER|MAIN_FOLDER)=' "$XUI_ENV_FILE" > "$dst_env" || true
-        chmod 600 "$dst_env"
+        # The env file may hold the database password: it is written to a
+        # 0600 temporary file next to its place and moved there, so it is
+        # never readable by others. 3x-ui's folders must not follow: still-ui
+        # keeps its own, and an XUI_DB_FOLDER pointing at /etc/x-ui would open
+        # 3x-ui's database.
+        tmp=$(umask 077 && mktemp "${dst_env}.XXXXXX") || return 1
+        grep -Ev '^[[:space:]]*(export[[:space:]]+)?XUI_(DB_FOLDER|BIN_FOLDER|LOG_FOLDER|MAIN_FOLDER)=' "$XUI_ENV_FILE" > "$tmp"
+        if ! { chmod 600 "$tmp" && mv -f "$tmp" "$dst_env"; }; then
+            rm -f "$tmp"
+            return 1
+        fi
     fi
     return 0
 }
@@ -512,7 +534,9 @@ run_install() {
         [[ -e "$f" ]] && fail2ban=true
     done
     info "Installing still-ui (log: ${BK}/install.log) ..."
-    (cd "$WORK" && env NONINTERACTIVE=1 XUI_NONINTERACTIVE=1 STILL_UI_MIGRATING=1 \
+    # The installer creates program files and folders others must read:
+    # it runs with the usual umask, not this script's 077.
+    (cd "$WORK" && umask 022 && env NONINTERACTIVE=1 XUI_NONINTERACTIVE=1 STILL_UI_MIGRATING=1 \
         STILL_UI_ARCHIVE="$STILL_ARCHIVE" XUI_ENABLE_FAIL2BAN="$fail2ban" \
         bash "${WORK}/install.sh" < /dev/null > "${BK}/install.log" 2>&1)
 }
@@ -634,6 +658,8 @@ cmd_migrate() {
         die "3x-ui ${XUI_VERSION} is newer than the 3x-ui ${STILL_UPSTREAM} this still-ui is based on; its database may hold data still-ui does not know. Wait for a still-ui release based on it, or set STILL_UI_MIGRATE_ALLOW_NEWER=1."
     fi
 
+    [[ "$XUI_DB_TYPE" == "postgres" ]] && pg_load_env "${WORK}/pg.env"
+
     # What has to survive, read while 3x-ui serves clients.
     local before="${WORK}/before"
     mkdir -p "$before"
@@ -710,7 +736,7 @@ do_rollback() {
         err "The backup in ${dir} does not match its checksums; refusing to restore from it."
         return 1
     fi
-    local M_XUI_DIR M_XUI_UNIT M_XUI_DB_TYPE M_XUI_DB M_XUI_ACTIVE M_XUI_ENABLED M_XUI_XRAY M_XUI_ENV_FILE
+    local M_XUI_DIR M_XUI_UNIT M_XUI_DB_TYPE M_XUI_DB M_XUI_ACTIVE M_XUI_ENABLED M_XUI_XRAY
     M_XUI_DIR=$(env_value "${dir}/manifest.env" XUI_DIR)
     M_XUI_UNIT=$(env_value "${dir}/manifest.env" XUI_UNIT)
     M_XUI_DB_TYPE=$(env_value "${dir}/manifest.env" XUI_DB_TYPE)
@@ -718,7 +744,6 @@ do_rollback() {
     M_XUI_ACTIVE=$(env_value "${dir}/manifest.env" XUI_ACTIVE)
     M_XUI_ENABLED=$(env_value "${dir}/manifest.env" XUI_ENABLED)
     M_XUI_XRAY=$(env_value "${dir}/manifest.env" XUI_XRAY)
-    M_XUI_ENV_FILE=$(env_value "${dir}/manifest.env" XUI_ENV_FILE)
     [[ -n "$M_XUI_DIR" && -n "$M_XUI_UNIT" ]] || {
         err "Incomplete manifest in ${dir}."
         return 1
@@ -743,8 +768,8 @@ do_rollback() {
         [[ "$exe" == "${STILL_DIR}/"* ]] && kill "$pid" 2> /dev/null
     done
     if [[ "$M_XUI_DB_TYPE" == "postgres" ]]; then
-        XUI_DB_DSN=$(env_value "${dir}/files${M_XUI_ENV_FILE}" XUI_DB_DSN)
-        pg_dump_dsn -Fc -f "${after}/still-ui.pgdump" || warn "Could not dump still-ui's PostgreSQL data before restoring."
+        PG_ENV_FILE="${dir}/pg.env"
+        pg_dump_db -Fc -f "${after}/still-ui.pgdump" || warn "Could not dump still-ui's PostgreSQL data before restoring."
     fi
     [[ -d "$STILL_DB_DIR" ]] && mv "$STILL_DB_DIR" "${after}/etc-still-ui"
     for f in /etc/default/still-ui /etc/conf.d/still-ui /etc/sysconfig/still-ui /etc/x-ui/install-result.env.still-ui; do
@@ -763,7 +788,7 @@ do_rollback() {
     while IFS= read -r f; do
         [[ -n "$f" ]] || continue
         rm -rf "$f"
-        mkdir -p "$(dirname "$f")"
+        (umask 022 && mkdir -p "$(dirname "$f")")
         cp -a "${dir}/files${f}" "$f" || rc=1
     done < "${dir}/files.list"
     if [[ -f "${dir}/fail2ban.absent" ]]; then
@@ -779,11 +804,12 @@ do_rollback() {
         [[ -f "$src" ]] || src="${dir}/x-ui.db"
         install -d -m 700 "$(dirname "$M_XUI_DB")"
         rm -f "${M_XUI_DB}-wal" "${M_XUI_DB}-shm"
-        cp "$src" "${M_XUI_DB}.restore.$$" && chmod 600 "${M_XUI_DB}.restore.$$" && mv -f "${M_XUI_DB}.restore.$$" "$M_XUI_DB" || rc=1
+        (umask 077 && cp "$src" "${M_XUI_DB}.restore.$$") && chmod 600 "${M_XUI_DB}.restore.$$" &&
+            mv -f "${M_XUI_DB}.restore.$$" "$M_XUI_DB" || rc=1
     else
         local src="${dir}/x-ui.at-stop.pgdump"
         [[ -f "$src" ]] || src="${dir}/x-ui.pgdump"
-        pg_restore_dsn "$src" || rc=1
+        pg_restore_db "$src" || rc=1
     fi
 
     # 4. 3x-ui back on.
@@ -887,6 +913,9 @@ EOF
 }
 
 main() {
+    # Everything this script writes (backups, database copies, the env file
+    # with a database password) is for root only from the moment it exists.
+    umask 077
     case "${1:-}" in
         migrate) cmd_migrate ;;
         migrate-rollback | rollback)

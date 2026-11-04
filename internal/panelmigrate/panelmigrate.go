@@ -284,6 +284,17 @@ func BackupSQLite(src, dst string) error {
 	if err != nil {
 		return err
 	}
+	// SQLite creates the copy with the process umask (often 0644). Write it
+	// inside a private 0700 folder, restrict it, and only then move it into
+	// place: the copy holds the panel login, client keys and tokens, and must
+	// never be readable by others, not even for a moment.
+	stage, err := os.MkdirTemp(filepath.Dir(absDst), ".x-ui-backup-stage-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(stage)
+	staged := filepath.Join(stage, "x-ui.db")
+
 	gdb, err := OpenSQLiteReadOnly(src)
 	if err != nil {
 		return err
@@ -293,14 +304,19 @@ func BackupSQLite(src, dst string) error {
 		return err
 	}
 	defer sqlDB.Close()
-	if _, err := sqlDB.Exec("VACUUM INTO ?", absDst); err != nil {
-		_ = os.Remove(absDst)
+	if _, err := sqlDB.Exec("VACUUM INTO ?", staged); err != nil {
 		return fmt.Errorf("VACUUM INTO: %w", err)
 	}
-	if err := os.Chmod(absDst, 0o600); err != nil {
+	if err := os.Chmod(staged, 0o600); err != nil {
 		return err
 	}
-	return CheckSQLite(absDst)
+	if err := CheckSQLite(staged); err != nil {
+		return err
+	}
+	if _, err := os.Lstat(absDst); err == nil {
+		return fmt.Errorf("%s already exists", dst)
+	}
+	return os.Rename(staged, absDst)
 }
 
 // CheckSQLite runs PRAGMA integrity_check on a SQLite file.

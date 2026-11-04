@@ -61,14 +61,34 @@ expect "missing file is empty" equals "$(env_value "$test_dir/none" XUI_DB_TYPE)
 expect "command substitution is not run" test ! -e /tmp/should-not-exist-migrate-unit
 
 # --- the PostgreSQL password stays out of argv ----------------------------
-XUI_DB_DSN='postgres://xui:p%40ss@127.0.0.1:5432/xui?sslmode=disable'
-pg_split_dsn
-expect "URI password removed from the DSN" equals "$PG_DSN_NOPASS" 'postgres://xui@127.0.0.1:5432/xui?sslmode=disable'
-expect "URI password percent-decoded" equals "$PG_PASS" 'p@ss'
-XUI_DB_DSN='host=127.0.0.1 user=xui password=secret dbname=xui'
-pg_split_dsn
-expect "key=value password removed" equals "$PG_DSN_NOPASS" 'host=127.0.0.1 user=xui  dbname=xui'
-expect "key=value password kept aside" equals "$PG_PASS" secret
+# pg.env is what "x-ui migrate-3xui pgenv" prints (its parsing of tricky DSNs
+# is tested in Go). A stub pg_dump records its argv and the libpq variables.
+mkdir -p "$test_dir/bin"
+cat > "$test_dir/bin/pg_dump" << 'STUB'
+#!/bin/bash
+printf '%s\n' "$0" "$@" > "$STUB_DIR/argv"
+env | grep -E '^(PG[A-Z_]*|XUI_DB_DSN)=' | sort > "$STUB_DIR/env"
+STUB
+chmod 755 "$test_dir/bin/pg_dump"
+# shellcheck disable=SC2016 # a literal $(x): the password must not be evaluated
+printf 'PGDATABASE\txui\nPGHOST\t127.0.0.1\nPGPASSWORD\tp@ss w0rd'"'"'$(x)\nPGSSLMODE\tdisable\nPGUSER\txui\nNOTPG\tnope\n' > "$test_dir/pg.env"
+export STUB_DIR="$test_dir"
+PG_ENV_FILE="$test_dir/pg.env"
+XUI_DB_DSN='postgres://xui:p%40ss%20w0rd@127.0.0.1/xui?sslmode=disable'
+export XUI_DB_DSN
+PATH="$test_dir/bin:$PATH" pg_dump_db -Fc -f "$test_dir/out.pgdump"
+expect "pg_dump ran" test -s "$test_dir/argv"
+expect_not "no password in pg_dump's argv" grep -q 'w0rd' "$test_dir/argv"
+expect_not "no DSN in pg_dump's argv" grep -qE 'postgres(ql)?://|password=' "$test_dir/argv"
+expect "argv is only the dump options" equals "$(tail -n +2 "$test_dir/argv" | tr '\n' ' ')" "--no-owner -Fc -f $test_dir/out.pgdump "
+expect "password handed over in PGPASSWORD, verbatim" grep -qxF "PGPASSWORD=p@ss w0rd'\$(x)" "$test_dir/env"
+expect "host, user, database, sslmode handed over" equals "$(grep -cE '^PG(HOST|USER|DATABASE|SSLMODE)=' "$test_dir/env")" 4
+expect_not "XUI_DB_DSN not passed on to pg_dump" grep -q '^XUI_DB_DSN=' "$test_dir/env"
+expect_not "only PG* names are exported" grep -q NOTPG "$test_dir/env"
+expect "the DSN stays in this shell" equals "$XUI_DB_DSN" 'postgres://xui:p%40ss%20w0rd@127.0.0.1/xui?sslmode=disable'
+PG_ENV_FILE=""
+expect_not "no pg.env, no pg_dump" pg_dump_db -Fc
+unset XUI_DB_DSN
 
 # --- probes reach the listener the way a client does ----------------------
 probe_url "" "" 2053 "" ""
@@ -99,13 +119,27 @@ expect "spiderX ignored, base64 decoded" equals "$(sub_normalized "$test_dir/s1"
 expect "other parameters still count" test "$(sub_normalized "$test_dir/s2")" != "$(sub_normalized "$test_dir/s3")"
 
 # --- still-ui gets 3x-ui's env file without 3x-ui's folders ---------------
+# The copy may hold the database password: it must be 0600 from the moment it
+# exists, whatever the caller's umask. grep is wrapped to report the mode of
+# the file its output goes to while it writes.
 XUI_ENV_FILE="$test_dir/x-ui"
 XUI_DB_TYPE=postgres
-hand_db_to_still_ui
+grep() {
+    stat -L -c %a "/proc/${BASHPID}/fd/1" > "$test_dir/mode-while-writing" 2> /dev/null
+    command grep "$@"
+}
+(umask 022 && hand_db_to_still_ui)
+unset -f grep
 expect "env file copied next to the original" test -f "$test_dir/still-ui"
 expect "DSN carried over" grep -q '^XUI_DB_DSN=' "$test_dir/still-ui"
 expect_not "XUI_DB_FOLDER/XUI_LOG_FOLDER dropped" grep -qE 'XUI_(DB|LOG)_FOLDER' "$test_dir/still-ui"
 expect "copy is 0600" equals "$(stat -c %a "$test_dir/still-ui" 2> /dev/null || stat -f %Lp "$test_dir/still-ui")" 600
+if [[ -d /proc/self/fd ]]; then
+    expect "copy was already 0600 while being written (umask 022)" equals "$(cat "$test_dir/mode-while-writing")" 600
+fi
+expect_not "no temporary file left" compgen -G "$test_dir/still-ui.*"
+expect "main runs with umask 077" grep -q -A3 '^main() {' "$repo_root/migrate.sh"
+expect "main sets umask 077 first" equals "$(grep -A3 '^main() {' "$repo_root/migrate.sh" | grep -c 'umask 077')" 1
 
 # --- the rollback picks the newest backup of a migration that happened ----
 BACKUP_PARENT="$test_dir/root"

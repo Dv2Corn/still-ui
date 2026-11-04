@@ -18,6 +18,8 @@ const cliUsage = `usage: x-ui migrate-3xui <action> [flags]
   backup   -src FILE -dst FILE    consistent SQLite copy (VACUUM INTO) + integrity check
   verify   -pre FILE (-db FILE | -postgres)
                                   compare a saved "inspect -format json" report with a database
+  pgenv                           print $XUI_DB_DSN as libpq environment variables
+                                  ("NAME<TAB>value"), so pg_dump never gets it in argv
   subcompare -a FILE -b FILE      compare two subscription bodies, before (a) and after (b):
                                   exit 0 identical, 3 identical apart from remarks, 4 the
                                   same settings with parameters added in b, 1 different
@@ -99,6 +101,15 @@ func RunCLI(args []string, stdout, stderr io.Writer) int {
 			return failed(err)
 		}
 		fmt.Fprintf(stdout, "backup ok: %s\n", *dst)
+		return 0
+	case "pgenv":
+		env, err := PostgresEnv(os.Getenv("XUI_DB_DSN"))
+		if err != nil {
+			return failed(err)
+		}
+		if err := WritePostgresEnv(stdout, env); err != nil {
+			return failed(err)
+		}
 		return 0
 	case "subcompare":
 		a := fs.String("a", "", "first subscription body")
