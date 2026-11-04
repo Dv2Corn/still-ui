@@ -6,7 +6,8 @@
 # Needs bash, docker, git, curl, tar and sha256sum on a Linux x86_64 host.
 # Produces <output-dir>/still-ui-linux-<arch>.tar.gz and a .sha256 next to it,
 # in the layout install.sh/update.sh expect (the same as 3x-ui's release
-# archives, with the top folder named still-ui):
+# archives, with the top folder named still-ui), plus still-probe-linux-<arch>.tar.gz
+# for scripts/still-probe-install.sh (still-probe/still-probe, still-probe/xray):
 #
 #   still-ui/x-ui                 panel binary (static, musl)
 #   still-ui/x-ui.sh              management script, installed as /usr/bin/still-ui
@@ -114,6 +115,21 @@ for arch in "${ARCHES[@]}"; do
     curl -fsSL --retry 5 -o "$pkg/bin/geosite_IR.dat" https://github.com/chocolate4u/Iran-v2ray-rules/releases/latest/download/geosite.dat
     curl -fsSL --retry 5 -o "$pkg/bin/geoip_RU.dat" https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/latest/download/geoip.dat
     curl -fsSL --retry 5 -o "$pkg/bin/geosite_RU.dat" https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/latest/download/geosite.dat
+
+    # Reachability probe agent: static, standard library only, shipped with the same Xray.
+    docker run --rm -u "$UIDGID" -e HOME=/tmp -e GOFLAGS=-buildvcs=false \
+        -e GOMODCACHE=/gomod -e GOCACHE=/gobuild -e CGO_ENABLED=0 -e GOOS=linux -e GOARCH="$goarch" \
+        -v "$CACHE/gomod:/gomod" -v "$CACHE/gobuild:/gobuild" \
+        -v "$SRC:/src" -w /src "golang:${GO_VERSION}-bookworm" \
+        go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o "/src/build-release/still-probe-$arch" ./cmd/still-probe
+    probe_stage="$stage/probe/still-probe"
+    mkdir -p "$probe_stage"
+    install -m 755 "$SRC/build-release/still-probe-$arch" "$probe_stage/still-probe"
+    install -m 755 "$XRAY_DIR/xray-linux-$arch" "$probe_stage/xray"
+    install -m 755 "$SRC/scripts/still-probe-install.sh" "$probe_stage/still-probe-install.sh"
+    probe_archive="still-probe-linux-${arch}.tar.gz"
+    tar -C "$stage/probe" --owner=0 --group=0 -czf "$OUT_DIR/$probe_archive" still-probe
+    (cd "$OUT_DIR" && sha256sum "$probe_archive" > "$probe_archive.sha256")
 
     archive="still-ui-linux-${arch}.tar.gz"
     tar -C "$stage" --owner=0 --group=0 -czf "$OUT_DIR/$archive" still-ui
