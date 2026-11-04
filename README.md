@@ -123,6 +123,26 @@ systemctl enable --now x-ui
 
 This was tested with a 3x-ui v3.11.0 database. A database from a newer 3x-ui release may not open in still-ui.
 
+## Check reachability from Russia
+
+A panel cannot tell from the inside whether its inbounds work for users in a censored network: the server sees a handshake, while the censor may freeze the connection a few kilobytes later. A **probe** answers "does my VPN work from there right now?". It is a small agent (`still-probe`, a static binary with the still-ui Xray) that you run on any Linux box inside that network: a home server, a Raspberry Pi or a cheap local VPS.
+
+1. In the panel open **Probes** → **Add probe**, give it a name and choose the inbounds to test (VLESS, VMess, Trojan, Shadowsocks, Hysteria). The panel creates a service client `still-probe-…` for it on those inbounds, with no traffic or time limit; do not edit or delete that client.
+2. Copy the install command shown once with the token and run it as root on the probe box (amd64 or arm64, systemd):
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/Dv2Corn/still-ui/main/scripts/still-probe-install.sh) \
+    --panel 'https://<server>:<port>/<base path>/' --token '<token>'
+```
+
+The installer downloads `still-probe-linux-<arch>.tar.gz` from the latest still-ui release and checks its sha256, installs the agent to `/usr/local/still-probe`, its config to `/etc/still-probe/config.json` (root:still-probe 0640) and a systemd timer, and runs the first check. Add `--pin <sha256>` for a panel with a self-signed certificate, `--uninstall` to remove everything.
+
+Every interval (10 minutes by default) the agent fetches its job from the panel, starts Xray with one SOCKS port per inbound endpoint (the same address, SNI and keys the subscription hands out), downloads the test URL through each of them (by default 256 KiB from Cloudflare: a censor that cuts connections after the first kilobytes shows up as a failure) and, optionally, a direct URL without the VPN, such as your site or subscription page. It reports success, time to first byte, total time and bytes. If the panel itself is blocked from there, the report goes through an inbound that just worked.
+
+The **Probes** page shows the last result of every endpoint, its uptime over 7 days and an hourly history strip; a probe that has not reported for three intervals is marked "Not reporting". The Telegram bot sends an alert when an endpoint fails twice in a row, when it works again, and when a probe goes silent: turn on the "Reachability probes" events in **Panel Settings → Telegram**.
+
+The probe token opens only the two agent routes (`<base path>probe/v1/job` and `probe/v1/report`), nothing under `/panel/api`; the panel stores only its SHA-256, and a job holds only the probe client's own credentials. **New token** or deleting the probe revokes it at once. WireGuard, AmneziaWG, TUIC and MTProto inbounds are not probed yet.
+
 ## Check your panel
 
 [xui-doctor](https://github.com/Dv2Corn/xui-doctor) is a small read-only checker for still-ui and 3x-ui. It looks at the Xray core version, REALITY and TLS settings, open ports, clients and panel security, and prints what to fix. It changes nothing on the server.
