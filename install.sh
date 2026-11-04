@@ -2307,7 +2307,14 @@ install_x-ui() {
     chmod +x /usr/bin/still-ui
     mkdir -p /var/log/still-ui
     _still_import_3xui
-    config_after_install
+    if [[ "${STILL_UI_MIGRATING:-}" == "1" ]]; then
+        # migrate.sh moved a 3x-ui database in: its login, base path, port and
+        # certificates must stay exactly as they are, so none of the first-run
+        # setup applies; only the schema migration does.
+        ${xui_folder}/x-ui migrate
+    else
+        config_after_install
+    fi
 
     # Etckeeper compatibility
     if [ -d "/etc/.git" ]; then
@@ -2451,6 +2458,31 @@ install_x-ui() {
 │  ${blue}still-ui uninstall${plain}    - Uninstall                        │
 └───────────────────────────────────────────────────────┘"
 }
+
+# still-ui: "install.sh migrate" moves an existing 3x-ui to still-ui and
+# "install.sh migrate-rollback [DIR]" undoes it; both live in migrate.sh.
+# STILL_UI_MIGRATE_SCRIPT=/path/migrate.sh runs a local copy instead of the
+# one on main.
+_still_migrate() {
+    local script rc
+    if [[ -n "${STILL_UI_MIGRATE_SCRIPT:-}" ]]; then
+        script="${STILL_UI_MIGRATE_SCRIPT}"
+    else
+        script=$(mktemp /root/still-ui-migrate.sh.XXXXXX) || exit 1
+        if ! curl -fsSL --retry 3 -o "${script}" "https://raw.githubusercontent.com/Dv2Corn/still-ui/main/migrate.sh" || [[ ! -s "${script}" ]]; then
+            rm -f "${script}"
+            echo -e "${red}Could not download migrate.sh${plain}"
+            exit 1
+        fi
+    fi
+    bash "${script}" "$@"
+    rc=$?
+    [[ -z "${STILL_UI_MIGRATE_SCRIPT:-}" ]] && rm -f "${script}"
+    exit "$rc"
+}
+case "${1:-}" in
+    migrate | migrate-rollback) _still_migrate "$@" ;;
+esac
 
 echo -e "${green}Running...${plain}"
 install_base

@@ -22,6 +22,7 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/crypto/nodetoken"
 	"github.com/mhsanaei/3x-ui/v3/internal/database"
 	"github.com/mhsanaei/3x-ui/v3/internal/logger"
+	"github.com/mhsanaei/3x-ui/v3/internal/panelmigrate"
 	"github.com/mhsanaei/3x-ui/v3/internal/sub"
 	"github.com/mhsanaei/3x-ui/v3/internal/tunnelmonitor"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/sys"
@@ -673,6 +674,8 @@ func main() {
 		migrateDb()
 	case "encrypt-tokens":
 		encryptNodeTokens()
+	case "migrate-3xui":
+		os.Exit(panelmigrate.RunCLI(os.Args[2:], os.Stdout, os.Stderr))
 	case "migrate-db":
 		if err := migrateDbCmd.Parse(os.Args[2:]); err != nil {
 			fmt.Println(err)
@@ -775,6 +778,8 @@ Commands:
     migrate        migrate from other/old x-ui
     migrate-db     SQLite <-> .dump (--dump/--restore) or copy into PostgreSQL (--dsn)
     encrypt-tokens encrypt node bearer tokens with the configured active key
+    migrate-3xui   read-only inspection and consistent backup of a 3x-ui
+                   database (used by migrate.sh)
     setting        set settings
     install-awg-kernel
                    build and install the AmneziaWG kernel module (required for

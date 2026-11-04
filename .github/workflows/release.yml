@@ -115,6 +115,7 @@ jobs:
           cp still-xray.service still-ui/
           cp x-ui.sh still-ui/
           cp x-ui.rc still-ui/
+          cp migrate.sh still-ui/
           mv still-ui/xui-release still-ui/x-ui
           mkdir still-ui/bin
           cd still-ui/bin

@@ -155,6 +155,28 @@ update() {
     fi
 }
 
+# still-ui: run migrate.sh (3x-ui -> still-ui, and back). The rollback prefers
+# the copy kept in the backup folder, so it also works offline.
+still_migrate() {
+    local script="${xui_folder}/migrate.sh" tmp="" rc
+    if [[ "$1" == "migrate-rollback" && ! -f "$script" ]]; then
+        script=$(ls -1d /root/still-ui-migrate-*/migrate.sh 2> /dev/null | sort -r | head -n 1)
+    fi
+    if [[ -z "$script" || ! -f "$script" ]]; then
+        tmp=$(mktemp) || return 1
+        if ! curl -fsSL -o "$tmp" https://raw.githubusercontent.com/Dv2Corn/still-ui/main/migrate.sh; then
+            rm -f "$tmp"
+            LOGE "Could not download migrate.sh"
+            return 1
+        fi
+        script="$tmp"
+    fi
+    bash "$script" "$@"
+    rc=$?
+    [[ -n "$tmp" ]] && rm -f "$tmp"
+    return "$rc"
+}
+
 update_dev() {
     confirm "This will update still-ui to the latest DEV commit (the rolling 'dev-latest' build, not a stable release). Your data is preserved. Continue?" "y"
     if [[ $? != 0 ]]; then
@@ -3561,6 +3583,7 @@ show_usage() {
 │  ${blue}still-ui update-all-geofiles${plain}   - Update all geo files             │
 │  ${blue}still-ui migrateDB [file]${plain}      - Convert .db <-> .dump (SQLite)   │
 │  ${blue}still-ui pgclient [ver]${plain}        - Upgrade pg_dump/pg_restore tools │
+│  ${blue}still-ui migrate-rollback${plain}      - Undo a migration from 3x-ui      │
 │  ${blue}still-ui legacy${plain}                - Legacy version                   │
 │  ${blue}still-ui install${plain}               - Install                          │
 │  ${blue}still-ui uninstall${plain}             - Uninstall                        │
@@ -3763,6 +3786,9 @@ if [[ $# -gt 0 ]]; then
             ;;
         "migrateDB")
             migrate_db "$2" "$3"
+            ;;
+        "migrate" | "migrate-rollback")
+            still_migrate "$@"
             ;;
         "pgclient")
             pg_upgrade_client "$2"
