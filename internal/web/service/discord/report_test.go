@@ -1,13 +1,19 @@
 package discord
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"filippo.io/age"
+
+	"github.com/mhsanaei/3x-ui/v3/internal/backup"
+	"github.com/mhsanaei/3x-ui/v3/internal/database"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/service"
 	"github.com/mhsanaei/3x-ui/v3/internal/xray"
@@ -285,5 +291,45 @@ func TestBuildReportShowsUnavailableUptime(t *testing.T) {
 				t.Fatal("no local status payload")
 			}
 		})
+	}
+}
+
+// STILL-BKP-1: with backup encryption keys set, the Discord report attaches only age files, and
+// tells nobody the copy is plain.
+func TestBuildReport_BackupIsEncryptedWhenKeysAreSet(t *testing.T) {
+	settingService := setupTestDB(t)
+	_ = settingService.SetDiscordBotBackup(true)
+	id, err := age.GenerateX25519Identity()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := database.GetDB().Create(&model.Setting{Key: "backupAgeRecipients", Value: id.Recipient().String()}).Error; err != nil {
+		t.Fatal(err)
+	}
+	mockServer := &mockServerProvider{status: &service.Status{}, dbData: []byte("test-db-content"), filename: "x-ui_backup.db"}
+	payload, files, err := NewDiscordService(settingService).BuildReport(context.Background(), mockServer, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) == 0 {
+		t.Fatal("no backup attached")
+	}
+	for _, f := range files {
+		if !backup.IsEncrypted(f.Data) || !strings.HasSuffix(f.Filename, ".age") {
+			t.Fatalf("%s is attached unencrypted", f.Filename)
+		}
+	}
+	r, err := age.Decrypt(bytes.NewReader(files[0].Data), id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plain, _ := io.ReadAll(r); string(plain) != "test-db-content" {
+		t.Fatalf("the DB decrypts to %q", plain)
+	}
+	title := translator(settingService)("discord.commands.backupTitle")
+	for _, f := range payload.Embeds[0].Fields {
+		if f.Name == title {
+			t.Fatalf("an encrypted backup is reported as %q", f.Value)
+		}
 	}
 }

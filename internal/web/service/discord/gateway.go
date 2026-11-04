@@ -20,7 +20,6 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/logger"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/common"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/service"
-	"github.com/mhsanaei/3x-ui/v3/internal/xray"
 )
 
 const (
@@ -532,34 +531,22 @@ func (g *GatewayClient) sendBackup(ctx context.Context) {
 		return
 	}
 
-	dbData, err := g.serverService.GetDb()
-	if err != nil || len(dbData) == 0 {
-		_ = g.discordService.SendMessage(ctx, MessagePayload{Content: tr("discord.commands.backupFailed", "Error=="+fmt.Sprint(err))})
+	files, note, err := backupAttachments(g.serverService, tr)
+	if err != nil {
+		logger.Warning("Discord backup command: ", err)
+		_ = g.discordService.SendMessage(ctx, MessagePayload{Content: note})
 		return
 	}
-
-	filename := g.serverService.BackupFilename("")
-	if filename == "" {
-		filename = "x-ui.db"
-	}
-
-	files := []FileAttachment{
-		{Filename: filename, Data: dbData},
-	}
-
-	configPath := xray.GetConfigPath()
-	if configData, err := os.ReadFile(configPath); err == nil && len(configData) > 0 {
-		files = append(files, FileAttachment{
-			Filename: "config.json",
-			Data:     configData,
-		})
+	description := tr("discord.commands.backupDescription", "Time=="+time.Now().UTC().Format(time.RFC3339))
+	if note != "" {
+		description += "\n\n" + note
 	}
 
 	payload := MessagePayload{
 		Embeds: []Embed{
 			{
 				Title:       tr("discord.commands.backupTitle"),
-				Description: tr("discord.commands.backupDescription", "Time=="+time.Now().UTC().Format(time.RFC3339)),
+				Description: description,
 				Color:       ColorBlue,
 				Timestamp:   time.Now().UTC().Format(time.RFC3339),
 				Footer:      &EmbedFooter{Text: tr("discord.footer")},

@@ -2,6 +2,7 @@ package discord
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -14,7 +15,6 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/logger"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/common"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/service"
-	"github.com/mhsanaei/3x-ui/v3/internal/xray"
 )
 
 // ServerProvider abstracts server status and database backup operations.
@@ -167,30 +167,44 @@ func (s *DiscordService) BuildReport(ctx context.Context, server ServerProvider,
 	var files []FileAttachment
 	backupEnabled, err := s.settingService.GetDiscordBotBackup()
 	if err == nil && backupEnabled && server != nil {
-		dbData, err := server.GetDb()
+		attachments, note, err := backupAttachments(server, tr)
 		if err != nil {
-			logger.Warning("Discord report: failed to get DB backup: ", err)
-		} else if len(dbData) > 0 {
-			filename := server.BackupFilename("")
-			if filename == "" {
-				filename = "x-ui.db"
-			}
-			files = append(files, FileAttachment{
-				Filename: filename,
-				Data:     dbData,
-			})
+			logger.Warning("Discord report: no backup attached: ", err)
 		}
-
-		configPath := xray.GetConfigPath()
-		if configData, err := os.ReadFile(configPath); err == nil && len(configData) > 0 {
-			files = append(files, FileAttachment{
-				Filename: "config.json",
-				Data:     configData,
+		files = attachments
+		if note != "" {
+			payload.Embeds[0].Fields = append(payload.Embeds[0].Fields, EmbedField{
+				Name: tr("discord.commands.backupTitle"), Value: note, Inline: false,
 			})
 		}
 	}
 
 	return payload, files, nil
+}
+
+// backupAttachments is the backup a Discord message carries, built by service.PrepareChatBackup
+// (encrypted when backup encryption keys are set) and checked by service.CheckChatBackup. note is
+// what to tell the channel: that the copy is not encrypted, or why none was attached.
+func backupAttachments(src service.ChatBackupSource, tr func(string, ...string) string) ([]FileAttachment, string, error) {
+	b, err := service.PrepareChatBackup(src)
+	if err == nil {
+		_, err = service.CheckChatBackup(b)
+	}
+	if err != nil {
+		if errors.Is(err, service.ErrChatBackupEncrypt) || errors.Is(err, service.ErrChatBackupPlain) {
+			return nil, tr("discord.commands.backupEncryptFailed"), err
+		}
+		return nil, tr("discord.commands.backupFailed", "Error=="+err.Error()), err
+	}
+	files := make([]FileAttachment, 0, len(b.Files))
+	for _, f := range b.Files {
+		files = append(files, FileAttachment{Filename: f.Name, Data: f.Data})
+	}
+	note := ""
+	if !b.Encrypted {
+		note = tr("discord.commands.backupNotEncrypted")
+	}
+	return files, note, nil
 }
 
 // SendReport generates and sends the periodic report to Discord.
