@@ -220,16 +220,32 @@ The archive as a whole is not bit-for-bit reproducible: the panel binary is link
 
 ## Moving from 3x-ui
 
-If the installer finds `/etc/x-ui/x-ui.db`, it offers to copy that database into still-ui and stop x-ui. Without a terminal (cloud-init and similar), set `STILL_UI_IMPORT_3XUI=yes` to accept. Your panel login, API access, inbounds and clients carry over; clients do not need new links. 3x-ui's own files are left untouched.
-
-To go back, stop still-ui and start 3x-ui again:
+One command moves a running 3x-ui to still-ui and keeps everything clients and you rely on:
 
 ```bash
-systemctl disable --now still-ui
-systemctl enable --now x-ui
+bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh) migrate
 ```
 
-This was tested with a 3x-ui v3.11.0 database. A database from a newer 3x-ui release may not open in still-ui.
+What it does:
+
+1. Finds 3x-ui (`/usr/local/x-ui`, `x-ui.service`, the SQLite database or the PostgreSQL one named in `/etc/default/x-ui`) and refuses what it cannot move safely: other x-ui forks, 3x-ui older than 2.0.0 (update it first with `x-ui update`), a 3x-ui newer than the release still-ui is based on, hosts without systemd, Docker installs, hosts that already run still-ui.
+2. While 3x-ui still runs, records what has to survive: inbounds, clients, the panel login, the panel and subscription addresses, and the subscriptions of up to five clients as 3x-ui serves them.
+3. Backs up everything to `/root/still-ui-migrate-<UTC time>/` (readable by root only) before changing anything: a consistent copy of the database (or a `pg_dump`), `/usr/local/x-ui`, the unit and its drop-ins, `/usr/bin/x-ui`, the env file, and a manifest with checksums.
+4. Stops 3x-ui and installs still-ui with a copy of its database. still-ui lives in its own folders (`/usr/local/still-ui`, `/etc/still-ui`, `still-ui.service`); ports, certificates, the panel base path, subscription URLs, client links and the panel login (with 2FA) come from the database and stay the same.
+5. Checks still-ui: the panel answers at the same address, Xray runs, inbounds, clients, login and listener settings match, and the sampled subscriptions are byte-identical. A 3x-ui 2.x writes fewer link parameters than still-ui does; then every parameter a link had must still be there with the same value.
+6. If any step after stopping 3x-ui fails, it restores 3x-ui on its own and says why.
+
+When it is done, `x-ui.service` is removed (it is in the backup) so 3x-ui cannot start next to still-ui, and the `x-ui` command opens still-ui's menu. 3x-ui's own files and database are not modified.
+
+Undo it at any time — this restores 3x-ui's files, unit and database from the newest backup, starts 3x-ui, removes still-ui and keeps still-ui's database in the backup folder:
+
+```bash
+still-ui migrate-rollback
+```
+
+Changes made in still-ui after the migration (new clients, traffic counters) do not travel back to 3x-ui. Without a terminal, set `STILL_UI_MIGRATE_YES=1`. A PostgreSQL setup needs `pg_dump` and `pg_restore` on the server. Tested on Debian 12 and Ubuntu 24.04 with 3x-ui 3.11.0 (SQLite and PostgreSQL), 3.7.0, 2.9.4, 2.6.7, 2.4.11, 2.3.15, 2.2.8 and 2.0.2 (`scripts/test-migrate.sh`).
+
+A plain install also offers to take over `/etc/x-ui/x-ui.db` (non-interactive: `STILL_UI_IMPORT_3XUI=yes`), without the checks and the backup above.
 
 ## Check reachability from Russia
 

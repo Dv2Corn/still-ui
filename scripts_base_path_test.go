@@ -31,7 +31,7 @@ func scriptFunction(t *testing.T, script, name string) string {
 const settingsCLIMock = `#!/bin/bash
 set -eu
 state=$TEST_SETTINGS_DIR
-if [[ "$1" == migrate ]]; then exit 0; fi
+if [[ "$1" == migrate ]]; then printf 'migrate\n' >> "$state/migrations"; exit 0; fi
 shift
 case "$1" in
     -show)
@@ -98,7 +98,7 @@ func runScriptConfig(t *testing.T, script, path string, defaults bool, mode stri
 	for name, value := range map[string]string{
 		"path": path, "username": username, "password": password,
 		"default": fmt.Sprint(defaults), "port": "54321", "x-ui": settingsCLIMock,
-		"writes": "", "path-writes": "", "restarts": "", "lifecycle": "", "x-ui.service": "test unit",
+		"writes": "", "path-writes": "", "restarts": "", "lifecycle": "", "migrations": "", "x-ui.service": "test unit",
 	} {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(value), 0o700); err != nil {
 			t.Fatal(err)
@@ -259,6 +259,29 @@ func TestScriptConfigRejectsUnreadableSettings(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// migrate.sh installs still-ui over a copy of a 3x-ui database. Whatever that
+// database holds -- even the default login and an empty base path, which a
+// fresh install would replace -- has to survive: clients and the admin rely
+// on it. Only the schema migration runs.
+func TestInstallWhileMigratingKeepsImportedSettings(t *testing.T) {
+	t.Setenv("STILL_UI_MIGRATING", "1")
+	dir, out, err := runScriptConfig(t, "install.sh", "/", true, "", 1, false)
+	if err != nil {
+		t.Fatalf("config_after_install while migrating: %v\n%s", err, out)
+	}
+	for name, want := range map[string]string{
+		"path": "/", "username": "admin", "password": "admin", "port": "54321",
+		"writes": "", "migrations": "migrate\n",
+	} {
+		if actual := readScriptState(t, dir, name); actual != want {
+			t.Errorf("%s = %q, want %q", name, actual, want)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(dir, "ssl")); !os.IsNotExist(err) {
+		t.Errorf("the TLS setup must not run while migrating: %v", err)
 	}
 }
 
