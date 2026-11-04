@@ -9,10 +9,10 @@ describe('probeInstallCommand', () => {
     expect(cmd).toContain(`STILL_PROBE_TOKEN='tok$en' bash `);
   });
 
-  it('keeps the token out of the installer arguments', () => {
-    const cmd = probeInstallCommand('https://panel.example.com/', 'secret48');
+  it('keeps the token off the installer command line', () => {
+    const cmd = probeInstallCommand('https://panel.example.com/', 'secrettoken');
     expect(cmd).not.toContain('--token');
-    expect(cmd.indexOf('secret48')).toBeLessThan(cmd.indexOf('bash'));
+    expect(cmd.startsWith(`STILL_PROBE_TOKEN='secrettoken' bash <(curl -fsSL `)).toBe(true);
   });
 });
 

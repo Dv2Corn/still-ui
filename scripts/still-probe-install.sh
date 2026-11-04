@@ -2,12 +2,18 @@
 # still-probe installer: puts the reachability probe agent on a Linux box inside
 # the network you want to test from, and runs it from a systemd timer.
 #
-#   bash <(curl -fsSL https://raw.githubusercontent.com/Dv2Corn/still-ui/main/scripts/still-probe-install.sh) \
-#       --panel 'https://panel.example.com:2053/path/' --token 'TOKEN'
+#   STILL_PROBE_TOKEN='TOKEN' bash <(curl -fsSL https://raw.githubusercontent.com/Dv2Corn/still-ui/main/scripts/still-probe-install.sh) \
+#       --panel 'https://panel.example.com:2053/path/'
+#
+# The token is a credential: give it through STILL_PROBE_TOKEN, a file
+# (--token-file FILE) or standard input (asked for when nothing else gives it),
+# not on the command line, where every local user sees it in ps.
 #
 # Options:
 #   --panel URL       the panel URL with its base path, as you open it in a browser
-#   --token TOKEN     the probe token shown once on the panel's Probes page
+#   --token-file FILE read the probe token (shown once on the panel's Probes page)
+#                     from FILE; "-" reads standard input
+#   --token TOKEN     the token on the command line (visible in ps; deprecated)
 #   --pin SHA256      pin the panel's TLS certificate (hex SHA-256), for a self-signed panel
 #   --release TAG     still-ui release to install the agent from (default: latest)
 #   --archive FILE    install from a local still-probe-linux-<arch>.tar.gz instead of downloading
@@ -23,19 +29,55 @@ USER_NAME=still-probe
 
 die() { echo "still-probe-install: $*" >&2; exit 1; }
 
-panel="" token="" pin="" release="latest" archive="" uninstall=0
+panel="" token="" token_file="" pin="" release="latest" archive="" uninstall=0
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --panel) panel="${2:-}"; shift 2 ;;
-        --token) token="${2:-}"; shift 2 ;;
+        --token)
+            token="${2:-}"; shift 2
+            echo "still-probe-install: warning: --token puts the token on the command line, where every local user can read it (ps, /proc); use STILL_PROBE_TOKEN or --token-file instead" >&2 ;;
+        --token-file) token_file="${2:-}"; shift 2 ;;
         --pin) pin="${2:-}"; shift 2 ;;
         --release) release="${2:-}"; shift 2 ;;
         --archive) archive="${2:-}"; shift 2 ;;
         --uninstall) uninstall=1; shift ;;
-        -h|--help) sed -n '2,16p' "$0" 2>/dev/null || true; exit 0 ;;
+        -h|--help) sed -n '2,23p' "$0" 2>/dev/null || true; exit 0 ;;
         *) die "unknown option $1" ;;
     esac
 done
+
+# read_token: --token-file, then --token, then STILL_PROBE_TOKEN, then
+# standard input (with a hidden prompt on a terminal).
+read_token() {
+    local line=""
+    if [[ -n "$token_file" ]]; then
+        if [[ "$token_file" == - ]]; then
+            IFS= read -r line || [[ -n "$line" ]] || die "no token on standard input"
+        else
+            [[ -r "$token_file" ]] || die "cannot read --token-file $token_file"
+            IFS= read -r line < "$token_file" || [[ -n "$line" ]] || die "--token-file $token_file is empty"
+        fi
+        token="$line"
+    elif [[ -z "$token" && -n "${STILL_PROBE_TOKEN:-}" ]]; then
+        token="$STILL_PROBE_TOKEN"
+    elif [[ -z "$token" ]]; then
+        if [[ -t 0 ]]; then
+            IFS= read -rs -p "Probe token (from the panel's Probes page): " line || true
+            echo >&2
+        else
+            IFS= read -r line || true
+        fi
+        token="$line"
+    fi
+    token="${token//[[:space:]]/}"
+    unset STILL_PROBE_TOKEN
+}
+
+# deploy/test/probe-install-token.sh sources this file to test read_token;
+# everything below installs.
+if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
+    return 0
+fi
 
 [[ $(id -u) -eq 0 ]] || die "run as root"
 command -v systemctl >/dev/null || die "systemd is required"
@@ -51,10 +93,12 @@ if [[ $uninstall -eq 1 ]]; then
     exit 0
 fi
 
+read_token
+
 # Values go into a JSON file written by printf, so they are checked strictly.
 panel_re='^https?://[]A-Za-z0-9.:[-]+(/[A-Za-z0-9._~/%+-]*)?$'
 [[ "$panel" =~ $panel_re ]] || die "--panel must be the panel URL, e.g. https://panel.example.com:2053/path/"
-[[ "$token" =~ ^[A-Za-z0-9]{48}$ ]] || die "--token must be the 48-character token from the Probes page"
+[[ "$token" =~ ^[A-Za-z0-9]{48}$ ]] || die "the token must be the 48-character token from the Probes page (STILL_PROBE_TOKEN, --token-file or standard input)"
 [[ -z "$pin" || "$pin" =~ ^[A-Fa-f0-9:]{64,95}$ ]] || die "--pin must be a hex SHA-256"
 [[ "$panel" == */ ]] || panel="$panel/"
 

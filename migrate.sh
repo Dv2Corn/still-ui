@@ -36,7 +36,8 @@
 #                                   of downloading the latest release (offline,
 #                                   own builds, tests)
 #   STILL_UI_VERSION=TAG            release to download (default: latest)
-#   STILL_UI_INSTALL_SCRIPT=FILE    use this install.sh instead of downloading it
+#   STILL_UI_INSTALL_SCRIPT=FILE    use this install.sh instead of the one in the
+#                                   release archive
 #   STILL_UI_MIGRATE_YES=1          do not ask for confirmation
 #   STILL_UI_MIGRATE_ALLOW_NEWER=1  also migrate a 3x-ui newer than still-ui's base
 #   STILL_UI_MIGRATE_ANY_FORK=1     also migrate an install that is not MHSanaei/3x-ui
@@ -207,7 +208,9 @@ xray_running() {
 # --- still-ui release ------------------------------------------------------
 
 # Puts the release archive and install.sh into $WORK and the still-ui binary
-# from the archive into $STILL_BIN (it does the database work below).
+# from the archive into $STILL_BIN (it does the database work below). A
+# downloaded archive must match the .sha256 published next to it; install.sh
+# comes from the same archive, so nothing is fetched from a branch.
 fetch_still_ui() {
     local archive tag url
     archive="${WORK}/still-ui-linux-$(arch).tar.gz"
@@ -223,14 +226,12 @@ fetch_still_ui() {
         url="https://github.com/${REPO}/releases/download/${tag}/still-ui-linux-$(arch).tar.gz"
         info "Downloading still-ui ${tag} ..."
         curl -fLR --retry 5 --retry-delay 3 --connect-timeout 15 -o "$archive" "$url" || die "Download failed: ${url}"
-        if curl -fsSL --max-time 30 -o "${archive}.sha256" "${url}.sha256"; then
-            local want got
-            want=$(awk '{print $1; exit}' "${archive}.sha256")
-            got=$(sha256sum "$archive" | awk '{print $1}')
-            [[ "$want" == "$got" ]] || die "Checksum mismatch for ${url}."
-        else
-            warn "No .sha256 published next to the archive; continuing without a checksum check."
-        fi
+        local want got
+        curl -fsSL --retry 3 --retry-delay 3 --max-time 60 -o "${archive}.sha256" "${url}.sha256" ||
+            die "Could not download the checksum ${url}.sha256; refusing to install an unverified archive."
+        want=$(awk '{print $1; exit}' "${archive}.sha256")
+        got=$(sha256sum "$archive" | awk '{print $1}')
+        [[ "$want" =~ ^[0-9a-f]{64}$ && "$want" == "$got" ]] || die "Checksum mismatch for ${url} (expected ${want:-nothing}, got ${got})."
     fi
     tar -xzf "$archive" -C "$WORK" still-ui/x-ui 2> /dev/null || die "Not a still-ui release archive: ${archive}."
     STILL_BIN="${WORK}/still-ui/x-ui"
@@ -243,8 +244,9 @@ fetch_still_ui() {
     if [[ -n "${STILL_UI_INSTALL_SCRIPT:-}" ]]; then
         cp -f "$STILL_UI_INSTALL_SCRIPT" "${WORK}/install.sh" || die "Could not copy ${STILL_UI_INSTALL_SCRIPT}."
     else
-        curl -fsSL --retry 3 -o "${WORK}/install.sh" "https://raw.githubusercontent.com/${REPO}/main/install.sh" ||
-            die "Could not download install.sh."
+        if ! tar -xzOf "$archive" still-ui/install.sh > "${WORK}/install.sh" 2> /dev/null || [[ ! -s "${WORK}/install.sh" ]]; then
+            die "This still-ui archive has no install.sh. Use a newer release, or set STILL_UI_INSTALL_SCRIPT=<install.sh of the same release>."
+        fi
     fi
     grep -q 'STILL_UI_MIGRATING' "${WORK}/install.sh" || die "This install.sh does not support migrations."
 }
@@ -456,12 +458,13 @@ make_backup() {
     fi
     sort -u -o "${BK}/files.list" "${BK}/files.list"
 
-    # A copy of this script, so the rollback works offline.
+    # A copy of this script, so the rollback works offline: this file, or the
+    # migrate.sh of the checked release archive. Nothing comes from a branch.
     if [[ -f "$0" && -s "$0" ]]; then
         cp "$0" "${BK}/migrate.sh"
-    else
-        curl -fsSL -o "${BK}/migrate.sh" "https://raw.githubusercontent.com/${REPO}/main/migrate.sh" ||
-            warn "Could not keep a copy of migrate.sh in the backup; 'still-ui migrate-rollback' downloads it when needed."
+    elif ! { [[ -n "${STILL_ARCHIVE:-}" ]] && tar -xzOf "$STILL_ARCHIVE" still-ui/migrate.sh > "${BK}/migrate.sh" 2> /dev/null && [[ -s "${BK}/migrate.sh" ]]; }; then
+        rm -f "${BK}/migrate.sh"
+        warn "Could not keep a copy of migrate.sh in the backup; 'still-ui migrate-rollback' uses the one still-ui installed."
     fi
     chmod 700 "${BK}/migrate.sh" 2> /dev/null
 

@@ -6,7 +6,10 @@
 # For every <dist-dir>/still-ui-linux-<arch>.tar.gz writes
 # still-ui-linux-<arch>.tar.gz.spdx.json (SPDX 2.3 JSON, made by syft from the
 # unpacked archive: every file with its sha256, and the Go modules inside x-ui,
-# xray and mtg), then <dist-dir>/SHA256SUMS over the archives, the SBOMs and the probe agent archives.
+# xray and mtg), then <dist-dir>/SHA256SUMS over the archives, the SBOMs, the
+# probe agent archives and the scripts still-release.sh published next to them
+# (install.sh, update.sh, x-ui.sh, migrate.sh). The panel updater and the
+# still-ui menu refuse to run a script whose sum is not in SHA256SUMS.
 # Needs docker.
 # The release workflow runs this; it works the same on any Linux host.
 set -euo pipefail
@@ -39,7 +42,11 @@ for archive in "${archives[@]}"; do
     echo "still-sbom: $DIST/$name.spdx.json"
 done
 
+scripts=(install.sh update.sh x-ui.sh migrate.sh)
+for script in "${scripts[@]}"; do
+    [[ -s "$DIST/$script" ]] || die "$DIST/$script is missing (scripts/still-release.sh publishes it)"
+done
 # The probe agent archives (still-probe-linux-<arch>.tar.gz) are listed too, when present.
-(cd "$DIST" && shopt -s nullglob && sha256sum -- still-ui-linux-*.tar.gz still-ui-linux-*.tar.gz.spdx.json still-probe-linux-*.tar.gz > SHA256SUMS)
+(cd "$DIST" && shopt -s nullglob && sha256sum -- still-ui-linux-*.tar.gz still-ui-linux-*.tar.gz.spdx.json still-probe-linux-*.tar.gz "${scripts[@]}" > SHA256SUMS)
 echo "still-sbom: $DIST/SHA256SUMS"
 cat "$DIST/SHA256SUMS"

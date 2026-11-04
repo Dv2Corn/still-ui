@@ -2079,21 +2079,20 @@ resolve_latest_tag() {
     curl -Ls --retry 5 --retry-delay 3 --connect-timeout 15 --max-time 60 "https://api.github.com/repos/Dv2Corn/still-ui/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'
 }
 
-# Releases publish <asset>.sha256 next to each archive. A mismatch or a failed
-# sidecar download aborts the install; only a 404 (releases predating the
-# sidecar) is tolerated with a warning.
+# Every still-ui release publishes <asset>.sha256 next to each archive. The
+# install stops unless that file downloads and matches: a missing sidecar
+# (HTTP 404), a failed download or a mismatch all abort it.
 verify_release_checksum() {
     local url="$1" file="$2" sums="$2.sha256" code expected actual
     rm -f "${sums}"
     code=$(curl -sL --retry 3 --retry-delay 3 --connect-timeout 15 --max-time 60 -o "${sums}" -w '%{http_code}' "${url}.sha256")
-    if [[ "${code}" == "404" ]]; then
-        rm -f "${sums}"
-        echo -e "${yellow}No checksum published for this release, skipping verification${plain}"
-        return 0
-    fi
     if [[ "${code}" != "200" ]]; then
         rm -f "${sums}" "${file}"
-        echo -e "${red}Failed to download the checksum for $(basename "${file}") (HTTP ${code})${plain}"
+        if [[ "${code}" == "404" ]]; then
+            echo -e "${red}No checksum is published for $(basename "${file}") (${url}.sha256: HTTP 404). Refusing to install an unverified archive.${plain}"
+        else
+            echo -e "${red}Failed to download the checksum for $(basename "${file}") (HTTP ${code}). Refusing to install an unverified archive.${plain}"
+        fi
         exit 1
     fi
     expected=$(awk 'NR == 1 {print $1}' "${sums}")
@@ -2107,18 +2106,16 @@ verify_release_checksum() {
     echo -e "${green}Checksum verified: ${actual}${plain}"
 }
 
-# Older tags predate some of these files (x-ui.rc arrived in v2.8.4). Serving
-# main's copy against an old binary is the mismatch this pinning exists to
-# prevent, so probe before anything is stopped or removed and refuse the tag.
-require_repo_files() {
-    local ref="$1" name status
+# The management script, the OpenRC script and the systemd units are installed
+# from the checksum-verified archive, never from the repository. Every
+# still-ui release ships them; check before anything is stopped or removed.
+require_archive_files() {
+    local archive="$1" name
     shift
-    [[ "${ref}" == "main" ]] && return 0
     for name in "$@"; do
-        status=$(curl -sIL --retry 3 --connect-timeout 15 -o /dev/null -w '%{http_code}' "https://raw.githubusercontent.com/Dv2Corn/still-ui/${ref}/${name}")
-        if [[ "${status}" != "200" ]]; then
-            echo -e "${red}${name} is not available for ${ref} (HTTP ${status})${plain}"
-            echo -e "${red}Install a release that ships it, or 'dev' for the rolling build. Your existing installation has not been touched.${plain}"
+        if ! tar -tzf "${archive}" "still-ui/${name}" > /dev/null 2>&1; then
+            rm -f "${archive}"
+            echo -e "${red}The release archive has no still-ui/${name}. Your existing installation has not been touched.${plain}"
             exit 1
         fi
     done
@@ -2168,22 +2165,24 @@ install_x-ui() {
         verify_release_checksum "https://github.com/Dv2Corn/still-ui/releases/download/${tag_version}/still-ui-linux-$(arch).tar.gz" "${xui_folder}-linux-$(arch).tar.gz"
     else
         tag_version=$1
-        # The rolling dev channel ships under a fixed, non-semver tag that is
-        # force-moved to the latest main commit on every push. Accept `dev` as a
-        # convenient alias and skip the numeric floor check for it.
+        # still-ui publishes no rolling dev build: every install comes from a
+        # release with checksums and build attestations.
         if [[ "$tag_version" == "dev" || "$tag_version" == "dev-latest" ]]; then
-            tag_version="dev-latest"
-            echo -e "${yellow}Installing the rolling dev build (tag: dev-latest). This is a per-commit pre-release, not a stable version.${plain}"
-        else
-            # still-ui numbers its releases from v1.0.0; the earlier v3.11.0-still.N
-            # tags sort above that and stay installable.
-            tag_version_numeric=${tag_version#v}
-            min_version="1.0.0"
+            echo -e "${red}still-ui publishes no dev build. Install the latest release (no argument) or a release tag such as v1.5.0.${plain}"
+            exit 1
+        fi
+        if [[ ! "$tag_version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
+            echo -e "${red}${tag_version} is not a release tag (expected vX.Y.Z, e.g. v1.5.0)${plain}"
+            exit 1
+        fi
+        # still-ui numbers its releases from v1.0.0; the earlier v3.11.0-still.N
+        # tags sort above that and stay installable.
+        tag_version_numeric=${tag_version#v}
+        min_version="1.0.0"
 
-            if [[ "$(printf '%s\n' "$min_version" "$tag_version_numeric" | sort -V | head -n1)" != "$min_version" ]]; then
-                echo -e "${red}Please use a newer version (at least v1.0.0). Exiting installation.${plain}"
-                exit 1
-            fi
+        if [[ "$(printf '%s\n' "$min_version" "$tag_version_numeric" | sort -V | head -n1)" != "$min_version" ]]; then
+            echo -e "${red}Please use a newer version (at least v1.0.0). Exiting installation.${plain}"
+            exit 1
         fi
 
         url="https://github.com/Dv2Corn/still-ui/releases/download/${tag_version}/still-ui-linux-$(arch).tar.gz"
@@ -2200,32 +2199,21 @@ install_x-ui() {
         fi
         verify_release_checksum "${url}" "${xui_folder}-linux-$(arch).tar.gz"
     fi
-    # x-ui.sh, x-ui.rc and the unit files must come from the same release as
-    # the binary; only the rolling dev build tracks main.
-    local script_ref="${tag_version}"
-    if [[ "${tag_version}" == "dev-latest" ]]; then
-        script_ref="main"
-    fi
-    # The unit files are only fetched when the release tarball lacks them, so
-    # they are checked at that point instead of here.
+    # x-ui.sh, x-ui.rc and the unit files come from the archive checked above,
+    # so they always match the binary and its checksum.
     local required_files=("x-ui.sh")
-    [[ $release == "alpine" ]] && required_files+=("x-ui.rc")
-    [[ -n "${local_archive}" ]] || require_repo_files "${script_ref}" "${required_files[@]}"
+    case "${release}" in
+        alpine) required_files+=("x-ui.rc") ;;
+        ubuntu | debian | armbian) required_files+=("x-ui.service.debian") ;;
+        arch | manjaro | parch) required_files+=("x-ui.service.arch") ;;
+        *) required_files+=("x-ui.service.rhel") ;;
+    esac
+    require_archive_files "${xui_folder}-linux-$(arch).tar.gz" "${required_files[@]}"
     local xui_script_temp="/usr/bin/still-ui-temp.$$"
     rm -f "${xui_script_temp}"
-    if [[ -n "${local_archive}" ]]; then
-        tar -xzOf "${xui_folder}-linux-$(arch).tar.gz" still-ui/x-ui.sh > "${xui_script_temp}"
-    else
-        curl -fLRo "${xui_script_temp}" "https://raw.githubusercontent.com/Dv2Corn/still-ui/${script_ref}/x-ui.sh"
-    fi
-    if [[ $? -ne 0 ]]; then
+    if ! tar -xzOf "${xui_folder}-linux-$(arch).tar.gz" still-ui/x-ui.sh > "${xui_script_temp}" || [[ ! -s "${xui_script_temp}" ]]; then
         rm -f "${xui_script_temp}"
-        echo -e "${red}Failed to download x-ui.sh${plain}"
-        exit 1
-    fi
-    if [[ ! -s "${xui_script_temp}" ]]; then
-        rm -f "${xui_script_temp}"
-        echo -e "${red}Downloaded x-ui.sh is empty${plain}"
+        echo -e "${red}Failed to read x-ui.sh from the release archive${plain}"
         exit 1
     fi
 
@@ -2373,19 +2361,9 @@ install_x-ui() {
     if [[ $release == "alpine" ]]; then
         xui_rc_temp="/etc/init.d/still-ui.tmp.$$"
         rm -f "${xui_rc_temp}"
-        if [[ -s x-ui.rc ]]; then
-            cp -f x-ui.rc "${xui_rc_temp}"
-        else
-            curl -fLRo "${xui_rc_temp}" "https://raw.githubusercontent.com/Dv2Corn/still-ui/${script_ref}/x-ui.rc"
-        fi
-        if [[ $? -ne 0 ]]; then
+        if ! cp -f x-ui.rc "${xui_rc_temp}" || [[ ! -s "${xui_rc_temp}" ]]; then
             rm -f "${xui_rc_temp}"
-            echo -e "${red}Failed to download x-ui.rc${plain}"
-            exit 1
-        fi
-        if [[ ! -s "${xui_rc_temp}" ]]; then
-            rm -f "${xui_rc_temp}"
-            echo -e "${red}Downloaded x-ui.rc is empty${plain}"
+            echo -e "${red}Failed to install x-ui.rc from the release archive${plain}"
             exit 1
         fi
         mv -f "${xui_rc_temp}" /etc/init.d/still-ui
@@ -2437,28 +2415,6 @@ install_x-ui() {
             esac
         fi
 
-        # If service file not found in tar.gz, download from GitHub
-        if [ "$service_installed" = false ]; then
-            echo -e "${yellow}Service files not found in tar.gz, downloading from GitHub...${plain}"
-            case "${release}" in
-                ubuntu | debian | armbian)
-                    service_unit_url="https://raw.githubusercontent.com/Dv2Corn/still-ui/${script_ref}/x-ui.service.debian"
-                    ;;
-                arch | manjaro | parch)
-                    service_unit_url="https://raw.githubusercontent.com/Dv2Corn/still-ui/${script_ref}/x-ui.service.arch"
-                    ;;
-                *)
-                    service_unit_url="https://raw.githubusercontent.com/Dv2Corn/still-ui/${script_ref}/x-ui.service.rhel"
-                    ;;
-            esac
-
-            if ! _install_xui_service_unit "$service_unit_url" "true"; then
-                echo -e "${red}Failed to install still-ui.service from GitHub (${script_ref}) -- the release tarball did not ship one either${plain}"
-                exit 1
-            fi
-            service_installed=true
-        fi
-
         if [ "$service_installed" = true ]; then
             echo -e "${green}Setting up systemd unit...${plain}"
             chown root:root ${xui_service}/still-ui.service > /dev/null 2>&1
@@ -2501,23 +2457,49 @@ install_x-ui() {
 
 # still-ui: "install.sh migrate" moves an existing 3x-ui to still-ui and
 # "install.sh migrate-rollback [DIR]" undoes it; both live in migrate.sh.
-# STILL_UI_MIGRATE_SCRIPT=/path/migrate.sh runs a local copy instead of the
-# one on main.
+# migrate.sh is taken from the release archive (STILL_UI_VERSION, default the
+# latest release) after its checksum is verified, and gets that archive, so
+# the migration installs exactly the release it came with. A rollback uses
+# the migrate.sh kept in the newest backup folder when there is one.
+# STILL_UI_MIGRATE_SCRIPT=/path/migrate.sh runs a local copy instead.
 _still_migrate() {
-    local script rc
+    # work is global: the EXIT trap that removes it runs outside this function.
+    local script rc tag url
+    work=""
     if [[ -n "${STILL_UI_MIGRATE_SCRIPT:-}" ]]; then
         script="${STILL_UI_MIGRATE_SCRIPT}"
+    elif [[ "${1:-}" == "migrate-rollback" ]] && script=$(ls -1d /root/still-ui-migrate-*/migrate.sh 2> /dev/null | sort -r | head -n 1) && [[ -n "${script}" ]]; then
+        :
     else
-        script=$(mktemp /root/still-ui-migrate.sh.XXXXXX) || exit 1
-        if ! curl -fsSL --retry 3 -o "${script}" "https://raw.githubusercontent.com/Dv2Corn/still-ui/main/migrate.sh" || [[ ! -s "${script}" ]]; then
-            rm -f "${script}"
-            echo -e "${red}Could not download migrate.sh${plain}"
+        work=$(mktemp -d /root/.still-ui-release.XXXXXX) || exit 1
+        trap 'rm -rf "${work}"' EXIT
+        if [[ -n "${STILL_UI_ARCHIVE:-}" ]]; then
+            cp -f "${STILL_UI_ARCHIVE}" "${work}/still-ui.tar.gz" || exit 1
+        else
+            tag="${STILL_UI_VERSION:-$(resolve_latest_tag)}"
+            if [[ ! "${tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
+                echo -e "${red}Could not find the still-ui release to migrate to (got '${tag}'). Set STILL_UI_VERSION=vX.Y.Z.${plain}"
+                exit 1
+            fi
+            url="https://github.com/Dv2Corn/still-ui/releases/download/${tag}/still-ui-linux-$(arch).tar.gz"
+            echo -e "Downloading still-ui ${tag} ..."
+            if ! curl -fLR --retry 5 --retry-delay 3 --connect-timeout 15 -o "${work}/still-ui.tar.gz" "${url}" || [[ ! -s "${work}/still-ui.tar.gz" ]]; then
+                echo -e "${red}Could not download ${url}${plain}"
+                exit 1
+            fi
+            verify_release_checksum "${url}" "${work}/still-ui.tar.gz"
+            export STILL_UI_VERSION="${tag}"
+        fi
+        if ! tar -xzf "${work}/still-ui.tar.gz" -C "${work}" still-ui/migrate.sh 2> /dev/null || [[ ! -s "${work}/still-ui/migrate.sh" ]]; then
+            echo -e "${red}This still-ui release has no migrate.sh; use a newer release.${plain}"
             exit 1
         fi
+        script="${work}/still-ui/migrate.sh"
+        export STILL_UI_ARCHIVE="${work}/still-ui.tar.gz"
     fi
     bash "${script}" "$@"
     rc=$?
-    [[ -z "${STILL_UI_MIGRATE_SCRIPT:-}" ]] && rm -f "${script}"
+    [[ -n "${work}" ]] && rm -rf "${work}"
     exit "$rc"
 }
 case "${1:-}" in

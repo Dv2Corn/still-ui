@@ -1,6 +1,6 @@
 ---
 title: Installation
-description: Install 3x-ui via the official script (stable, pinned, or dev-latest), unattended/cloud-init, or Docker — and choose SQLite or PostgreSQL.
+description: Install 3x-ui via the official script (latest or a pinned release), unattended/cloud-init, or Docker — and choose SQLite or PostgreSQL.
 icon: Download
 ---
 
@@ -23,20 +23,13 @@ The official script is the recommended path. During installation it generates a
 and installs the `x-ui` management command.
 
 ```bash title="latest stable"
-bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh)
 ```
 
 Install a **specific version** by appending its tag:
 
 ```bash title="pinned version"
-bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh) v3.4.0
-```
-
-Install the rolling **dev** build (the latest per-commit pre-release from `main`
-— not a stable release) by passing `dev-latest`:
-
-```bash title="rolling dev build"
-bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh) dev-latest
+bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh) v1.5.0
 ```
 
 When it finishes, note the printed login details and run `x-ui` to open the
@@ -61,23 +54,10 @@ lines in `docker-compose.yml` and start with the profile:
 docker compose --profile postgres up -d
 ```
 
-Prefer the prebuilt image? It's published to the GitHub Container Registry. The
-image bundles Fail2ban (for [IP limits](/docs/operations/security)), which bans
-with `iptables` and therefore needs `NET_ADMIN` (and `NET_RAW` for IPv6) —
-otherwise bans are logged but never applied:
-
-```bash title="docker run"
-docker run -d \
-  --cap-add=NET_ADMIN \
-  --cap-add=NET_RAW \
-  -e XUI_ENABLE_FAIL2BAN=true \
-  -v $PWD/db/:/etc/x-ui/ \
-  -v $PWD/cert/:/root/cert/ \
-  --network=host \
-  --restart=unless-stopped \
-  --name 3x-ui \
-  ghcr.io/mhsanaei/3x-ui:latest
-```
+still-ui publishes no prebuilt container image: Compose builds one from the
+repository's `Dockerfile`, with still-ui's own Xray build inside. For
+[IP limits](/docs/operations/security) the container needs `NET_ADMIN` (and
+`NET_RAW` for IPv6), as in `docker-compose.yml`.
 
 The `db/` volume holds the SQLite database (`/etc/x-ui/x-ui.db`) and `cert/`
 holds TLS certificates, so your data survives upgrades.
@@ -87,7 +67,7 @@ holds TLS certificates, so your data survives upgrades.
 <Tab value="Manual">
 
 For advanced users, download a release archive for your architecture from the
-[releases page](https://github.com/MHSanaei/3x-ui/releases), extract it, and run
+[releases page](https://github.com/Dv2Corn/still-ui/releases), extract it, and run
 the binary as a systemd service. The install script automates exactly these
 steps, so it's preferred unless you have a specific reason to install by hand.
 
@@ -117,13 +97,13 @@ migration.
 The installer also runs **non-interactively** for automation. Set
 `XUI_NONINTERACTIVE=1` (or run with no TTY) and it installs end-to-end with zero
 prompts, generating random credentials and writing them to
-`/etc/x-ui/install-result.env`:
+`/etc/still-ui/install-result.env`:
 
 ```bash
-XUI_NONINTERACTIVE=1 bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh)
+XUI_NONINTERACTIVE=1 bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh)
 ```
 
-The repo's [`deploy/`](https://github.com/MHSanaei/3x-ui/tree/main/deploy)
+The repo's [`deploy/`](https://github.com/Dv2Corn/still-ui/tree/main/deploy)
 directory has ready-made **cloud-init** user-data for unattended installs on any
 cloud (Hetzner, AWS, DigitalOcean, Vultr, GCP, Azure, Oracle).
 

@@ -164,6 +164,49 @@ expect "a run that stopped 3x-ui is the newest candidate" equals "$(newest_backu
 mkdir -p "$BACKUP_PARENT/still-ui-migrate-20261105T000000Z"
 expect "a folder without manifest is ignored" equals "$(newest_backup)" "$BACKUP_PARENT/still-ui-migrate-20261104T000000Z"
 
+# --- the still-ui archive must match its .sha256; install.sh comes from it --
+mk_still_archive() { # DEST WITH_INSTALL_SH(0|1)
+    local d
+    d=$(mktemp -d "$test_dir/pkg.XXXXXX")
+    mkdir -p "$d/still-ui"
+    # shellcheck disable=SC2016
+    printf '#!/bin/bash\n[[ "$1 $2" == "migrate-3xui version" ]] && echo 3.11.0\n' > "$d/still-ui/x-ui"
+    chmod 755 "$d/still-ui/x-ui"
+    [[ "$2" == 1 ]] && printf '# STILL_UI_MIGRATING\n' > "$d/still-ui/install.sh"
+    tar -C "$d" -czf "$1" still-ui
+}
+mk_still_archive "$test_dir/good.tar.gz" 1
+mk_still_archive "$test_dir/noinstall.tar.gz" 0
+# shellcheck disable=SC2317,SC2329
+curl() {
+    local out="" prev="" url="${*: -1}"
+    for arg in "$@"; do
+        [[ "$prev" == -o ]] && out="$arg"
+        prev="$arg"
+    done
+    if [[ "$url" == *.sha256 ]]; then
+        case "$SIDECAR" in
+            ok) printf '%s  still-ui.tar.gz\n' "$(sha256sum "$SERVE" | cut -d' ' -f1)" > "$out" ;;
+            wrong) printf '%064d  still-ui.tar.gz\n' 0 > "$out" ;;
+            missing) return 22 ;;
+        esac
+        return 0
+    fi
+    cp "$SERVE" "$out"
+}
+fetch_case() { # SIDECAR SERVE
+    WORK=$(mktemp -d "$test_dir/work.XXXXXX")
+    (SIDECAR="$1" SERVE="$2" STILL_UI_VERSION=v9.9.9 STILL_UI_ARCHIVE="" STILL_UI_INSTALL_SCRIPT="" fetch_still_ui && cat "${WORK}/install.sh") 2>&1
+}
+contains() { [[ "$1" == *"$2"* ]] || { echo "     got: $1"; return 1; }; }
+expect "a matching .sha256 passes, install.sh from the archive" contains "$(fetch_case ok "$test_dir/good.tar.gz")" STILL_UI_MIGRATING
+expect "a missing .sha256 stops the migration" contains "$(fetch_case missing "$test_dir/good.tar.gz")" "Could not download the checksum"
+expect "a wrong .sha256 stops the migration" contains "$(fetch_case wrong "$test_dir/good.tar.gz")" "Checksum mismatch"
+expect "an archive without install.sh stops the migration" contains "$(fetch_case ok "$test_dir/noinstall.tar.gz")" "has no install.sh"
+# shellcheck disable=SC2016
+expect_not "nothing is fetched from a branch" grep -q 'raw.githubusercontent.com/${REPO}/main' "$repo_root/migrate.sh"
+unset -f curl
+
 echo
 if ((failures > 0)); then
     echo "$failures check(s) failed"

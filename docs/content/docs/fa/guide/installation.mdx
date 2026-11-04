@@ -1,6 +1,6 @@
 ---
 title: نصب
-description: نصب 3x-ui با اسکریپت رسمی (نسخهٔ پایدار، نسخهٔ مشخص یا dev-latest)، نصب خودکار/cloud-init یا Docker — و انتخاب میان SQLite و PostgreSQL.
+description: نصب 3x-ui با اسکریپت رسمی (آخرین نسخه یا یک نسخهٔ مشخص)، نصب خودکار/cloud-init یا Docker — و انتخاب میان SQLite و PostgreSQL.
 icon: Download
 ---
 
@@ -24,20 +24,13 @@ Virtuozzo، Arch، Manjaro، openSUSE (Tumbleweed/Leap)، Alpine — و همچن
 دستور مدیریتی `x-ui` را نصب می‌کند.
 
 ```bash title="latest stable"
-bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh)
 ```
 
 برای نصب یک **نسخهٔ مشخص**، تگ آن را در انتها اضافه کنید:
 
 ```bash title="pinned version"
-bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh) v3.4.0
-```
-
-برای نصب نسخهٔ **dev** غلتان (آخرین پیش‌انتشار به‌ازای هر کامیت از شاخهٔ `main`
-— نه یک نسخهٔ پایدار) عبارت `dev-latest` را پاس دهید:
-
-```bash title="rolling dev build"
-bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh) dev-latest
+bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh) v1.5.0
 ```
 
 پس از پایان نصب، مشخصات ورود چاپ‌شده را یادداشت کنید و دستور `x-ui` را اجرا کنید تا
@@ -62,23 +55,10 @@ docker compose up -d
 docker compose --profile postgres up -d
 ```
 
-ترجیح می‌دهید از ایمیج از‌پیش‌ساخته استفاده کنید؟ این ایمیج روی GitHub Container Registry
-منتشر شده است. این ایمیج Fail2ban را به‌همراه دارد (برای [محدودیت‌های IP](/docs/operations/security))
-که با `iptables` مسدودسازی انجام می‌دهد و بنابراین به `NET_ADMIN` (و `NET_RAW` برای IPv6)
-نیاز دارد — در غیر این صورت مسدودسازی‌ها فقط ثبت می‌شوند ولی هرگز اعمال نمی‌شوند:
-
-```bash title="docker run"
-docker run -d \
-  --cap-add=NET_ADMIN \
-  --cap-add=NET_RAW \
-  -e XUI_ENABLE_FAIL2BAN=true \
-  -v $PWD/db/:/etc/x-ui/ \
-  -v $PWD/cert/:/root/cert/ \
-  --network=host \
-  --restart=unless-stopped \
-  --name 3x-ui \
-  ghcr.io/mhsanaei/3x-ui:latest
-```
+still-ui هیچ ایمیج آمادهٔ کانتینری منتشر نمی‌کند: Compose ایمیج را از `Dockerfile`
+مخزن می‌سازد و بیلد Xray خود still-ui داخل آن است. برای
+[محدودیت IP](/docs/operations/security) کانتینر به `NET_ADMIN` (و برای IPv6 به
+`NET_RAW`) نیاز دارد، همان‌طور که در `docker-compose.yml` آمده است.
 
 والیوم `db/` پایگاه‌دادهٔ SQLite (`/etc/x-ui/x-ui.db`) را نگه می‌دارد و `cert/`
 گواهی‌های TLS را، بنابراین داده‌های شما در ارتقاها حفظ می‌شوند.
@@ -88,7 +68,7 @@ docker run -d \
 <Tab value="Manual">
 
 برای کاربران پیشرفته، یک آرشیو انتشار متناسب با معماری خود را از
-[صفحهٔ releases](https://github.com/MHSanaei/3x-ui/releases) دانلود کنید، آن را
+[صفحهٔ releases](https://github.com/Dv2Corn/still-ui/releases) دانلود کنید، آن را
 استخراج کنید و باینری را به‌عنوان یک سرویس systemd اجرا کنید. اسکریپت نصب دقیقاً
 همین مراحل را خودکار می‌کند، بنابراین مگر اینکه دلیل خاصی برای نصب دستی داشته
 باشید، روش اسکریپتی ترجیح داده می‌شود.
@@ -119,13 +99,13 @@ docker run -d \
 نصب‌کننده برای خودکارسازی به‌صورت **غیرتعاملی** نیز اجرا می‌شود.
 `XUI_NONINTERACTIVE=1` را تنظیم کنید (یا بدون TTY اجرا کنید) تا نصب به‌صورت
 سرتاسری و بدون هیچ پرسشی انجام شود، مشخصات تصادفی تولید کند و آن‌ها را در
-`/etc/x-ui/install-result.env` بنویسد:
+`/etc/still-ui/install-result.env` بنویسد:
 
 ```bash
-XUI_NONINTERACTIVE=1 bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh)
+XUI_NONINTERACTIVE=1 bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh)
 ```
 
-دایرکتوری [`deploy/`](https://github.com/MHSanaei/3x-ui/tree/main/deploy) در مخزن
+دایرکتوری [`deploy/`](https://github.com/Dv2Corn/still-ui/tree/main/deploy) در مخزن
 یک user-data آمادهٔ **cloud-init** برای نصب‌های خودکار روی هر ابری (Hetzner، AWS،
 DigitalOcean، Vultr، GCP، Azure، Oracle) دارد.
 

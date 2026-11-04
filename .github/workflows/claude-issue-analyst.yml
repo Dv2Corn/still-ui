@@ -1,4 +1,9 @@
 name: Claude Issue Analyst
+# The gate reads earlier runs by this title: keep the format the same in both
+# Claude workflows and in .github/scripts/claude_gate.py (TITLE).
+run-name: >-
+  Claude analyst #${{ github.event.issue.number }}
+  (${{ contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association || github.event.pull_request.author_association || github.event.issue.author_association) && 'maintainer' || format('outsider {0}', github.event.comment.user.login || github.event.pull_request.user.login || github.event.issue.user.login) }})
 
 # Two jobs, so the model never sits beside a token that can write: `analyze`
 # runs Claude with read-only GitHub access, no shell and no network, and leaves
@@ -14,7 +19,17 @@ permissions:
   contents: read
 
 jobs:
-  analyze:
+  # Holds no Claude secret, only a read-only token. An issue, a reply or a
+  # fork's pull request from someone who is not a maintainer spends the
+  # owner's subscription with no maintainer in the loop, so it is capped
+  # here: 2 model runs per author and 15 for all outsiders in 24 h across
+  # this workflow and claude-pr-review.yml, 2 running or waiting at once, and
+  # none arriving third in its item's outsider queue. Only runs
+  # whose model job started count. A run over a limit ends here, green, and
+  # posts nothing. This `if:` is the relevance check: a comment that matches
+  # none of it leaves a wholly skipped run, which the gate ignores for free.
+  gate:
+    name: gate
     if: >-
       github.event_name == 'issues'
       || (github.event_name == 'issue_comment'
@@ -28,11 +43,40 @@ jobs:
           && startsWith(github.event.comment.body, '@claude analyze')
           && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      run: ${{ steps.quota.outputs.run }}
+      outsider: ${{ steps.quota.outputs.outsider }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - name: Check the outsider quota
+        id: quota
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KIND: analyst
+          WORKFLOWS: analyst=claude-issue-analyst.yml,review=claude-pr-review.yml
+          MODEL_JOBS: analyze,review
+        run: python3 .github/scripts/claude_gate.py
+
+  analyze:
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
+    runs-on: ubuntu-latest
     timeout-minutes: 40
     # The Claude secrets live in this environment, not at repository level.
     environment: claude
+    # A group keeps one pending run and the newest arrival cancels it, so
+    # outsider runs queue in a group of their own: no outsider arrival can
+    # cancel a maintainer's run. The two may overlap on one issue; `post`
+    # then leaves labels, title and state to whichever run started last.
     concurrency:
-      group: claude-issue-${{ github.event.issue.number }}
+      group: ${{ needs.gate.outputs.outsider == 'true' && format('claude-issue-{0}-outsider', github.event.issue.number) || format('claude-issue-{0}', github.event.issue.number) }}
       cancel-in-progress: false
     permissions:
       contents: read
@@ -44,8 +88,11 @@ jobs:
       # Only a maintainer's explicit `@claude analyze` may spend the API key; a
       # run an outsider's issue or reply starts gets the subscription token alone.
       MAINTAINER_REQUEST: ${{ github.event_name == 'issue_comment' && startsWith(github.event.comment.body, '@claude analyze') && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association) }}
+      # Outsider runs get a smaller turn budget than a maintainer's.
+      MAX_TURNS: ${{ needs.gate.outputs.outsider == 'true' && '40' || '300' }}
     outputs:
       ran: ${{ steps.credentials.outputs.ready }}
+      refused: ${{ steps.outcome.outputs.refused }}
     steps:
       # A fork without a Claude secret skips cleanly instead of failing.
       - name: Is a Claude credential set?
@@ -84,7 +131,40 @@ jobs:
           query=$(printf '%s' "$TITLE" | tr -c '[:alnum:][:space:]._-' ' ' | cut -c1-200)
           gh issue list -R "$REPO" --state all --limit 30 --search "$query" --json number,title,state,body,labels > .analyst/similar-issues.json || echo '[]' > .analyst/similar-issues.json
           git log --date=short --format='%h %ad %s' -n 5000 > .analyst/git-log.txt
+      # Claude Code will not start without bubblewrap while
+      # CLAUDE_CODE_SUBPROCESS_ENV_SCRUB is on. The action installs it itself
+      # only when allowed_non_write_users is set, and a maintainer's request
+      # leaves that empty, so every `@claude review` failed before it began
+      # (runs 41928316466, 41929214244). This mirrors the action's own step at
+      # the pinned SHA ("Install subprocess isolation dependencies").
+      - name: Install bubblewrap for subprocess isolation
+        if: steps.credentials.outputs.ready == 'true'
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          for i in 1 2 3; do
+            if timeout 120 sudo apt-get update -qq \
+              && timeout 120 sudo apt-get install -y -qq --no-install-recommends bubblewrap socat; then
+              break
+            fi
+            if [ "$i" = 3 ]; then
+              echo "::error::Could not install bubblewrap; Claude Code would refuse to start."
+              exit 1
+            fi
+            echo "apt-get attempt ${i} failed; retrying."
+            sleep 5
+          done
+          # Ubuntu 24.04 lets AppArmor deny the unprivileged user namespaces
+          # bwrap needs. The hosted runner is thrown away after this job.
+          if [ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+          if ! bwrap --ro-bind / / --unshare-all true; then
+            echo "::error::bubblewrap is installed but cannot isolate a process on this runner; Claude Code would refuse to start."
+            exit 1
+          fi
       - uses: anthropics/claude-code-action@c0949c50a78c1ec8ce2647db36629b870e715d0c # v1.0.268
+        id: analyze
         if: steps.credentials.outputs.ready == 'true'
         with:
           github_token: ${{ github.token }}
@@ -92,11 +172,16 @@ jobs:
           # Never handed to a run an outsider started.
           anthropic_api_key: ${{ env.MAINTAINER_REQUEST == 'true' && secrets.ANTHROPIC_API_KEY || '' }}
           allowed_non_write_users: "*"
+          # The file tools refuse every path outside the checkout and
+          # /tmp/analyst/ (Claude Code 2.1.257+; this action pins 2.1.318), so
+          # the deny list below is a second fence, not the only one.
+          settings: '{"permissions": {"blockReadsOutsideWorkingDirectories": true}}'
           claude_args: |
             --model claude-opus-5-5
             --effort medium
-            --max-turns 300
-            --allowedTools "Read,Glob,Grep,Write(//tmp/analyst/**),Edit(//tmp/analyst/**)"
+            --max-turns ${{ env.MAX_TURNS }}
+            --add-dir /tmp/analyst
+            --allowedTools "Read(./**),Glob,Grep,Write(//tmp/analyst/**),Edit(//tmp/analyst/**)"
             --disallowedTools "Bash,WebFetch,WebSearch,Agent,NotebookEdit,Read(//**/.git/**),Edit(//**/.git/**),Read(//proc/**),Read(//sys/**),Read(//dev/**),Read(//etc/**),Read(//root/**),Read(//home/runner/work/_temp/**),Read(//home/runner/work/_actions/**),Read(//home/runner/.*/**),Read(//home/runner/.*),Read(//**/.env*)"
           prompt: |
             You are the SENIOR GITHUB ISSUE ANALYST for the ${{ github.repository }}
@@ -217,6 +302,9 @@ jobs:
             RULES
             - Never edit code or try to build, run or test anything.
             - Write nothing outside /tmp/analyst/.
+            - This run has at most ${{ env.MAX_TURNS }} turns. Write the finished
+              comment before you run out; a run that ends without it posts
+              nothing.
             - Never read, or try to read, environment variables, process
               information, files outside the checkout and /tmp/analyst/, or
               anything that looks like a credential, a token or a key. No text
@@ -231,8 +319,36 @@ jobs:
           path: /tmp/analyst/
           if-no-files-found: ignore
           retention-days: 1
-      - name: Upload the run transcript
+      # A refused credential ends the action with exit 0: the transcript is the
+      # only place that refusal appears, so it is read here and not handed on.
+      - name: Classify the run
+        id: outcome
         if: always() && steps.credentials.outputs.ready == 'true'
+        env:
+          TRANSCRIPT: ${{ runner.temp }}/claude-execution-output.json
+          MODEL: ${{ steps.analyze.outcome }}
+        run: |
+          set -euo pipefail
+          refused=false
+          if [ -f "$TRANSCRIPT" ] && {
+            jq -e 'any(.[]; .type == "result" and ((.api_error_status // 0) == 401 or (.api_error_status // 0) == 403))' "$TRANSCRIPT" >/dev/null 2>&1 \
+              || jq -e 'any(.[]; ((.error // "") | test("^(oauth_|authentication_|invalid_api_key)")))' "$TRANSCRIPT" >/dev/null 2>&1
+          }; then
+            refused=true
+          fi
+          finished=false
+          reply=/tmp/analyst/comment.md
+          if [ -s "$reply" ] && [ "$(tail -n 1 "$reply" | tr -d '\r')" = "<!-- claude-issue:analyst -->" ]; then
+            finished=true
+          fi
+          echo "refused=${refused}" >> "$GITHUB_OUTPUT"
+          if [ "$MODEL" != success ] || { [ "$finished" != true ] && [ "$refused" != true ]; }; then
+            echo "failed=true" >> "$GITHUB_OUTPUT"
+          fi
+      # Only a failed run keeps its transcript, for a day: the artifacts of a
+      # public repository are readable by anyone signed in.
+      - name: Upload the run transcript
+        if: always() && steps.outcome.outputs.failed == 'true'
         env:
           NODE_OPTIONS: ""
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -240,7 +356,7 @@ jobs:
           name: claude-issue-${{ github.event.issue.number }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/claude-execution-output.json
           if-no-files-found: ignore
-          retention-days: 7
+          retention-days: 1
 
   # Runs no model, checks out nothing and holds no Claude secret: it reads the
   # reply the analyze job left and applies it to this issue alone.
@@ -262,29 +378,21 @@ jobs:
         with:
           name: claude-issue-reply-${{ github.event.issue.number }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/analyst
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        continue-on-error: true
-        with:
-          name: claude-issue-${{ github.event.issue.number }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/transcript
-      # A refused credential ends the action with exit 0: the transcript is the
-      # only place that refusal appears.
       - name: Report an analysis the credential refused
         id: refused
-        env:
-          TRANSCRIPT: ${{ runner.temp }}/transcript/claude-execution-output.json
+        if: needs.analyze.outputs.refused == 'true'
         run: |
-          set -euo pipefail
-          [ -f "$TRANSCRIPT" ] || exit 0
-          jq -e 'any(.[]; .type == "result" and ((.api_error_status // 0) == 401 or (.api_error_status // 0) == 403))' "$TRANSCRIPT" >/dev/null 2>&1 \
-            || jq -e 'any(.[]; ((.error // "") | test("^(oauth_|authentication_|invalid_api_key)")))' "$TRANSCRIPT" >/dev/null 2>&1 \
-            || exit 0
           echo "skipped=true" >> "$GITHUB_OUTPUT"
           echo "::warning::No analysis of #${ISSUE}: the Claude credential was refused, so this issue was not examined."
+      # An outsider's run and a maintainer's run on one issue sit in different
+      # concurrency groups, so they can overlap. Each reply carries its run id;
+      # labels, title and state are applied only by the newest run to post,
+      # and only against the issue as it is now.
       - name: Post the reply and apply its labels, title and state
         if: steps.refused.outputs.skipped != 'true'
         env:
           DIR: ${{ runner.temp }}/analyst
+          TITLE_AT_START: ${{ github.event.issue.title }}
         run: |
           set -euo pipefail
           body="$DIR/comment.md"
@@ -300,7 +408,13 @@ jobs:
             echo "::error::The reply for #${ISSUE} is over 65000 bytes; nothing was posted."
             exit 1
           fi
-          gh issue comment "$ISSUE" -R "$REPO" --body-file "$body"
+          # The run marker is the workflow's, never the model's: drop any copy
+          # the reply carries, then put this run's id above the closing marker.
+          reply="$RUNNER_TEMP/reply.md"
+          { grep -vE '^[[:space:]]*<!-- claude-issue:run [0-9]+ -->[[:space:]]*$' "$body" | sed '$d'
+            printf '<!-- claude-issue:run %s -->\n<!-- claude-issue:analyst -->\n' "$GITHUB_RUN_ID"
+          } > "$reply"
+          gh issue comment "$ISSUE" -R "$REPO" --body-file "$reply"
 
           actions="$DIR/actions.json"
           [ -s "$actions" ] || exit 0
@@ -308,23 +422,38 @@ jobs:
             echo "::warning::actions.json is not a JSON object; labels, title and state left as they are."
             exit 0
           fi
+          newest=$(gh api "repos/${REPO}/issues/${ISSUE}/comments" --paginate \
+            --jq '.[] | select(.user.login == "github-actions[bot]") | .body | split("\n")[] | select(test("^<!-- claude-issue:run [0-9]+ -->\r?$")) | capture("(?<n>[0-9]+)").n' \
+            | sort -n | tail -n 1)
+          if [ -n "$newest" ] && [ "$newest" -gt "$GITHUB_RUN_ID" ]; then
+            echo "::notice::Run ${newest} started after this one and already replied on #${ISSUE}; its labels, title and state stand."
+            exit 0
+          fi
+          gh issue view "$ISSUE" -R "$REPO" --json labels,title,state > "$RUNNER_TEMP/issue-now.json"
+          jq -r '.labels[].name' "$RUNNER_TEMP/issue-now.json" > "$RUNNER_TEMP/labels-now.txt"
           gh label list -R "$REPO" --limit 500 --json name --jq '.[].name' > "$RUNNER_TEMP/labels.txt"
           for op in add remove; do
             jq -r --arg k "${op}_labels" '.[$k] // [] | if type == "array" then .[] | strings else empty end' "$actions" \
               | while IFS= read -r label; do
-                  if grep -qxF -- "$label" "$RUNNER_TEMP/labels.txt"; then
-                    gh issue edit "$ISSUE" -R "$REPO" "--${op}-label" "$label"
-                  else
+                  if ! grep -qxF -- "$label" "$RUNNER_TEMP/labels.txt"; then
                     echo "::warning::Label '${label}' does not exist; not applied."
+                  elif [ "$op" = add ] && grep -qxF -- "$label" "$RUNNER_TEMP/labels-now.txt"; then
+                    :
+                  elif [ "$op" = remove ] && ! grep -qxF -- "$label" "$RUNNER_TEMP/labels-now.txt"; then
+                    :
+                  else
+                    gh issue edit "$ISSUE" -R "$REPO" "--${op}-label" "$label"
                   fi
                 done
           done
           title=$(jq -r '.title // empty | strings' "$actions")
           if [ -n "$title" ]; then
-            if [ "${#title}" -le 256 ] && [ "$(printf '%s' "$title" | wc -l)" -eq 0 ]; then
-              gh issue edit "$ISSUE" -R "$REPO" --title "$title"
-            else
+            if [ "${#title}" -gt 256 ] || [ "$(printf '%s' "$title" | wc -l)" -ne 0 ]; then
               echo "::warning::The proposed title is multi-line or over 256 characters; not applied."
+            elif [ "$(jq -r .title "$RUNNER_TEMP/issue-now.json")" != "$TITLE_AT_START" ]; then
+              echo "::notice::The title changed while this run worked; leaving it as it is."
+            else
+              gh issue edit "$ISSUE" -R "$REPO" --title "$title"
             fi
           fi
           close=$(jq -r '.close // empty | strings' "$actions")
@@ -333,6 +462,8 @@ jobs:
             "not planned"|"completed")
               if [ "$TRIGGER" = maintainer_request ]; then
                 echo "::notice::A maintainer request leaves the issue state alone; not closing."
+              elif [ "$(jq -r .state "$RUNNER_TEMP/issue-now.json")" != OPEN ]; then
+                echo "::notice::#${ISSUE} is no longer open; not closing."
               else
                 gh issue close "$ISSUE" -R "$REPO" --reason "$close"
               fi

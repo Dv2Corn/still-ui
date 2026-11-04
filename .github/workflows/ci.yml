@@ -14,6 +14,7 @@ on:
       - "**.sh"
       - "scripts/**"
       - ".github/workflows/**"
+      - ".github/scripts/**"
   push:
     branches:
       - main
@@ -29,6 +30,7 @@ on:
       - "**.sh"
       - "scripts/**"
       - ".github/workflows/**"
+      - ".github/scripts/**"
 
 permissions:
   contents: read
@@ -338,6 +340,9 @@ jobs:
             echo "::error::Pin these actions to a full commit SHA (add the tag as a comment)."
             exit 1
           fi
+      # The quota gate of the Claude workflows, with the GitHub API mocked.
+      - name: Claude gate unit tests
+        run: python3 -m unittest discover -s .github/scripts -p 'test_*.py' -v
       - name: Install shellcheck
         run: sudo apt-get update && sudo apt-get install -y shellcheck
       - name: shellcheck
@@ -345,11 +350,14 @@ jobs:
           shellcheck --severity=style DockerInit.sh DockerEntrypoint.sh deploy/test/smoke-noninteractive.sh deploy/test/installer-panel-port.sh \
             scripts/still-release.sh scripts/still-sbom.sh scripts/xray-build/build.sh
           shellcheck --severity=style migrate.sh deploy/test/migrate-unit.sh scripts/test-migrate.sh
+          shellcheck --severity=style scripts/still-probe-install.sh deploy/test/release-scripts.sh
           shellcheck --severity=error install.sh update.sh x-ui.sh
       - name: Installer panel port regression tests
         run: bash deploy/test/installer-panel-port.sh
       - name: migrate.sh unit tests
         run: bash deploy/test/migrate-unit.sh
+      - name: Release script checksum gates
+        run: bash deploy/test/release-scripts.sh
 
   frontend:
     runs-on: ubuntu-latest

