@@ -465,7 +465,7 @@ export const sections: readonly Section[] = [
         summary:
           'State of "Block torrents for clients": the stored toggle, whether this host can run the nftables filter (Linux with nft), whether its table is loaded, packet counters since it was loaded, and the last apply error if any.',
         response:
-          '{\n  "success": true,\n  "obj": {\n    "enabled": true,\n    "supported": true,\n    "nftInstalled": true,\n    "active": true,\n    "counters": {\n      "handshakes": 3,\n      "dht": 61,\n      "trackers": 2,\n      "utp": 276,\n      "peerDrops": 59811,\n      "tunnelBans": 1\n    }\n  }\n}',
+          '{\n  "success": true,\n  "obj": {\n    "enabled": true,\n    "supported": true,\n    "nftInstalled": true,\n    "active": true,\n    "counters": {\n      "handshakes": 3,\n      "dht": 61,\n      "trackers": 2,\n      "utp": 276,\n      "learned": 5,\n      "peerDrops": 59811,\n      "tunnelBans": 1\n    }\n  }\n}',
       },
       {
         method: 'GET',
@@ -703,7 +703,7 @@ export const sections: readonly Section[] = [
         method: 'POST',
         path: '/panel/api/server/setTorrentBlock',
         summary:
-          'Turn "Block torrents for clients" on or off. On: every generated Xray config routes sniffed BitTorrent to a blackhole first and enables content sniffing on client inbounds where it is off, and on Linux an nftables table drops BitTorrent signatures in egress the server originates and in forwarded AmneziaWG kernel-mode traffic. Xray is reconciled immediately. Returns the same object as GET /torrentBlock; a host without nft keeps the Xray half and reports the error.',
+          'Turn "Block torrents for clients" on or off. On: every generated Xray config routes sniffed BitTorrent to a blackhole first and enables content sniffing on client inbounds where it is off, and on Linux an nftables table drops BitTorrent signatures in egress the server originates and in forwarded AmneziaWG kernel-mode traffic, and cuts a peer endpoint only after that peer answers with BitTorrent itself. Xray is reconciled immediately. Returns the same object as GET /torrentBlock; a host without nft keeps the Xray half and reports the error.',
         params: [
           {
             name: 'enable',

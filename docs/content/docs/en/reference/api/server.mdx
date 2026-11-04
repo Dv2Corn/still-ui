@@ -131,10 +131,11 @@ _openapi:
         config routes sniffed BitTorrent to a blackhole first and enables
         content sniffing on client inbounds where it is off, and on Linux an
         nftables table drops BitTorrent signatures in egress the server
-        originates and in forwarded AmneziaWG kernel-mode traffic. Xray is
-        reconciled immediately. Returns the same object as GET /torrentBlock; a
-        host without nft keeps the Xray half and reports the error.'
-      url: '#turn-block-torrents-for-clients-on-or-off-on-every-generated-xray-config-routes-sniffed-bittorrent-to-a-blackhole-first-and-enables-content-sniffing-on-client-inbounds-where-it-is-off-and-on-linux-an-nftables-table-drops-bittorrent-signatures-in-egress-the-server-originates-and-in-forwarded-amneziawg-kernel-mode-traffic-xray-is-reconciled-immediately-returns-the-same-object-as-get-torrentblock-a-host-without-nft-keeps-the-xray-half-and-reports-the-error'
+        originates and in forwarded AmneziaWG kernel-mode traffic, and cuts a
+        peer endpoint only after that peer answers with BitTorrent itself. Xray
+        is reconciled immediately. Returns the same object as GET /torrentBlock;
+        a host without nft keeps the Xray half and reports the error.'
+      url: '#turn-block-torrents-for-clients-on-or-off-on-every-generated-xray-config-routes-sniffed-bittorrent-to-a-blackhole-first-and-enables-content-sniffing-on-client-inbounds-where-it-is-off-and-on-linux-an-nftables-table-drops-bittorrent-signatures-in-egress-the-server-originates-and-in-forwarded-amneziawg-kernel-mode-traffic-and-cuts-a-peer-endpoint-only-after-that-peer-answers-with-bittorrent-itself-xray-is-reconciled-immediately-returns-the-same-object-as-get-torrentblock-a-host-without-nft-keeps-the-xray-half-and-reports-the-error'
     - depth: 2
       title: Refresh the default GeoIP / GeoSite data files. Use the /:fileName
         variant to update one file.
@@ -292,10 +293,12 @@ _openapi:
           config routes sniffed BitTorrent to a blackhole first and enables
           content sniffing on client inbounds where it is off, and on Linux an
           nftables table drops BitTorrent signatures in egress the server
-          originates and in forwarded AmneziaWG kernel-mode traffic. Xray is
-          reconciled immediately. Returns the same object as GET /torrentBlock;
-          a host without nft keeps the Xray half and reports the error.'
-        id: turn-block-torrents-for-clients-on-or-off-on-every-generated-xray-config-routes-sniffed-bittorrent-to-a-blackhole-first-and-enables-content-sniffing-on-client-inbounds-where-it-is-off-and-on-linux-an-nftables-table-drops-bittorrent-signatures-in-egress-the-server-originates-and-in-forwarded-amneziawg-kernel-mode-traffic-xray-is-reconciled-immediately-returns-the-same-object-as-get-torrentblock-a-host-without-nft-keeps-the-xray-half-and-reports-the-error
+          originates and in forwarded AmneziaWG kernel-mode traffic, and cuts a
+          peer endpoint only after that peer answers with BitTorrent itself.
+          Xray is reconciled immediately. Returns the same object as GET
+          /torrentBlock; a host without nft keeps the Xray half and reports the
+          error.'
+        id: turn-block-torrents-for-clients-on-or-off-on-every-generated-xray-config-routes-sniffed-bittorrent-to-a-blackhole-first-and-enables-content-sniffing-on-client-inbounds-where-it-is-off-and-on-linux-an-nftables-table-drops-bittorrent-signatures-in-egress-the-server-originates-and-in-forwarded-amneziawg-kernel-mode-traffic-and-cuts-a-peer-endpoint-only-after-that-peer-answers-with-bittorrent-itself-xray-is-reconciled-immediately-returns-the-same-object-as-get-torrentblock-a-host-without-nft-keeps-the-xray-half-and-reports-the-error
       - content: Refresh the default GeoIP / GeoSite data files. Use the /:fileName
           variant to update one file.
         id: refresh-the-default-geoip--geosite-data-files-use-the-filename-variant-to-update-one-file

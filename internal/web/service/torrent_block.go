@@ -25,8 +25,8 @@ type TorrentBlockStatus struct {
 
 // hostFilter is the nftables side; swapped out in tests.
 type hostFilter interface {
-	Apply() error
-	Ensure() error
+	Apply(protected []uint16) error
+	Ensure(protected []uint16) error
 	Remove() error
 	Status() torrentblock.Status
 }
@@ -40,6 +40,36 @@ var (
 // TorrentBlockService turns "Block torrents for clients" on and off.
 type TorrentBlockService struct {
 	settingService SettingService
+	inboundService InboundService
+	nodeService    NodeService
+}
+
+// protectedPorts are this server's own service ports plus node panel ports: a
+// BitTorrent-looking answer from one of them is never learned as a peer.
+func (s *TorrentBlockService) protectedPorts() []uint16 {
+	var ports []uint16
+	add := func(p int) {
+		if p > 0 && p <= 65535 {
+			ports = append(ports, uint16(p))
+		}
+	}
+	if p, err := s.settingService.GetPort(); err == nil {
+		add(p)
+	}
+	if p, err := s.settingService.GetSubPort(); err == nil {
+		add(p)
+	}
+	if inbounds, err := s.inboundService.GetAllInbounds(); err == nil {
+		for _, in := range inbounds {
+			add(in.Port)
+		}
+	}
+	if nodes, err := s.nodeService.GetAll(); err == nil {
+		for _, n := range nodes {
+			add(n.Port)
+		}
+	}
+	return ports
 }
 
 // Enabled reports the stored toggle; a read error counts as off.
@@ -61,10 +91,14 @@ func (s *TorrentBlockService) SetEnabled(on bool) (TorrentBlockStatus, error) {
 	if err := s.settingService.setString(torrentBlockSettingKey, strconv.FormatBool(on)); err != nil {
 		return TorrentBlockStatus{}, err
 	}
+	var protected []uint16
+	if on {
+		protected = s.protectedPorts()
+	}
 	torrentBlockMu.Lock()
 	var err error
 	if on {
-		err = torrentBlockHost.Apply()
+		err = torrentBlockHost.Apply(protected)
 	} else {
 		err = torrentBlockHost.Remove()
 	}
@@ -73,14 +107,16 @@ func (s *TorrentBlockService) SetEnabled(on bool) (TorrentBlockStatus, error) {
 	return s.Status(), nil
 }
 
-// EnsureHostFilter reloads the table after a reboot or a foreign ruleset flush.
+// EnsureHostFilter reloads the table after a reboot or a foreign ruleset flush, and keeps
+// its protected ports in step with the inbounds.
 func (s *TorrentBlockService) EnsureHostFilter() {
 	if !s.Enabled() {
 		return
 	}
+	protected := s.protectedPorts()
 	torrentBlockMu.Lock()
 	defer torrentBlockMu.Unlock()
-	recordTorrentBlockErr(torrentBlockHost.Ensure())
+	recordTorrentBlockErr(torrentBlockHost.Ensure(protected))
 }
 
 // recordTorrentBlockErr keeps the last host error for the UI; caller holds torrentBlockMu.

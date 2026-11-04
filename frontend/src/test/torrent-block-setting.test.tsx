@@ -11,6 +11,7 @@ const zero = {
   dht: 0,
   trackers: 0,
   utp: 0,
+  learned: 0,
   peerDrops: 0,
   tunnelBans: 0,
 };
@@ -76,6 +77,7 @@ describe('TorrentBlockSetting', () => {
         dht: 61,
         trackers: 2,
         utp: 276,
+        learned: 5,
         peerDrops: 59811,
         tunnelBans: 7,
       },

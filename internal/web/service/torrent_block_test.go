@@ -3,8 +3,10 @@ package service
 import (
 	"encoding/json"
 	"reflect"
+	"slices"
 	"testing"
 
+	"github.com/mhsanaei/3x-ui/v3/internal/database"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 	"github.com/mhsanaei/3x-ui/v3/internal/torrentblock"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/json_util"
@@ -12,12 +14,22 @@ import (
 )
 
 type fakeHostFilter struct {
+	protected              []uint16
 	applyErr               error
 	applied, ensured, gone int
 }
 
-func (f *fakeHostFilter) Apply() error  { f.applied++; return f.applyErr }
-func (f *fakeHostFilter) Ensure() error { f.ensured++; return f.applyErr }
+func (f *fakeHostFilter) Apply(p []uint16) error {
+	f.applied++
+	f.protected = p
+	return f.applyErr
+}
+
+func (f *fakeHostFilter) Ensure(p []uint16) error {
+	f.ensured++
+	f.protected = p
+	return f.applyErr
+}
 func (f *fakeHostFilter) Remove() error { f.gone++; return nil }
 func (f *fakeHostFilter) Status() torrentblock.Status {
 	return torrentblock.Status{Supported: true, NftInstalled: true, Active: f.applied > f.gone}
@@ -169,5 +181,27 @@ func TestTorrentBlockService_HostErrorsDoNotBlockTheToggle(t *testing.T) {
 	st, err = svc.SetEnabled(false)
 	if err != nil || st.Enabled || fake.gone != 1 || st.Active {
 		t.Fatalf("SetEnabled(false) = %+v, %v; removed %d times", st, err, fake.gone)
+	}
+}
+
+// A node panel or an inbound answering with a BitTorrent-looking payload must never be
+// learned as a swarm peer, so their ports reach the nftables protected set.
+func TestTorrentBlockService_ProtectsOwnAndNodePorts(t *testing.T) {
+	setupConflictDB(t)
+	fake := useFakeHostFilter(t)
+	addTorrentBlockInbound(t, "in-guarded", 30011, `{"enabled":true,"destOverride":["http"]}`)
+	if err := (&SettingService{}).setString("webPort", "54321"); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.GetDB().Create(&model.Node{Name: "n1", Address: "203.0.113.5", Port: 41000}).Error; err != nil {
+		t.Fatalf("create node: %v", err)
+	}
+	if _, err := (&TorrentBlockService{}).SetEnabled(true); err != nil {
+		t.Fatalf("SetEnabled: %v", err)
+	}
+	for _, want := range []uint16{54321, 30011, 41000} {
+		if !slices.Contains(fake.protected, want) {
+			t.Fatalf("protected ports %v miss %d", fake.protected, want)
+		}
 	}
 }

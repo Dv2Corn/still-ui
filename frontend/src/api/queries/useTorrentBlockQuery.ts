@@ -8,6 +8,7 @@ export interface TorrentBlockCounters {
   dht: number;
   trackers: number;
   utp: number;
+  learned: number;
   peerDrops: number;
   tunnelBans: number;
 }
