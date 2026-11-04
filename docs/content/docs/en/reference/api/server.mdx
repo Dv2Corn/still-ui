@@ -124,13 +124,16 @@ _openapi:
         newest release.
       url: '#download-and-install-the-specified-xray-version-pass-latest-for-the-newest-release'
     - depth: 2
-      title: Self-update the panel to the latest version. The server restarts on
-        success. Bearer-token callers need admin or node-admin scope.
-      url: '#self-update-the-panel-to-the-latest-version-the-server-restarts-on-success-bearer-token-callers-need-admin-or-node-admin-scope'
+      title: Self-update the panel to the latest release. The panel runs update.sh of
+        that release only if its sha256 is listed in the release SHA256SUMS. The
+        server restarts on success. Bearer-token callers need admin or
+        node-admin scope.
+      url: '#self-update-the-panel-to-the-latest-release-the-panel-runs-updatesh-of-that-release-only-if-its-sha256-is-listed-in-the-release-sha256sums-the-server-restarts-on-success-bearer-token-callers-need-admin-or-node-admin-scope'
     - depth: 2
-      title: Toggle the panel update channel between stable and the rolling per-commit
-        dev release. Only effective on dev builds.
-      url: '#toggle-the-panel-update-channel-between-stable-and-the-rolling-per-commit-dev-release-only-effective-on-dev-builds'
+      title: 'Set the panel update channel. still-ui publishes no dev builds, so only
+        the stable channel exists: dev=false switches off a dev setting left by
+        an older release, dev=true is refused.'
+      url: '#set-the-panel-update-channel-still-ui-publishes-no-dev-builds-so-only-the-stable-channel-exists-devfalse-switches-off-a-dev-setting-left-by-an-older-release-devtrue-is-refused'
     - depth: 2
       title: 'Turn "Block torrents for clients" on or off. On: every generated Xray
         config routes sniffed BitTorrent to a blackhole first and enables
@@ -298,12 +301,15 @@ _openapi:
       - content: Download and install the specified Xray version. Pass "latest" for the
           newest release.
         id: download-and-install-the-specified-xray-version-pass-latest-for-the-newest-release
-      - content: Self-update the panel to the latest version. The server restarts on
-          success. Bearer-token callers need admin or node-admin scope.
-        id: self-update-the-panel-to-the-latest-version-the-server-restarts-on-success-bearer-token-callers-need-admin-or-node-admin-scope
-      - content: Toggle the panel update channel between stable and the rolling
-          per-commit dev release. Only effective on dev builds.
-        id: toggle-the-panel-update-channel-between-stable-and-the-rolling-per-commit-dev-release-only-effective-on-dev-builds
+      - content: Self-update the panel to the latest release. The panel runs update.sh
+          of that release only if its sha256 is listed in the release
+          SHA256SUMS. The server restarts on success. Bearer-token callers need
+          admin or node-admin scope.
+        id: self-update-the-panel-to-the-latest-release-the-panel-runs-updatesh-of-that-release-only-if-its-sha256-is-listed-in-the-release-sha256sums-the-server-restarts-on-success-bearer-token-callers-need-admin-or-node-admin-scope
+      - content: 'Set the panel update channel. still-ui publishes no dev builds, so
+          only the stable channel exists: dev=false switches off a dev setting
+          left by an older release, dev=true is refused.'
+        id: set-the-panel-update-channel-still-ui-publishes-no-dev-builds-so-only-the-stable-channel-exists-devfalse-switches-off-a-dev-setting-left-by-an-older-release-devtrue-is-refused
       - content: 'Turn "Block torrents for clients" on or off. On: every generated Xray
           config routes sniffed BitTorrent to a blackhole first and enables
           content sniffing on client inbounds where it is off, and on Linux an
