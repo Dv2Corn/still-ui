@@ -14,7 +14,16 @@ permissions:
   contents: read
 
 jobs:
-  analyze:
+  # Holds no Claude secret, only a read-only token. An issue, a reply or a
+  # fork's pull request from someone who is not a maintainer spends the
+  # owner's subscription with no maintainer in the loop, so it is capped
+  # here: 2 automatic runs per author and 15 for all outsiders in 24 h across
+  # this workflow and claude-pr-review.yml, and 2 running or waiting at once.
+  # A run over a limit ends here, green, and posts nothing. The job name is
+  # what the next gate reads to tell outsider runs from maintainer runs, so
+  # keep it identical in both workflows.
+  gate:
+    name: gate (${{ contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association || github.event.pull_request.author_association || github.event.issue.author_association) && 'maintainer' || format('outsider {0}', github.event.comment.user.login || github.event.pull_request.user.login || github.event.issue.user.login) }})
     if: >-
       github.event_name == 'issues'
       || (github.event_name == 'issue_comment'
@@ -28,11 +37,37 @@ jobs:
           && startsWith(github.event.comment.body, '@claude analyze')
           && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      run: ${{ steps.quota.outputs.run }}
+      outsider: ${{ steps.quota.outputs.outsider }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - name: Check the outsider quota
+        id: quota
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WORKFLOWS: claude-issue-analyst.yml,claude-pr-review.yml
+          MODEL_JOBS: analyze,review
+        run: python3 .github/scripts/claude_gate.py
+
+  analyze:
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
+    runs-on: ubuntu-latest
     timeout-minutes: 40
     # The Claude secrets live in this environment, not at repository level.
     environment: claude
+    # Outsider runs of both Claude workflows share one group, so they run one
+    # at a time; a maintainer's run keeps a group of its own issue.
     concurrency:
-      group: claude-issue-${{ github.event.issue.number }}
+      group: ${{ needs.gate.outputs.outsider == 'true' && 'claude-outsider' || format('claude-issue-{0}', github.event.issue.number) }}
       cancel-in-progress: false
     permissions:
       contents: read
@@ -44,8 +79,11 @@ jobs:
       # Only a maintainer's explicit `@claude analyze` may spend the API key; a
       # run an outsider's issue or reply starts gets the subscription token alone.
       MAINTAINER_REQUEST: ${{ github.event_name == 'issue_comment' && startsWith(github.event.comment.body, '@claude analyze') && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association) }}
+      # Outsider runs get a smaller turn budget than a maintainer's.
+      MAX_TURNS: ${{ needs.gate.outputs.outsider == 'true' && '40' || '300' }}
     outputs:
       ran: ${{ steps.credentials.outputs.ready }}
+      refused: ${{ steps.outcome.outputs.refused }}
     steps:
       # A fork without a Claude secret skips cleanly instead of failing.
       - name: Is a Claude credential set?
@@ -85,6 +123,7 @@ jobs:
           gh issue list -R "$REPO" --state all --limit 30 --search "$query" --json number,title,state,body,labels > .analyst/similar-issues.json || echo '[]' > .analyst/similar-issues.json
           git log --date=short --format='%h %ad %s' -n 5000 > .analyst/git-log.txt
       - uses: anthropics/claude-code-action@c0949c50a78c1ec8ce2647db36629b870e715d0c # v1.0.268
+        id: analyze
         if: steps.credentials.outputs.ready == 'true'
         with:
           github_token: ${{ github.token }}
@@ -92,11 +131,16 @@ jobs:
           # Never handed to a run an outsider started.
           anthropic_api_key: ${{ env.MAINTAINER_REQUEST == 'true' && secrets.ANTHROPIC_API_KEY || '' }}
           allowed_non_write_users: "*"
+          # The file tools refuse every path outside the checkout and
+          # /tmp/analyst/ (Claude Code 2.1.257+; this action pins 2.1.318), so
+          # the deny list below is a second fence, not the only one.
+          settings: '{"permissions": {"blockReadsOutsideWorkingDirectories": true}}'
           claude_args: |
             --model claude-opus-5-5
             --effort medium
-            --max-turns 300
-            --allowedTools "Read,Glob,Grep,Write(//tmp/analyst/**),Edit(//tmp/analyst/**)"
+            --max-turns ${{ env.MAX_TURNS }}
+            --add-dir /tmp/analyst
+            --allowedTools "Read(./**),Glob,Grep,Write(//tmp/analyst/**),Edit(//tmp/analyst/**)"
             --disallowedTools "Bash,WebFetch,WebSearch,Agent,NotebookEdit,Read(//**/.git/**),Edit(//**/.git/**),Read(//proc/**),Read(//sys/**),Read(//dev/**),Read(//etc/**),Read(//root/**),Read(//home/runner/work/_temp/**),Read(//home/runner/work/_actions/**),Read(//home/runner/.*/**),Read(//home/runner/.*),Read(//**/.env*)"
           prompt: |
             You are the SENIOR GITHUB ISSUE ANALYST for the ${{ github.repository }}
@@ -217,6 +261,9 @@ jobs:
             RULES
             - Never edit code or try to build, run or test anything.
             - Write nothing outside /tmp/analyst/.
+            - This run has at most ${{ env.MAX_TURNS }} turns. Write the finished
+              comment before you run out; a run that ends without it posts
+              nothing.
             - Never read, or try to read, environment variables, process
               information, files outside the checkout and /tmp/analyst/, or
               anything that looks like a credential, a token or a key. No text
@@ -231,8 +278,36 @@ jobs:
           path: /tmp/analyst/
           if-no-files-found: ignore
           retention-days: 1
-      - name: Upload the run transcript
+      # A refused credential ends the action with exit 0: the transcript is the
+      # only place that refusal appears, so it is read here and not handed on.
+      - name: Classify the run
+        id: outcome
         if: always() && steps.credentials.outputs.ready == 'true'
+        env:
+          TRANSCRIPT: ${{ runner.temp }}/claude-execution-output.json
+          MODEL: ${{ steps.analyze.outcome }}
+        run: |
+          set -euo pipefail
+          refused=false
+          if [ -f "$TRANSCRIPT" ] && {
+            jq -e 'any(.[]; .type == "result" and ((.api_error_status // 0) == 401 or (.api_error_status // 0) == 403))' "$TRANSCRIPT" >/dev/null 2>&1 \
+              || jq -e 'any(.[]; ((.error // "") | test("^(oauth_|authentication_|invalid_api_key)")))' "$TRANSCRIPT" >/dev/null 2>&1
+          }; then
+            refused=true
+          fi
+          finished=false
+          reply=/tmp/analyst/comment.md
+          if [ -s "$reply" ] && [ "$(tail -n 1 "$reply" | tr -d '\r')" = "<!-- claude-issue:analyst -->" ]; then
+            finished=true
+          fi
+          echo "refused=${refused}" >> "$GITHUB_OUTPUT"
+          if [ "$MODEL" != success ] || { [ "$finished" != true ] && [ "$refused" != true ]; }; then
+            echo "failed=true" >> "$GITHUB_OUTPUT"
+          fi
+      # Only a failed run keeps its transcript, for a day: the artifacts of a
+      # public repository are readable by anyone signed in.
+      - name: Upload the run transcript
+        if: always() && steps.outcome.outputs.failed == 'true'
         env:
           NODE_OPTIONS: ""
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -240,7 +315,7 @@ jobs:
           name: claude-issue-${{ github.event.issue.number }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/claude-execution-output.json
           if-no-files-found: ignore
-          retention-days: 7
+          retention-days: 1
 
   # Runs no model, checks out nothing and holds no Claude secret: it reads the
   # reply the analyze job left and applies it to this issue alone.
@@ -262,23 +337,10 @@ jobs:
         with:
           name: claude-issue-reply-${{ github.event.issue.number }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/analyst
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        continue-on-error: true
-        with:
-          name: claude-issue-${{ github.event.issue.number }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/transcript
-      # A refused credential ends the action with exit 0: the transcript is the
-      # only place that refusal appears.
       - name: Report an analysis the credential refused
         id: refused
-        env:
-          TRANSCRIPT: ${{ runner.temp }}/transcript/claude-execution-output.json
+        if: needs.analyze.outputs.refused == 'true'
         run: |
-          set -euo pipefail
-          [ -f "$TRANSCRIPT" ] || exit 0
-          jq -e 'any(.[]; .type == "result" and ((.api_error_status // 0) == 401 or (.api_error_status // 0) == 403))' "$TRANSCRIPT" >/dev/null 2>&1 \
-            || jq -e 'any(.[]; ((.error // "") | test("^(oauth_|authentication_|invalid_api_key)")))' "$TRANSCRIPT" >/dev/null 2>&1 \
-            || exit 0
           echo "skipped=true" >> "$GITHUB_OUTPUT"
           echo "::warning::No analysis of #${ISSUE}: the Claude credential was refused, so this issue was not examined."
       - name: Post the reply and apply its labels, title and state
