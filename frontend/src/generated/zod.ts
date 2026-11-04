@@ -31,6 +31,17 @@ export const transportBitsSchema = z.number().int();
 export type transportBits = z.infer<typeof transportBitsSchema>;
 
 export const AllSettingSchema = z.object({
+  alertCertDays: z.number().int().min(1).max(365),
+  alertDisk: z.number().int().min(1).max(100),
+  alertMemory: z.number().int().min(1).max(100),
+  alertRemindHours: z.number().int().min(0).max(720),
+  alertXrayRestartWindow: z.number().int().min(1).max(1440),
+  alertXrayRestarts: z.number().int().min(1).max(100),
+  backupAgeRecipients: z.string(),
+  backupEnable: z.boolean(),
+  backupKeep: z.number().int().min(1).max(1000),
+  backupSchedule: z.string(),
+  backupTelegram: z.boolean(),
   datepicker: z.string(),
   discordAdminIds: z.string(),
   discordBotBackup: z.boolean(),
@@ -215,6 +226,17 @@ export const AllSettingSchema = z.object({
 export type AllSetting = z.infer<typeof AllSettingSchema>;
 
 export const AllSettingViewSchema = z.object({
+  alertCertDays: z.number().int().min(1).max(365),
+  alertDisk: z.number().int().min(1).max(100),
+  alertMemory: z.number().int().min(1).max(100),
+  alertRemindHours: z.number().int().min(0).max(720),
+  alertXrayRestartWindow: z.number().int().min(1).max(1440),
+  alertXrayRestarts: z.number().int().min(1).max(100),
+  backupAgeRecipients: z.string(),
+  backupEnable: z.boolean(),
+  backupKeep: z.number().int().min(1).max(1000),
+  backupSchedule: z.string(),
+  backupTelegram: z.boolean(),
   datepicker: z.string(),
   discordAdminIds: z.string(),
   discordBotBackup: z.boolean(),

@@ -56,6 +56,7 @@ func (a *ServerController) initRouter(g *gin.RouterGroup) {
 	g.GET("/getUpdateStatus", a.getUpdateStatus)
 	g.GET("/getConfigJson", a.getConfigJson)
 	g.GET("/getDb", a.getDb)
+	g.GET("/localBackups", a.getLocalBackups)
 	g.GET("/getMigration", a.getMigration)
 	g.GET("/getNewUUID", a.getNewUUID)
 	g.GET("/getWebCertFiles", a.getWebCertFiles)
@@ -78,6 +79,7 @@ func (a *ServerController) initRouter(g *gin.RouterGroup) {
 	g.POST("/xraylogs/:count", a.getXrayLogs)
 	g.POST("/amneziawglogs/:count", a.getAmneziaWGLogs)
 	g.POST("/importDB", a.importDB)
+	g.POST("/localBackup", a.runLocalBackup)
 	g.POST("/getNewEchCert", a.getNewEchCert)
 	g.POST("/getCertHash", a.getCertHash)
 	g.POST("/getRemoteCertHash", a.getRemoteCertHash)
@@ -338,6 +340,22 @@ func (a *ServerController) getConfigJson(c *gin.Context) {
 		return
 	}
 	jsonObj(c, configJson, nil)
+}
+
+// getLocalBackups lists the scheduled local backups and the outcome of the last one.
+func (a *ServerController) getLocalBackups(c *gin.Context) {
+	status, err := (&service.LocalBackupService{}).Status()
+	jsonObj(c, status, err)
+}
+
+// runLocalBackup takes a local backup now, with the saved backup settings.
+func (a *ServerController) runLocalBackup(c *gin.Context) {
+	res, err := (&service.LocalBackupService{}).Run()
+	if err != nil {
+		jsonMsg(c, I18nWeb(c, "pages.settings.backupRunFailed"), err)
+		return
+	}
+	jsonObj(c, res, nil)
 }
 
 // getDb downloads the database file.

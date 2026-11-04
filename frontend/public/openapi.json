@@ -28,6 +28,56 @@
     "schemas": {
       "AllSetting": {
         "properties": {
+          "alertCertDays": {
+            "maximum": 365,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "alertDisk": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "alertMemory": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "alertRemindHours": {
+            "maximum": 720,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "alertXrayRestartWindow": {
+            "maximum": 1440,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "alertXrayRestarts": {
+            "description": "Server health alert thresholds (events xray.down, xray.flapping, process.memory,\ndisk.high, cert.expiring, backup.failed); a reminder repeats every alertRemindHours, 0 = never.",
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "backupAgeRecipients": {
+            "type": "string"
+          },
+          "backupEnable": {
+            "description": "Scheduled local backups: on/off, cron schedule, how many are kept, age/SSH public keys\nthey are encrypted to (empty = unencrypted), and whether an encrypted one goes to Telegram.",
+            "type": "boolean"
+          },
+          "backupKeep": {
+            "maximum": 1000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "backupSchedule": {
+            "example": "@daily",
+            "type": "string"
+          },
+          "backupTelegram": {
+            "type": "boolean"
+          },
           "datepicker": {
             "type": "string"
           },
@@ -610,6 +660,17 @@
           }
         },
         "required": [
+          "alertCertDays",
+          "alertDisk",
+          "alertMemory",
+          "alertRemindHours",
+          "alertXrayRestartWindow",
+          "alertXrayRestarts",
+          "backupAgeRecipients",
+          "backupEnable",
+          "backupKeep",
+          "backupSchedule",
+          "backupTelegram",
           "datepicker",
           "discordAdminIds",
           "discordBotBackup",
@@ -795,6 +856,56 @@
       },
       "AllSettingView": {
         "properties": {
+          "alertCertDays": {
+            "maximum": 365,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "alertDisk": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "alertMemory": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "alertRemindHours": {
+            "maximum": 720,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "alertXrayRestartWindow": {
+            "maximum": 1440,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "alertXrayRestarts": {
+            "description": "Server health alert thresholds (events xray.down, xray.flapping, process.memory,\ndisk.high, cert.expiring, backup.failed); a reminder repeats every alertRemindHours, 0 = never.",
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "backupAgeRecipients": {
+            "type": "string"
+          },
+          "backupEnable": {
+            "description": "Scheduled local backups: on/off, cron schedule, how many are kept, age/SSH public keys\nthey are encrypted to (empty = unencrypted), and whether an encrypted one goes to Telegram.",
+            "type": "boolean"
+          },
+          "backupKeep": {
+            "maximum": 1000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "backupSchedule": {
+            "example": "@daily",
+            "type": "string"
+          },
+          "backupTelegram": {
+            "type": "boolean"
+          },
           "datepicker": {
             "type": "string"
           },
@@ -1401,6 +1512,17 @@
           }
         },
         "required": [
+          "alertCertDays",
+          "alertDisk",
+          "alertMemory",
+          "alertRemindHours",
+          "alertXrayRestartWindow",
+          "alertXrayRestarts",
+          "backupAgeRecipients",
+          "backupEnable",
+          "backupKeep",
+          "backupSchedule",
+          "backupTelegram",
           "datepicker",
           "discordAdminIds",
           "discordBotBackup",
@@ -6837,6 +6959,57 @@
         }
       }
     },
+    "/panel/api/server/localBackups": {
+      "get": {
+        "tags": [
+          "Server"
+        ],
+        "summary": "List the scheduled local backups on this server (newest first) and the outcome of the last one since the panel started. Restore one on the server with: still-ui restore <file>.",
+        "operationId": "get_panel_api_server_localBackups",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": {
+                    "folder": "/etc/still-ui/backups",
+                    "last": {
+                      "file": "still-ui-panel-20261104-033000.db.age",
+                      "size": 1048576,
+                      "encrypted": true,
+                      "time": 1793763000,
+                      "telegram": "sent"
+                    },
+                    "backups": [
+                      {
+                        "name": "still-ui-panel-20261104-033000.db.age",
+                        "size": 1048576,
+                        "time": "2026-11-04T03:30:00Z",
+                        "encrypted": true
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/panel/api/server/getMigration": {
       "get": {
         "tags": [
@@ -7751,6 +7924,45 @@
                       "type": "string"
                     },
                     "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/server/localBackup": {
+      "post": {
+        "tags": [
+          "Server"
+        ],
+        "summary": "Take a local backup now with the saved backup settings: a consistent database snapshot, encrypted to the configured age/SSH keys, rotated, and sent to Telegram when that is on. Returns the file written.",
+        "operationId": "post_panel_api_server_localBackup",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": {
+                    "file": "still-ui-panel-20261104-120000.db.age",
+                    "size": 1048576,
+                    "encrypted": true,
+                    "time": 1793793600
                   }
                 }
               }

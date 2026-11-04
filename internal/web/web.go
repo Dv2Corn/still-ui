@@ -318,6 +318,8 @@ const (
 	// stacks overlapping samplers; subscribers rate-limit alerts to 1/min anyway.
 	cadenceCPUAlarm    = "@every 1m"
 	cadenceMemoryAlarm = "@every 1m"
+	// Server health alerts: Xray down/restarts, memory, disk, certificates, backups.
+	cadenceHealthAlerts = "@every 1m"
 )
 
 // startTask schedules background jobs (Xray checks, traffic jobs, cron
@@ -399,6 +401,19 @@ func (s *Server) startTask(restartXray, forceXrayRestart bool, loc *time.Locatio
 		runtime, _ := s.settingService.GetLdapSyncCron()
 		// job has zero-value services with method receivers that read settings on demand
 		scheduleSettingJob(s.cron, "LDAP sync", runtime, "@every 1m", job.NewLdapSyncJob())
+	}
+
+	// Server health alerts; the notifiers pick the events they were asked for.
+	_, _ = s.cron.AddFunc(cadenceHealthAlerts, func() {
+		(&service.HealthAlertService{}).Run()
+	})
+
+	// Scheduled local backups (still-ui): snapshot, encrypt, rotate, optionally send to Telegram.
+	if on, _ := s.settingService.GetBackupEnable(); on {
+		spec, _ := s.settingService.GetBackupSchedule()
+		scheduleSettingJob(s.cron, "Local backup", spec, "@daily", cron.FuncJob(func() {
+			_, _ = (&service.LocalBackupService{}).Run()
+		}))
 	}
 
 	// Telegram-bot–dependent jobs: periodic stats report + callback-hash cleanup.
@@ -664,6 +679,7 @@ func (s *Server) start(restartXray bool, startTgBot bool) (err error) {
 
 	// Wire xray crash callback BEFORE startTask so it's ready
 	xray.OnCrash = func(err error) {
+		service.RecordXrayCrash(time.Now())
 		if s.bus != nil {
 			s.bus.Publish(eventbus.Event{
 				Type: eventbus.EventXrayCrash,
@@ -727,6 +743,11 @@ func (s *Server) start(restartXray bool, startTgBot bool) (err error) {
 		s.tgbotService.SendMsgToTgbotAdmins("✅ Test message from 3x-ui")
 		return nil
 	})
+
+	// Scheduled local backups reach Telegram through the bot while it runs.
+	service.BackupTelegramSender = func(name string, data []byte) error {
+		return s.tgbotService.SendBackupFile(name, data)
+	}
 
 	controller.SetTgBotCapsFunc(func() (controller.TgBotCapabilities, error) {
 		caps, err := s.tgbotService.Capabilities()

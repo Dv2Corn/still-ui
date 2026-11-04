@@ -23,6 +23,15 @@ const (
 
 	// Security
 	EventLoginAttempt EventType = "login.attempt"
+
+	// Server health alerts (still-ui): raised once when a condition goes bad, reminded while it
+	// stays bad, resolved once when it is fixed. Data is *HealthAlertData.
+	EventXrayDown      EventType = "xray.down"
+	EventXrayFlapping  EventType = "xray.flapping"
+	EventProcessMemory EventType = "process.memory"
+	EventDiskHigh      EventType = "disk.high"
+	EventCertExpiring  EventType = "cert.expiring"
+	EventBackupFailed  EventType = "backup.failed"
 )
 
 // Event is the unit of information flowing through the bus.
@@ -62,4 +71,12 @@ type LoginEventData struct {
 type SystemMetricData struct {
 	Percent   float64 // current usage percentage
 	Threshold int     // configured threshold
+}
+
+// HealthAlertData carries one server health alert. Phase is "raised", "reminder" or
+// "resolved"; Params fill the alert's message (names depend on the event).
+type HealthAlertData struct {
+	Phase  string
+	Since  time.Time
+	Params map[string]string
 }

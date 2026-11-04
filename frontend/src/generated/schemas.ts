@@ -2,6 +2,56 @@
 export const SCHEMAS: Record<string, unknown> = {
   "AllSetting": {
     "properties": {
+      "alertCertDays": {
+        "maximum": 365,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "alertDisk": {
+        "maximum": 100,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "alertMemory": {
+        "maximum": 100,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "alertRemindHours": {
+        "maximum": 720,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "alertXrayRestartWindow": {
+        "maximum": 1440,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "alertXrayRestarts": {
+        "description": "Server health alert thresholds (events xray.down, xray.flapping, process.memory,\ndisk.high, cert.expiring, backup.failed); a reminder repeats every alertRemindHours, 0 = never.",
+        "maximum": 100,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "backupAgeRecipients": {
+        "type": "string"
+      },
+      "backupEnable": {
+        "description": "Scheduled local backups: on/off, cron schedule, how many are kept, age/SSH public keys\nthey are encrypted to (empty = unencrypted), and whether an encrypted one goes to Telegram.",
+        "type": "boolean"
+      },
+      "backupKeep": {
+        "maximum": 1000,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "backupSchedule": {
+        "example": "@daily",
+        "type": "string"
+      },
+      "backupTelegram": {
+        "type": "boolean"
+      },
       "datepicker": {
         "type": "string"
       },
@@ -584,6 +634,17 @@ export const SCHEMAS: Record<string, unknown> = {
       }
     },
     "required": [
+      "alertCertDays",
+      "alertDisk",
+      "alertMemory",
+      "alertRemindHours",
+      "alertXrayRestartWindow",
+      "alertXrayRestarts",
+      "backupAgeRecipients",
+      "backupEnable",
+      "backupKeep",
+      "backupSchedule",
+      "backupTelegram",
       "datepicker",
       "discordAdminIds",
       "discordBotBackup",
@@ -769,6 +830,56 @@ export const SCHEMAS: Record<string, unknown> = {
   },
   "AllSettingView": {
     "properties": {
+      "alertCertDays": {
+        "maximum": 365,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "alertDisk": {
+        "maximum": 100,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "alertMemory": {
+        "maximum": 100,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "alertRemindHours": {
+        "maximum": 720,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "alertXrayRestartWindow": {
+        "maximum": 1440,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "alertXrayRestarts": {
+        "description": "Server health alert thresholds (events xray.down, xray.flapping, process.memory,\ndisk.high, cert.expiring, backup.failed); a reminder repeats every alertRemindHours, 0 = never.",
+        "maximum": 100,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "backupAgeRecipients": {
+        "type": "string"
+      },
+      "backupEnable": {
+        "description": "Scheduled local backups: on/off, cron schedule, how many are kept, age/SSH public keys\nthey are encrypted to (empty = unencrypted), and whether an encrypted one goes to Telegram.",
+        "type": "boolean"
+      },
+      "backupKeep": {
+        "maximum": 1000,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "backupSchedule": {
+        "example": "@daily",
+        "type": "string"
+      },
+      "backupTelegram": {
+        "type": "boolean"
+      },
       "datepicker": {
         "type": "string"
       },
@@ -1375,6 +1486,17 @@ export const SCHEMAS: Record<string, unknown> = {
       }
     },
     "required": [
+      "alertCertDays",
+      "alertDisk",
+      "alertMemory",
+      "alertRemindHours",
+      "alertXrayRestartWindow",
+      "alertXrayRestarts",
+      "backupAgeRecipients",
+      "backupEnable",
+      "backupKeep",
+      "backupSchedule",
+      "backupTelegram",
       "datepicker",
       "discordAdminIds",
       "discordBotBackup",

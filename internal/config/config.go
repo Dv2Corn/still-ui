@@ -268,6 +268,15 @@ func GetXrayUnitLogFolder() string {
 	return "/var/log/still-xray"
 }
 
+// GetBackupFolderPath is where scheduled local backups go (XUI_BACKUP_FOLDER, default
+// "backups" beside the database, which the panel's systemd sandbox already lets it write).
+func GetBackupFolderPath() string {
+	if p := strings.TrimSpace(os.Getenv("XUI_BACKUP_FOLDER")); p != "" {
+		return p
+	}
+	return filepath.Join(GetDBFolderPath(), "backups")
+}
+
 // GetLogFolder returns the path to the log folder based on environment variables or platform defaults.
 func GetLogFolder() string {
 	logFolderPath := os.Getenv("XUI_LOG_FOLDER")

@@ -41,9 +41,10 @@ const xrayReloadInterval = time.Hour
 
 // CertInfo identifies one certificate.
 type CertInfo struct {
-	Subject  string `json:"subject" example:"example.com"`
-	NotAfter int64  `json:"notAfter" example:"1767225600"`
-	SHA256   string `json:"sha256" example:"9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"`
+	Subject   string `json:"subject" example:"example.com"`
+	NotBefore int64  `json:"notBefore,omitempty" example:"1759449600"`
+	NotAfter  int64  `json:"notAfter" example:"1767225600"`
+	SHA256    string `json:"sha256" example:"9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"`
 }
 
 // Status is what one inbound's certificate check found.
@@ -165,7 +166,7 @@ func describe(cert *x509.Certificate) *CertInfo {
 	} else if len(cert.IPAddresses) > 0 {
 		subject = cert.IPAddresses[0].String()
 	}
-	return &CertInfo{Subject: subject, NotAfter: cert.NotAfter.Unix(), SHA256: hex.EncodeToString(sum[:])}
+	return &CertInfo{Subject: subject, NotBefore: cert.NotBefore.Unix(), NotAfter: cert.NotAfter.Unix(), SHA256: hex.EncodeToString(sum[:])}
 }
 
 // readLeaf parses the first certificate of a PEM file.

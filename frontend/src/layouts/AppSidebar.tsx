@@ -23,6 +23,7 @@ import {
   PushpinOutlined,
   ReadOutlined,
   SafetyOutlined,
+  SaveOutlined,
   SearchOutlined,
   SettingOutlined,
   SunOutlined,
@@ -244,6 +245,11 @@ export default function AppSidebar() {
         key: '/settings#discord',
         icon: <DiscordOutlined aria-hidden />,
         label: t('pages.settings.discordSettings'),
+      },
+      {
+        key: '/settings#backups',
+        icon: <SaveOutlined aria-hidden />,
+        label: t('pages.settings.backupSettings'),
       },
       {
         key: '/settings#subscription',

@@ -185,6 +185,17 @@ export const AllSettingSchema = z
     discordMemory: z.number().int().min(0).max(100).optional(),
     discordLang: z.string().optional(),
     discordEnabledEvents: z.string().optional(),
+    backupEnable: z.boolean().optional(),
+    backupSchedule: z.string().optional(),
+    backupKeep: z.number().int().min(1).max(1000).optional(),
+    backupAgeRecipients: z.string().optional(),
+    backupTelegram: z.boolean().optional(),
+    alertXrayRestarts: z.number().int().min(1).max(100).optional(),
+    alertXrayRestartWindow: z.number().int().min(1).max(1440).optional(),
+    alertMemory: z.number().int().min(1).max(100).optional(),
+    alertDisk: z.number().int().min(1).max(100).optional(),
+    alertCertDays: z.number().int().min(1).max(365).optional(),
+    alertRemindHours: z.number().int().min(0).max(720).optional(),
   })
   .loose();
 
