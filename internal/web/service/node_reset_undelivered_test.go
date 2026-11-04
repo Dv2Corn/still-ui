@@ -334,8 +334,16 @@ func TestNodeResetDeliveryDoesNotHoldTheRequestBehindASilentNode(t *testing.T) {
 	// id (every test starts a fresh database) does not find the lock taken.
 	t.Cleanup(func() {
 		lock, _ := nodeResetDeliveryLocks.LoadOrStore(node.Id, &sync.Mutex{})
-		lock.(*sync.Mutex).Lock()
-		lock.(*sync.Mutex).Unlock()
+		mu := lock.(*sync.Mutex)
+		deadline := time.Now().Add(2 * nodeClientPushTimeout)
+		for !mu.TryLock() {
+			if time.Now().After(deadline) {
+				t.Errorf("the background reset delivery still holds node %d's lock", node.Id)
+				return
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+		mu.Unlock()
 	})
 	ib := nodeInbound(t, node.Id, 41912, []model.Client{{Email: "held", ID: "11111111-1111-1111-1111-1111111111ab", Enable: true}})
 	if err := (&InboundService{}).AddClientStat(database.GetDB(), ib.Id, &model.Client{Email: "held", Enable: true}); err != nil {
