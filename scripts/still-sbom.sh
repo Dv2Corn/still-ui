@@ -6,7 +6,7 @@
 # For every <dist-dir>/still-ui-linux-<arch>.tar.gz writes
 # still-ui-linux-<arch>.tar.gz.spdx.json (SPDX 2.3 JSON, made by syft from the
 # unpacked archive: every file with its sha256, and the Go modules inside x-ui,
-# xray and mtg), then <dist-dir>/SHA256SUMS over the archives and the SBOMs.
+# xray and mtg), then <dist-dir>/SHA256SUMS over the archives, the SBOMs and the probe agent archives.
 # Needs docker.
 # The release workflow runs this; it works the same on any Linux host.
 set -euo pipefail
@@ -39,6 +39,7 @@ for archive in "${archives[@]}"; do
     echo "still-sbom: $DIST/$name.spdx.json"
 done
 
-(cd "$DIST" && sha256sum -- still-ui-linux-*.tar.gz still-ui-linux-*.tar.gz.spdx.json > SHA256SUMS)
+# The probe agent archives (still-probe-linux-<arch>.tar.gz) are listed too, when present.
+(cd "$DIST" && shopt -s nullglob && sha256sum -- still-ui-linux-*.tar.gz still-ui-linux-*.tar.gz.spdx.json still-probe-linux-*.tar.gz > SHA256SUMS)
 echo "still-sbom: $DIST/SHA256SUMS"
 cat "$DIST/SHA256SUMS"

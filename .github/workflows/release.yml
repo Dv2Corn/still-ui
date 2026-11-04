@@ -65,6 +65,8 @@ jobs:
             dist/still-ui-linux-*.tar.gz
             dist/still-ui-linux-*.tar.gz.sha256
             dist/still-ui-linux-*.tar.gz.spdx.json
+            dist/still-probe-linux-*.tar.gz
+            dist/still-probe-linux-*.tar.gz.sha256
             dist/SHA256SUMS
           if-no-files-found: error
           retention-days: 14
@@ -94,7 +96,7 @@ jobs:
         working-directory: dist
         run: |
           sha256sum -c SHA256SUMS
-          for f in still-ui-linux-*.tar.gz; do sha256sum -c "$f.sha256"; done
+          for f in still-ui-linux-*.tar.gz still-probe-linux-*.tar.gz; do sha256sum -c "$f.sha256"; done
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
@@ -102,6 +104,8 @@ jobs:
           subject-path: |
             dist/still-ui-linux-amd64.tar.gz
             dist/still-ui-linux-arm64.tar.gz
+            dist/still-probe-linux-amd64.tar.gz
+            dist/still-probe-linux-arm64.tar.gz
             dist/SHA256SUMS
 
       # actions/attest is what actions/attest-sbom wraps since v4 (the wrapper is
@@ -124,7 +128,7 @@ jobs:
       - name: Create or update the GitHub release
         run: |
           set -euo pipefail
-          files=(dist/still-ui-linux-*.tar.gz dist/still-ui-linux-*.tar.gz.sha256 dist/still-ui-linux-*.tar.gz.spdx.json dist/SHA256SUMS)
+          files=(dist/still-ui-linux-*.tar.gz dist/still-ui-linux-*.tar.gz.sha256 dist/still-ui-linux-*.tar.gz.spdx.json dist/still-probe-linux-*.tar.gz dist/still-probe-linux-*.tar.gz.sha256 dist/SHA256SUMS)
           if gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then
             gh release upload "$TAG" -R "$REPO" --clobber "${files[@]}"
           else
