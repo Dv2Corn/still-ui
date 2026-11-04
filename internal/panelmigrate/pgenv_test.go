@@ -13,18 +13,26 @@ func TestPostgresEnv(t *testing.T) {
 		dsn  string
 		want map[string]string
 	}{
-		{"URL with percent-encoded password and sslmode",
+		{
+			"URL with percent-encoded password and sslmode",
 			"postgres://xui:p%40ss%2Fw%3Ard%20x@127.0.0.1:5432/xui?sslmode=disable",
-			map[string]string{"PGUSER": "xui", "PGPASSWORD": "p@ss/w:rd x", "PGHOST": "127.0.0.1", "PGPORT": "5432", "PGDATABASE": "xui", "PGSSLMODE": "disable"}},
-		{"postgresql:// scheme, IPv6 host, password in the query",
+			map[string]string{"PGUSER": "xui", "PGPASSWORD": "p@ss/w:rd x", "PGHOST": "127.0.0.1", "PGPORT": "5432", "PGDATABASE": "xui", "PGSSLMODE": "disable"},
+		},
+		{
+			"postgresql:// scheme, IPv6 host, password in the query",
 			"postgresql://xui@[::1]:6432/db?password=q%26uery&connect_timeout=5&application_name=x",
-			map[string]string{"PGUSER": "xui", "PGPASSWORD": "q&uery", "PGHOST": "::1", "PGPORT": "6432", "PGDATABASE": "db", "PGCONNECT_TIMEOUT": "5", "PGAPPNAME": "x"}},
-		{"keyword/value with quoted password and escapes",
+			map[string]string{"PGUSER": "xui", "PGPASSWORD": "q&uery", "PGHOST": "::1", "PGPORT": "6432", "PGDATABASE": "db", "PGCONNECT_TIMEOUT": "5", "PGAPPNAME": "x"},
+		},
+		{
+			"keyword/value with quoted password and escapes",
 			`host=db.local port=5432 user=xui password='a b\'c\\d' dbname=xui sslmode=require`,
-			map[string]string{"PGHOST": "db.local", "PGPORT": "5432", "PGUSER": "xui", "PGPASSWORD": `a b'c\d`, "PGDATABASE": "xui", "PGSSLMODE": "require"}},
-		{"keyword/value with spaces around '=' and an escaped space",
+			map[string]string{"PGHOST": "db.local", "PGPORT": "5432", "PGUSER": "xui", "PGPASSWORD": `a b'c\d`, "PGDATABASE": "xui", "PGSSLMODE": "require"},
+		},
+		{
+			"keyword/value with spaces around '=' and an escaped space",
 			`host = /var/run/postgresql  user=xui password=sp\ ace dbname=xui`,
-			map[string]string{"PGHOST": "/var/run/postgresql", "PGUSER": "xui", "PGPASSWORD": "sp ace", "PGDATABASE": "xui"}},
+			map[string]string{"PGHOST": "/var/run/postgresql", "PGUSER": "xui", "PGPASSWORD": "sp ace", "PGDATABASE": "xui"},
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

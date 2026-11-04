@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -29,7 +30,7 @@ func freePorts(n int) ([]int, error) {
 	}()
 	ports := make([]int, 0, n)
 	for range n {
-		l, err := net.Listen("tcp", "127.0.0.1:0")
+		l, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
 		if err != nil {
 			return nil, err
 		}
@@ -83,7 +84,7 @@ func startXray(bin, stateDir string, targets []jobTarget) (*xrayRun, error) {
 	if err := os.WriteFile(cfgPath, raw, 0o600); err != nil {
 		return nil, err
 	}
-	cmd := exec.Command(bin, "run", "-c", cfgPath)
+	cmd := exec.CommandContext(context.Background(), bin, "run", "-c", cfgPath)
 	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 	if err := cmd.Start(); err != nil {
 		_ = os.Remove(cfgPath)
@@ -99,7 +100,7 @@ func waitPorts(ports []int, limit time.Duration) bool {
 	for _, p := range ports {
 		addr := net.JoinHostPort("127.0.0.1", strconv.Itoa(p))
 		for {
-			c, err := net.DialTimeout("tcp", addr, time.Second)
+			c, err := (&net.Dialer{Timeout: time.Second}).DialContext(context.Background(), "tcp", addr)
 			if err == nil {
 				_ = c.Close()
 				break

@@ -18,6 +18,7 @@
 package panelmigrate
 
 import (
+	"context"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
@@ -117,7 +118,7 @@ func hashHex(s string) string {
 // Inspect reads db and reports what a migration has to preserve. It only
 // issues SELECTs.
 func Inspect(gdb *gorm.DB) (*Report, error) {
-	r := &Report{Dialect: gdb.Dialector.Name(), ClientsTable: -1, Settings: map[string]string{}}
+	r := &Report{Dialect: gdb.Name(), ClientsTable: -1, Settings: map[string]string{}}
 	mig := gdb.Migrator()
 	for _, table := range []string{"inbounds", "users", "settings"} {
 		if !mig.HasTable(table) {
@@ -304,7 +305,7 @@ func BackupSQLite(src, dst string) error {
 		return err
 	}
 	defer sqlDB.Close()
-	if _, err := sqlDB.Exec("VACUUM INTO ?", staged); err != nil {
+	if _, err := sqlDB.ExecContext(context.Background(), "VACUUM INTO ?", staged); err != nil {
 		return fmt.Errorf("VACUUM INTO: %w", err)
 	}
 	if err := os.Chmod(staged, 0o600); err != nil {
@@ -331,7 +332,7 @@ func CheckSQLite(path string) error {
 	}
 	defer sqlDB.Close()
 	var result string
-	if err := sqlDB.QueryRow("PRAGMA integrity_check").Scan(&result); err != nil {
+	if err := sqlDB.QueryRowContext(context.Background(), "PRAGMA integrity_check").Scan(&result); err != nil {
 		return fmt.Errorf("integrity_check: %w", err)
 	}
 	if result != "ok" {

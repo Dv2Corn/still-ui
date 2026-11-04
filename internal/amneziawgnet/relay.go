@@ -85,7 +85,7 @@ func (r SocksRelay) RelayTCP(conn *gonet.TCPConn, email string, dest netip.AddrP
 // It returns the raw *net.TCPConn, not the *socks.Conn that DialContext wraps it in:
 // pipeBothWays needs CloseWrite to pass a client's half-close on to the upstream.
 func (r SocksRelay) dialUpstream(email string, dest netip.AddrPort) (net.Conn, error) {
-	conn, err := net.DialTimeout("tcp", r.Addr, socks5ConnectTimeout)
+	conn, err := (&net.Dialer{Timeout: socks5ConnectTimeout}).DialContext(context.Background(), "tcp", r.Addr)
 	if err != nil {
 		return nil, err
 	}

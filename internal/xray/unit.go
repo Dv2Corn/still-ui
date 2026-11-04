@@ -188,7 +188,7 @@ func (u *unitControl) restartAndWait(apiPort int) error {
 	defer unitStarts.Add(1)
 	_, _ = u.systemctl(10*time.Second, "reset-failed", u.name)
 	if out, err := u.systemctl(unitStartTimeout+5*time.Second, "restart", u.name); err != nil {
-		return fmt.Errorf("systemctl restart %s: %v: %s", u.name, err, strings.TrimSpace(string(out)))
+		return fmt.Errorf("systemctl restart %s: %w: %s", u.name, err, strings.TrimSpace(string(out)))
 	}
 	started := u.state(true)
 	deadline := time.Now().Add(unitStartTimeout)
@@ -238,7 +238,7 @@ func (u *unitControl) forgetJournal() {
 
 func (u *unitControl) stop() error {
 	if out, err := u.systemctl(30*time.Second, "stop", u.name); err != nil {
-		return fmt.Errorf("systemctl stop %s: %v: %s", u.name, err, strings.TrimSpace(string(out)))
+		return fmt.Errorf("systemctl stop %s: %w: %s", u.name, err, strings.TrimSpace(string(out)))
 	}
 	u.state(true)
 	return nil
@@ -269,7 +269,7 @@ func apiPortAnswers(port int) bool {
 	if port <= 0 {
 		return true
 	}
-	conn, err := net.DialTimeout("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)), 300*time.Millisecond)
+	conn, err := (&net.Dialer{Timeout: 300 * time.Millisecond}).DialContext(context.Background(), "tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
 	if err != nil {
 		return false
 	}

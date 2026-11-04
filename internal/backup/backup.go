@@ -170,7 +170,7 @@ func ParseRecipients(text string) ([]age.Recipient, error) {
 			r, err = age.ParseRecipients(strings.NewReader(key))
 		}
 		if err != nil {
-			return nil, fmt.Errorf("recipient %d is not an age or SSH public key: %v", i+1, err)
+			return nil, fmt.Errorf("recipient %d is not an age or SSH public key: %w", i+1, err)
 		}
 		out = append(out, r...)
 	}

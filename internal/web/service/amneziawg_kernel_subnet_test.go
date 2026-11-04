@@ -21,8 +21,10 @@ func kernelAWGSubnetSettings(subnet string, kernel bool) string {
 // is lost. Such a save is refused; embedded inbounds have their own stacks.
 func TestNormalizeAmneziaWGSettingsRefusesOverlappingKernelSubnets(t *testing.T) {
 	setupConflictDB(t)
-	existing := &model.Inbound{Tag: "awg-k1", Enable: true, Port: 51820, Protocol: model.AmneziaWG,
-		Settings: kernelAWGSubnetSettings("10.8.1.0", true)}
+	existing := &model.Inbound{
+		Tag: "awg-k1", Enable: true, Port: 51820, Protocol: model.AmneziaWG,
+		Settings: kernelAWGSubnetSettings("10.8.1.0", true),
+	}
 	if err := database.GetDB().Create(existing).Error; err != nil {
 		t.Fatal(err)
 	}

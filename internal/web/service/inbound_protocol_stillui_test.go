@@ -25,8 +25,10 @@ func TestCheckNodeCanHostProtocol_StillUIVersions(t *testing.T) {
 	}
 	for i, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			node := &model.Node{Name: "still-node-" + tc.name, Address: "127.0.0.1", Port: 3096 + i,
-				PanelVersion: tc.panel, UpstreamVersion: tc.upstream}
+			node := &model.Node{
+				Name: "still-node-" + tc.name, Address: "127.0.0.1", Port: 3096 + i,
+				PanelVersion: tc.panel, UpstreamVersion: tc.upstream,
+			}
 			if err := database.GetDB().Create(node).Error; err != nil {
 				t.Fatalf("create node: %v", err)
 			}

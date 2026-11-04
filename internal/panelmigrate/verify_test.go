@@ -89,8 +89,10 @@ func TestWriteEnv(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := out.String()
-	for _, want := range []string{"dialect\tsqlite\n", "inbounds\t5\n", "clients\t6\n", "setting.webPort\t54321\n",
-		"setting.webBasePath\t/secret/\n", "sampleSubId\ts1\n", "sampleSubId\ts5\n"} {
+	for _, want := range []string{
+		"dialect\tsqlite\n", "inbounds\t5\n", "clients\t6\n", "setting.webPort\t54321\n",
+		"setting.webBasePath\t/secret/\n", "sampleSubId\ts1\n", "sampleSubId\ts5\n",
+	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("env output lacks %q:\n%s", want, got)
 		}

@@ -61,8 +61,10 @@ func TestNodeTrafficSyncKeepsNeedRestartOfAFailedLocalRemoval(t *testing.T) {
 		t.Fatalf("create node: %v", err)
 	}
 	const email = "spent@x"
-	ib := &model.Inbound{Tag: "local-vless", Enable: true, Protocol: model.VLESS, Port: 4330,
-		Settings: `{"clients":[{"email":"spent@x","id":"11111111-1111-1111-1111-111111111111","enable":true}]}`}
+	ib := &model.Inbound{
+		Tag: "local-vless", Enable: true, Protocol: model.VLESS, Port: 4330,
+		Settings: `{"clients":[{"email":"spent@x","id":"11111111-1111-1111-1111-111111111111","enable":true}]}`,
+	}
 	if err := db.Create(ib).Error; err != nil {
 		t.Fatalf("create inbound: %v", err)
 	}
