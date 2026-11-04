@@ -785,7 +785,18 @@
         "autoSystemWfpBlockLeakTooltip": "Yalnızca Windows, Auto system routes ile: dns, DNS'i (53 ve 853 portları ile DNS İstemcisi hizmeti) TUN içinde tutar ve DNS sunucuları gerekir; windnsclient yalnızca o hizmeti kapsar; başka bir port için tcp/PORT veya udp/PORT yazın; misconfigtun, hiçbir rotanın TUN'a göndermediği IP sürümünü engeller.",
         "maxVersion": "Maksimum sürüm",
         "headerName": "Başlık adı",
-        "headerValue": "Başlık değeri"
+        "headerValue": "Başlık değeri",
+        "preset": "Hazır ayar",
+        "presetNone": "Yok",
+        "presetHelp": "DPI ve beyaz liste modu olan Rusya mobil ağlarındaki istemciler için değerler. VLESS REALITY ios parmak izini kullanır: ClientHello'su (yaklaşık 517 bayt) tek bir TCP segmentine sığar; daha büyükleri bazı ağlarda ikinci segmentini kaybeder. still-ui'nin Xray'i ios'u kabul eder; resmi Xray 26.9.9 ve sonrası reddeder. Hysteria2 UDP üzerinden çalışır ve TCP kesildiğinde bile çoğu zaman çalışmaya devam eder.",
+        "presetOptions": {
+          "ruMobileReality": "Mobil ağlar (Rusya): VLESS REALITY",
+          "ruMobileHysteria": "Mobil ağlar (Rusya): Hysteria2 (UDP)"
+        },
+        "presetHints": {
+          "ruMobileReality": "Aşağıdan bir hedef seçin: Hedef bul, aday siteleri bu sunucudan denetler. Tek bir bilinen yabancı site yerine istemcilerinizin ülkesinde popüler ve engellenmemiş bir site tercih edin. İstemcilere xtls-rprx-vision flow'unu verin.",
+          "ruMobileHysteria": "Sertifikayı aşağıda ayarlayın. UDP 443, TCP ilk 12–16 KB'tan sonra kesildiğinde beyaz liste modunda çoğu zaman çalışır. En geniş istemci desteği için gizleme kapalıdır."
+        }
       },
       "info": {
         "mode": "Mod",

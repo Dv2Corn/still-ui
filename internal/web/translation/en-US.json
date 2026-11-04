@@ -786,7 +786,18 @@
         "autoSystemWfpBlockLeakTooltip": "Windows only, with Auto system routes: dns keeps DNS (ports 53 and 853 and the DNS Client service) inside the TUN and needs DNS servers; windnsclient covers only that service; type tcp/PORT or udp/PORT for any other port; misconfigtun blocks an IP version that no route sends into the TUN.",
         "maxVersion": "Max version",
         "headerName": "Header name",
-        "headerValue": "Header value"
+        "headerValue": "Header value",
+        "preset": "Preset",
+        "presetNone": "None",
+        "presetHelp": "Values for clients on Russian mobile networks with DPI and whitelist mode. VLESS REALITY uses the ios fingerprint: its ClientHello (about 517 bytes) fits in one TCP segment, while larger ones lose their second segment on some networks. still-ui's Xray accepts ios; official Xray 26.9.9 and newer rejects it. Hysteria2 runs over UDP, which often keeps working when TCP is cut.",
+        "presetOptions": {
+          "ruMobileReality": "Mobile networks (Russia): VLESS REALITY",
+          "ruMobileHysteria": "Mobile networks (Russia): Hysteria2 (UDP)"
+        },
+        "presetHints": {
+          "ruMobileReality": "Pick a target below: Find Targets checks candidate sites from this server. Prefer a site that is popular and not blocked in your clients' country instead of one well-known foreign site. Give clients the xtls-rprx-vision flow.",
+          "ruMobileHysteria": "Set the certificate below. UDP 443 often keeps working in whitelist mode, when TCP is cut after the first 12–16 KB. Obfuscation is off for the widest client support."
+        }
       },
       "info": {
         "mode": "Mode",

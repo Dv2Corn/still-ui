@@ -785,7 +785,18 @@
         "autoSystemWfpBlockLeakTooltip": "Solo Windows, con Auto system routes: dns mantiene el DNS (puertos 53 y 853 y el servicio Cliente DNS) dentro del TUN y necesita servidores DNS; windnsclient cubre solo ese servicio; escribe tcp/PUERTO o udp/PUERTO para cualquier otro puerto; misconfigtun bloquea una versión de IP que ninguna ruta envía al TUN.",
         "maxVersion": "Versión máxima",
         "headerName": "Nombre de cabecera",
-        "headerValue": "Valor de cabecera"
+        "headerValue": "Valor de cabecera",
+        "preset": "Plantilla",
+        "presetNone": "Ninguna",
+        "presetHelp": "Valores para clientes en redes móviles rusas con DPI y modo de lista blanca. VLESS REALITY usa la huella ios: su ClientHello (unos 517 bytes) cabe en un segmento TCP, mientras que en algunas redes los más largos pierden el segundo segmento. El Xray de still-ui acepta ios; el Xray oficial 26.9.9 y posteriores lo rechazan. Hysteria2 usa UDP, que a menudo sigue funcionando cuando TCP se corta.",
+        "presetOptions": {
+          "ruMobileReality": "Redes móviles (Rusia): VLESS REALITY",
+          "ruMobileHysteria": "Redes móviles (Rusia): Hysteria2 (UDP)"
+        },
+        "presetHints": {
+          "ruMobileReality": "Elija un destino abajo: Buscar objetivos comprueba sitios candidatos desde este servidor. Prefiera un sitio popular y no bloqueado en el país de sus clientes en lugar de un único sitio extranjero conocido. Asigne a los clientes el flow xtls-rprx-vision.",
+          "ruMobileHysteria": "Configure el certificado abajo. UDP 443 suele funcionar en modo de lista blanca, cuando TCP se corta tras los primeros 12–16 KB. La ofuscación está desactivada para la mayor compatibilidad con clientes."
+        }
       },
       "info": {
         "mode": "Modo",

@@ -785,7 +785,18 @@
         "autoSystemWfpBlockLeakTooltip": "Windows のみ（自動システムルートと併用）：dns は DNS（ポート 53・853 と DNS Client サービス）を TUN 内に留め、DNS サーバーが必要です。windnsclient はそのサービスのみを対象にします。その他のポートは tcp/ポート または udp/ポート と入力します。misconfigtun は TUN へのルートがない IP バージョンを遮断します。",
         "maxVersion": "最大バージョン",
         "headerName": "ヘッダー名",
-        "headerValue": "ヘッダー値"
+        "headerValue": "ヘッダー値",
+        "preset": "プリセット",
+        "presetNone": "なし",
+        "presetHelp": "DPI とホワイトリスト方式があるロシアのモバイル回線のクライアント向けの値です。VLESS REALITY は ios フィンガープリントを使います。その ClientHello（約 517 バイト）は 1 つの TCP セグメントに収まりますが、より大きいものは一部の回線で 2 番目のセグメントが落とされます。still-ui の Xray は ios を受け付けますが、公式 Xray 26.9.9 以降は拒否します。Hysteria2 は UDP で動作し、TCP が切られても通ることがよくあります。",
+        "presetOptions": {
+          "ruMobileReality": "モバイル回線（ロシア）: VLESS REALITY",
+          "ruMobileHysteria": "モバイル回線（ロシア）: Hysteria2（UDP）"
+        },
+        "presetHints": {
+          "ruMobileReality": "下でターゲットを選んでください。「ターゲットを検索」はこのサーバーから候補サイトを確認します。有名な海外サイト 1 つより、クライアントの国で人気がありブロックされていないサイトを選んでください。クライアントには xtls-rprx-vision フローを設定してください。",
+          "ruMobileHysteria": "下で証明書を設定してください。ホワイトリスト方式で TCP が最初の 12〜16 KB で切られても、UDP 443 は通ることがよくあります。より多くのクライアントで使えるよう難読化はオフです。"
+        }
       },
       "info": {
         "mode": "モード",
