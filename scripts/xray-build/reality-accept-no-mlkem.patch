@@ -6,7 +6,7 @@ index 51decd7..fedd73f 100644
  				break
  			}
  			var peerPub, peerPub2 []byte
-+			strange := false // silenceport: reject only duplicated key shares, accept Client Hello without X25519MLKEM768 (fp=ios)
++			strange := false // still-ui: reject only duplicated key shares, accept Client Hello without X25519MLKEM768 (fp=ios)
  			for _, keyShare := range hs.clientHello.keyShares {
  				if keyShare.group == X25519MLKEM768 && len(keyShare.data) == mlkem.EncapsulationKeySize768+32 {
  					if peerPub2 != nil {

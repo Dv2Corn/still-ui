@@ -21,7 +21,7 @@
 ### 已完成
 
 - **部分修改客户端不再把客户端改坏。** 在 3x-ui v3.11.0 中，通过 API（`/panel/api/clients/update/:email`）更新客户端时如果只提交部分字段，客户端会被禁用（`enable=false`），`limitIp`、`totalGB`、`tgId`、`comment`、`group`、`flow`、续期设置（`reset`、`resetMax`）和 `limitHwid` 会被清零。在 still-ui 中，请求里没有的字段取自已保存的客户端。显式提交 0 或空值仍然会清空对应字段。WireGuard/AmneziaWG 的密钥和对端地址在 v3.11.0 中本来就会保留，有测试保证这一点。
-- **REALITY 不要使用 `ios` 指纹。** 从 Xray 26.9 起，REALITY 服务端只接受带有 X25519MLKEM768 密钥交换的 ClientHello，而 `ios` 指纹没有它，这类客户端无法连接（已在 Xray 26.10.31 上测试 `ios`、`chrome`、`firefox` 和 `safari`）。新建的 REALITY 入站与 3x-ui 一样默认使用 `chrome`。如果你的入站使用了 `ios`，请改用其他指纹并让客户端更新订阅。
+- **Xray 核心重新支持 `ios` 指纹和 sing-box 客户端。** 从 Xray 26.9.9 起，官方 REALITY 服务端只接受带有 X25519MLKEM768 密钥交换的 ClientHello，因此使用 `ios`、`edge`、`qq` 指纹的 Xray 客户端、任何指纹的 sing-box 客户端（Hiddify、Karing），以及未开启 `support-x25519mlkem768` 的 mihomo 都无法连接。`ios` 指纹很短（约 517 字节，一个 TCP 分段），在会丢弃较长 ClientHello 的移动网络上只有它能用。still-ui 1.4.0 自带从源码构建的 Xray v26.10.31，只对 REALITY 打了一处补丁：没有该密钥交换的 ClientHello 重新被接受，重复的密钥交换仍被拒绝，其他不变。构建可复现：配方、补丁和 sha256 见 [scripts/xray-build](scripts/xray-build/README.md)。新建的 REALITY 入站与 3x-ui 一样默认使用 `chrome`。在面板中把 Xray 切换为官方版本（概览页 Xray 旁的 **版本** 按钮）会恢复旧行为；`still-ui update` 会装回 still-ui 的构建。
 - **安装脚本为面板设置内存上限。** 服务会获得 systemd 限制：`MemoryMax` 为内存的 35%（最少 256 MiB，最多 1 GiB），`MemoryHigh` 为其 85%，并且禁止面板使用 swap。面板内存失控时由 systemd 重启它，而不是把整台服务器拖进 swap 直至卡死。如果服务器没有 swap 且内存不超过 2 GiB，安装脚本会提议为系统其余部分创建一个 2 GiB 的 `/swapfile`。
 - **Xray 作为独立服务（可选开启）。** 在 `/etc/default/still-ui` 中设置 `STILL_XRAY_UNIT=on` 后，安装脚本和 `still-ui update` 会把 Xray 作为独立服务 `still-xray` 运行：非特权用户、只有 `CAP_NET_BIND_SERVICE`、`ProtectSystem=strict`、`Restart=always`，并有自己的内存上限。面板仍通过 Xray API 增删客户端而无需重启，只有入站结构变化时才重启内核——且先用 `xray run -test` 检查配置；通过检查却启动失败的配置会被换回上一个可用配置。重启、升级或面板崩溃都不再断开客户端：已验证在通过 VPN 下载 20 MB 的过程中执行 `systemctl restart still-ui`，文件完整到达，Xray 进程未变。默认情况下 Xray 仍和 3x-ui 一样是面板的子进程。内置的 AmneziaWG、MTProto 和 TUIC 仍运行在面板内部，面板重启时会重新连接。
 - **自动加载续期后的证书。** Xray 每小时（或每 `ocspStapling` 秒）会自行重新读取 TLS 和 Hysteria 入站的证书文件。面板每分钟通过握手（TLS，Hysteria 用 QUIC）检查每个入站实际提供的证书；如果续期后内核在该时间内没有加载新文件（或入站使用 `oneTimeLoading`），或者正在提供的证书将在一小时内过期，只重启 Xray：使用 `still-xray` 服务时自动重启；Xray 在面板内运行（默认）时，只有在 `/etc/default/still-ui` 中设置 `STILL_CERT_RESTART=on` 才会重启，因为这种重启会断开所有客户端；未设置时标签只显示证书已续期。概览页上的“证书”标签显示每个入站提供的证书及其有效期，并提前警告（提前一周；对于 IP 上的短期证书则提前其有效期的四分之一）。
@@ -44,7 +44,7 @@ bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.
 如需安装指定版本，在末尾加上版本标签（标签格式为 `vX.Y.Z-still.N`）：
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh) v1.3.0
+bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh) v1.4.0
 ```
 
 使用已下载的发行版压缩包安装：
@@ -55,7 +55,7 @@ STILL_UI_ARCHIVE=/path/still-ui-linux-amd64.tar.gz bash install.sh
 
 安装脚本会随机生成用户名、密码和面板访问路径，并在结束时显示出来，请妥善保存。之后运行 `still-ui` 即可打开管理菜单：启动和停止服务、查看或重置登录信息、修改端口、管理证书等。子命令与 3x-ui 的 `x-ui` 脚本相同：`still-ui start`、`stop`、`restart`、`status`、`log`、`update`、`legacy`、`uninstall` 等。
 
-发行版只提供 **Linux amd64 和 arm64** 的构建。当前版本：still-ui **1.3.0**（基于 3x-ui 3.11.0 及其后合并的修复），内置 **Xray v26.10.31**。
+发行版只提供 **Linux amd64 和 arm64** 的构建。当前版本：still-ui **1.4.0**（基于 3x-ui 3.11.0 及其后合并的修复），内置 **Xray v26.10.31**。
 
 ### 文件位置
 
