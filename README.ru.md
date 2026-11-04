@@ -110,6 +110,50 @@ still-ui uninstall
 > [!WARNING]
 > `still-ui uninstall` удаляет и базу в `/etc/still-ui` — так же, как в 3x-ui. Если входы и клиенты могут ещё понадобиться, сначала сохраните `/etc/still-ui/x-ui.db` в надёжное место.
 
+## Проверить выпуск
+
+Архивы выпусков собирает GitHub Actions из коммита с тегом ([сценарий выпуска](.github/workflows/release.yml)), а не компьютер разработчика, и к каждому архиву прилагается подписанная [аттестация происхождения](https://docs.github.com/ru/actions/security-for-github-actions/using-artifact-attestations). Выпуски до 1.4.0 включительно собраны вручную скриптом `scripts/still-release.sh`, у них есть только файлы `.sha256`.
+
+| Файл | Что это |
+| --- | --- |
+| `still-ui-linux-<arch>.tar.gz` | архив, который скачивают `install.sh` и `still-ui update` |
+| `still-ui-linux-<arch>.tar.gz.sha256` | его контрольная сумма, установщик её проверяет |
+| `still-ui-linux-<arch>.tar.gz.spdx.json` | SBOM (SPDX): все файлы архива с их sha256 и модули Go внутри `x-ui`, `xray` и `mtg` |
+| `SHA256SUMS` | контрольные суммы архивов и SBOM |
+
+Скачать и проверить суммы (вместо `v1.5.0` — выпуск, который ставите):
+
+```bash
+gh release download v1.5.0 -R Dv2Corn/still-ui -p 'still-ui-linux-amd64.tar.gz*' -p SHA256SUMS
+sha256sum -c SHA256SUMS --ignore-missing
+```
+
+Проверить, что архив собран сценарием выпуска этого репозитория из этого тега (нужен [GitHub CLI](https://cli.github.com/)):
+
+```bash
+gh attestation verify still-ui-linux-amd64.tar.gz -R Dv2Corn/still-ui \
+  --signer-workflow Dv2Corn/still-ui/.github/workflows/release.yml --source-ref refs/tags/v1.5.0
+```
+
+SBOM тоже подписан:
+
+```bash
+gh attestation verify still-ui-linux-amd64.tar.gz -R Dv2Corn/still-ui --predicate-type https://spdx.dev/Document/v2.3
+```
+
+Ядро Xray из архива можно собрать заново байт в байт. На Linux с git и docker:
+
+```bash
+tar -xzf still-ui-linux-amd64.tar.gz still-ui/bin/xray-linux-amd64
+sha256sum still-ui/bin/xray-linux-amd64
+git clone https://github.com/Dv2Corn/still-ui && cd still-ui && git checkout v1.5.0
+scripts/xray-build/build.sh /tmp/xray-out amd64 arm64
+```
+
+`build.sh` печатает суммы собранных файлов и завершается ошибкой, если они не совпали с закреплёнными в нём; сумма `xray-linux-amd64` из архива должна быть той же. Сценарий [Xray reproducible build](.github/workflows/xray-reproducible.yml) делает это при каждом изменении рецепта и раз в неделю — на машинах x86_64 и arm64. Что меняет заплатка: [scripts/xray-build](scripts/xray-build/README.md).
+
+Архив целиком байт в байт не воспроизводится: бинарник панели линкуется тем набором компиляторов C, что актуален в момент сборки, а geo-файлы и `mtg` берутся из последних выпусков своих проектов. Связь архива с коммитом и запуском сценария подтверждает аттестация происхождения.
+
 ## Переход с 3x-ui
 
 Если установщик найдёт `/etc/x-ui/x-ui.db`, он предложит скопировать эту базу в still-ui и остановить x-ui. Без терминала (cloud-init и т. п.) согласие задаётся переменной `STILL_UI_IMPORT_3XUI=yes`. Логин в панель, доступ к API, входы и клиенты сохраняются, новые ссылки клиентам не нужны. Файлы самой 3x-ui установщик не трогает.

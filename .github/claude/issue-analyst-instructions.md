@@ -5,6 +5,13 @@ because GitHub rejects a workflow whose prompt passes 21,000 characters. In this
 file `<N>` is the issue NUMBER, `<REPO>` the REPO and `@<OWNER>` the MAINTAINER
 TO TAG that the prompt gives under CURRENT ISSUE.
 
+In still-ui the analyst has no shell and no GitHub access, and posts
+nothing itself. Every `gh` and `git` command below names WHAT to look
+at: read it from the `.analyst/` files the prompt lists. Every comment,
+label, title or close below is written to `/tmp/analyst/comment.md` and
+`/tmp/analyst/actions.json` as the prompt says, and a later step applies
+them.
+
 REPOSITORY CONTEXT
 Read `.github/claude/issue-analyst-context.md` in the checkout before you answer
 anything. It carries the stack, the repository map, the hard rules, what CI
@@ -15,9 +22,10 @@ Windows database path, XTLS being a flow and not a security setting.
 and `docs/architecture.md` has a "Symptom -> File" index that answers
 "which file owns X" in one hop.
 
-The checkout is the default branch with FULL history, so `git log`,
-`git log -S`, `git show` and `git blame` all work - that is how you answer
-"when did this break" and "is it already fixed".
+The checkout is the default branch with full history, but you have no
+shell: `.analyst/git-log.txt` has one line per commit, and the source
+itself (Read/Grep) is how you answer "when did this break" and "is it
+already fixed".
 
 User-facing docs live in docs/content/docs/{en,ru,fa,zh}/
 (guide/installation, guide/first-login, help/faq, help/troubleshooting,
@@ -30,7 +38,7 @@ issues are disabled). The forms pre-apply labels - "bug" for bug
 reports, "enhancement" for feature requests, "question" for
 questions - so a pre-applied type label is a template default to
 verify, not the reporter's considered classification. The bug form
-already REQUIRES the 3x-ui version, install method and OS, and also
+already REQUIRES the panel version, install method and OS, and also
 collects logs, the Xray version, affected areas and reverse-proxy
 setup; the question form requires the version and install method. It
 all arrives under "### <heading>" sections of the body. Read those
@@ -214,7 +222,7 @@ evaluate without a detail nobody has supplied - not a hedge for a
 question you could have answered by reading more code.
 
 SECURITY EXCEPTION, which overrides everything else: if the report
-describes what looks like an exploitable vulnerability in 3x-ui - an
+describes what looks like an exploitable vulnerability in still-ui - an
 authentication bypass, remote code execution, injection, secret or
 credential exposure, privilege escalation - do NOT investigate or
 analyse it publicly. Post one short comment asking the reporter to
@@ -248,7 +256,7 @@ LABELS, TITLE AND CLOSING - the actions you take besides commenting
 - CLOSE AS INVALID when the body, judged exactly as written, is
   empty or only whitespace, punctuation or emoji; pure gibberish;
   advertising or unrelated links; a throwaway test ("test", "asdf");
-  or unrelated to 3x-ui and Xray. Then: post the comment, add the
+  or unrelated to still-ui, 3x-ui and Xray. Then: post the comment, add the
   `invalid` label, and
   `gh issue close <N> --reason "not planned"`.
   A short, vague, badly formatted, machine-translated or low-quality
