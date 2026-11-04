@@ -14,6 +14,7 @@ on:
       - "**.sh"
       - "scripts/**"
       - ".github/workflows/**"
+      - ".github/scripts/**"
   push:
     branches:
       - main
@@ -29,6 +30,7 @@ on:
       - "**.sh"
       - "scripts/**"
       - ".github/workflows/**"
+      - ".github/scripts/**"
 
 permissions:
   contents: read
@@ -338,6 +340,9 @@ jobs:
             echo "::error::Pin these actions to a full commit SHA (add the tag as a comment)."
             exit 1
           fi
+      # The quota gate of the Claude workflows, with the GitHub API mocked.
+      - name: Claude gate unit tests
+        run: python3 -m unittest discover -s .github/scripts -p 'test_*.py' -v
       - name: Install shellcheck
         run: sudo apt-get update && sudo apt-get install -y shellcheck
       - name: shellcheck
