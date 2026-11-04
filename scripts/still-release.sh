@@ -14,6 +14,7 @@
 #   still-ui/x-ui.sh              management script, installed as /usr/bin/still-ui
 #   still-ui/x-ui.rc              OpenRC unit (Alpine)
 #   still-ui/x-ui.service.*       systemd units (debian/arch/rhel)
+#   still-ui/migrate.sh           3x-ui -> still-ui migration and its rollback
 #   still-ui/bin/xray-linux-<arch>, mtg-linux-<arch>, geo*.dat
 #
 # Frontend with Node from .nvmrc, Go from
@@ -97,8 +98,8 @@ for arch in "${ARCHES[@]}"; do
     pkg="$stage/still-ui"
     mkdir -p "$pkg/bin"
     cp "$SRC/build-release/x-ui-$arch" "$pkg/x-ui"
-    cp "$SRC/x-ui.sh" "$SRC/x-ui.rc" "$SRC/x-ui.service.debian" "$SRC/x-ui.service.arch" "$SRC/x-ui.service.rhel" "$SRC/still-xray.service" "$pkg/"
-    chmod 755 "$pkg/x-ui" "$pkg/x-ui.sh"
+    cp "$SRC/x-ui.sh" "$SRC/x-ui.rc" "$SRC/x-ui.service.debian" "$SRC/x-ui.service.arch" "$SRC/x-ui.service.rhel" "$SRC/still-xray.service" "$SRC/migrate.sh" "$pkg/"
+    chmod 755 "$pkg/x-ui" "$pkg/x-ui.sh" "$pkg/migrate.sh"
 
     # Patched Xray, built above; the build script already checked its sha256.
     install -m 755 "$XRAY_DIR/xray-linux-$arch" "$pkg/bin/xray-linux-$arch"
