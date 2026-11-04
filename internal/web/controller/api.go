@@ -231,6 +231,9 @@ func (a *APIController) initRouter(g *gin.RouterGroup) {
 	// Subscription balancers — client-side balancers for the JSON sub output
 	NewSubBalancerController(api)
 
+	// External reachability probes (admin side; agents use {basePath}probe/v1)
+	NewReachProbeController(api.Group("/probes"))
+
 	// Extra routes
 	api.POST("/backuptotgbot", a.BackuptoTgbot)
 }

@@ -461,6 +461,14 @@ export const sections: readonly Section[] = [
       },
       {
         method: 'GET',
+        path: '/panel/api/server/torrentBlock',
+        summary:
+          'State of "Block torrents for clients": the stored toggle, whether this host can run the nftables filter (Linux with nft), whether its table is loaded, packet counters since it was loaded, and the last apply error if any.',
+        response:
+          '{\n  "success": true,\n  "obj": {\n    "enabled": true,\n    "supported": true,\n    "nftInstalled": true,\n    "active": true,\n    "counters": {\n      "handshakes": 3,\n      "dht": 61,\n      "trackers": 2,\n      "utp": 276,\n      "learned": 5,\n      "peerDrops": 59811,\n      "tunnelBans": 1\n    }\n  }\n}',
+      },
+      {
+        method: 'GET',
         path: '/panel/api/server/cpuHistory/:bucket',
         summary:
           'Legacy: aggregated CPU history. Use /history/cpu/:bucket instead — same data with a uniform {t, v} shape.',
@@ -580,6 +588,14 @@ export const sections: readonly Section[] = [
       },
       {
         method: 'GET',
+        path: '/panel/api/server/localBackups',
+        summary:
+          'List the scheduled local backups on this server (newest first) and the outcome of the last one since the panel started. Restore one on the server with: still-ui restore <file>.',
+        response:
+          '{\n  "success": true,\n  "obj": {\n    "folder": "/etc/still-ui/backups",\n    "last": { "file": "still-ui-panel-20261104-033000.db.age", "size": 1048576, "encrypted": true, "time": 1793763000, "telegram": "sent" },\n    "backups": [ { "name": "still-ui-panel-20261104-033000.db.age", "size": 1048576, "time": "2026-11-04T03:30:00Z", "encrypted": true } ]\n  }\n}',
+      },
+      {
+        method: 'GET',
         path: '/panel/api/server/getMigration',
         summary:
           'Stream a cross-engine migration file as an attachment: a .dump (SQL text) on SQLite, or a .db SQLite database built from the live data on PostgreSQL.',
@@ -690,6 +706,21 @@ export const sections: readonly Section[] = [
           },
         ],
         body: 'dev=true',
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/server/setTorrentBlock',
+        summary:
+          'Turn "Block torrents for clients" on or off. On: every generated Xray config routes sniffed BitTorrent to a blackhole first and enables content sniffing on client inbounds where it is off, and on Linux an nftables table drops BitTorrent signatures in egress the server originates and in forwarded AmneziaWG kernel-mode traffic, and cuts a peer endpoint only after that peer itself answers with a BitTorrent handshake or DHT response. Xray is reconciled immediately. Returns the same object as GET /torrentBlock; a host without nft keeps the Xray half and reports the error.',
+        params: [
+          {
+            name: 'enable',
+            in: 'body (form)',
+            type: 'boolean',
+            desc: 'true = block, false = stop blocking and remove the nftables table.',
+          },
+        ],
+        body: 'enable=true',
       },
       {
         method: 'POST',
@@ -820,6 +851,14 @@ export const sections: readonly Section[] = [
             defaultValue: true,
           },
         ],
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/server/localBackup',
+        summary:
+          'Take a local backup now with the saved backup settings: a consistent database snapshot, encrypted to the configured age/SSH keys, rotated, and sent to Telegram when that is on. Returns the file written.',
+        response:
+          '{\n  "success": true,\n  "obj": { "file": "still-ui-panel-20261104-120000.db.age", "size": 1048576, "encrypted": true, "time": 1793793600 }\n}',
       },
       {
         method: 'POST',
@@ -1924,6 +1963,59 @@ export const sections: readonly Section[] = [
         path: '/panel/api/hosts/bulk/del',
         summary: 'Delete many host groups in one call.',
         body: '{\n  "ids": ["abc-123", "def-456"]\n}',
+      },
+    ],
+  },
+
+  {
+    id: 'probes',
+    title: 'Reachability probes',
+    description:
+      'External agents that test the inbounds from inside a censored network (cmd/still-probe). These endpoints manage the probes; the agents use probe/v1/job and probe/v1/report under the panel base path with their own Bearer token, which opens nothing under /panel/api.',
+    endpoints: [
+      {
+        method: 'GET',
+        path: '/panel/api/probes/list',
+        summary: 'Every probe with the latest state of each tested endpoint and its 7-day uptime.',
+        responseSchema: 'ReachProbeView',
+        responseSchemaArray: true,
+      },
+      {
+        method: 'GET',
+        path: '/panel/api/probes/history/:id',
+        summary: "One probe's results of the last seven days, oldest first.",
+        params: [{ name: 'id', in: 'path', type: 'number', desc: 'Probe ID.' }],
+        responseSchema: 'ReachHistoryPoint',
+        responseSchemaArray: true,
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/probes/add',
+        summary:
+          'Create a probe and the panel-managed client it connects as. The response carries the plaintext token once; only its hash is stored.',
+        body: '{\n  "name": "home-1",\n  "inboundIds": [1],\n  "testUrl": "https://speed.cloudflare.com/__down?bytes=262144",\n  "directUrl": "",\n  "intervalSec": 600\n}',
+        responseSchema: 'ReachProbeCreated',
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/probes/update/:id',
+        summary:
+          "Change a probe's settings; its client is attached to the chosen inbounds and detached from the rest.",
+        params: [{ name: 'id', in: 'path', type: 'number', desc: 'Probe ID.' }],
+        body: '{\n  "name": "home-1",\n  "enabled": true,\n  "inboundIds": [1, 2],\n  "testUrl": "https://speed.cloudflare.com/__down?bytes=262144",\n  "directUrl": "",\n  "intervalSec": 600\n}',
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/probes/del/:id',
+        summary: 'Revoke a probe: its token stops working, its client and its history are deleted.',
+        params: [{ name: 'id', in: 'path', type: 'number', desc: 'Probe ID.' }],
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/probes/rotateToken/:id',
+        summary: 'Issue a new token for a probe; the previous one stops working at once.',
+        params: [{ name: 'id', in: 'path', type: 'number', desc: 'Probe ID.' }],
+        response: '{\n  "success": true,\n  "obj": { "token": "new-token-string" }\n}',
       },
     ],
   },

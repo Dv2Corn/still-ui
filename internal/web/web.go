@@ -264,6 +264,7 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 	s.index = controller.NewIndexController(g)
 	s.panel = controller.NewXUIController(g)
 	s.api = controller.NewAPIController(g)
+	controller.NewReachProbeAgentController(g.Group("/probe/v1"))
 
 	// Initialize WebSocket hub
 	s.wsHub = websocket.NewHub()
@@ -313,11 +314,15 @@ const (
 	cadenceRemoteRouting = "@every 5m"
 	cadenceXrayLogPrune  = "@every 10m"
 	cadenceCertWatch     = "@every 1m"
+	cadenceTorrentBlock  = "@every 1m"
 	cadenceCheckHash     = "@every 2m"
+	cadenceReachStale    = "@every 1m"
 	// cpu.Percent samples over a full minute (blocking), so a finer cadence just
 	// stacks overlapping samplers; subscribers rate-limit alerts to 1/min anyway.
 	cadenceCPUAlarm    = "@every 1m"
 	cadenceMemoryAlarm = "@every 1m"
+	// Server health alerts: Xray down/restarts, memory, disk, certificates, backups.
+	cadenceHealthAlerts = "@every 1m"
 )
 
 // startTask schedules background jobs (Xray checks, traffic jobs, cron
@@ -336,6 +341,11 @@ func (s *Server) startTask(restartXray, forceXrayRestart bool, loc *time.Locatio
 	_, _ = s.cron.AddFunc(cadenceXrayRestart, func() {
 		s.xrayService.ApplyPendingRestart()
 	})
+
+	// "Block torrents for clients": reload the nftables table after a reboot or a ruleset flush.
+	torrentBlock := service.TorrentBlockService{}
+	go torrentBlock.EnsureHostFilter()
+	_, _ = s.cron.AddFunc(cadenceTorrentBlock, torrentBlock.EnsureHostFilter)
 
 	// Renewed TLS/Hysteria certificates: copy for the core, check what each inbound serves.
 	_, _ = s.cron.AddFunc(cadenceCertWatch, func() {
@@ -373,6 +383,8 @@ func (s *Server) startTask(restartXray, forceXrayRestart bool, loc *time.Locatio
 
 	_, _ = s.cron.AddJob(cadenceReapOrphans, job.NewReapSyncOrphansJob())
 
+	_, _ = s.cron.AddJob(cadenceReachStale, job.NewReachProbeStaleJob())
+
 	// Warm permanent routing URLs immediately and refresh them outside the
 	// latency-sensitive subscription request path.
 	remoteRoutingJob := job.NewRemoteRoutingJob()
@@ -399,6 +411,19 @@ func (s *Server) startTask(restartXray, forceXrayRestart bool, loc *time.Locatio
 		runtime, _ := s.settingService.GetLdapSyncCron()
 		// job has zero-value services with method receivers that read settings on demand
 		scheduleSettingJob(s.cron, "LDAP sync", runtime, "@every 1m", job.NewLdapSyncJob())
+	}
+
+	// Server health alerts; the notifiers pick the events they were asked for.
+	_, _ = s.cron.AddFunc(cadenceHealthAlerts, func() {
+		(&service.HealthAlertService{}).Run()
+	})
+
+	// Scheduled local backups (still-ui): snapshot, encrypt, rotate, optionally send to Telegram.
+	if on, _ := s.settingService.GetBackupEnable(); on {
+		spec, _ := s.settingService.GetBackupSchedule()
+		scheduleSettingJob(s.cron, "Local backup", spec, "@daily", cron.FuncJob(func() {
+			_, _ = (&service.LocalBackupService{}).Run()
+		}))
 	}
 
 	// Telegram-bot–dependent jobs: periodic stats report + callback-hash cleanup.
@@ -664,6 +689,7 @@ func (s *Server) start(restartXray bool, startTgBot bool) (err error) {
 
 	// Wire xray crash callback BEFORE startTask so it's ready
 	xray.OnCrash = func(err error) {
+		service.RecordXrayCrash(time.Now())
 		if s.bus != nil {
 			s.bus.Publish(eventbus.Event{
 				Type: eventbus.EventXrayCrash,
@@ -727,6 +753,11 @@ func (s *Server) start(restartXray bool, startTgBot bool) (err error) {
 		s.tgbotService.SendMsgToTgbotAdmins("✅ Test message from 3x-ui")
 		return nil
 	})
+
+	// Scheduled local backups reach Telegram through the bot while it runs.
+	service.BackupTelegramSender = func(name string, data []byte) error {
+		return s.tgbotService.SendBackupFile(name, data)
+	}
 
 	controller.SetTgBotCapsFunc(func() (controller.TgBotCapabilities, error) {
 		caps, err := s.tgbotService.Capabilities()

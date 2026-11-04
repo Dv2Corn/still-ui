@@ -126,7 +126,8 @@
     "openMenu": "開啟選單",
     "pinSidebar": "固定側邊欄",
     "unpinSidebar": "取消固定側邊欄",
-    "subFormats": "Sub Formats"
+    "subFormats": "Sub Formats",
+    "probes": "探針"
   },
   "pages": {
     "login": {
@@ -785,7 +786,18 @@
         "autoSystemWfpBlockLeakTooltip": "僅限 Windows，需搭配自動系統路由：dns 讓 DNS（連接埠 53、853 及 DNS Client 服務）只走 TUN，需設定 DNS 伺服器；windnsclient 只針對該服務；其他連接埠請輸入 tcp/連接埠 或 udp/連接埠；misconfigtun 阻止沒有任何路由指向 TUN 的 IP 版本。",
         "maxVersion": "最高版本",
         "headerName": "標頭名稱",
-        "headerValue": "標頭值"
+        "headerValue": "標頭值",
+        "preset": "預設",
+        "presetNone": "無",
+        "presetHelp": "適用於俄羅斯行動網路（有 DPI 與白名單模式）用戶端的參數。VLESS REALITY 使用 ios 指紋：其 ClientHello（約 517 位元組）可放入一個 TCP 分段，較大的在部分網路中第二個分段會被丟棄。still-ui 的 Xray 接受 ios；官方 Xray 26.9.9 及更新版本會拒絕。Hysteria2 走 UDP，在 TCP 被切斷時往往仍可使用。",
+        "presetOptions": {
+          "ruMobileReality": "行動網路（俄羅斯）：VLESS REALITY",
+          "ruMobileHysteria": "行動網路（俄羅斯）：Hysteria2（UDP）"
+        },
+        "presetHints": {
+          "ruMobileReality": "請在下方選擇目標：「尋找目標」會從本伺服器檢測候選網站。優先選擇在用戶所在國家熱門且未被封鎖的網站，而非某個知名的境外網站。為用戶端設定 xtls-rprx-vision 流控。",
+          "ruMobileHysteria": "請在下方設定憑證。在白名單模式下，TCP 在前 12–16 KB 後被切斷時，UDP 443 往往仍可用。為相容更多用戶端，混淆已關閉。"
+        }
       },
       "info": {
         "mode": "模式",
@@ -1562,6 +1574,37 @@
       "smtpNoRecipients": "尚未設定收件人",
       "smtpFromNotConfigured": "未設定 SMTP 寄件人地址",
       "eventLoginAttempt": "登入嘗試",
+      "backupSettings": "備份",
+      "backupEnable": "排程備份",
+      "backupEnableDesc": "依排程在本伺服器上保存資料庫副本。",
+      "backupSchedule": "排程",
+      "backupScheduleDesc": "備份時間（依面板時區）。",
+      "backupKeep": "保留份數",
+      "backupKeepDesc": "每次產生新副本後刪除較舊的副本。",
+      "backupRecipients": "加密金鑰",
+      "backupRecipientsDesc": "age（age1…）或 SSH（ssh-ed25519 …）公鑰，每行一個。這裡只填公鑰：私鑰由您自行保管。留空表示不加密。",
+      "backupTelegram": "傳送到 Telegram",
+      "backupTelegramDesc": "將每份加密備份傳送給 Telegram 管理員。未加密的備份絕不傳送。",
+      "backupApplyHint": "儲存設定並重新啟動面板後新排程才會生效。",
+      "backupLast": "最近一次備份",
+      "backupRunNow": "立即備份",
+      "backupRunFailed": "備份失敗",
+      "backupRestoreHint": "還原方式：在伺服器上執行 still-ui restore <檔案>",
+      "backupList": "本伺服器上的備份",
+      "backupNoFiles": "尚無備份",
+      "backupEncrypted": "已加密",
+      "eventGroupHealth": "伺服器狀態",
+      "eventXrayDown": "Xray 未執行",
+      "eventXrayFlapping": "Xray 重新啟動",
+      "eventXrayFlappingHint": "次／分鐘",
+      "eventProcessMemory": "面板或 Xray 記憶體 (%)",
+      "eventProcessMemoryHint": "相對 MemoryMax 或實體記憶體",
+      "eventDiskHigh": "磁碟已滿 (%)",
+      "eventCertExpiring": "憑證即將到期（天）",
+      "eventCertExpiringHint": "最多為有效期的四分之一",
+      "eventBackupFailed": "備份失敗",
+      "alertRemindHours": "提醒間隔（小時）",
+      "alertRemindHoursDesc": "問題持續期間重複告警；0 表示只傳送一次。",
       "telegramTokenConfigured": "已設定；留空以保留目前的權杖。",
       "telegramTokenPlaceholder": "已設定 - 輸入新權杖以取代",
       "smtpPasswordConfigured": "已設定；留空以保留目前的密碼。",
@@ -1859,7 +1902,11 @@
       "subHostSortMode": "訂閱節點排序",
       "subHostSortInbound": "入站順序（預設）",
       "subHostSortHosts": "主機順序",
-      "subHostSortModeDesc": "跨入站使用主機頁面中的排序。此設定決定伺服器輸出順序；用戶端應用程式仍可能自行排序。"
+      "subHostSortModeDesc": "跨入站使用主機頁面中的排序。此設定決定伺服器輸出順序；用戶端應用程式仍可能自行排序。",
+      "eventGroupProbe": "可達性探針",
+      "eventProbeDown": "入站無法連線",
+      "eventProbeUp": "入站已恢復",
+      "eventProbeStale": "探針無回應"
     },
     "xray": {
       "save": "儲存",
@@ -1902,6 +1949,15 @@
       "outboundTestUrl": "出站測試 URL",
       "outboundTestUrlDesc": "測試出站連線時使用的 URL",
       "Torrent": "遮蔽 BitTorrent 協議",
+      "TorrentDesc": "僅限經過 Xray 的流量，且僅限開啟嗅探的入站。",
+      "torrentBlock": {
+        "title": "封鎖用戶端的 BT 下載",
+        "desc": "涵蓋所有協定，包括核心模式的 AmneziaWG：加入 Xray BitTorrent 規則（在關閉嗅探的入站上開啟嗅探），並在本伺服器上載入 nftables 過濾器。立即生效，不會通知用戶端。",
+        "unsupported": "本伺服器不是 Linux：僅封鎖經過 Xray 的流量。",
+        "nftMissing": "未安裝 nft：僅封鎖經過 Xray 的流量。請安裝 nftables 套件。",
+        "error": "nftables 過濾器未載入：{error}",
+        "counters": "自過濾器載入以來：攔截 {caught} 個 BT 封包，丟棄發往已知節點的 {dropped} 個封包。"
+      },
       "Inbounds": "入站",
       "Outbounds": "出站",
       "Balancers": "負載均衡",
@@ -2513,6 +2569,64 @@
         "badVlessRoute": "請輸入 0 到 65535 之間的單一數字"
       },
       "dragToReorder": "拖曳以重新排列 {name}"
+    },
+    "probes": {
+      "title": "可達性探針",
+      "intro": "探針是一個小型代理程式，可執行在目標國家境內的任何 Linux 機器上：家用伺服器、樹莓派或便宜的本地 VPS。它每隔幾分鐘像真實用戶端一樣透過你的入站連線，下載一個測試檔案，並把結果回報到這裡。",
+      "alertsHint": "警報透過 Telegram 機器人傳送：請在 面板設定 → Telegram 中開啟可達性探針事件。",
+      "addProbe": "新增探針",
+      "editProbe": "編輯探針",
+      "empty": "還沒有探針。新增一個，並在受審查網路內的機器上執行安裝指令。",
+      "minutes": "分鐘",
+      "directCheck": "直連檢查（不經 VPN）",
+      "history7d": "7 天",
+      "lastReport": "最近回報 {time}",
+      "neverReported": "尚未回報",
+      "stale": "沒有回報",
+      "rotateToken": "新權杖",
+      "rotateConfirm": "要簽發新權杖嗎？目前的權杖會立即失效。探針的用戶端也會換用新金鑰，舊的設定或連結將無法再連線。",
+      "clientNote": "以面板管理的用戶端 {email} 連線。請勿編輯或刪除該用戶端；它沒有流量和時間限制。",
+      "noResults": "尚無結果",
+      "tokenTitle": "探針權杖",
+      "tokenOnce": "請立即複製權杖：面板只儲存其雜湊值，無法再次顯示。",
+      "installCommand": "在探針機器上安裝（Linux，以 root 身分）：",
+      "installHint": "此指令會安裝代理程式、Xray 和 systemd 計時器，並執行第一次檢查。",
+      "token": "權杖",
+      "deleteConfirm": "刪除探針「{name}」？",
+      "deleteHint": "其權杖將失效，其用戶端將從入站中移除，歷史紀錄將被刪除。",
+      "fields": {
+        "name": "名稱",
+        "inbounds": "入站",
+        "testUrl": "測試 URL",
+        "directUrl": "直連 URL",
+        "interval": "間隔",
+        "target": "接入點",
+        "lastCheck": "最近檢查",
+        "latency": "首位元組 / 總計",
+        "uptime": "7 天可用率"
+      },
+      "hints": {
+        "name": "探針所在位置，例如 home-mobile",
+        "inbounds": "可探測 VLESS、VMess、Trojan、Shadowsocks 和 Hysteria 入站",
+        "testUrl": "透過每個入站下載。請使用大於約 100 KB 的檔案：有些審查系統只在最初幾 KB 之後才切斷連線。",
+        "directUrl": "選填：也在不經 VPN 的情況下存取，例如你的網站或訂閱頁面"
+      },
+      "errors": {
+        "name": "名稱：1 到 64 個字元，不能包含 < > &",
+        "inbounds": "請至少選擇一個入站",
+        "url": "請輸入 http:// 或 https:// 網址",
+        "interval": "1 到 1440 分鐘"
+      },
+      "status": {
+        "ok": "正常",
+        "fail": "無法連線",
+        "flaky": "失敗一次",
+        "unknown": "無資料"
+      },
+      "toasts": {
+        "saved": "探針已儲存",
+        "deleted": "探針已刪除"
+      }
     }
   },
   "tgbot": {
@@ -2626,6 +2740,20 @@
       "eventNodeUp": "節點 {{ .Name }} 已上線",
       "eventLoginFallback": "來自 {{ .Source }} 的登入失敗",
       "memoryThreshold": "記憶體使用率 {{ .Percent }}% 超過閾值 {{ .Threshold }}%",
+      "alertXrayDown": "Xray 未執行：{{ .Error }}",
+      "alertXrayDownResolved": "Xray 已恢復執行。",
+      "alertXrayFlapping": "Xray 在 {{ .Window }} 分鐘內重新啟動了 {{ .Count }} 次；每次重新啟動都會中斷所有用戶端。",
+      "alertXrayFlappingResolved": "Xray 已停止反覆重新啟動：最近 {{ .Window }} 分鐘內 {{ .Count }} 次。",
+      "alertMemory": "{{ .Process }} 使用了 {{ .Limit }} 中的 {{ .Used }}（{{ .LimitKind }}），{{ .Percent }}%。",
+      "alertMemoryResolved": "{{ .Process }} 的記憶體已回落到 {{ .Limit }} 的 {{ .Percent }}%。",
+      "alertDisk": "磁碟 {{ .Path }} 已使用 {{ .Percent }}%，剩餘 {{ .Free }}。",
+      "alertDiskResolved": "磁碟 {{ .Path }} 已回落到 {{ .Percent }}%。",
+      "alertCertExpiring": "憑證 {{ .Name }}（{{ .Where }}）將於 {{ .Date }} 到期，還剩 {{ .Days }} 天。",
+      "alertCertExpired": "憑證 {{ .Name }}（{{ .Where }}）已於 {{ .Date }} 到期。",
+      "alertCertRenewed": "憑證 {{ .Name }}（{{ .Where }}）已更新，有效期至 {{ .Date }}。",
+      "alertBackupFailed": "備份失敗：{{ .Error }}",
+      "alertBackupResolved": "備份已恢復正常：{{ .File }}",
+      "alertStill": "自 {{ .Since }} 起仍未解決。",
       "inboundsCount": "🔌 Inbounds: {{ .Count }}\r\n",
       "clientsCount": "👥 Clients: {{ .Count }}\r\n",
       "category_server": "🖥 伺服器",
@@ -2641,7 +2769,11 @@
       "qrLegendJSON": "{{ .Code }}. JSON 訂閱",
       "qrLegendLink": "{{ .Code }}. 應用程式連結 {{ .App }}",
       "backupFailed": "無法讀取資料庫，未傳送備份。",
-      "privateOnly": "🤖 此機器人僅在私聊中運作。請在私訊中開啟它。"
+      "privateOnly": "🤖 此機器人僅在私聊中運作。請在私訊中開啟它。",
+      "eventProbeDown": "探針 {{ .Probe }}：{{ .Target }} 無法連線",
+      "eventProbeUp": "探針 {{ .Probe }}：{{ .Target }} 已恢復連線",
+      "eventProbeBack": "探針 {{ .Probe }} 已恢復回報",
+      "eventProbeStale": "探針 {{ .Probe }} 已 {{ .Minutes }} 分鐘未回報"
     },
     "buttons": {
       "closeKeyboard": "❌ 關閉鍵盤",

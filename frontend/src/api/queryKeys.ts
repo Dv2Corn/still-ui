@@ -2,6 +2,7 @@ export const keys = {
   server: {
     status: () => ['server', 'status'] as const,
     fail2banStatus: () => ['server', 'fail2banStatus'] as const,
+    torrentBlock: () => ['server', 'torrentBlock'] as const,
   },
   nodes: {
     root: () => ['nodes'] as const,
@@ -13,6 +14,11 @@ export const keys = {
     raw: () => ['hosts', 'raw'] as const,
     byInbound: (inboundId: number) => ['hosts', 'byInbound', inboundId] as const,
     tags: () => ['hosts', 'tags'] as const,
+  },
+  probes: {
+    root: () => ['probes'] as const,
+    list: () => ['probes', 'list'] as const,
+    history: (id: number) => ['probes', 'history', id] as const,
   },
   subBalancers: {
     root: () => ['sub-balancers'] as const,

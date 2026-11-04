@@ -291,9 +291,9 @@ node heartbeat every 5s, periodic traffic resets (hourly/daily/weekly/monthly). 
 ├── install.sh / update.sh / x-ui.sh                        # VPS install + management CLI
 ├── x-ui.service.*  / x-ui.rc                               # systemd units (debian/rhel/arch) + rc script
 ├── windows_files/                                          # Windows service support
-└── .github/workflows/        # CI: ci.yml, codeql.yml, docker.yml, release.yml,
-                              #     mutation.yml, cleanup_caches.yml, claude-pr-review.yml,
-                              #     claude-issue-analyst.yml
+└── .github/workflows/        # CI: ci.yml, codeql.yml, release.yml, xray-reproducible.yml,
+                              #     docs-ci.yml, mutation.yml, cleanup_caches.yml,
+                              #     claude-pr-review.yml, claude-issue-analyst.yml
 ```
 
 ---
@@ -428,6 +428,7 @@ All registered in `web.go` → `startTask()`. Each is a struct with a `Run()` me
 | `@every 2m`         | `check_hash_storage`                                                                             | Only if TG bot enabled; expires bot callback hashes                                   |
 | `@every 1m`         | `check_cpu_usage`                                                                                | Only if a CPU alarm is configured (TG, Discord, or email); publishes `cpu.high`       |
 | `@every 1m`         | `check_memory_usage`                                                                             | Only if a memory alarm is configured (TG, Discord, or email); publishes `memory.high` |
+| `@every 1m`         | (inline func in `startTask`)                                                                     | Only if "Block torrents for clients" is on; reloads the nftables table if it vanished |
 | configurable        | `free_os_memory`                                                                                 | Only if `sys.MemoryReleaseIntervalMinutes() > 0`; returns heap to OS                  |
 
 To change _when_ something runs, edit `startTask()`. To change _what_ it does, edit the job file.
@@ -618,8 +619,9 @@ root → `go build ./...` / `go run main.go`.
 **Docker:** `docker compose up -d` (uses `Dockerfile` + `DockerEntrypoint.sh`).
 
 **CI** (`.github/workflows/`): `ci.yml` (build/test/lint), `codeql.yml` (security scan),
-`mutation.yml` (mutation testing), `docker.yml` + `release.yml`
-(multi-arch image + release builds), `cleanup_caches.yml`, `claude-pr-review.yml` (PR review
+`mutation.yml` (mutation testing), `release.yml` (Linux release archives with SBOMs and
+provenance attestations, on a version tag), `xray-reproducible.yml` (rebuilds the bundled
+Xray and checks the pinned sums), `cleanup_caches.yml`, `claude-pr-review.yml` (PR review
 only - it changes no code), `claude-issue-analyst.yml` (issue triage). A maintainer re-runs
 them with a comment starting `@claude review` on a PR or `@claude analyze` on an issue.
 

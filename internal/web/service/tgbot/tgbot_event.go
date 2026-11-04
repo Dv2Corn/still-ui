@@ -2,6 +2,7 @@ package tgbot
 
 import (
 	"fmt"
+	"html"
 	"os"
 	"strconv"
 	"strings"
@@ -29,6 +30,18 @@ func getHostname() string {
 // live card per admin chat, so a repeat edits it instead of a wall of messages.
 func (t *Tgbot) HandleEvent(e eventbus.Event) {
 	if !t.isEventEnabled(e.Type) {
+		return
+	}
+	// Health alerts are de-duplicated before they get here (raised, reminder, resolved): each
+	// one is its own message, so a fix never silently overwrites the alert it answers.
+	if data, ok := e.Data.(*eventbus.HealthAlertData); ok {
+		msg := t.formatHealthAlert(e.Type, data)
+		if msg == "" {
+			return
+		}
+		for _, adminID := range adminSnapshot() {
+			t.sendNotice(adminID, msg)
+		}
 		return
 	}
 	msg := t.formatEventMessage(e)
@@ -130,6 +143,13 @@ func (t *Tgbot) formatEventMessage(e eventbus.Event) string {
 		}
 		return msg
 
+	case eventbus.EventProbeDown, eventbus.EventProbeUp, eventbus.EventProbeStale:
+		data, ok := e.Data.(*eventbus.ProbeHealthData)
+		if !ok {
+			return ""
+		}
+		return header + t.formatProbeEvent(e.Type, data)
+
 	case eventbus.EventCPUHigh:
 		if data, ok := e.Data.(*eventbus.SystemMetricData); ok {
 			tgCpu, err := t.settingService.GetTgCpu()
@@ -178,4 +198,72 @@ func (t *Tgbot) formatEventMessage(e eventbus.Event) string {
 	}
 
 	return ""
+}
+
+// healthAlertKeys names the bot messages of each health alert: while bad, and once fixed.
+var healthAlertKeys = map[eventbus.EventType][2]string{
+	eventbus.EventXrayDown:      {"alertXrayDown", "alertXrayDownResolved"},
+	eventbus.EventXrayFlapping:  {"alertXrayFlapping", "alertXrayFlappingResolved"},
+	eventbus.EventProcessMemory: {"alertMemory", "alertMemoryResolved"},
+	eventbus.EventDiskHigh:      {"alertDisk", "alertDiskResolved"},
+	eventbus.EventCertExpiring:  {"alertCertExpiring", "alertCertRenewed"},
+	eventbus.EventBackupFailed:  {"alertBackupFailed", "alertBackupResolved"},
+}
+
+// healthAlertMessage picks the message and its icon: the problem, or its fix; a certificate
+// already past its date says "expired" rather than "expires in -1 days".
+func healthAlertMessage(eventType eventbus.EventType, data *eventbus.HealthAlertData) (key, icon string) {
+	keys, ok := healthAlertKeys[eventType]
+	if !ok || data == nil {
+		return "", ""
+	}
+	switch {
+	case data.Phase == "resolved":
+		return keys[1], "🟢 "
+	case eventType == eventbus.EventCertExpiring && strings.HasPrefix(data.Params["Hours"], "-"):
+		return "alertCertExpired", "🔴 "
+	}
+	return keys[0], "🔴 "
+}
+
+// formatHealthAlert renders one health alert in the bot's language.
+func (t *Tgbot) formatHealthAlert(eventType eventbus.EventType, data *eventbus.HealthAlertData) string {
+	key, icon := healthAlertMessage(eventType, data)
+	if key == "" {
+		return ""
+	}
+	var params []string
+	for k, v := range data.Params {
+		params = append(params, k+"=="+oneLine(v))
+	}
+	msg := fmt.Sprintf("<b>📡 %s</b>\n", html.EscapeString(getHostname())) + icon + t.I18nBot("tgbot.messages."+key, params...)
+	if data.Phase == "reminder" && !data.Since.IsZero() {
+		msg += "\n⏰ " + t.I18nBot("tgbot.messages.alertStill", "Since=="+data.Since.Local().Format("2006-01-02 15:04"))
+	}
+	return msg
+}
+
+// formatProbeEvent words a reachability probe alert; I18nBot escapes the values
+// for HTML mode, oneLine keeps an agent-sent error on its own line.
+func (t *Tgbot) formatProbeEvent(eventType eventbus.EventType, data *eventbus.ProbeHealthData) string {
+	probe, target := "Probe=="+oneLine(data.Probe), "Target=="+oneLine(data.Target)
+	switch eventType {
+	case eventbus.EventProbeDown:
+		msg := "🔴 " + t.I18nBot("tgbot.messages.eventProbeDown", probe, target)
+		if data.Error != "" {
+			msg += "\n" + t.I18nBot("tgbot.messages.eventErrorDetail", "Error=="+oneLine(data.Error))
+		}
+		return msg
+	case eventbus.EventProbeUp:
+		if data.Target == "" {
+			return "🟢 " + t.I18nBot("tgbot.messages.eventProbeBack", probe)
+		}
+		msg := "🟢 " + t.I18nBot("tgbot.messages.eventProbeUp", probe, target)
+		if data.LatencyMs > 0 {
+			msg += "\n" + t.I18nBot("tgbot.messages.eventDelayDetail", "Delay=="+strconv.Itoa(data.LatencyMs))
+		}
+		return msg
+	default:
+		return "⚠️ " + t.I18nBot("tgbot.messages.eventProbeStale", probe, "Minutes=="+strconv.Itoa(data.SilentFor))
+	}
 }

@@ -126,7 +126,8 @@
     "openMenu": "Mở menu",
     "pinSidebar": "Ghim thanh bên",
     "unpinSidebar": "Bỏ ghim thanh bên",
-    "subFormats": "Sub Formats"
+    "subFormats": "Sub Formats",
+    "probes": "Thăm dò"
   },
   "pages": {
     "login": {
@@ -785,7 +786,18 @@
         "autoSystemWfpBlockLeakTooltip": "Chỉ Windows, cùng với Auto system routes: dns giữ DNS (cổng 53 và 853 và dịch vụ DNS Client) bên trong TUN và cần máy chủ DNS; windnsclient chỉ áp dụng cho dịch vụ đó; nhập tcp/CỔNG hoặc udp/CỔNG cho cổng khác; misconfigtun chặn phiên bản IP mà không tuyến nào đưa vào TUN.",
         "maxVersion": "Phiên bản tối đa",
         "headerName": "Tên header",
-        "headerValue": "Giá trị header"
+        "headerValue": "Giá trị header",
+        "preset": "Mẫu cài đặt",
+        "presetNone": "Không",
+        "presetHelp": "Giá trị cho người dùng trên mạng di động Nga có DPI và chế độ danh sách trắng. VLESS REALITY dùng dấu vân tay ios: ClientHello của nó (khoảng 517 byte) nằm gọn trong một đoạn TCP, còn các ClientHello lớn hơn bị mất đoạn thứ hai trên một số mạng. Xray của still-ui chấp nhận ios; Xray chính thức 26.9.9 trở lên từ chối nó. Hysteria2 chạy trên UDP, thường vẫn hoạt động khi TCP bị cắt.",
+        "presetOptions": {
+          "ruMobileReality": "Mạng di động (Nga): VLESS REALITY",
+          "ruMobileHysteria": "Mạng di động (Nga): Hysteria2 (UDP)"
+        },
+        "presetHints": {
+          "ruMobileReality": "Chọn đích bên dưới: Tìm mục tiêu kiểm tra các trang ứng viên từ máy chủ này. Nên chọn trang phổ biến và không bị chặn ở quốc gia của người dùng thay vì một trang nước ngoài nổi tiếng. Đặt flow xtls-rprx-vision cho người dùng.",
+          "ruMobileHysteria": "Đặt chứng chỉ bên dưới. UDP 443 thường vẫn hoạt động ở chế độ danh sách trắng, khi TCP bị cắt sau 12–16 KB đầu tiên. Làm rối bị tắt để hỗ trợ nhiều ứng dụng nhất."
+        }
       },
       "info": {
         "mode": "Chế độ",
@@ -1562,6 +1574,37 @@
       "smtpNoRecipients": "Chưa cấu hình người nhận",
       "smtpFromNotConfigured": "Chưa cấu hình địa chỉ người gửi SMTP",
       "eventLoginAttempt": "Lần thử đăng nhập",
+      "backupSettings": "Sao lưu",
+      "backupEnable": "Sao lưu theo lịch",
+      "backupEnableDesc": "Lưu một bản sao cơ sở dữ liệu trên máy chủ này theo lịch.",
+      "backupSchedule": "Lịch",
+      "backupScheduleDesc": "Thời điểm sao lưu, theo múi giờ của bảng điều khiển.",
+      "backupKeep": "Số bản giữ lại",
+      "backupKeepDesc": "Sau mỗi bản mới, các bản cũ hơn sẽ bị xóa.",
+      "backupRecipients": "Khóa mã hóa",
+      "backupRecipientsDesc": "Khóa công khai age (age1…) hoặc SSH (ssh-ed25519 …), mỗi dòng một khóa. Chỉ nhập khóa công khai: khóa riêng do bạn giữ. Để trống là không mã hóa.",
+      "backupTelegram": "Gửi lên Telegram",
+      "backupTelegramDesc": "Gửi mỗi bản sao lưu đã mã hóa cho quản trị viên Telegram. Bản chưa mã hóa không bao giờ được gửi.",
+      "backupApplyHint": "Lưu cài đặt và khởi động lại bảng điều khiển để áp dụng lịch mới.",
+      "backupLast": "Bản sao lưu gần nhất",
+      "backupRunNow": "Sao lưu ngay",
+      "backupRunFailed": "Sao lưu thất bại",
+      "backupRestoreHint": "Để khôi phục, chạy trên máy chủ: still-ui restore <tệp>",
+      "backupList": "Bản sao lưu trên máy chủ này",
+      "backupNoFiles": "Chưa có bản sao lưu",
+      "backupEncrypted": "đã mã hóa",
+      "eventGroupHealth": "Tình trạng máy chủ",
+      "eventXrayDown": "Xray không chạy",
+      "eventXrayFlapping": "Xray khởi động lại",
+      "eventXrayFlappingHint": "lần trong số phút",
+      "eventProcessMemory": "Bộ nhớ bảng điều khiển hoặc Xray (%)",
+      "eventProcessMemoryHint": "của MemoryMax hoặc của RAM",
+      "eventDiskHigh": "Ổ đĩa đầy (%)",
+      "eventCertExpiring": "Chứng chỉ sắp hết hạn (ngày)",
+      "eventCertExpiringHint": "tối đa một phần tư thời hạn",
+      "eventBackupFailed": "Sao lưu thất bại",
+      "alertRemindHours": "Nhắc lại mỗi (giờ)",
+      "alertRemindHoursDesc": "Lặp lại cảnh báo khi sự cố còn tiếp diễn; 0 chỉ gửi một lần.",
       "telegramTokenConfigured": "Đã cấu hình; để trống để giữ token hiện tại.",
       "telegramTokenPlaceholder": "Đã cấu hình - nhập token mới để thay thế",
       "smtpPasswordConfigured": "Đã cấu hình; để trống để giữ mật khẩu hiện tại.",
@@ -1859,7 +1902,11 @@
       "subHostSortMode": "Thứ tự nút đăng ký",
       "subHostSortInbound": "Thứ tự kết nối vào (mặc định)",
       "subHostSortHosts": "Thứ tự máy chủ",
-      "subHostSortModeDesc": "Theo thứ tự trên trang Máy chủ giữa các kết nối vào. Thiết lập này quyết định thứ tự do máy chủ xuất ra; ứng dụng khách có thể tự sắp xếp lại."
+      "subHostSortModeDesc": "Theo thứ tự trên trang Máy chủ giữa các kết nối vào. Thiết lập này quyết định thứ tự do máy chủ xuất ra; ứng dụng khách có thể tự sắp xếp lại.",
+      "eventGroupProbe": "Thăm dò khả năng truy cập",
+      "eventProbeDown": "Inbound không truy cập được",
+      "eventProbeUp": "Inbound truy cập lại được",
+      "eventProbeStale": "Thăm dò im lặng"
     },
     "xray": {
       "importRules": "Nhập quy tắc",
@@ -1902,6 +1949,15 @@
       "outboundTestUrl": "URL kiểm tra outbound",
       "outboundTestUrlDesc": "URL dùng khi kiểm tra kết nối outbound",
       "Torrent": "Cấu hình sử dụng BitTorrent",
+      "TorrentDesc": "Chỉ lưu lượng qua Xray và chỉ trên inbound bật sniffing.",
+      "torrentBlock": {
+        "title": "Chặn torrent của người dùng",
+        "desc": "Mọi giao thức, kể cả AmneziaWG chế độ kernel: thêm quy tắc BitTorrent của Xray (bật sniffing nơi đang tắt) và bộ lọc nftables trên máy chủ này. Áp dụng ngay; người dùng không được thông báo.",
+        "unsupported": "Máy chủ này không chạy Linux: chỉ lưu lượng qua Xray bị chặn.",
+        "nftMissing": "Chưa cài nft: chỉ lưu lượng qua Xray bị chặn. Hãy cài gói nftables.",
+        "error": "Bộ lọc nftables chưa được nạp: {error}",
+        "counters": "Từ khi nạp bộ lọc: bắt được {caught} gói torrent, loại bỏ {dropped} gói tới các peer đã biết."
+      },
       "Inbounds": "Inbound",
       "Outbounds": "Outbound",
       "Balancers": "Cân bằng",
@@ -2513,6 +2569,64 @@
         "badVlessRoute": "Nhập một số duy nhất từ 0 đến 65535"
       },
       "dragToReorder": "Kéo để sắp xếp lại {name}"
+    },
+    "probes": {
+      "title": "Thăm dò khả năng truy cập",
+      "intro": "Thăm dò là một tác tử nhỏ chạy trên bất kỳ máy Linux nào bên trong quốc gia bạn quan tâm: máy chủ tại nhà, Raspberry Pi hoặc một VPS nội địa giá rẻ. Cứ vài phút nó lại kết nối qua các inbound của bạn như một máy khách thật, tải một tệp thử và gửi kết quả về đây.",
+      "alertsHint": "Cảnh báo được gửi qua bot Telegram: hãy bật các sự kiện thăm dò khả năng truy cập trong Cài đặt bảng điều khiển → Telegram.",
+      "addProbe": "Thêm thăm dò",
+      "editProbe": "Sửa thăm dò",
+      "empty": "Chưa có thăm dò nào. Hãy thêm một thăm dò và chạy lệnh cài đặt trên một máy trong mạng bị kiểm duyệt.",
+      "minutes": "phút",
+      "directCheck": "Kiểm tra trực tiếp (không VPN)",
+      "history7d": "7 ngày",
+      "lastReport": "báo cáo gần nhất {time}",
+      "neverReported": "chưa gửi báo cáo",
+      "stale": "Không báo cáo",
+      "rotateToken": "Mã mới",
+      "rotateConfirm": "Cấp mã mới? Mã hiện tại sẽ ngừng hoạt động ngay. Máy khách của đầu dò cũng nhận khóa mới, nên cấu hình hoặc liên kết cũ sẽ không kết nối được nữa.",
+      "clientNote": "Kết nối bằng máy khách do bảng điều khiển quản lý {email}. Đừng sửa hay xóa máy khách đó; nó không có giới hạn lưu lượng hay thời hạn.",
+      "noResults": "Chưa có kết quả",
+      "tokenTitle": "Mã thăm dò",
+      "tokenOnce": "Hãy sao chép mã ngay: bảng điều khiển chỉ lưu giá trị băm và không thể hiển thị lại.",
+      "installCommand": "Cài đặt trên máy thăm dò (Linux, quyền root):",
+      "installHint": "Lệnh này cài tác tử cùng Xray và bộ hẹn giờ systemd, rồi chạy lần kiểm tra đầu tiên.",
+      "token": "Mã",
+      "deleteConfirm": "Xóa thăm dò \"{name}\"?",
+      "deleteHint": "Mã của nó ngừng hoạt động, máy khách của nó bị gỡ khỏi các inbound và lịch sử bị xóa.",
+      "fields": {
+        "name": "Tên",
+        "inbounds": "Inbound",
+        "testUrl": "URL thử",
+        "directUrl": "URL trực tiếp",
+        "interval": "Khoảng thời gian",
+        "target": "Điểm truy cập",
+        "lastCheck": "Lần kiểm tra cuối",
+        "latency": "Byte đầu / tổng",
+        "uptime": "Khả dụng 7 ngày"
+      },
+      "hints": {
+        "name": "Nơi thăm dò chạy, ví dụ home-mobile",
+        "inbounds": "Có thể thăm dò các inbound VLESS, VMess, Trojan, Shadowsocks và Hysteria",
+        "testUrl": "Được tải qua từng inbound. Hãy dùng tệp lớn hơn khoảng 100 KB: một số hệ thống kiểm duyệt chỉ cắt kết nối sau vài kilobyte đầu.",
+        "directUrl": "Tùy chọn: cũng mở không qua VPN, ví dụ trang web hoặc trang đăng ký của bạn"
+      },
+      "errors": {
+        "name": "Tên: 1 đến 64 ký tự, không chứa < > &",
+        "inbounds": "Chọn ít nhất một inbound",
+        "url": "Nhập URL http:// hoặc https://",
+        "interval": "Từ 1 đến 1440 phút"
+      },
+      "status": {
+        "ok": "Bình thường",
+        "fail": "Không truy cập được",
+        "flaky": "Lỗi một lần",
+        "unknown": "Không có dữ liệu"
+      },
+      "toasts": {
+        "saved": "Đã lưu thăm dò",
+        "deleted": "Đã xóa thăm dò"
+      }
     }
   },
   "tgbot": {
@@ -2626,6 +2740,20 @@
       "eventNodeUp": "Node {{ .Name }} đã HOẠT ĐỘNG",
       "eventLoginFallback": "Đăng nhập thất bại từ {{ .Source }}",
       "memoryThreshold": "Sử dụng bộ nhớ {{ .Percent }}% vượt quá ngưỡng {{ .Threshold }}%",
+      "alertXrayDown": "Xray không chạy: {{ .Error }}",
+      "alertXrayDownResolved": "Xray đã chạy lại.",
+      "alertXrayFlapping": "Xray đã khởi động lại {{ .Count }} lần trong {{ .Window }} phút; mỗi lần đều ngắt mọi máy khách.",
+      "alertXrayFlappingResolved": "Xray đã ngừng khởi động lại: {{ .Count }} lần trong {{ .Window }} phút gần nhất.",
+      "alertMemory": "{{ .Process }} dùng {{ .Used }} trên {{ .Limit }} ({{ .LimitKind }}), {{ .Percent }}%.",
+      "alertMemoryResolved": "Bộ nhớ của {{ .Process }} đã về {{ .Percent }}% của {{ .Limit }}.",
+      "alertDisk": "Ổ đĩa {{ .Path }} đã đầy {{ .Percent }}%, còn trống {{ .Free }}.",
+      "alertDiskResolved": "Ổ đĩa {{ .Path }} đã về mức {{ .Percent }}%.",
+      "alertCertExpiring": "Chứng chỉ {{ .Name }} ({{ .Where }}) hết hạn vào {{ .Date }}, sau {{ .Days }} ngày.",
+      "alertCertExpired": "Chứng chỉ {{ .Name }} ({{ .Where }}) đã hết hạn vào {{ .Date }}.",
+      "alertCertRenewed": "Chứng chỉ {{ .Name }} ({{ .Where }}) đã được gia hạn, hiệu lực đến {{ .Date }}.",
+      "alertBackupFailed": "Sao lưu thất bại: {{ .Error }}",
+      "alertBackupResolved": "Sao lưu hoạt động trở lại: {{ .File }}",
+      "alertStill": "Vẫn chưa khắc phục, từ {{ .Since }}.",
       "inboundsCount": "🔌 Inbounds: {{ .Count }}\r\n",
       "clientsCount": "👥 Clients: {{ .Count }}\r\n",
       "category_server": "🖥 Máy chủ",
@@ -2641,7 +2769,11 @@
       "qrLegendJSON": "{{ .Code }}. Gói đăng ký JSON",
       "qrLegendLink": "{{ .Code }}. Liên kết ứng dụng {{ .App }}",
       "backupFailed": "Không đọc được cơ sở dữ liệu; không có bản sao lưu nào được gửi.",
-      "privateOnly": "🤖 Bot này chỉ hoạt động trong trò chuyện riêng. Hãy mở nó trong tin nhắn trực tiếp."
+      "privateOnly": "🤖 Bot này chỉ hoạt động trong trò chuyện riêng. Hãy mở nó trong tin nhắn trực tiếp.",
+      "eventProbeDown": "Thăm dò {{ .Probe }}: KHÔNG truy cập được {{ .Target }}",
+      "eventProbeUp": "Thăm dò {{ .Probe }}: {{ .Target }} truy cập lại được",
+      "eventProbeBack": "Thăm dò {{ .Probe }} đã gửi báo cáo trở lại",
+      "eventProbeStale": "Thăm dò {{ .Probe }} đã {{ .Minutes }} phút không gửi báo cáo"
     },
     "buttons": {
       "closeKeyboard": "❌ Đóng Bàn Phím",

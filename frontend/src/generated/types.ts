@@ -6,11 +6,23 @@ export type ProcessState = string;
 export type Protocol = string;
 export type addrFamily = number;
 export type payloadKeys = string[];
+export type reachTransition = number;
 export type staticEgressResolver = string;
 export type trafficLocalApplyAction = number;
 export type transportBits = number;
 
 export interface AllSetting {
+  alertCertDays: number;
+  alertDisk: number;
+  alertMemory: number;
+  alertRemindHours: number;
+  alertXrayRestartWindow: number;
+  alertXrayRestarts: number;
+  backupAgeRecipients: string;
+  backupEnable: boolean;
+  backupKeep: number;
+  backupSchedule: string;
+  backupTelegram: boolean;
   datepicker: string;
   discordAdminIds: string;
   discordBotBackup: boolean;
@@ -194,6 +206,17 @@ export interface AllSetting {
 }
 
 export interface AllSettingView {
+  alertCertDays: number;
+  alertDisk: number;
+  alertMemory: number;
+  alertRemindHours: number;
+  alertXrayRestartWindow: number;
+  alertXrayRestarts: number;
+  backupAgeRecipients: string;
+  backupEnable: boolean;
+  backupKeep: number;
+  backupSchedule: string;
+  backupTelegram: boolean;
   datepicker: string;
   discordAdminIds: string;
   discordBotBackup: boolean;
@@ -979,6 +1002,61 @@ export interface ProbeResultUI {
   xrayError: string;
   xrayState: string;
   xrayVersion: string;
+}
+
+export interface ReachHistoryPoint {
+  at: number;
+  key: string;
+  ok: boolean;
+  totalMs: number;
+  ttfbMs: number;
+}
+
+export interface ReachProbeCreated {
+  probe: ReachProbeView;
+  token: string;
+}
+
+export interface ReachProbeInput {
+  directUrl: string;
+  enabled?: boolean | null;
+  inboundIds: number[];
+  intervalSec: number;
+  name: string;
+  testUrl: string;
+}
+
+export interface ReachProbeView {
+  agentVersion: string;
+  clientEmail: string;
+  createdAt: number;
+  directUrl: string;
+  enabled: boolean;
+  id: number;
+  inboundIds: number[];
+  intervalSec: number;
+  lastSeenAt: number;
+  name: string;
+  stale: boolean;
+  targets: ReachTargetView[];
+  testUrl: string;
+}
+
+export interface ReachTargetView {
+  changedAt: number;
+  checks7d: number;
+  consecutiveFails: number;
+  inboundId: number;
+  key: string;
+  label: string;
+  lastAt: number;
+  lastBytes: number;
+  lastError: string;
+  lastOk: boolean;
+  lastTotalMs: number;
+  lastTtfbMs: number;
+  status: string;
+  uptime7d: number;
 }
 
 export interface Readiness {

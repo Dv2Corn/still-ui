@@ -28,6 +28,56 @@
     "schemas": {
       "AllSetting": {
         "properties": {
+          "alertCertDays": {
+            "maximum": 365,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "alertDisk": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "alertMemory": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "alertRemindHours": {
+            "maximum": 720,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "alertXrayRestartWindow": {
+            "maximum": 1440,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "alertXrayRestarts": {
+            "description": "Server health alert thresholds (events xray.down, xray.flapping, process.memory,\ndisk.high, cert.expiring, backup.failed); a reminder repeats every alertRemindHours, 0 = never.",
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "backupAgeRecipients": {
+            "type": "string"
+          },
+          "backupEnable": {
+            "description": "Scheduled local backups: on/off, cron schedule, how many are kept, age/SSH public keys\nthey are encrypted to (empty = unencrypted), and whether an encrypted one goes to Telegram.",
+            "type": "boolean"
+          },
+          "backupKeep": {
+            "maximum": 1000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "backupSchedule": {
+            "example": "@daily",
+            "type": "string"
+          },
+          "backupTelegram": {
+            "type": "boolean"
+          },
           "datepicker": {
             "type": "string"
           },
@@ -610,6 +660,17 @@
           }
         },
         "required": [
+          "alertCertDays",
+          "alertDisk",
+          "alertMemory",
+          "alertRemindHours",
+          "alertXrayRestartWindow",
+          "alertXrayRestarts",
+          "backupAgeRecipients",
+          "backupEnable",
+          "backupKeep",
+          "backupSchedule",
+          "backupTelegram",
           "datepicker",
           "discordAdminIds",
           "discordBotBackup",
@@ -795,6 +856,56 @@
       },
       "AllSettingView": {
         "properties": {
+          "alertCertDays": {
+            "maximum": 365,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "alertDisk": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "alertMemory": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "alertRemindHours": {
+            "maximum": 720,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "alertXrayRestartWindow": {
+            "maximum": 1440,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "alertXrayRestarts": {
+            "description": "Server health alert thresholds (events xray.down, xray.flapping, process.memory,\ndisk.high, cert.expiring, backup.failed); a reminder repeats every alertRemindHours, 0 = never.",
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "backupAgeRecipients": {
+            "type": "string"
+          },
+          "backupEnable": {
+            "description": "Scheduled local backups: on/off, cron schedule, how many are kept, age/SSH public keys\nthey are encrypted to (empty = unencrypted), and whether an encrypted one goes to Telegram.",
+            "type": "boolean"
+          },
+          "backupKeep": {
+            "maximum": 1000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "backupSchedule": {
+            "example": "@daily",
+            "type": "string"
+          },
+          "backupTelegram": {
+            "type": "boolean"
+          },
           "datepicker": {
             "type": "string"
           },
@@ -1401,6 +1512,17 @@
           }
         },
         "required": [
+          "alertCertDays",
+          "alertDisk",
+          "alertMemory",
+          "alertRemindHours",
+          "alertXrayRestartWindow",
+          "alertXrayRestarts",
+          "backupAgeRecipients",
+          "backupEnable",
+          "backupKeep",
+          "backupSchedule",
+          "backupTelegram",
           "datepicker",
           "discordAdminIds",
           "discordBotBackup",
@@ -4354,6 +4476,260 @@
         ],
         "type": "object"
       },
+      "ReachHistoryPoint": {
+        "properties": {
+          "at": {
+            "example": 1736000000000,
+            "format": "int64",
+            "type": "integer"
+          },
+          "key": {
+            "example": "1@vpn.example.com:443",
+            "type": "string"
+          },
+          "ok": {
+            "example": true,
+            "type": "boolean"
+          },
+          "totalMs": {
+            "example": 950,
+            "type": "integer"
+          },
+          "ttfbMs": {
+            "example": 180,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "at",
+          "key",
+          "ok",
+          "totalMs",
+          "ttfbMs"
+        ],
+        "type": "object"
+      },
+      "ReachProbeCreated": {
+        "description": "ReachProbeCreated carries the plaintext token, which is never shown again.",
+        "properties": {
+          "probe": {
+            "$ref": "#/components/schemas/ReachProbeView"
+          },
+          "token": {
+            "example": "8fJ2kQ...",
+            "type": "string"
+          }
+        },
+        "required": [
+          "probe",
+          "token"
+        ],
+        "type": "object"
+      },
+      "ReachProbeInput": {
+        "properties": {
+          "directUrl": {
+            "example": "https://example.com/",
+            "type": "string"
+          },
+          "enabled": {
+            "description": "Enabled is read by Update only; omitted keeps the probe's current state.",
+            "example": true,
+            "nullable": true,
+            "type": "boolean"
+          },
+          "inboundIds": {
+            "example": [
+              1,
+              2
+            ],
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "intervalSec": {
+            "example": 600,
+            "type": "integer"
+          },
+          "name": {
+            "example": "home-mobile",
+            "type": "string"
+          },
+          "testUrl": {
+            "example": "https://speed.cloudflare.com/__down?bytes=262144",
+            "type": "string"
+          }
+        },
+        "required": [
+          "directUrl",
+          "inboundIds",
+          "intervalSec",
+          "name",
+          "testUrl"
+        ],
+        "type": "object"
+      },
+      "ReachProbeView": {
+        "properties": {
+          "agentVersion": {
+            "example": "1.4.0",
+            "type": "string"
+          },
+          "clientEmail": {
+            "example": "still-probe-k3m9x2qa",
+            "type": "string"
+          },
+          "createdAt": {
+            "example": 1736000000000,
+            "format": "int64",
+            "type": "integer"
+          },
+          "directUrl": {
+            "type": "string"
+          },
+          "enabled": {
+            "example": true,
+            "type": "boolean"
+          },
+          "id": {
+            "example": 1,
+            "type": "integer"
+          },
+          "inboundIds": {
+            "example": [
+              1,
+              2
+            ],
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "intervalSec": {
+            "example": 600,
+            "type": "integer"
+          },
+          "lastSeenAt": {
+            "example": 1736000000000,
+            "format": "int64",
+            "type": "integer"
+          },
+          "name": {
+            "example": "home-mobile",
+            "type": "string"
+          },
+          "stale": {
+            "example": false,
+            "type": "boolean"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/ReachTargetView"
+            },
+            "type": "array"
+          },
+          "testUrl": {
+            "example": "https://speed.cloudflare.com/__down?bytes=262144",
+            "type": "string"
+          }
+        },
+        "required": [
+          "agentVersion",
+          "clientEmail",
+          "createdAt",
+          "directUrl",
+          "enabled",
+          "id",
+          "inboundIds",
+          "intervalSec",
+          "lastSeenAt",
+          "name",
+          "stale",
+          "targets",
+          "testUrl"
+        ],
+        "type": "object"
+      },
+      "ReachTargetView": {
+        "properties": {
+          "changedAt": {
+            "example": 1736000000000,
+            "format": "int64",
+            "type": "integer"
+          },
+          "checks7d": {
+            "example": 1008,
+            "type": "integer"
+          },
+          "consecutiveFails": {
+            "example": 0,
+            "type": "integer"
+          },
+          "inboundId": {
+            "example": 1,
+            "type": "integer"
+          },
+          "key": {
+            "example": "1@vpn.example.com:443",
+            "type": "string"
+          },
+          "label": {
+            "example": "VLESS-443",
+            "type": "string"
+          },
+          "lastAt": {
+            "example": 1736000000000,
+            "format": "int64",
+            "type": "integer"
+          },
+          "lastBytes": {
+            "example": 262144,
+            "format": "int64",
+            "type": "integer"
+          },
+          "lastError": {
+            "type": "string"
+          },
+          "lastOk": {
+            "example": true,
+            "type": "boolean"
+          },
+          "lastTotalMs": {
+            "example": 950,
+            "type": "integer"
+          },
+          "lastTtfbMs": {
+            "example": 180,
+            "type": "integer"
+          },
+          "status": {
+            "example": "ok",
+            "type": "string"
+          },
+          "uptime7d": {
+            "example": 99.4,
+            "type": "number"
+          }
+        },
+        "required": [
+          "changedAt",
+          "checks7d",
+          "consecutiveFails",
+          "inboundId",
+          "key",
+          "label",
+          "lastAt",
+          "lastBytes",
+          "lastError",
+          "lastOk",
+          "lastTotalMs",
+          "lastTtfbMs",
+          "status",
+          "uptime7d"
+        ],
+        "type": "object"
+      },
       "Readiness": {
         "description": "Readiness is the host's ability to run any kernel-mode inbound at all.",
         "properties": {
@@ -4963,6 +5339,10 @@
     {
       "name": "Hosts",
       "description": "Per-inbound override endpoints. Each enabled host renders one extra subscription link/proxy with its own address/port/TLS, superseding the legacy externalProxy array. All endpoints under /panel/api/hosts."
+    },
+    {
+      "name": "Reachability probes",
+      "description": "External agents that test the inbounds from inside a censored network (cmd/still-probe). These endpoints manage the probes; the agents use probe/v1/job and probe/v1/report under the panel base path with their own Bearer token, which opens nothing under /panel/api."
     },
     {
       "name": "Backup",
@@ -6404,6 +6784,54 @@
         }
       }
     },
+    "/panel/api/server/torrentBlock": {
+      "get": {
+        "tags": [
+          "Server"
+        ],
+        "summary": "State of \"Block torrents for clients\": the stored toggle, whether this host can run the nftables filter (Linux with nft), whether its table is loaded, packet counters since it was loaded, and the last apply error if any.",
+        "operationId": "get_panel_api_server_torrentBlock",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": {
+                    "enabled": true,
+                    "supported": true,
+                    "nftInstalled": true,
+                    "active": true,
+                    "counters": {
+                      "handshakes": 3,
+                      "dht": 61,
+                      "trackers": 2,
+                      "utp": 276,
+                      "learned": 5,
+                      "peerDrops": 59811,
+                      "tunnelBans": 1
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/panel/api/server/cpuHistory/{bucket}": {
       "get": {
         "tags": [
@@ -6829,6 +7257,57 @@
                       "type": "string"
                     },
                     "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/server/localBackups": {
+      "get": {
+        "tags": [
+          "Server"
+        ],
+        "summary": "List the scheduled local backups on this server (newest first) and the outcome of the last one since the panel started. Restore one on the server with: still-ui restore <file>.",
+        "operationId": "get_panel_api_server_localBackups",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": {
+                    "folder": "/etc/still-ui/backups",
+                    "last": {
+                      "file": "still-ui-panel-20261104-033000.db.age",
+                      "size": 1048576,
+                      "encrypted": true,
+                      "time": 1793763000,
+                      "telegram": "sent"
+                    },
+                    "backups": [
+                      {
+                        "name": "still-ui-panel-20261104-033000.db.age",
+                        "size": 1048576,
+                        "time": "2026-11-04T03:30:00Z",
+                        "encrypted": true
+                      }
+                    ]
                   }
                 }
               }
@@ -7388,6 +7867,55 @@
         }
       }
     },
+    "/panel/api/server/setTorrentBlock": {
+      "post": {
+        "tags": [
+          "Server"
+        ],
+        "summary": "Turn \"Block torrents for clients\" on or off. On: every generated Xray config routes sniffed BitTorrent to a blackhole first and enables content sniffing on client inbounds where it is off, and on Linux an nftables table drops BitTorrent signatures in egress the server originates and in forwarded AmneziaWG kernel-mode traffic, and cuts a peer endpoint only after that peer itself answers with a BitTorrent handshake or DHT response. Xray is reconciled immediately. Returns the same object as GET /torrentBlock; a host without nft keeps the Xray half and reports the error.",
+        "operationId": "post_panel_api_server_setTorrentBlock",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "enable": {
+                    "type": "boolean",
+                    "description": "true = block, false = stop blocking and remove the nftables table."
+                  }
+                },
+                "required": [
+                  "enable"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/panel/api/server/updateGeofile": {
       "post": {
         "tags": [
@@ -7751,6 +8279,45 @@
                       "type": "string"
                     },
                     "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/server/localBackup": {
+      "post": {
+        "tags": [
+          "Server"
+        ],
+        "summary": "Take a local backup now with the saved backup settings: a consistent database snapshot, encrypted to the configured age/SSH keys, rotated, and sent to Telegram when that is on. Returns the file written.",
+        "operationId": "post_panel_api_server_localBackup",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": {
+                    "file": "still-ui-panel-20261104-120000.db.age",
+                    "size": 1048576,
+                    "encrypted": true,
+                    "time": 1793793600
                   }
                 }
               }
@@ -13048,6 +13615,381 @@
                       "type": "string"
                     },
                     "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/probes/list": {
+      "get": {
+        "tags": [
+          "Reachability probes"
+        ],
+        "summary": "Every probe with the latest state of each tested endpoint and its 7-day uptime.",
+        "operationId": "get_panel_api_probes_list",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ReachProbeView"
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": [
+                    {
+                      "agentVersion": "1.4.0",
+                      "clientEmail": "still-probe-k3m9x2qa",
+                      "createdAt": 1736000000000,
+                      "directUrl": "",
+                      "enabled": true,
+                      "id": 1,
+                      "inboundIds": [
+                        1,
+                        2
+                      ],
+                      "intervalSec": 600,
+                      "lastSeenAt": 1736000000000,
+                      "name": "home-mobile",
+                      "stale": false,
+                      "targets": [
+                        {
+                          "changedAt": 1736000000000,
+                          "checks7d": 1008,
+                          "consecutiveFails": 0,
+                          "inboundId": 1,
+                          "key": "1@vpn.example.com:443",
+                          "label": "VLESS-443",
+                          "lastAt": 1736000000000,
+                          "lastBytes": 262144,
+                          "lastError": "",
+                          "lastOk": true,
+                          "lastTotalMs": 950,
+                          "lastTtfbMs": 180,
+                          "status": "ok",
+                          "uptime7d": 99.4
+                        }
+                      ],
+                      "testUrl": "https://speed.cloudflare.com/__down?bytes=262144"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/probes/history/{id}": {
+      "get": {
+        "tags": [
+          "Reachability probes"
+        ],
+        "summary": "One probe's results of the last seven days, oldest first.",
+        "operationId": "get_panel_api_probes_history_id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Probe ID.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ReachHistoryPoint"
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": [
+                    {
+                      "at": 1736000000000,
+                      "key": "1@vpn.example.com:443",
+                      "ok": true,
+                      "totalMs": 950,
+                      "ttfbMs": 180
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/probes/add": {
+      "post": {
+        "tags": [
+          "Reachability probes"
+        ],
+        "summary": "Create a probe and the panel-managed client it connects as. The response carries the plaintext token once; only its hash is stored.",
+        "operationId": "post_panel_api_probes_add",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "name": "home-1",
+                "inboundIds": [
+                  1
+                ],
+                "testUrl": "https://speed.cloudflare.com/__down?bytes=262144",
+                "directUrl": "",
+                "intervalSec": 600
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "$ref": "#/components/schemas/ReachProbeCreated"
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": {
+                    "probe": {
+                      "agentVersion": "1.4.0",
+                      "clientEmail": "still-probe-k3m9x2qa",
+                      "createdAt": 1736000000000,
+                      "directUrl": "",
+                      "enabled": true,
+                      "id": 1,
+                      "inboundIds": [
+                        1,
+                        2
+                      ],
+                      "intervalSec": 600,
+                      "lastSeenAt": 1736000000000,
+                      "name": "home-mobile",
+                      "stale": false,
+                      "targets": [
+                        {
+                          "changedAt": 1736000000000,
+                          "checks7d": 1008,
+                          "consecutiveFails": 0,
+                          "inboundId": 1,
+                          "key": "1@vpn.example.com:443",
+                          "label": "VLESS-443",
+                          "lastAt": 1736000000000,
+                          "lastBytes": 262144,
+                          "lastError": "",
+                          "lastOk": true,
+                          "lastTotalMs": 950,
+                          "lastTtfbMs": 180,
+                          "status": "ok",
+                          "uptime7d": 99.4
+                        }
+                      ],
+                      "testUrl": "https://speed.cloudflare.com/__down?bytes=262144"
+                    },
+                    "token": "8fJ2kQ..."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/probes/update/{id}": {
+      "post": {
+        "tags": [
+          "Reachability probes"
+        ],
+        "summary": "Change a probe's settings; its client is attached to the chosen inbounds and detached from the rest.",
+        "operationId": "post_panel_api_probes_update_id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Probe ID.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "name": "home-1",
+                "enabled": true,
+                "inboundIds": [
+                  1,
+                  2
+                ],
+                "testUrl": "https://speed.cloudflare.com/__down?bytes=262144",
+                "directUrl": "",
+                "intervalSec": 600
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/probes/del/{id}": {
+      "post": {
+        "tags": [
+          "Reachability probes"
+        ],
+        "summary": "Revoke a probe: its token stops working, its client and its history are deleted.",
+        "operationId": "post_panel_api_probes_del_id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Probe ID.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/probes/rotateToken/{id}": {
+      "post": {
+        "tags": [
+          "Reachability probes"
+        ],
+        "summary": "Issue a new token for a probe; the previous one stops working at once.",
+        "operationId": "post_panel_api_probes_rotateToken_id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Probe ID.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": {
+                    "token": "new-token-string"
                   }
                 }
               }

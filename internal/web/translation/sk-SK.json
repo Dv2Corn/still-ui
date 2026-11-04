@@ -126,7 +126,8 @@
     "openMenu": "Otvoriť menu",
     "pinSidebar": "Pripnúť bočné menu",
     "unpinSidebar": "Odopnúť bočné menu",
-    "subFormats": "Formáty odberu"
+    "subFormats": "Formáty odberu",
+    "probes": "Sondy"
   },
   "pages": {
     "login": {
@@ -786,7 +787,18 @@
         "autoSystemWfpBlockLeakTooltip": "Iba pre Windows s automatickými systémovými trasami: dns ponechá DNS (porty 53 a 853 a službu DNS Client) v TUN a vyžaduje DNS servery; windnsclient pokrýva iba túto službu; pre akýkoľvek iný port zadajte tcp/PORT alebo udp/PORT; misconfigtun zablokuje verziu IP, pre ktorú nevedie žiadna trasa do TUN.",
         "maxVersion": "Maximálna verzia",
         "headerName": "Názov hlavičky",
-        "headerValue": "Hodnota hlavičky"
+        "headerValue": "Hodnota hlavičky",
+        "preset": "Predvoľba",
+        "presetNone": "Žiadna",
+        "presetHelp": "Hodnoty pre klientov v ruských mobilných sieťach s DPI a režimom bieleho zoznamu. VLESS REALITY používa odtlačok ios: jeho ClientHello (asi 517 bajtov) sa zmestí do jedného segmentu TCP, kým väčším v niektorých sieťach stratí druhý segment. Xray v still-ui ios prijíma; oficiálny Xray 26.9.9 a novší ho odmieta. Hysteria2 beží cez UDP, ktoré často funguje aj vtedy, keď sa TCP preruší.",
+        "presetOptions": {
+          "ruMobileReality": "Mobilné siete (Rusko): VLESS REALITY",
+          "ruMobileHysteria": "Mobilné siete (Rusko): Hysteria2 (UDP)"
+        },
+        "presetHints": {
+          "ruMobileReality": "Nižšie vyberte cieľ: Nájsť ciele overí kandidátske stránky z tohto servera. Namiesto jednej známej zahraničnej stránky uprednostnite stránku populárnu a neblokovanú v krajine vašich klientov. Klientom nastavte flow xtls-rprx-vision.",
+          "ruMobileHysteria": "Nižšie nastavte certifikát. UDP 443 často funguje v režime bieleho zoznamu, keď sa TCP preruší po prvých 12–16 KB. Zahmlievanie je vypnuté pre čo najširšiu podporu klientov."
+        }
       },
       "info": {
         "mode": "Režim",
@@ -1687,6 +1699,37 @@
       "smtpNoRecipients": "Nie sú nastavení žiadni príjemcovia",
       "smtpFromNotConfigured": "Adresa odosielateľa SMTP nie je nastavená",
       "eventLoginAttempt": "Pokus o prihlásenie",
+      "backupSettings": "Zálohy",
+      "backupEnable": "Plánované zálohy",
+      "backupEnableDesc": "Ukladať kópiu databázy na tomto serveri podľa plánu.",
+      "backupSchedule": "Plán",
+      "backupScheduleDesc": "Kedy zálohovať, v časovom pásme panela.",
+      "backupKeep": "Počet uchovaných kópií",
+      "backupKeepDesc": "Po každej novej kópii sa staršie zmažú.",
+      "backupRecipients": "Šifrovacie kľúče",
+      "backupRecipientsDesc": "Verejné kľúče age (age1…) alebo SSH (ssh-ed25519 …), jeden na riadok. Len verejné kľúče: súkromný zostáva u vás. Prázdne znamená bez šifrovania.",
+      "backupTelegram": "Posielať do Telegramu",
+      "backupTelegramDesc": "Posielať každú zašifrovanú zálohu správcom v Telegrame. Nezašifrované zálohy sa nikdy neposielajú.",
+      "backupApplyHint": "Nový plán začne platiť po uložení nastavení a reštarte panela.",
+      "backupLast": "Posledná záloha",
+      "backupRunNow": "Zálohovať teraz",
+      "backupRunFailed": "Záloha zlyhala",
+      "backupRestoreHint": "Obnova: na serveri spustite still-ui restore <súbor>",
+      "backupList": "Zálohy na tomto serveri",
+      "backupNoFiles": "Zatiaľ žiadne zálohy",
+      "backupEncrypted": "zašifrovaná",
+      "eventGroupHealth": "Stav servera",
+      "eventXrayDown": "Xray nebeží",
+      "eventXrayFlapping": "Reštarty Xray",
+      "eventXrayFlappingHint": "krát za minút",
+      "eventProcessMemory": "Pamäť panela alebo Xray (%)",
+      "eventProcessMemoryHint": "z MemoryMax alebo z RAM",
+      "eventDiskHigh": "Disk je plný (%)",
+      "eventCertExpiring": "Certifikát vyprší (dni)",
+      "eventCertExpiringHint": "najviac štvrtina jeho platnosti",
+      "eventBackupFailed": "Záloha zlyhala",
+      "alertRemindHours": "Pripomínať každých (hodín)",
+      "alertRemindHoursDesc": "Opakovať upozornenie, kým problém trvá; 0 ho pošle raz.",
       "telegramTokenConfigured": "Nastavené. Prázdne pole ponechá aktuálny token.",
       "telegramTokenPlaceholder": "Nastavené; nový token nahradí aktuálny",
       "smtpPasswordConfigured": "Nastavené. Prázdne pole ponechá aktuálne heslo.",
@@ -1980,7 +2023,11 @@
       "subHostSortMode": "Poradie uzlov v predplatnom",
       "subHostSortInbound": "Poradie inboundov (predvolené)",
       "subHostSortHosts": "Poradie hostiteľov",
-      "subHostSortModeDesc": "Poradie hostiteľov sa riadi stránkou Hostitelia naprieč inboundmi. Určuje poradie, ktoré odosiela server; klientske aplikácie môžu použiť vlastné triedenie."
+      "subHostSortModeDesc": "Poradie hostiteľov sa riadi stránkou Hostitelia naprieč inboundmi. Určuje poradie, ktoré odosiela server; klientske aplikácie môžu použiť vlastné triedenie.",
+      "eventGroupProbe": "Sondy dostupnosti",
+      "eventProbeDown": "Vstup nedostupný",
+      "eventProbeUp": "Vstup opäť dostupný",
+      "eventProbeStale": "Sonda mlčí"
     },
     "xray": {
       "save": "Uložiť",
@@ -2015,6 +2062,15 @@
       "outboundTestUrl": "URL na test výstupov",
       "outboundTestUrlDesc": "URL použitá na overenie pripojenia cez výstup.",
       "Torrent": "Blokovať protokol BitTorrent",
+      "TorrentDesc": "Iba prevádzka cez Xray a iba na prichádzajúcich so zapnutým sniffingom.",
+      "torrentBlock": {
+        "title": "Blokovať torrenty klientov",
+        "desc": "Všetky protokoly vrátane AmneziaWG v režime jadra: pridá pravidlo BitTorrent v Xray (kde je sniffing vypnutý, zapne ho) a filter nftables na tomto serveri. Platí hneď; klienti nie sú upozornení.",
+        "unsupported": "Tento server nie je Linux: blokuje sa iba prevádzka cez Xray.",
+        "nftMissing": "nft nie je nainštalovaný: blokuje sa iba prevádzka cez Xray. Nainštalujte balík nftables.",
+        "error": "Filter nftables nie je načítaný: {error}",
+        "counters": "Od načítania filtra: zachytených {caught} torrentových paketov, zahodených {dropped} paketov k známym peerom."
+      },
       "Inbounds": "Vstupy",
       "Outbounds": "Výstupy",
       "Balancers": "Vyvažovanie záťaže",
@@ -2513,6 +2569,64 @@
       "routingScript": "Skript smerovania",
       "routingScriptDesc": "Cesta k súboru .lua s funkciou HandleRoute, absolútna alebo vzhľadom na priečinok bin Xray. Skript vyberá každú trasu a Xray ignoruje všetky pravidlá vrátane pravidla api panelu. Vstup api preto smerujte na výstup api, inak prestanú fungovať štatistiky spotreby aj zmeny klientov za behu. Ak súbor chýba alebo je neplatný, Xray sa nespustí.",
       "routingScriptActive": "V časti {section} je nastavený skript smerovania, preto Xray tieto pravidlá ignoruje."
+    },
+    "probes": {
+      "title": "Sondy dostupnosti",
+      "intro": "Sonda je malý agent, ktorý spustíte na ľubovoľnom počítači s Linuxom v krajine, o ktorú vám ide: na domácom serveri, Raspberry Pi alebo lacnom miestnom VPS. Každých pár minút sa pripojí cez vaše vstupy ako skutočný klient, stiahne testovací súbor a pošle výsledok sem.",
+      "alertsHint": "Upozornenia chodia cez Telegram bota: zapnite udalosti sond dostupnosti v Nastavenia panelu → Telegram.",
+      "addProbe": "Pridať sondu",
+      "editProbe": "Upraviť sondu",
+      "empty": "Zatiaľ žiadne sondy. Pridajte jednu a spustite inštalačný príkaz na počítači v cenzurovanej sieti.",
+      "minutes": "min",
+      "directCheck": "Priama kontrola (bez VPN)",
+      "history7d": "7 dní",
+      "lastReport": "posledné hlásenie {time}",
+      "neverReported": "ešte sa neozvala",
+      "stale": "Bez hlásení",
+      "rotateToken": "Nový token",
+      "rotateConfirm": "Vydať nový token? Súčasný okamžite prestane fungovať. Klient sondy dostane aj nové kľúče, takže stará konfigurácia ani odkaz sa už nepripoja.",
+      "clientNote": "Pripája sa ako klient spravovaný panelom {email}. Tohto klienta neupravujte ani nemažte; nemá limit prenosu ani času.",
+      "noResults": "Zatiaľ žiadne výsledky",
+      "tokenTitle": "Token sondy",
+      "tokenOnce": "Skopírujte token teraz: panel si uchováva len jeho hash a znova ho zobraziť nevie.",
+      "installCommand": "Inštalácia na počítač sondy (Linux, ako root):",
+      "installHint": "Príkaz nainštaluje agenta s Xray a časovačom systemd a spustí prvú kontrolu.",
+      "token": "Token",
+      "deleteConfirm": "Odstrániť sondu „{name}“?",
+      "deleteHint": "Jej token prestane fungovať, jej klient sa odoberie zo vstupov a história sa vymaže.",
+      "fields": {
+        "name": "Názov",
+        "inbounds": "Vstupy",
+        "testUrl": "Testovacia URL",
+        "directUrl": "Priama URL",
+        "interval": "Interval",
+        "target": "Prístupový bod",
+        "lastCheck": "Posledná kontrola",
+        "latency": "Prvý bajt / spolu",
+        "uptime": "Dostupnosť za 7 dní"
+      },
+      "hints": {
+        "name": "Kde sonda beží, napríklad home-mobile",
+        "inbounds": "Skúšať sa dajú vstupy VLESS, VMess, Trojan, Shadowsocks a Hysteria",
+        "testUrl": "Sťahuje sa cez každý vstup. Použite súbor väčší ako asi 100 KB: niektoré cenzúrne systémy prerušia spojenie až po prvých kilobajtoch.",
+        "directUrl": "Voliteľné: otvára sa aj bez VPN, napríklad váš web alebo stránka predplatného"
+      },
+      "errors": {
+        "name": "Názov: 1 až 64 znakov, bez < > &",
+        "inbounds": "Vyberte aspoň jeden vstup",
+        "url": "Zadajte URL začínajúcu http:// alebo https://",
+        "interval": "Od 1 do 1440 minút"
+      },
+      "status": {
+        "ok": "OK",
+        "fail": "Nedostupné",
+        "flaky": "Raz zlyhalo",
+        "unknown": "Bez údajov"
+      },
+      "toasts": {
+        "saved": "Sonda uložená",
+        "deleted": "Sonda odstránená"
+      }
     }
   },
   "tgbot": {
@@ -2626,6 +2740,20 @@
       "eventNodeUp": "Server {{ .Name }} je DOSTUPNÝ",
       "eventLoginFallback": "Neúspešné prihlásenie z {{ .Source }}",
       "memoryThreshold": "Využitie pamäte {{ .Percent }}% prekročilo prah {{ .Threshold }}%",
+      "alertXrayDown": "Xray nebeží: {{ .Error }}",
+      "alertXrayDownResolved": "Xray opäť beží.",
+      "alertXrayFlapping": "Xray sa reštartoval {{ .Count }}-krát za {{ .Window }} min; každý reštart odpojí všetkých klientov.",
+      "alertXrayFlappingResolved": "Xray sa prestal reštartovať: {{ .Count }} reštartov za posledných {{ .Window }} min.",
+      "alertMemory": "{{ .Process }} používa {{ .Used }} z {{ .Limit }} ({{ .LimitKind }}), {{ .Percent }} %.",
+      "alertMemoryResolved": "Pamäť {{ .Process }} je opäť na {{ .Percent }} % z {{ .Limit }}.",
+      "alertDisk": "Disk {{ .Path }} je zaplnený na {{ .Percent }} %, voľných {{ .Free }}.",
+      "alertDiskResolved": "Disk {{ .Path }} je opäť zaplnený na {{ .Percent }} %.",
+      "alertCertExpiring": "Certifikát {{ .Name }} ({{ .Where }}) vyprší {{ .Date }}, o {{ .Days }} dní.",
+      "alertCertExpired": "Certifikát {{ .Name }} ({{ .Where }}) vypršal {{ .Date }}.",
+      "alertCertRenewed": "Certifikát {{ .Name }} ({{ .Where }}) je obnovený, platí do {{ .Date }}.",
+      "alertBackupFailed": "Záloha zlyhala: {{ .Error }}",
+      "alertBackupResolved": "Zálohy opäť fungujú: {{ .File }}",
+      "alertStill": "Stále neopravené, od {{ .Since }}.",
       "inboundsCount": "🔌 Inboundy: {{ .Count }}\r\n",
       "clientsCount": "👥 Klienti: {{ .Count }}\r\n",
       "category_server": "🖥 Server",
@@ -2641,7 +2769,11 @@
       "qrLegendJSON": "{{ .Code }}. Predplatné JSON",
       "qrLegendLink": "{{ .Code }}. Odkaz pre aplikáciu {{ .App }}",
       "backupFailed": "Databázu sa nepodarilo prečítať; záloha nebola odoslaná.",
-      "privateOnly": "🤖 Tento bot funguje len v súkromnom chate. Otvorte ho, prosím, v priamej správe."
+      "privateOnly": "🤖 Tento bot funguje len v súkromnom chate. Otvorte ho, prosím, v priamej správe.",
+      "eventProbeDown": "Sonda {{ .Probe }}: {{ .Target }} je NEDOSTUPNÝ",
+      "eventProbeUp": "Sonda {{ .Probe }}: {{ .Target }} je opäť dostupný",
+      "eventProbeBack": "Sonda {{ .Probe }} opäť posiela hlásenia",
+      "eventProbeStale": "Sonda {{ .Probe }} sa neozvala {{ .Minutes }} min"
     },
     "buttons": {
       "closeKeyboard": "❌ Zavrieť klávesnicu",

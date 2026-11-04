@@ -62,6 +62,9 @@ func migrationModels() []any {
 		&model.SubBalancer{},
 		&model.TuicTrafficReceipt{},
 		&model.RevokedSession{},
+		&model.ReachProbe{},
+		&model.ReachProbeResult{},
+		&model.ReachProbeTarget{},
 	}
 }
 

@@ -1,10 +1,14 @@
-import { InputNumber } from 'antd';
+import { InputNumber, Typography } from 'antd';
+import { useTranslation } from 'react-i18next';
+import { onNumber } from '@/utils/onNumber';
 import {
   CloudServerOutlined,
+  HeartOutlined,
   ThunderboltOutlined,
   DesktopOutlined,
   DashboardOutlined,
   SafetyOutlined,
+  RadarChartOutlined,
 } from '@ant-design/icons';
 import type { AllSetting } from '@/models/setting';
 import { NotificationLayout } from './NotificationLayout';
@@ -108,7 +112,99 @@ const GROUPS: NotificationGroupConfig[] = [
     title: 'eventGroupSecurity',
     events: [{ key: 'login.attempt', label: 'eventLoginAttempt', settingKey: '' }],
   },
+  {
+    icon: <RadarChartOutlined aria-hidden />,
+    title: 'eventGroupProbe',
+    events: [
+      { key: 'probe.down', label: 'eventProbeDown', settingKey: '' },
+      { key: 'probe.up', label: 'eventProbeUp', settingKey: '' },
+      { key: 'probe.stale', label: 'eventProbeStale', settingKey: '' },
+    ],
+  },
 ];
+
+function thresholdInput(min: number, max: number) {
+  return function ThresholdInput({
+    value,
+    onChange,
+    ariaLabel,
+  }: {
+    value: number;
+    onChange: (v: number | null) => void;
+    ariaLabel: string;
+  }) {
+    return (
+      <InputNumber
+        size="small"
+        min={min}
+        max={max}
+        value={value}
+        onChange={onChange}
+        aria-label={ariaLabel}
+        style={{ width: 80 }}
+      />
+    );
+  };
+}
+
+// Server health alerts (still-ui): sent once when a problem starts, again every
+// alertRemindHours while it lasts, and once when it is fixed.
+const HEALTH_GROUP: NotificationGroupConfig = {
+  icon: <HeartOutlined aria-hidden />,
+  title: 'eventGroupHealth',
+  events: [
+    { key: 'xray.down', label: 'eventXrayDown', settingKey: '' },
+    {
+      key: 'xray.flapping',
+      label: 'eventXrayFlapping',
+      settingKey: 'alertXrayRestarts',
+      hint: 'eventXrayFlappingHint',
+      extra: ({ value, onChange, ariaLabel, settingValue, setSetting }) => (
+        <>
+          <InputNumber
+            size="small"
+            min={1}
+            max={100}
+            value={value}
+            onChange={onChange}
+            aria-label={ariaLabel}
+            style={{ width: 70 }}
+          />
+          <InputNumber
+            size="small"
+            min={1}
+            max={1440}
+            value={settingValue('alertXrayRestartWindow')}
+            onChange={onNumber((v) => setSetting('alertXrayRestartWindow', v))}
+            aria-label={`${ariaLabel} (min)`}
+            style={{ width: 80 }}
+          />
+        </>
+      ),
+    },
+    {
+      key: 'process.memory',
+      label: 'eventProcessMemory',
+      settingKey: 'alertMemory',
+      hint: 'eventProcessMemoryHint',
+      extra: thresholdInput(1, 100),
+    },
+    {
+      key: 'disk.high',
+      label: 'eventDiskHigh',
+      settingKey: 'alertDisk',
+      extra: thresholdInput(1, 100),
+    },
+    {
+      key: 'cert.expiring',
+      label: 'eventCertExpiring',
+      settingKey: 'alertCertDays',
+      hint: 'eventCertExpiringHint',
+      extra: thresholdInput(1, 365),
+    },
+    { key: 'backup.failed', label: 'eventBackupFailed', settingKey: '' },
+  ],
+};
 
 interface Props {
   allSetting: AllSetting;
@@ -116,6 +212,7 @@ interface Props {
 }
 
 export function TelegramNotifications({ allSetting, updateSetting }: Props) {
+  const { t } = useTranslation();
   const events = allSetting.tgEnabledEvents || '';
   const selected = events
     ? events
@@ -150,6 +247,37 @@ export function TelegramNotifications({ allSetting, updateSetting }: Props) {
           updateSetting={updateSetting}
         />
       ))}
+      <NotificationGroup
+        config={HEALTH_GROUP}
+        selected={selected}
+        onToggle={toggle}
+        onToggleAll={toggleAll}
+        allSetting={allSetting}
+        updateSetting={updateSetting}
+      />
+      <div
+        style={{
+          gridColumn: '1 / -1',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          flexWrap: 'wrap',
+        }}
+      >
+        <Typography.Text>{t('pages.settings.alertRemindHours')}</Typography.Text>
+        <InputNumber
+          size="small"
+          min={0}
+          max={720}
+          value={allSetting.alertRemindHours}
+          onChange={onNumber((v) => updateSetting({ alertRemindHours: v }))}
+          aria-label={t('pages.settings.alertRemindHours')}
+          style={{ width: 80 }}
+        />
+        <Typography.Text type="secondary">
+          {t('pages.settings.alertRemindHoursDesc')}
+        </Typography.Text>
+      </div>
     </NotificationLayout>
   );
 }

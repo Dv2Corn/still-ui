@@ -16,6 +16,8 @@ tmp/
 
 # Ignore build and distribution directories
 backup/
+# ...but not the backup package
+!internal/backup/
 bin/
 x-ui/
 dist/

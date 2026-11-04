@@ -2,6 +2,56 @@
 export const SCHEMAS: Record<string, unknown> = {
   "AllSetting": {
     "properties": {
+      "alertCertDays": {
+        "maximum": 365,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "alertDisk": {
+        "maximum": 100,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "alertMemory": {
+        "maximum": 100,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "alertRemindHours": {
+        "maximum": 720,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "alertXrayRestartWindow": {
+        "maximum": 1440,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "alertXrayRestarts": {
+        "description": "Server health alert thresholds (events xray.down, xray.flapping, process.memory,\ndisk.high, cert.expiring, backup.failed); a reminder repeats every alertRemindHours, 0 = never.",
+        "maximum": 100,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "backupAgeRecipients": {
+        "type": "string"
+      },
+      "backupEnable": {
+        "description": "Scheduled local backups: on/off, cron schedule, how many are kept, age/SSH public keys\nthey are encrypted to (empty = unencrypted), and whether an encrypted one goes to Telegram.",
+        "type": "boolean"
+      },
+      "backupKeep": {
+        "maximum": 1000,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "backupSchedule": {
+        "example": "@daily",
+        "type": "string"
+      },
+      "backupTelegram": {
+        "type": "boolean"
+      },
       "datepicker": {
         "type": "string"
       },
@@ -584,6 +634,17 @@ export const SCHEMAS: Record<string, unknown> = {
       }
     },
     "required": [
+      "alertCertDays",
+      "alertDisk",
+      "alertMemory",
+      "alertRemindHours",
+      "alertXrayRestartWindow",
+      "alertXrayRestarts",
+      "backupAgeRecipients",
+      "backupEnable",
+      "backupKeep",
+      "backupSchedule",
+      "backupTelegram",
       "datepicker",
       "discordAdminIds",
       "discordBotBackup",
@@ -769,6 +830,56 @@ export const SCHEMAS: Record<string, unknown> = {
   },
   "AllSettingView": {
     "properties": {
+      "alertCertDays": {
+        "maximum": 365,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "alertDisk": {
+        "maximum": 100,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "alertMemory": {
+        "maximum": 100,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "alertRemindHours": {
+        "maximum": 720,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "alertXrayRestartWindow": {
+        "maximum": 1440,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "alertXrayRestarts": {
+        "description": "Server health alert thresholds (events xray.down, xray.flapping, process.memory,\ndisk.high, cert.expiring, backup.failed); a reminder repeats every alertRemindHours, 0 = never.",
+        "maximum": 100,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "backupAgeRecipients": {
+        "type": "string"
+      },
+      "backupEnable": {
+        "description": "Scheduled local backups: on/off, cron schedule, how many are kept, age/SSH public keys\nthey are encrypted to (empty = unencrypted), and whether an encrypted one goes to Telegram.",
+        "type": "boolean"
+      },
+      "backupKeep": {
+        "maximum": 1000,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "backupSchedule": {
+        "example": "@daily",
+        "type": "string"
+      },
+      "backupTelegram": {
+        "type": "boolean"
+      },
       "datepicker": {
         "type": "string"
       },
@@ -1375,6 +1486,17 @@ export const SCHEMAS: Record<string, unknown> = {
       }
     },
     "required": [
+      "alertCertDays",
+      "alertDisk",
+      "alertMemory",
+      "alertRemindHours",
+      "alertXrayRestartWindow",
+      "alertXrayRestarts",
+      "backupAgeRecipients",
+      "backupEnable",
+      "backupKeep",
+      "backupSchedule",
+      "backupTelegram",
       "datepicker",
       "discordAdminIds",
       "discordBotBackup",
@@ -4325,6 +4447,260 @@ export const SCHEMAS: Record<string, unknown> = {
       "xrayError",
       "xrayState",
       "xrayVersion"
+    ],
+    "type": "object"
+  },
+  "ReachHistoryPoint": {
+    "properties": {
+      "at": {
+        "example": 1736000000000,
+        "format": "int64",
+        "type": "integer"
+      },
+      "key": {
+        "example": "1@vpn.example.com:443",
+        "type": "string"
+      },
+      "ok": {
+        "example": true,
+        "type": "boolean"
+      },
+      "totalMs": {
+        "example": 950,
+        "type": "integer"
+      },
+      "ttfbMs": {
+        "example": 180,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "at",
+      "key",
+      "ok",
+      "totalMs",
+      "ttfbMs"
+    ],
+    "type": "object"
+  },
+  "ReachProbeCreated": {
+    "description": "ReachProbeCreated carries the plaintext token, which is never shown again.",
+    "properties": {
+      "probe": {
+        "$ref": "#/components/schemas/ReachProbeView"
+      },
+      "token": {
+        "example": "8fJ2kQ...",
+        "type": "string"
+      }
+    },
+    "required": [
+      "probe",
+      "token"
+    ],
+    "type": "object"
+  },
+  "ReachProbeInput": {
+    "properties": {
+      "directUrl": {
+        "example": "https://example.com/",
+        "type": "string"
+      },
+      "enabled": {
+        "description": "Enabled is read by Update only; omitted keeps the probe's current state.",
+        "example": true,
+        "nullable": true,
+        "type": "boolean"
+      },
+      "inboundIds": {
+        "example": [
+          1,
+          2
+        ],
+        "items": {
+          "type": "integer"
+        },
+        "type": "array"
+      },
+      "intervalSec": {
+        "example": 600,
+        "type": "integer"
+      },
+      "name": {
+        "example": "home-mobile",
+        "type": "string"
+      },
+      "testUrl": {
+        "example": "https://speed.cloudflare.com/__down?bytes=262144",
+        "type": "string"
+      }
+    },
+    "required": [
+      "directUrl",
+      "inboundIds",
+      "intervalSec",
+      "name",
+      "testUrl"
+    ],
+    "type": "object"
+  },
+  "ReachProbeView": {
+    "properties": {
+      "agentVersion": {
+        "example": "1.4.0",
+        "type": "string"
+      },
+      "clientEmail": {
+        "example": "still-probe-k3m9x2qa",
+        "type": "string"
+      },
+      "createdAt": {
+        "example": 1736000000000,
+        "format": "int64",
+        "type": "integer"
+      },
+      "directUrl": {
+        "type": "string"
+      },
+      "enabled": {
+        "example": true,
+        "type": "boolean"
+      },
+      "id": {
+        "example": 1,
+        "type": "integer"
+      },
+      "inboundIds": {
+        "example": [
+          1,
+          2
+        ],
+        "items": {
+          "type": "integer"
+        },
+        "type": "array"
+      },
+      "intervalSec": {
+        "example": 600,
+        "type": "integer"
+      },
+      "lastSeenAt": {
+        "example": 1736000000000,
+        "format": "int64",
+        "type": "integer"
+      },
+      "name": {
+        "example": "home-mobile",
+        "type": "string"
+      },
+      "stale": {
+        "example": false,
+        "type": "boolean"
+      },
+      "targets": {
+        "items": {
+          "$ref": "#/components/schemas/ReachTargetView"
+        },
+        "type": "array"
+      },
+      "testUrl": {
+        "example": "https://speed.cloudflare.com/__down?bytes=262144",
+        "type": "string"
+      }
+    },
+    "required": [
+      "agentVersion",
+      "clientEmail",
+      "createdAt",
+      "directUrl",
+      "enabled",
+      "id",
+      "inboundIds",
+      "intervalSec",
+      "lastSeenAt",
+      "name",
+      "stale",
+      "targets",
+      "testUrl"
+    ],
+    "type": "object"
+  },
+  "ReachTargetView": {
+    "properties": {
+      "changedAt": {
+        "example": 1736000000000,
+        "format": "int64",
+        "type": "integer"
+      },
+      "checks7d": {
+        "example": 1008,
+        "type": "integer"
+      },
+      "consecutiveFails": {
+        "example": 0,
+        "type": "integer"
+      },
+      "inboundId": {
+        "example": 1,
+        "type": "integer"
+      },
+      "key": {
+        "example": "1@vpn.example.com:443",
+        "type": "string"
+      },
+      "label": {
+        "example": "VLESS-443",
+        "type": "string"
+      },
+      "lastAt": {
+        "example": 1736000000000,
+        "format": "int64",
+        "type": "integer"
+      },
+      "lastBytes": {
+        "example": 262144,
+        "format": "int64",
+        "type": "integer"
+      },
+      "lastError": {
+        "type": "string"
+      },
+      "lastOk": {
+        "example": true,
+        "type": "boolean"
+      },
+      "lastTotalMs": {
+        "example": 950,
+        "type": "integer"
+      },
+      "lastTtfbMs": {
+        "example": 180,
+        "type": "integer"
+      },
+      "status": {
+        "example": "ok",
+        "type": "string"
+      },
+      "uptime7d": {
+        "example": 99.4,
+        "type": "number"
+      }
+    },
+    "required": [
+      "changedAt",
+      "checks7d",
+      "consecutiveFails",
+      "inboundId",
+      "key",
+      "label",
+      "lastAt",
+      "lastBytes",
+      "lastError",
+      "lastOk",
+      "lastTotalMs",
+      "lastTtfbMs",
+      "status",
+      "uptime7d"
     ],
     "type": "object"
   },

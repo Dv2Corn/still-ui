@@ -1,0 +1,83 @@
+name: Xray reproducible build
+
+# Rebuilds still-ui's patched Xray from source and fails unless the binaries
+# match the sums pinned in scripts/xray-build/build.sh. Two independent hosts:
+# an x86_64 runner (the pinned amd64 Go image, arm64 cross-compiled, exactly as
+# releases are built) and an arm64 runner (native Go in the same pinned image).
+# Weekly as well, so a moved upstream tag or a changed module is noticed.
+on:
+  pull_request:
+    paths:
+      - "scripts/xray-build/**"
+      - "scripts/still-release.sh"
+      - "Dockerfile"
+      - ".github/workflows/xray-reproducible.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "scripts/xray-build/**"
+      - "scripts/still-release.sh"
+      - "Dockerfile"
+      - ".github/workflows/xray-reproducible.yml"
+  schedule:
+    - cron: "41 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rebuild:
+    name: Rebuild on ${{ matrix.host }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - host: x86_64 (release path)
+            runner: ubuntu-latest
+            native: "0"
+          - host: arm64 (native Go)
+            runner: ubuntu-24.04-arm
+            native: "1"
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # build.sh exits non-zero when a pinned arch builds to any other sum.
+      - name: Build amd64 and arm64
+        env:
+          NATIVE: ${{ matrix.native }}
+        run: |
+          set -euo pipefail
+          if [ "$NATIVE" = 1 ]; then
+            image=$(sed -n 's/^GO_IMAGE=//p' scripts/xray-build/build.sh)
+            docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -e XRAY_BUILD_NATIVE=1 \
+              -v "$PWD:/src" -w /src "$image" scripts/xray-build/build.sh /src/xray-out amd64 arm64
+          else
+            scripts/xray-build/build.sh xray-out amd64 arm64
+          fi
+
+      - name: Compare with the pinned sums
+        run: |
+          set -euo pipefail
+          fail=0
+          {
+            echo "### Xray on $(uname -m)"
+            echo
+            echo "| file | built | pinned |"
+            echo "| --- | --- | --- |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          for arch in amd64 arm64; do
+            got=$(sha256sum "xray-out/xray-linux-$arch" | cut -d' ' -f1)
+            want=$(sed -n "s/^SHA256_${arch}=//p" scripts/xray-build/build.sh)
+            echo "| xray-linux-$arch | \`$got\` | \`$want\` |" >> "$GITHUB_STEP_SUMMARY"
+            if [ "$got" != "$want" ]; then
+              echo "::error::xray-linux-$arch built to $got, pinned $want"
+              fail=1
+            fi
+          done
+          exit "$fail"

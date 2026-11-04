@@ -23,6 +23,20 @@ const (
 
 	// Security
 	EventLoginAttempt EventType = "login.attempt"
+
+	// Server health alerts (still-ui): raised once when a condition goes bad, reminded while it
+	// stays bad, resolved once when it is fixed. Data is *HealthAlertData.
+	EventXrayDown      EventType = "xray.down"
+	EventXrayFlapping  EventType = "xray.flapping"
+	EventProcessMemory EventType = "process.memory"
+	EventDiskHigh      EventType = "disk.high"
+	EventCertExpiring  EventType = "cert.expiring"
+	EventBackupFailed  EventType = "backup.failed"
+
+	// External reachability probes (reports from an agent inside a censored network)
+	EventProbeDown  EventType = "probe.down"
+	EventProbeUp    EventType = "probe.up"
+	EventProbeStale EventType = "probe.stale"
 )
 
 // Event is the unit of information flowing through the bus.
@@ -62,4 +76,22 @@ type LoginEventData struct {
 type SystemMetricData struct {
 	Percent   float64 // current usage percentage
 	Threshold int     // configured threshold
+}
+
+// HealthAlertData carries one server health alert. Phase is "raised", "reminder" or
+// "resolved"; Params fill the alert's message (names depend on the event).
+type HealthAlertData struct {
+	Phase  string
+	Since  time.Time
+	Params map[string]string
+}
+
+// ProbeHealthData carries one probe target's verdict. Target is empty when the
+// event is about the probe agent itself (stale, or reporting again).
+type ProbeHealthData struct {
+	Probe     string
+	Target    string
+	Error     string
+	LatencyMs int
+	SilentFor int // minutes without a report, for probe.stale
 }

@@ -63,6 +63,9 @@ export function NotificationGroup({
                     0,
                   onChange: (v) => updateSetting({ [event.settingKey]: v }),
                   ariaLabel: t(`pages.settings.${event.label}`),
+                  settingValue: (key) =>
+                    Number((allSetting as unknown as Record<string, unknown>)[key]) || 0,
+                  setSetting: (key, v) => updateSetting({ [key]: v }),
                 })}
                 {event.hint && (
                   <Typography.Text type="secondary">

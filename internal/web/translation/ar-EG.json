@@ -126,7 +126,8 @@
     "openMenu": "فتح القائمة",
     "pinSidebar": "تثبيت الشريط الجانبي",
     "unpinSidebar": "إلغاء تثبيت الشريط الجانبي",
-    "subFormats": "Sub Formats"
+    "subFormats": "Sub Formats",
+    "probes": "المجسّات"
   },
   "pages": {
     "login": {
@@ -785,7 +786,18 @@
         "autoSystemWfpBlockLeakTooltip": "على ويندوز بس، مع Auto system routes: ‏dns بيخلّي DNS (البورتات 53 و853 وخدمة DNS Client) جوّه الـTUN ومحتاج سيرفرات DNS؛ ‏windnsclient بيغطي الخدمة دي بس؛ اكتب tcp/PORT أو udp/PORT لأي بورت تاني؛ وmisconfigtun بيمنع نسخة IP مفيش مسار بيوديها للـTUN.",
         "maxVersion": "الحد الأقصى للإصدار",
         "headerName": "اسم الترويسة",
-        "headerValue": "قيمة الترويسة"
+        "headerValue": "قيمة الترويسة",
+        "preset": "إعداد مسبق",
+        "presetNone": "بلا",
+        "presetHelp": "قيم لعملاء شبكات الجوال الروسية التي تستخدم DPI ووضع القائمة البيضاء. يستخدم VLESS REALITY بصمة ios: رسالة ClientHello الخاصة بها (نحو 517 بايت) تتسع في مقطع TCP واحد، بينما تفقد الرسائل الأكبر مقطعها الثاني في بعض الشبكات. يقبل Xray الخاص بـ still-ui بصمة ios، ويرفضها Xray الرسمي 26.9.9 وما بعده. يعمل Hysteria2 عبر UDP الذي يستمر غالبًا في العمل عند قطع TCP.",
+        "presetOptions": {
+          "ruMobileReality": "شبكات الجوال (روسيا): VLESS REALITY",
+          "ruMobileHysteria": "شبكات الجوال (روسيا): Hysteria2 (UDP)"
+        },
+        "presetHints": {
+          "ruMobileReality": "اختر هدفًا أدناه: يفحص «البحث عن أهداف» المواقع المرشحة من هذا الخادم. فضّل موقعًا شائعًا وغير محجوب في بلد عملائك بدلًا من موقع أجنبي واحد معروف. اضبط flow ‏xtls-rprx-vision للعملاء.",
+          "ruMobileHysteria": "اضبط الشهادة أدناه. يعمل UDP 443 غالبًا في وضع القائمة البيضاء عندما يُقطع TCP بعد أول 12–16 كيلوبايت. التمويه معطل لأوسع دعم للعملاء."
+        }
       },
       "info": {
         "mode": "الوضع",
@@ -1562,6 +1574,37 @@
       "smtpNoRecipients": "لا يوجد مستلمون مهيؤون",
       "smtpFromNotConfigured": "عنوان مرسل SMTP غير مُهيأ",
       "eventLoginAttempt": "محاولة تسجيل دخول",
+      "backupSettings": "النسخ الاحتياطية",
+      "backupEnable": "نسخ احتياطية مجدولة",
+      "backupEnableDesc": "حفظ نسخة من قاعدة البيانات على هذا الخادم حسب جدول.",
+      "backupSchedule": "الجدول",
+      "backupScheduleDesc": "موعد النسخ الاحتياطي بتوقيت اللوحة.",
+      "backupKeep": "عدد النسخ المحفوظة",
+      "backupKeepDesc": "تُحذف النسخ الأقدم بعد كل نسخة جديدة.",
+      "backupRecipients": "مفاتيح التشفير",
+      "backupRecipientsDesc": "مفاتيح عامة age (age1…) أو SSH (ssh-ed25519 …)، مفتاح في كل سطر. المفاتيح العامة فقط: المفتاح الخاص يبقى معك. الفراغ يعني بدون تشفير.",
+      "backupTelegram": "إرسال إلى Telegram",
+      "backupTelegramDesc": "إرسال كل نسخة مشفرة إلى مشرفي Telegram. النسخ غير المشفرة لا تُرسل أبدًا.",
+      "backupApplyHint": "احفظ الإعدادات وأعد تشغيل اللوحة ليسري الجدول الجديد.",
+      "backupLast": "آخر نسخة",
+      "backupRunNow": "انسخ الآن",
+      "backupRunFailed": "فشل النسخ الاحتياطي",
+      "backupRestoreHint": "للاستعادة نفّذ على الخادم: still-ui restore <الملف>",
+      "backupList": "النسخ على هذا الخادم",
+      "backupNoFiles": "لا توجد نسخ بعد",
+      "backupEncrypted": "مشفرة",
+      "eventGroupHealth": "حالة الخادم",
+      "eventXrayDown": "Xray لا يعمل",
+      "eventXrayFlapping": "إعادات تشغيل Xray",
+      "eventXrayFlappingHint": "مرات خلال دقائق",
+      "eventProcessMemory": "ذاكرة اللوحة أو Xray (%)",
+      "eventProcessMemoryHint": "من MemoryMax أو من الذاكرة",
+      "eventDiskHigh": "القرص ممتلئ (%)",
+      "eventCertExpiring": "انتهاء الشهادة (أيام)",
+      "eventCertExpiringHint": "بحد أقصى ربع مدة صلاحيتها",
+      "eventBackupFailed": "فشل النسخ الاحتياطي",
+      "alertRemindHours": "التذكير كل (ساعات)",
+      "alertRemindHoursDesc": "تكرار التنبيه ما دامت المشكلة قائمة؛ 0 يرسله مرة واحدة.",
       "telegramTokenConfigured": "مهيأ؛ اتركه فارغاً للاحتفاظ بالتوكن الحالي.",
       "telegramTokenPlaceholder": "مهيأ — أدخل توكن جديد لاستبداله",
       "smtpPasswordConfigured": "مهيأة؛ اتركها فارغة للاحتفاظ بكلمة المرور الحالية.",
@@ -1859,7 +1902,11 @@
       "subHostSortMode": "ترتيب عقد الاشتراك",
       "subHostSortInbound": "ترتيب الاتصالات الواردة (الافتراضي)",
       "subHostSortHosts": "ترتيب المضيفين",
-      "subHostSortModeDesc": "يتبع ترتيب المضيفين صفحة المضيفين عبر جميع الاتصالات الواردة. يحدد هذا ترتيب مخرجات الخادم؛ وقد تطبق تطبيقات العميل ترتيبًا آخر."
+      "subHostSortModeDesc": "يتبع ترتيب المضيفين صفحة المضيفين عبر جميع الاتصالات الواردة. يحدد هذا ترتيب مخرجات الخادم؛ وقد تطبق تطبيقات العميل ترتيبًا آخر.",
+      "eventGroupProbe": "مجسّات إمكانية الوصول",
+      "eventProbeDown": "الوارد غير متاح",
+      "eventProbeUp": "الوارد متاح مجددًا",
+      "eventProbeStale": "المجسّ صامت"
     },
     "xray": {
       "save": "احفظ",
@@ -1894,6 +1941,15 @@
       "outboundTestUrl": "رابط اختبار المخرج",
       "outboundTestUrlDesc": "الرابط المستخدم عند اختبار اتصال المخرج",
       "Torrent": "حظر بروتوكول التورنت",
+      "TorrentDesc": "حركة المرور عبر Xray فقط، وفي الواردات التي تم تفعيل sniffing فيها فقط.",
+      "torrentBlock": {
+        "title": "حظر التورنت للعملاء",
+        "desc": "جميع البروتوكولات، بما فيها AmneziaWG في وضع النواة: يضيف قاعدة BitTorrent في Xray (مع تفعيل sniffing حيث يكون معطلًا) ومرشح nftables على هذا الخادم. يُطبق فورًا؛ ولا يُبلَّغ العملاء.",
+        "unsupported": "هذا الخادم ليس Linux: تُحظر حركة المرور عبر Xray فقط.",
+        "nftMissing": "nft غير مثبت: تُحظر حركة المرور عبر Xray فقط. ثبّت حزمة nftables.",
+        "error": "مرشح nftables غير محمّل: {error}",
+        "counters": "منذ تحميل المرشح: تم التقاط {caught} حزمة تورنت، وإسقاط {dropped} حزمة إلى أقران معروفين."
+      },
       "Inbounds": "الواردات",
       "Outbounds": "الصادرات",
       "importRules": "استيراد القواعد",
@@ -2513,6 +2569,64 @@
         "badVlessRoute": "أدخل رقماً واحداً بين 0 و65535"
       },
       "dragToReorder": "اسحب لتغيير ترتيب {name}"
+    },
+    "probes": {
+      "title": "مجسّات إمكانية الوصول",
+      "intro": "المجسّ وكيل صغير تشغّله على أي جهاز لينكس داخل البلد الذي يهمك: خادم منزلي أو Raspberry Pi أو خادم VPS محلي رخيص. كل بضع دقائق يتصل عبر الواردات مثل عميل حقيقي، ويحمّل ملف اختبار ويرسل النتيجة إلى هنا.",
+      "alertsHint": "تصل التنبيهات عبر بوت Telegram: فعّل أحداث مجسّات إمكانية الوصول في إعدادات اللوحة ← Telegram.",
+      "addProbe": "إضافة مجسّ",
+      "editProbe": "تعديل المجسّ",
+      "empty": "لا توجد مجسّات بعد. أضف واحدًا وشغّل أمر التثبيت على جهاز داخل الشبكة الخاضعة للرقابة.",
+      "minutes": "دقيقة",
+      "directCheck": "فحص مباشر (بدون VPN)",
+      "history7d": "7 أيام",
+      "lastReport": "آخر تقرير {time}",
+      "neverReported": "لم يرسل تقريرًا بعد",
+      "stale": "لا تقارير",
+      "rotateToken": "رمز جديد",
+      "rotateConfirm": "إصدار رمز جديد؟ سيتوقف الرمز الحالي عن العمل فورًا. كما يحصل عميل الفحص على مفاتيح جديدة، فلن يتصل أي إعداد أو رابط قديم.",
+      "clientNote": "يتصل بصفته العميل الذي تديره اللوحة {email}. لا تعدّل هذا العميل ولا تحذفه؛ ليس له حد للبيانات أو للمدة.",
+      "noResults": "لا نتائج بعد",
+      "tokenTitle": "رمز المجسّ",
+      "tokenOnce": "انسخ الرمز الآن: اللوحة تحتفظ ببصمته فقط ولا يمكنها عرضه مرة أخرى.",
+      "installCommand": "التثبيت على جهاز المجسّ (لينكس، بصلاحيات root):",
+      "installHint": "يثبّت الأمر الوكيل مع Xray ومؤقّت systemd ثم يجري أول فحص.",
+      "token": "الرمز",
+      "deleteConfirm": "حذف المجسّ \"{name}\"؟",
+      "deleteHint": "سيتوقف رمزه عن العمل، وسيُزال عميله من الواردات ويُحذف سجله.",
+      "fields": {
+        "name": "الاسم",
+        "inbounds": "الواردات",
+        "testUrl": "رابط الاختبار",
+        "directUrl": "الرابط المباشر",
+        "interval": "الفاصل الزمني",
+        "target": "نقطة الاتصال",
+        "lastCheck": "آخر فحص",
+        "latency": "أول بايت / الإجمالي",
+        "uptime": "التوفر خلال 7 أيام"
+      },
+      "hints": {
+        "name": "مكان تشغيل المجسّ، مثل home-mobile",
+        "inbounds": "يمكن فحص واردات VLESS وVMess وTrojan وShadowsocks وHysteria",
+        "testUrl": "يُحمَّل عبر كل وارد. استخدم ملفًا أكبر من نحو 100 كيلوبايت: بعض أنظمة الرقابة تقطع الاتصال بعد الكيلوبايتات الأولى فقط.",
+        "directUrl": "اختياري: يُفتح أيضًا بدون VPN، مثل موقعك أو صفحة الاشتراك"
+      },
+      "errors": {
+        "name": "الاسم: من 1 إلى 64 حرفًا، بدون < > &",
+        "inbounds": "اختر واردًا واحدًا على الأقل",
+        "url": "أدخل رابطًا يبدأ بـ http:// أو https://",
+        "interval": "من 1 إلى 1440 دقيقة"
+      },
+      "status": {
+        "ok": "يعمل",
+        "fail": "غير متاح",
+        "flaky": "فشل مرة",
+        "unknown": "لا بيانات"
+      },
+      "toasts": {
+        "saved": "تم حفظ المجسّ",
+        "deleted": "تم حذف المجسّ"
+      }
     }
   },
   "tgbot": {
@@ -2626,6 +2740,20 @@
       "eventNodeUp": "العقدة {{ .Name }} متصلة",
       "eventLoginFallback": "فشل تسجيل الدخول من {{ .Source }}",
       "memoryThreshold": "استخدام الذاكرة {{ .Percent }}% يتجاوز الحد {{ .Threshold }}%",
+      "alertXrayDown": "Xray لا يعمل: {{ .Error }}",
+      "alertXrayDownResolved": "عاد Xray إلى العمل.",
+      "alertXrayFlapping": "أُعيد تشغيل Xray {{ .Count }} مرات خلال {{ .Window }} دقيقة؛ كل إعادة تشغيل تقطع جميع العملاء.",
+      "alertXrayFlappingResolved": "توقف Xray عن إعادة التشغيل: {{ .Count }} مرات خلال آخر {{ .Window }} دقيقة.",
+      "alertMemory": "{{ .Process }} يستخدم {{ .Used }} من {{ .Limit }} ({{ .LimitKind }})، {{ .Percent }}%.",
+      "alertMemoryResolved": "عادت ذاكرة {{ .Process }} إلى {{ .Percent }}% من {{ .Limit }}.",
+      "alertDisk": "القرص {{ .Path }} ممتلئ بنسبة {{ .Percent }}%، والمتاح {{ .Free }}.",
+      "alertDiskResolved": "عاد القرص {{ .Path }} إلى {{ .Percent }}%.",
+      "alertCertExpiring": "تنتهي الشهادة {{ .Name }} ({{ .Where }}) في {{ .Date }}، بعد {{ .Days }} يومًا.",
+      "alertCertExpired": "انتهت الشهادة {{ .Name }} ({{ .Where }}) في {{ .Date }}.",
+      "alertCertRenewed": "جُددت الشهادة {{ .Name }} ({{ .Where }})، صالحة حتى {{ .Date }}.",
+      "alertBackupFailed": "فشل النسخ الاحتياطي: {{ .Error }}",
+      "alertBackupResolved": "عاد النسخ الاحتياطي إلى العمل: {{ .File }}",
+      "alertStill": "لم تُحل بعد، منذ {{ .Since }}.",
       "inboundsCount": "🔌 Inbounds: {{ .Count }}\r\n",
       "clientsCount": "👥 Clients: {{ .Count }}\r\n",
       "category_server": "🖥 الخادم",
@@ -2641,7 +2769,11 @@
       "qrLegendJSON": "{{ .Code }}. اشتراك JSON",
       "qrLegendLink": "{{ .Code }}. رابط التطبيق {{ .App }}",
       "backupFailed": "فشل قراءة قاعدة البيانات؛ لم يُرسل أي نسخة احتياطية.",
-      "privateOnly": "🤖 يعمل هذا البوت في المحادثة الخاصة فقط. يرجى فتحه في رسالة مباشرة."
+      "privateOnly": "🤖 يعمل هذا البوت في المحادثة الخاصة فقط. يرجى فتحه في رسالة مباشرة.",
+      "eventProbeDown": "المجسّ {{ .Probe }}: {{ .Target }} غير متاح",
+      "eventProbeUp": "المجسّ {{ .Probe }}: {{ .Target }} متاح مجددًا",
+      "eventProbeBack": "عاد المجسّ {{ .Probe }} إلى إرسال التقارير",
+      "eventProbeStale": "لم يرسل المجسّ {{ .Probe }} تقريرًا منذ {{ .Minutes }} دقيقة"
     },
     "buttons": {
       "closeKeyboard": "❌ اقفل الكيبورد",

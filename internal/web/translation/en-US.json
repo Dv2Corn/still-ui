@@ -126,7 +126,8 @@
     "openMenu": "Open menu",
     "pinSidebar": "Pin sidebar",
     "unpinSidebar": "Unpin sidebar",
-    "subFormats": "Sub Formats"
+    "subFormats": "Sub Formats",
+    "probes": "Probes"
   },
   "pages": {
     "login": {
@@ -786,7 +787,18 @@
         "autoSystemWfpBlockLeakTooltip": "Windows only, with Auto system routes: dns keeps DNS (ports 53 and 853 and the DNS Client service) inside the TUN and needs DNS servers; windnsclient covers only that service; type tcp/PORT or udp/PORT for any other port; misconfigtun blocks an IP version that no route sends into the TUN.",
         "maxVersion": "Max version",
         "headerName": "Header name",
-        "headerValue": "Header value"
+        "headerValue": "Header value",
+        "preset": "Preset",
+        "presetNone": "None",
+        "presetHelp": "Values for clients on Russian mobile networks with DPI and whitelist mode. VLESS REALITY uses the ios fingerprint: its ClientHello (about 517 bytes) fits in one TCP segment, while larger ones lose their second segment on some networks. still-ui's Xray accepts ios; official Xray 26.9.9 and newer rejects it. Hysteria2 runs over UDP, which often keeps working when TCP is cut.",
+        "presetOptions": {
+          "ruMobileReality": "Mobile networks (Russia): VLESS REALITY",
+          "ruMobileHysteria": "Mobile networks (Russia): Hysteria2 (UDP)"
+        },
+        "presetHints": {
+          "ruMobileReality": "Pick a target below: Find Targets checks candidate sites from this server. Prefer a site that is popular and not blocked in your clients' country instead of one well-known foreign site. Give clients the xtls-rprx-vision flow.",
+          "ruMobileHysteria": "Set the certificate below. UDP 443 often keeps working in whitelist mode, when TCP is cut after the first 12–16 KB. Obfuscation is off for the widest client support."
+        }
       },
       "info": {
         "mode": "Mode",
@@ -1687,6 +1699,37 @@
       "smtpNoRecipients": "No recipients configured",
       "smtpFromNotConfigured": "SMTP sender address not configured",
       "eventLoginAttempt": "Login attempt",
+      "backupSettings": "Backups",
+      "backupEnable": "Scheduled backups",
+      "backupEnableDesc": "Save a copy of the database on this server on a schedule.",
+      "backupSchedule": "Schedule",
+      "backupScheduleDesc": "When to back up, in the panel's time zone.",
+      "backupKeep": "Copies to keep",
+      "backupKeepDesc": "Older copies are deleted after each new one.",
+      "backupRecipients": "Encryption keys",
+      "backupRecipientsDesc": "age (age1…) or SSH (ssh-ed25519 …) public keys, one per line. Only public keys go here: the private key stays with you. Empty means no encryption.",
+      "backupTelegram": "Send to Telegram",
+      "backupTelegramDesc": "Send each encrypted backup to the Telegram admins. Unencrypted backups are never sent.",
+      "backupApplyHint": "Save the settings and restart the panel for a new schedule to take effect.",
+      "backupLast": "Last backup",
+      "backupRunNow": "Back up now",
+      "backupRunFailed": "Backup failed",
+      "backupRestoreHint": "To restore, run on the server: still-ui restore <file>",
+      "backupList": "Backups on this server",
+      "backupNoFiles": "No backups yet",
+      "backupEncrypted": "encrypted",
+      "eventGroupHealth": "Server health",
+      "eventXrayDown": "Xray is not running",
+      "eventXrayFlapping": "Xray restarts",
+      "eventXrayFlappingHint": "times in minutes",
+      "eventProcessMemory": "Panel or Xray memory (%)",
+      "eventProcessMemoryHint": "of MemoryMax, or of RAM",
+      "eventDiskHigh": "Disk full (%)",
+      "eventCertExpiring": "Certificate expires (days)",
+      "eventCertExpiringHint": "at most a quarter of its lifetime",
+      "eventBackupFailed": "Backup failed",
+      "alertRemindHours": "Remind every (hours)",
+      "alertRemindHoursDesc": "Repeat a health alert while the problem lasts; 0 sends it once.",
       "telegramTokenConfigured": "Configured; leave blank to keep current token.",
       "telegramTokenPlaceholder": "Configured - enter a new token to replace",
       "smtpPasswordConfigured": "Configured; leave blank to keep current password.",
@@ -1980,7 +2023,11 @@
       "subHostSortMode": "Subscription Node Ordering",
       "subHostSortInbound": "Inbound order (default)",
       "subHostSortHosts": "Hosts order",
-      "subHostSortModeDesc": "Hosts order follows the Hosts page across inbounds. This controls the order emitted by the server; client apps may apply their own sorting."
+      "subHostSortModeDesc": "Hosts order follows the Hosts page across inbounds. This controls the order emitted by the server; client apps may apply their own sorting.",
+      "eventGroupProbe": "Reachability probes",
+      "eventProbeDown": "Inbound unreachable",
+      "eventProbeUp": "Inbound reachable again",
+      "eventProbeStale": "Probe silent"
     },
     "xray": {
       "save": "Save",
@@ -2015,6 +2062,15 @@
       "outboundTestUrl": "Outbound Test URL",
       "outboundTestUrlDesc": "URL used when testing outbound connectivity.",
       "Torrent": "Block BitTorrent Protocol",
+      "TorrentDesc": "Xray traffic only, and only on inbounds with sniffing on.",
+      "torrentBlock": {
+        "title": "Block torrents for clients",
+        "desc": "All protocols, including AmneziaWG kernel mode: adds the Xray BitTorrent rule (turning sniffing on where it is off) and an nftables filter on this server. Applies at once; clients are not notified.",
+        "unsupported": "This server is not Linux: only traffic through Xray is blocked.",
+        "nftMissing": "nft is not installed: only traffic through Xray is blocked. Install the nftables package.",
+        "error": "The nftables filter is not loaded: {error}",
+        "counters": "Since the filter loaded: {caught} torrent packets caught, {dropped} packets to known peers dropped."
+      },
       "Inbounds": "Inbounds",
       "Outbounds": "Outbounds",
       "Balancers": "Balancers",
@@ -2513,6 +2569,64 @@
       "routingScript": "Routing Script",
       "routingScriptDesc": "Path to a .lua file defining HandleRoute, absolute or relative to the Xray bin folder. The script then picks every route and Xray ignores all routing rules, the panel's api rule included: send the api inbound to the api outbound or traffic stats and live client changes stop. Xray will not start if the file is missing or invalid.",
       "routingScriptActive": "A routing script is set under {section}, so Xray ignores these rules."
+    },
+    "probes": {
+      "title": "Reachability probes",
+      "intro": "A probe is a small agent you run on any Linux box inside the country you care about: a home server, a Raspberry Pi or a cheap local VPS. Every few minutes it connects through your inbounds like a real client, downloads a test file and reports the result here.",
+      "alertsHint": "Alerts come through the Telegram bot: turn on the reachability probe events in Panel Settings → Telegram.",
+      "addProbe": "Add probe",
+      "editProbe": "Edit probe",
+      "empty": "No probes yet. Add one and run the install command on a machine inside the censored network.",
+      "minutes": "min",
+      "directCheck": "Direct check (no VPN)",
+      "history7d": "7 days",
+      "lastReport": "last report {time}",
+      "neverReported": "has not reported yet",
+      "stale": "Not reporting",
+      "rotateToken": "New token",
+      "rotateConfirm": "Issue a new token? The current one stops working at once. The probe's client also gets new keys, so an old config or link no longer connects.",
+      "clientNote": "Connects as the panel-managed client {email}. Do not edit or delete that client; it has no traffic or time limit.",
+      "noResults": "No results yet",
+      "tokenTitle": "Probe token",
+      "tokenOnce": "Copy the token now: the panel keeps only its hash and cannot show it again.",
+      "installCommand": "Install on the probe machine (Linux, as root):",
+      "installHint": "The command installs the agent with Xray and a systemd timer, then runs the first check.",
+      "token": "Token",
+      "deleteConfirm": "Delete probe \"{name}\"?",
+      "deleteHint": "Its token stops working, its client is removed from the inbounds and its history is deleted.",
+      "fields": {
+        "name": "Name",
+        "inbounds": "Inbounds",
+        "testUrl": "Test URL",
+        "directUrl": "Direct URL",
+        "interval": "Interval",
+        "target": "Endpoint",
+        "lastCheck": "Last check",
+        "latency": "TTFB / total",
+        "uptime": "Uptime, 7 days"
+      },
+      "hints": {
+        "name": "Where the probe runs, for example home-mobile",
+        "inbounds": "VLESS, VMess, Trojan, Shadowsocks and Hysteria inbounds can be probed",
+        "testUrl": "Downloaded through each inbound. Use a file larger than about 100 KB: some censors cut a connection only after its first kilobytes.",
+        "directUrl": "Optional: also fetched without the VPN, for example your website or subscription page"
+      },
+      "errors": {
+        "name": "Name: 1 to 64 characters, without < > &",
+        "inbounds": "Choose at least one inbound",
+        "url": "Enter an http:// or https:// URL",
+        "interval": "From 1 to 1440 minutes"
+      },
+      "status": {
+        "ok": "OK",
+        "fail": "Down",
+        "flaky": "Failed once",
+        "unknown": "No data"
+      },
+      "toasts": {
+        "saved": "Probe saved",
+        "deleted": "Probe deleted"
+      }
     }
   },
   "tgbot": {
@@ -2626,6 +2740,20 @@
       "eventNodeUp": "Node {{ .Name }} is UP",
       "eventLoginFallback": "Login failed from {{ .Source }}",
       "memoryThreshold": "Memory Load {{ .Percent }}% exceeds the threshold of {{ .Threshold }}%",
+      "alertXrayDown": "Xray is not running: {{ .Error }}",
+      "alertXrayDownResolved": "Xray is running again.",
+      "alertXrayFlapping": "Xray restarted {{ .Count }} times in {{ .Window }} min; each restart drops every client.",
+      "alertXrayFlappingResolved": "Xray has stopped restarting: {{ .Count }} restarts in the last {{ .Window }} min.",
+      "alertMemory": "{{ .Process }} uses {{ .Used }} of {{ .Limit }} ({{ .LimitKind }}), {{ .Percent }}%.",
+      "alertMemoryResolved": "{{ .Process }} memory is back to {{ .Percent }}% of {{ .Limit }}.",
+      "alertDisk": "Disk {{ .Path }} is {{ .Percent }}% full, {{ .Free }} free.",
+      "alertDiskResolved": "Disk {{ .Path }} is back to {{ .Percent }}% full.",
+      "alertCertExpiring": "Certificate {{ .Name }} ({{ .Where }}) expires on {{ .Date }}, in {{ .Days }} days.",
+      "alertCertExpired": "Certificate {{ .Name }} ({{ .Where }}) expired on {{ .Date }}.",
+      "alertCertRenewed": "Certificate {{ .Name }} ({{ .Where }}) is renewed, valid until {{ .Date }}.",
+      "alertBackupFailed": "Backup failed: {{ .Error }}",
+      "alertBackupResolved": "Backups work again: {{ .File }}",
+      "alertStill": "Still not fixed, since {{ .Since }}.",
       "inboundsCount": "🔌 Inbounds: {{ .Count }}\r\n",
       "clientsCount": "👥 Clients: {{ .Count }}\r\n",
       "category_server": "🖥 Server",
@@ -2641,7 +2769,11 @@
       "qrLegendJSON": "{{ .Code }}. JSON subscription",
       "qrLegendLink": "{{ .Code }}. App link {{ .App }}",
       "backupFailed": "Could not read the database; no backup was sent.",
-      "privateOnly": "🤖 This bot works in private chat only. Please open it in a direct message."
+      "privateOnly": "🤖 This bot works in private chat only. Please open it in a direct message.",
+      "eventProbeDown": "Probe {{ .Probe }}: {{ .Target }} is NOT reachable",
+      "eventProbeUp": "Probe {{ .Probe }}: {{ .Target }} is reachable again",
+      "eventProbeBack": "Probe {{ .Probe }} is reporting again",
+      "eventProbeStale": "Probe {{ .Probe }} has not reported for {{ .Minutes }} min"
     },
     "buttons": {
       "closeKeyboard": "❌ Close Keyboard",

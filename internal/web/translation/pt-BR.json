@@ -126,7 +126,8 @@
     "openMenu": "Abrir menu",
     "pinSidebar": "Fixar barra lateral",
     "unpinSidebar": "Desafixar barra lateral",
-    "subFormats": "Sub Formats"
+    "subFormats": "Sub Formats",
+    "probes": "Sondas"
   },
   "pages": {
     "login": {
@@ -785,7 +786,18 @@
         "autoSystemWfpBlockLeakTooltip": "Somente Windows, com Auto system routes: dns mantém o DNS (portas 53 e 853 e o serviço Cliente DNS) dentro do TUN e precisa de servidores DNS; windnsclient cobre só esse serviço; digite tcp/PORTA ou udp/PORTA para qualquer outra porta; misconfigtun bloqueia uma versão de IP que nenhuma rota envia ao TUN.",
         "maxVersion": "Versão máxima",
         "headerName": "Nome do cabeçalho",
-        "headerValue": "Valor do cabeçalho"
+        "headerValue": "Valor do cabeçalho",
+        "preset": "Predefinição",
+        "presetNone": "Nenhuma",
+        "presetHelp": "Valores para clientes em redes móveis russas com DPI e modo de lista branca. VLESS REALITY usa a impressão ios: seu ClientHello (cerca de 517 bytes) cabe em um segmento TCP, enquanto em algumas redes os maiores perdem o segundo segmento. O Xray do still-ui aceita ios; o Xray oficial 26.9.9 e posteriores o rejeitam. Hysteria2 usa UDP, que muitas vezes continua funcionando quando o TCP é cortado.",
+        "presetOptions": {
+          "ruMobileReality": "Redes móveis (Rússia): VLESS REALITY",
+          "ruMobileHysteria": "Redes móveis (Rússia): Hysteria2 (UDP)"
+        },
+        "presetHints": {
+          "ruMobileReality": "Escolha um destino abaixo: Buscar alvos verifica sites candidatos a partir deste servidor. Prefira um site popular e não bloqueado no país dos seus clientes em vez de um único site estrangeiro conhecido. Dê aos clientes o flow xtls-rprx-vision.",
+          "ruMobileHysteria": "Defina o certificado abaixo. UDP 443 costuma funcionar no modo de lista branca, quando o TCP é cortado após os primeiros 12–16 KB. A ofuscação está desligada para máxima compatibilidade com clientes."
+        }
       },
       "info": {
         "mode": "Modo",
@@ -1562,6 +1574,37 @@
       "smtpNoRecipients": "Nenhum destinatário configurado",
       "smtpFromNotConfigured": "Endereço do remetente SMTP não configurado",
       "eventLoginAttempt": "Tentativa de login",
+      "backupSettings": "Backups",
+      "backupEnable": "Backups agendados",
+      "backupEnableDesc": "Salvar uma cópia do banco de dados neste servidor conforme um agendamento.",
+      "backupSchedule": "Agendamento",
+      "backupScheduleDesc": "Quando fazer o backup, no fuso horário do painel.",
+      "backupKeep": "Cópias a manter",
+      "backupKeepDesc": "Após cada nova cópia, as mais antigas são apagadas.",
+      "backupRecipients": "Chaves de criptografia",
+      "backupRecipientsDesc": "Chaves públicas age (age1…) ou SSH (ssh-ed25519 …), uma por linha. Apenas chaves públicas: a privada fica com você. Vazio significa sem criptografia.",
+      "backupTelegram": "Enviar ao Telegram",
+      "backupTelegramDesc": "Enviar cada backup criptografado aos administradores no Telegram. Backups sem criptografia nunca são enviados.",
+      "backupApplyHint": "Salve as configurações e reinicie o painel para aplicar um novo agendamento.",
+      "backupLast": "Último backup",
+      "backupRunNow": "Fazer backup agora",
+      "backupRunFailed": "O backup falhou",
+      "backupRestoreHint": "Para restaurar, execute no servidor: still-ui restore <arquivo>",
+      "backupList": "Backups neste servidor",
+      "backupNoFiles": "Nenhum backup ainda",
+      "backupEncrypted": "criptografado",
+      "eventGroupHealth": "Saúde do servidor",
+      "eventXrayDown": "Xray não está em execução",
+      "eventXrayFlapping": "Reinícios do Xray",
+      "eventXrayFlappingHint": "vezes em minutos",
+      "eventProcessMemory": "Memória do painel ou do Xray (%)",
+      "eventProcessMemoryHint": "do MemoryMax ou da RAM",
+      "eventDiskHigh": "Disco cheio (%)",
+      "eventCertExpiring": "Certificado expira (dias)",
+      "eventCertExpiringHint": "no máximo um quarto da sua validade",
+      "eventBackupFailed": "O backup falhou",
+      "alertRemindHours": "Lembrar a cada (horas)",
+      "alertRemindHoursDesc": "Repetir o alerta enquanto o problema durar; 0 envia uma vez só.",
       "telegramTokenConfigured": "Configurado; deixe em branco para manter o token atual.",
       "telegramTokenPlaceholder": "Configurado - insira um novo token para substituir",
       "smtpPasswordConfigured": "Configurada; deixe em branco para manter a senha atual.",
@@ -1859,7 +1902,11 @@
       "subHostSortMode": "Ordem dos nós da assinatura",
       "subHostSortInbound": "Ordem das entradas (padrão)",
       "subHostSortHosts": "Ordem dos hosts",
-      "subHostSortModeDesc": "Segue a ordem da página de hosts entre diferentes entradas. Define a ordem emitida pelo servidor; os aplicativos clientes podem aplicar sua própria ordenação."
+      "subHostSortModeDesc": "Segue a ordem da página de hosts entre diferentes entradas. Define a ordem emitida pelo servidor; os aplicativos clientes podem aplicar sua própria ordenação.",
+      "eventGroupProbe": "Sondas de acessibilidade",
+      "eventProbeDown": "Entrada inacessível",
+      "eventProbeUp": "Entrada acessível de novo",
+      "eventProbeStale": "Sonda em silêncio"
     },
     "xray": {
       "importRules": "Importar regras",
@@ -1902,6 +1949,15 @@
       "outboundTestUrl": "URL de teste de outbound",
       "outboundTestUrlDesc": "URL usada ao testar conectividade do outbound",
       "Torrent": "Bloquear Protocolo BitTorrent",
+      "TorrentDesc": "Apenas tráfego pelo Xray e apenas em entradas com sniffing ativado.",
+      "torrentBlock": {
+        "title": "Bloquear torrents dos clientes",
+        "desc": "Todos os protocolos, incluindo AmneziaWG em modo kernel: adiciona a regra BitTorrent do Xray (ativando sniffing onde estiver desligado) e um filtro nftables neste servidor. Aplica-se na hora; os clientes não são avisados.",
+        "unsupported": "Este servidor não é Linux: só o tráfego pelo Xray é bloqueado.",
+        "nftMissing": "nft não está instalado: só o tráfego pelo Xray é bloqueado. Instale o pacote nftables.",
+        "error": "O filtro nftables não está carregado: {error}",
+        "counters": "Desde que o filtro foi carregado: {caught} pacotes de torrent detectados, {dropped} pacotes para pares conhecidos descartados."
+      },
       "Inbounds": "Entradas",
       "Outbounds": "Saídas",
       "Balancers": "Balanceadores",
@@ -2513,6 +2569,64 @@
         "badVlessRoute": "Insira um único número entre 0 e 65535"
       },
       "dragToReorder": "Arraste para reordenar {name}"
+    },
+    "probes": {
+      "title": "Sondas de acessibilidade",
+      "intro": "Uma sonda é um pequeno agente que você roda em qualquer máquina Linux dentro do país que importa: um servidor doméstico, um Raspberry Pi ou um VPS local barato. A cada poucos minutos ela se conecta pelas suas entradas como um cliente real, baixa um arquivo de teste e envia o resultado para cá.",
+      "alertsHint": "Os alertas chegam pelo bot do Telegram: ative os eventos de sondas de acessibilidade em Configurações do Painel → Telegram.",
+      "addProbe": "Adicionar sonda",
+      "editProbe": "Editar sonda",
+      "empty": "Nenhuma sonda ainda. Adicione uma e execute o comando de instalação em uma máquina dentro da rede censurada.",
+      "minutes": "min",
+      "directCheck": "Verificação direta (sem VPN)",
+      "history7d": "7 dias",
+      "lastReport": "último relatório {time}",
+      "neverReported": "ainda não enviou relatório",
+      "stale": "Sem relatórios",
+      "rotateToken": "Novo token",
+      "rotateConfirm": "Emitir um novo token? O atual para de funcionar imediatamente. O cliente da sonda também recebe chaves novas, então uma configuração ou link antigo deixa de conectar.",
+      "clientNote": "Conecta como o cliente gerenciado pelo painel {email}. Não edite nem exclua esse cliente; ele não tem limite de tráfego nem de tempo.",
+      "noResults": "Ainda sem resultados",
+      "tokenTitle": "Token da sonda",
+      "tokenOnce": "Copie o token agora: o painel guarda apenas o hash e não poderá mostrá-lo de novo.",
+      "installCommand": "Instalar na máquina da sonda (Linux, como root):",
+      "installHint": "O comando instala o agente com o Xray e um timer do systemd e executa a primeira verificação.",
+      "token": "Token",
+      "deleteConfirm": "Excluir a sonda \"{name}\"?",
+      "deleteHint": "O token para de funcionar, o cliente é removido das entradas e o histórico é apagado.",
+      "fields": {
+        "name": "Nome",
+        "inbounds": "Entradas",
+        "testUrl": "URL de teste",
+        "directUrl": "URL direta",
+        "interval": "Intervalo",
+        "target": "Ponto de acesso",
+        "lastCheck": "Última verificação",
+        "latency": "TTFB / total",
+        "uptime": "Disponibilidade, 7 dias"
+      },
+      "hints": {
+        "name": "Onde a sonda roda, por exemplo home-mobile",
+        "inbounds": "Entradas VLESS, VMess, Trojan, Shadowsocks e Hysteria podem ser sondadas",
+        "testUrl": "Baixado por cada entrada. Use um arquivo maior que uns 100 KB: alguns censores cortam a conexão só depois dos primeiros kilobytes.",
+        "directUrl": "Opcional: também acessado sem VPN, por exemplo seu site ou sua página de assinatura"
+      },
+      "errors": {
+        "name": "Nome: de 1 a 64 caracteres, sem < > &",
+        "inbounds": "Escolha pelo menos uma entrada",
+        "url": "Informe uma URL http:// ou https://",
+        "interval": "De 1 a 1440 minutos"
+      },
+      "status": {
+        "ok": "OK",
+        "fail": "Fora",
+        "flaky": "Uma falha",
+        "unknown": "Sem dados"
+      },
+      "toasts": {
+        "saved": "Sonda salva",
+        "deleted": "Sonda excluída"
+      }
     }
   },
   "tgbot": {
@@ -2626,6 +2740,20 @@
       "eventNodeUp": "O nó {{ .Name }} está ATIVO",
       "eventLoginFallback": "Falha de login a partir de {{ .Source }}",
       "memoryThreshold": "Uso de memória {{ .Percent }}% excede o limite de {{ .Threshold }}%",
+      "alertXrayDown": "O Xray não está em execução: {{ .Error }}",
+      "alertXrayDownResolved": "O Xray voltou a funcionar.",
+      "alertXrayFlapping": "O Xray reiniciou {{ .Count }} vezes em {{ .Window }} min; cada reinício derruba todos os clientes.",
+      "alertXrayFlappingResolved": "O Xray parou de reiniciar: {{ .Count }} reinícios nos últimos {{ .Window }} min.",
+      "alertMemory": "{{ .Process }} usa {{ .Used }} de {{ .Limit }} ({{ .LimitKind }}), {{ .Percent }}%.",
+      "alertMemoryResolved": "A memória de {{ .Process }} voltou a {{ .Percent }}% de {{ .Limit }}.",
+      "alertDisk": "O disco {{ .Path }} está {{ .Percent }}% cheio, {{ .Free }} livres.",
+      "alertDiskResolved": "O disco {{ .Path }} voltou a {{ .Percent }}%.",
+      "alertCertExpiring": "O certificado {{ .Name }} ({{ .Where }}) expira em {{ .Date }}, daqui a {{ .Days }} dias.",
+      "alertCertExpired": "O certificado {{ .Name }} ({{ .Where }}) expirou em {{ .Date }}.",
+      "alertCertRenewed": "O certificado {{ .Name }} ({{ .Where }}) foi renovado, válido até {{ .Date }}.",
+      "alertBackupFailed": "O backup falhou: {{ .Error }}",
+      "alertBackupResolved": "Os backups voltaram a funcionar: {{ .File }}",
+      "alertStill": "Ainda não resolvido, desde {{ .Since }}.",
       "inboundsCount": "🔌 Inbounds: {{ .Count }}\r\n",
       "clientsCount": "👥 Clients: {{ .Count }}\r\n",
       "category_server": "🖥 Servidor",
@@ -2641,7 +2769,11 @@
       "qrLegendJSON": "{{ .Code }}. Assinatura JSON",
       "qrLegendLink": "{{ .Code }}. Link do app {{ .App }}",
       "backupFailed": "Não foi possível ler o banco de dados; nenhum backup foi enviado.",
-      "privateOnly": "🤖 Este bot funciona apenas no chat privado. Abra-o em uma mensagem direta."
+      "privateOnly": "🤖 Este bot funciona apenas no chat privado. Abra-o em uma mensagem direta.",
+      "eventProbeDown": "Sonda {{ .Probe }}: {{ .Target }} NÃO está acessível",
+      "eventProbeUp": "Sonda {{ .Probe }}: {{ .Target }} está acessível de novo",
+      "eventProbeBack": "A sonda {{ .Probe }} voltou a enviar relatórios",
+      "eventProbeStale": "A sonda {{ .Probe }} não envia relatório há {{ .Minutes }} min"
     },
     "buttons": {
       "closeKeyboard": "❌ Fechar teclado",

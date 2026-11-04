@@ -126,7 +126,8 @@
     "openMenu": "打开菜单",
     "pinSidebar": "固定侧边栏",
     "unpinSidebar": "取消固定侧边栏",
-    "subFormats": "Sub Formats"
+    "subFormats": "Sub Formats",
+    "probes": "探针"
   },
   "pages": {
     "login": {
@@ -785,7 +786,18 @@
         "autoSystemWfpBlockLeakTooltip": "仅限 Windows，需配合自动系统路由：dns 让 DNS（端口 53、853 及 DNS Client 服务）只走 TUN，需设置 DNS 服务器；windnsclient 只针对该服务；其他端口请输入 tcp/端口 或 udp/端口；misconfigtun 阻止没有任何路由指向 TUN 的 IP 版本。",
         "maxVersion": "最高版本",
         "headerName": "标头名称",
-        "headerValue": "标头值"
+        "headerValue": "标头值",
+        "preset": "预设",
+        "presetNone": "无",
+        "presetHelp": "适用于俄罗斯移动网络（有 DPI 和白名单模式）客户端的参数。VLESS REALITY 使用 ios 指纹：其 ClientHello（约 517 字节）可放入一个 TCP 分段，而更大的在部分网络中第二个分段会被丢弃。still-ui 的 Xray 接受 ios；官方 Xray 26.9.9 及更高版本会拒绝。Hysteria2 走 UDP，在 TCP 被切断时往往仍可使用。",
+        "presetOptions": {
+          "ruMobileReality": "移动网络（俄罗斯）：VLESS REALITY",
+          "ruMobileHysteria": "移动网络（俄罗斯）：Hysteria2（UDP）"
+        },
+        "presetHints": {
+          "ruMobileReality": "请在下方选择目标：“查找目标”会从本服务器检测候选网站。优先选择在客户所在国家流行且未被封锁的网站，而不是某一个知名的境外网站。为客户端设置 xtls-rprx-vision 流控。",
+          "ruMobileHysteria": "请在下方设置证书。在白名单模式下，TCP 在前 12–16 KB 后被切断时，UDP 443 往往仍可用。为兼容更多客户端，混淆已关闭。"
+        }
       },
       "info": {
         "mode": "模式",
@@ -1562,6 +1574,37 @@
       "smtpNoRecipients": "尚未配置收件人",
       "smtpFromNotConfigured": "未配置 SMTP 发件人地址",
       "eventLoginAttempt": "登录尝试",
+      "backupSettings": "备份",
+      "backupEnable": "定时备份",
+      "backupEnableDesc": "按计划在本服务器上保存数据库副本。",
+      "backupSchedule": "计划",
+      "backupScheduleDesc": "备份时间（按面板时区）。",
+      "backupKeep": "保留份数",
+      "backupKeepDesc": "每次生成新副本后删除更早的副本。",
+      "backupRecipients": "加密密钥",
+      "backupRecipientsDesc": "age（age1…）或 SSH（ssh-ed25519 …）公钥，每行一个。这里只填公钥：私钥由您自己保管。留空表示不加密。",
+      "backupTelegram": "发送到 Telegram",
+      "backupTelegramDesc": "将每份加密备份发送给 Telegram 管理员。未加密的备份永远不会发送。",
+      "backupApplyHint": "保存设置并重启面板后新计划才会生效。",
+      "backupLast": "最近一次备份",
+      "backupRunNow": "立即备份",
+      "backupRunFailed": "备份失败",
+      "backupRestoreHint": "恢复方法：在服务器上运行 still-ui restore <文件>",
+      "backupList": "本服务器上的备份",
+      "backupNoFiles": "暂无备份",
+      "backupEncrypted": "已加密",
+      "eventGroupHealth": "服务器状态",
+      "eventXrayDown": "Xray 未运行",
+      "eventXrayFlapping": "Xray 重启",
+      "eventXrayFlappingHint": "次／分钟",
+      "eventProcessMemory": "面板或 Xray 内存 (%)",
+      "eventProcessMemoryHint": "相对 MemoryMax 或物理内存",
+      "eventDiskHigh": "磁盘已满 (%)",
+      "eventCertExpiring": "证书即将过期（天）",
+      "eventCertExpiringHint": "最多为有效期的四分之一",
+      "eventBackupFailed": "备份失败",
+      "alertRemindHours": "提醒间隔（小时）",
+      "alertRemindHoursDesc": "问题持续期间重复告警；0 表示只发送一次。",
       "telegramTokenConfigured": "已配置；留空则保留当前令牌。",
       "telegramTokenPlaceholder": "已配置——输入新令牌以替换",
       "smtpPasswordConfigured": "已配置；留空则保留当前密码。",
@@ -1859,7 +1902,11 @@
       "subHostSortMode": "订阅节点排序",
       "subHostSortInbound": "入站顺序（默认）",
       "subHostSortHosts": "主机顺序",
-      "subHostSortModeDesc": "跨入站使用主机页面中的排序。此设置决定服务器输出顺序；客户端应用仍可能自行排序。"
+      "subHostSortModeDesc": "跨入站使用主机页面中的排序。此设置决定服务器输出顺序；客户端应用仍可能自行排序。",
+      "eventGroupProbe": "可达性探针",
+      "eventProbeDown": "入站不可达",
+      "eventProbeUp": "入站已恢复",
+      "eventProbeStale": "探针无响应"
     },
     "xray": {
       "importRules": "导入规则",
@@ -1902,6 +1949,15 @@
       "outboundTestUrl": "出站测试 URL",
       "outboundTestUrlDesc": "测试出站连接时使用的 URL",
       "Torrent": "屏蔽 BitTorrent 协议",
+      "TorrentDesc": "仅限经过 Xray 的流量，且仅限开启嗅探的入站。",
+      "torrentBlock": {
+        "title": "阻止客户端使用种子下载",
+        "desc": "覆盖所有协议，包括内核模式的 AmneziaWG：添加 Xray BitTorrent 规则（在关闭嗅探的入站上开启嗅探），并在本服务器上加载 nftables 过滤器。立即生效，不会通知客户端。",
+        "unsupported": "本服务器不是 Linux：仅阻止经过 Xray 的流量。",
+        "nftMissing": "未安装 nft：仅阻止经过 Xray 的流量。请安装 nftables 软件包。",
+        "error": "nftables 过滤器未加载：{error}",
+        "counters": "自过滤器加载以来：捕获 {caught} 个种子数据包，丢弃发往已知节点的 {dropped} 个数据包。"
+      },
       "Inbounds": "入站",
       "Outbounds": "出站",
       "Balancers": "负载均衡",
@@ -2513,6 +2569,64 @@
         "badVlessRoute": "请输入 0 到 65535 之间的单个数字"
       },
       "dragToReorder": "拖动以重新排列 {name}"
+    },
+    "probes": {
+      "title": "可达性探针",
+      "intro": "探针是一个小型代理程序，可运行在目标国家境内的任意 Linux 机器上：家用服务器、树莓派或便宜的本地 VPS。它每隔几分钟像真实客户端一样通过你的入站连接，下载一个测试文件，并把结果报告到这里。",
+      "alertsHint": "告警通过 Telegram 机器人发送：请在 面板设置 → Telegram 中开启可达性探针事件。",
+      "addProbe": "添加探针",
+      "editProbe": "编辑探针",
+      "empty": "还没有探针。添加一个，并在受审查网络内的机器上运行安装命令。",
+      "minutes": "分钟",
+      "directCheck": "直连检查（不经 VPN）",
+      "history7d": "7 天",
+      "lastReport": "最近报告 {time}",
+      "neverReported": "尚未报告",
+      "stale": "无报告",
+      "rotateToken": "新令牌",
+      "rotateConfirm": "要签发新令牌吗？当前令牌会立即失效。探针的客户端也会换用新密钥，旧的配置或链接将无法再连接。",
+      "clientNote": "以面板管理的客户端 {email} 连接。请勿编辑或删除该客户端；它没有流量和时间限制。",
+      "noResults": "暂无结果",
+      "tokenTitle": "探针令牌",
+      "tokenOnce": "请立即复制令牌：面板只保存其哈希，无法再次显示。",
+      "installCommand": "在探针机器上安装（Linux，root 身份）：",
+      "installHint": "该命令会安装代理程序、Xray 和 systemd 定时器，并运行第一次检查。",
+      "token": "令牌",
+      "deleteConfirm": "删除探针“{name}”？",
+      "deleteHint": "其令牌将失效，其客户端将从入站中移除，历史记录将被删除。",
+      "fields": {
+        "name": "名称",
+        "inbounds": "入站",
+        "testUrl": "测试 URL",
+        "directUrl": "直连 URL",
+        "interval": "间隔",
+        "target": "接入点",
+        "lastCheck": "最近检查",
+        "latency": "首字节 / 总计",
+        "uptime": "7 天可用率"
+      },
+      "hints": {
+        "name": "探针所在位置，例如 home-mobile",
+        "inbounds": "可探测 VLESS、VMess、Trojan、Shadowsocks 和 Hysteria 入站",
+        "testUrl": "通过每个入站下载。请使用大于约 100 KB 的文件：有些审查系统只在最初几 KB 之后才切断连接。",
+        "directUrl": "可选：也在不经 VPN 的情况下访问，例如你的网站或订阅页面"
+      },
+      "errors": {
+        "name": "名称：1 到 64 个字符，不能包含 < > &",
+        "inbounds": "请至少选择一个入站",
+        "url": "请输入 http:// 或 https:// 地址",
+        "interval": "1 到 1440 分钟"
+      },
+      "status": {
+        "ok": "正常",
+        "fail": "不可达",
+        "flaky": "失败一次",
+        "unknown": "无数据"
+      },
+      "toasts": {
+        "saved": "探针已保存",
+        "deleted": "探针已删除"
+      }
     }
   },
   "tgbot": {
@@ -2626,6 +2740,20 @@
       "eventNodeUp": "节点 {{ .Name }} 已上线",
       "eventLoginFallback": "来自 {{ .Source }} 的登录失败",
       "memoryThreshold": "内存使用率 {{ .Percent }}% 超过阈值 {{ .Threshold }}%",
+      "alertXrayDown": "Xray 未运行：{{ .Error }}",
+      "alertXrayDownResolved": "Xray 已恢复运行。",
+      "alertXrayFlapping": "Xray 在 {{ .Window }} 分钟内重启了 {{ .Count }} 次；每次重启都会断开所有客户端。",
+      "alertXrayFlappingResolved": "Xray 已停止反复重启：最近 {{ .Window }} 分钟内重启 {{ .Count }} 次。",
+      "alertMemory": "{{ .Process }} 使用了 {{ .Limit }} 中的 {{ .Used }}（{{ .LimitKind }}），{{ .Percent }}%。",
+      "alertMemoryResolved": "{{ .Process }} 的内存已回落到 {{ .Limit }} 的 {{ .Percent }}%。",
+      "alertDisk": "磁盘 {{ .Path }} 已使用 {{ .Percent }}%，剩余 {{ .Free }}。",
+      "alertDiskResolved": "磁盘 {{ .Path }} 已回落到 {{ .Percent }}%。",
+      "alertCertExpiring": "证书 {{ .Name }}（{{ .Where }}）将于 {{ .Date }} 过期，还剩 {{ .Days }} 天。",
+      "alertCertExpired": "证书 {{ .Name }}（{{ .Where }}）已于 {{ .Date }} 过期。",
+      "alertCertRenewed": "证书 {{ .Name }}（{{ .Where }}）已续期，有效期至 {{ .Date }}。",
+      "alertBackupFailed": "备份失败：{{ .Error }}",
+      "alertBackupResolved": "备份已恢复正常：{{ .File }}",
+      "alertStill": "自 {{ .Since }} 起仍未解决。",
       "inboundsCount": "🔌 Inbounds: {{ .Count }}\r\n",
       "clientsCount": "👥 Clients: {{ .Count }}\r\n",
       "category_server": "🖥 服务器",
@@ -2641,7 +2769,11 @@
       "qrLegendJSON": "{{ .Code }}. JSON 订阅",
       "qrLegendLink": "{{ .Code }}. 应用链接 {{ .App }}",
       "backupFailed": "无法读取数据库，未发送备份。",
-      "privateOnly": "🤖 此机器人仅在私聊中工作。请在私信中打开它。"
+      "privateOnly": "🤖 此机器人仅在私聊中工作。请在私信中打开它。",
+      "eventProbeDown": "探针 {{ .Probe }}：{{ .Target }} 不可达",
+      "eventProbeUp": "探针 {{ .Probe }}：{{ .Target }} 已恢复可达",
+      "eventProbeBack": "探针 {{ .Probe }} 已恢复报告",
+      "eventProbeStale": "探针 {{ .Probe }} 已 {{ .Minutes }} 分钟未报告"
     },
     "buttons": {
       "closeKeyboard": "❌ 关闭键盘",

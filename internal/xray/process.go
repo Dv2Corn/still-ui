@@ -617,6 +617,26 @@ func (p *Process) GetUptime() uint64 {
 	return uint64(time.Since(p.startTime).Seconds())
 }
 
+// PID is the running core's process id (the unit's MainPID in unit mode), 0 when not running.
+func (p *Process) PID() int {
+	if p.unit != nil {
+		st := p.unit.state(false)
+		if !st.running() {
+			return 0
+		}
+		return st.MainPID
+	}
+	if !p.IsRunning() {
+		return 0
+	}
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	if p.cmd == nil || p.cmd.Process == nil {
+		return 0
+	}
+	return p.cmd.Process.Pid
+}
+
 // refreshAPIPort updates the API port from the inbound configs.
 func (p *process) refreshAPIPort() {
 	port := 0

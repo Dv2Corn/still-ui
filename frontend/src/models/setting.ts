@@ -161,7 +161,8 @@ export class AllSetting {
   ldapDefaultTotalGB = 0;
   ldapDefaultExpiryDays = 0;
   ldapDefaultLimitIP = 0;
-  tgEnabledEvents = 'login.attempt,cpu.high';
+  tgEnabledEvents =
+    'login.attempt,cpu.high,xray.down,xray.flapping,process.memory,disk.high,cert.expiring,backup.failed';
   smtpEnable = false;
   smtpHost = '';
   smtpPort = 587;
@@ -198,6 +199,17 @@ export class AllSetting {
   discordEnabledEvents = 'login.attempt,cpu.high';
   hasDiscordBotToken = false;
   clearDiscordBotToken = false;
+  backupEnable = false;
+  backupSchedule = '@daily';
+  backupKeep = 14;
+  backupAgeRecipients = '';
+  backupTelegram = false;
+  alertXrayRestarts = 3;
+  alertXrayRestartWindow = 10;
+  alertMemory = 80;
+  alertDisk = 90;
+  alertCertDays = 7;
+  alertRemindHours = 6;
 
   constructor(data?: unknown) {
     if (data != null) {

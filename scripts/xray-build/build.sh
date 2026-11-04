@@ -29,8 +29,10 @@ GO_IMAGE=golang:1.27.3@sha256:2920bb124f1a2e12a1d39f0cab756ae0068441ee1da7655dec
 XRAY_BUILD_NAME=sp-ios
 LDFLAGS="-s -w -buildid= -X github.com/xtls/xray-core/core.build=${XRAY_BUILD_NAME}"
 
-# Pinned sums of xray-linux-<arch>.
+# Pinned sums of xray-linux-<arch>, read below through ${!want_var}.
+# shellcheck disable=SC2034
 SHA256_amd64=67dfd3a25b349adc128112864973a9f1c9f3f4b58a3541d4d447374b9e6301aa
+# shellcheck disable=SC2034
 SHA256_arm64=7c5be31d6ec2a65c8d902eebf382d050c5a84d28d12325a8c0cd3da310c6af6d
 
 die() { echo "xray-build: $*" >&2; exit 1; }
@@ -77,6 +79,7 @@ for arch in "${ARCHES[@]}"; do
     esac
 done
 mkdir -p "$WORK/out"
+# shellcheck disable=SC2016 # expanded by the sh that runs it, not here
 GO_SCRIPT='set -e
     go mod tidy >/tmp/xray-tidy.log 2>&1 || { cat /tmp/xray-tidy.log >&2; exit 1; }
     for t in $XRAY_TARGETS; do

@@ -13,7 +13,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
-	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -533,18 +532,8 @@ func UnitListenError(cfg *Config) error {
 		return nil
 	}
 	for _, ib := range cfg.InboundConfigs {
-		var listen string
-		if len(ib.Listen) == 0 || json.Unmarshal(ib.Listen, &listen) != nil {
-			continue
-		}
-		path, _, _ := strings.Cut(listen, ",")
-		if !strings.HasPrefix(path, "/") {
-			continue
-		}
-		clean := filepath.Clean(path)
-		if !slices.ContainsFunc(unitSocketFolders, func(dir string) bool { return strings.HasPrefix(clean, dir) }) {
-			return fmt.Errorf("inbound %q listens on the unix socket %s, which the still-xray service cannot create there: use a path in %s",
-				ib.Tag, path, strings.Join(unitSocketFolders, " or "))
+		if p := unitSocketProblem(ib); p != "" {
+			return errors.New(p)
 		}
 	}
 	return nil
