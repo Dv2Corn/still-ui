@@ -11,6 +11,17 @@ export type trafficLocalApplyAction = number;
 export type transportBits = number;
 
 export interface AllSetting {
+  alertCertDays: number;
+  alertDisk: number;
+  alertMemory: number;
+  alertRemindHours: number;
+  alertXrayRestartWindow: number;
+  alertXrayRestarts: number;
+  backupAgeRecipients: string;
+  backupEnable: boolean;
+  backupKeep: number;
+  backupSchedule: string;
+  backupTelegram: boolean;
   datepicker: string;
   discordAdminIds: string;
   discordBotBackup: boolean;
@@ -194,6 +205,17 @@ export interface AllSetting {
 }
 
 export interface AllSettingView {
+  alertCertDays: number;
+  alertDisk: number;
+  alertMemory: number;
+  alertRemindHours: number;
+  alertXrayRestartWindow: number;
+  alertXrayRestarts: number;
+  backupAgeRecipients: string;
+  backupEnable: boolean;
+  backupKeep: number;
+  backupSchedule: string;
+  backupTelegram: boolean;
   datepicker: string;
   discordAdminIds: string;
   discordBotBackup: boolean;

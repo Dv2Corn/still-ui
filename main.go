@@ -748,6 +748,12 @@ func main() {
 		if enabletgbot {
 			updateTgbotEnableSts(enabletgbot)
 		}
+	case "xray-unit-check":
+		os.Exit(xrayUnitCheck(os.Args[2:]))
+	case "backup":
+		os.Exit(runLocalBackup())
+	case "restore":
+		os.Exit(restoreLocalBackup(os.Args[2:], os.Stdin))
 	case "cert":
 		err := settingCmd.Parse(os.Args[2:])
 		if err != nil {
@@ -776,6 +782,10 @@ Commands:
     migrate-db     SQLite <-> .dump (--dump/--restore) or copy into PostgreSQL (--dsn)
     encrypt-tokens encrypt node bearer tokens with the configured active key
     setting        set settings
+    backup         take a local backup now, with the panel's backup settings
+    restore        replace the database with a backup (-file F [-identity KEY|-]); stop the panel first
+    xray-unit-check
+                   list what keeps Xray from running as the still-xray service (exit 3)
     install-awg-kernel
                    build and install the AmneziaWG kernel module (required for
                    an AmneziaWG inbound's kernel mode)

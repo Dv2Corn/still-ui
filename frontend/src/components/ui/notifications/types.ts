@@ -9,6 +9,10 @@ export interface NotificationEventConfig {
     value: number;
     onChange: (v: number | null) => void;
     ariaLabel: string;
+    /** Reads another numeric setting, for an event with more than one threshold. */
+    settingValue: (key: string) => number;
+    /** Writes another numeric setting. */
+    setSetting: (key: string, v: number | null) => void;
   }) => ReactNode;
 }
 

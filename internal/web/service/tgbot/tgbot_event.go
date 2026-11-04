@@ -2,6 +2,7 @@ package tgbot
 
 import (
 	"fmt"
+	"html"
 	"os"
 	"strconv"
 	"strings"
@@ -29,6 +30,18 @@ func getHostname() string {
 // live card per admin chat, so a repeat edits it instead of a wall of messages.
 func (t *Tgbot) HandleEvent(e eventbus.Event) {
 	if !t.isEventEnabled(e.Type) {
+		return
+	}
+	// Health alerts are de-duplicated before they get here (raised, reminder, resolved): each
+	// one is its own message, so a fix never silently overwrites the alert it answers.
+	if data, ok := e.Data.(*eventbus.HealthAlertData); ok {
+		msg := t.formatHealthAlert(e.Type, data)
+		if msg == "" {
+			return
+		}
+		for _, adminID := range adminSnapshot() {
+			t.sendNotice(adminID, msg)
+		}
 		return
 	}
 	msg := t.formatEventMessage(e)
@@ -178,4 +191,47 @@ func (t *Tgbot) formatEventMessage(e eventbus.Event) string {
 	}
 
 	return ""
+}
+
+// healthAlertKeys names the bot messages of each health alert: while bad, and once fixed.
+var healthAlertKeys = map[eventbus.EventType][2]string{
+	eventbus.EventXrayDown:      {"alertXrayDown", "alertXrayDownResolved"},
+	eventbus.EventXrayFlapping:  {"alertXrayFlapping", "alertXrayFlappingResolved"},
+	eventbus.EventProcessMemory: {"alertMemory", "alertMemoryResolved"},
+	eventbus.EventDiskHigh:      {"alertDisk", "alertDiskResolved"},
+	eventbus.EventCertExpiring:  {"alertCertExpiring", "alertCertRenewed"},
+	eventbus.EventBackupFailed:  {"alertBackupFailed", "alertBackupResolved"},
+}
+
+// healthAlertMessage picks the message and its icon: the problem, or its fix; a certificate
+// already past its date says "expired" rather than "expires in -1 days".
+func healthAlertMessage(eventType eventbus.EventType, data *eventbus.HealthAlertData) (key, icon string) {
+	keys, ok := healthAlertKeys[eventType]
+	if !ok || data == nil {
+		return "", ""
+	}
+	switch {
+	case data.Phase == "resolved":
+		return keys[1], "🟢 "
+	case eventType == eventbus.EventCertExpiring && strings.HasPrefix(data.Params["Hours"], "-"):
+		return "alertCertExpired", "🔴 "
+	}
+	return keys[0], "🔴 "
+}
+
+// formatHealthAlert renders one health alert in the bot's language.
+func (t *Tgbot) formatHealthAlert(eventType eventbus.EventType, data *eventbus.HealthAlertData) string {
+	key, icon := healthAlertMessage(eventType, data)
+	if key == "" {
+		return ""
+	}
+	var params []string
+	for k, v := range data.Params {
+		params = append(params, k+"=="+oneLine(v))
+	}
+	msg := fmt.Sprintf("<b>📡 %s</b>\n", html.EscapeString(getHostname())) + icon + t.I18nBot("tgbot.messages."+key, params...)
+	if data.Phase == "reminder" && !data.Since.IsZero() {
+		msg += "\n⏰ " + t.I18nBot("tgbot.messages.alertStill", "Since=="+data.Since.Local().Format("2006-01-02 15:04"))
+	}
+	return msg
 }

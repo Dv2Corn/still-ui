@@ -10,6 +10,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/mhsanaei/3x-ui/v3/internal/backup"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/common"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/cronspec"
 )
@@ -80,6 +81,23 @@ type AllSetting struct {
 	DiscordMemory        int    `json:"discordMemory" form:"discordMemory" validate:"gte=0,lte=100"`
 	DiscordLang          string `json:"discordLang" form:"discordLang"`
 	DiscordEnabledEvents string `json:"discordEnabledEvents" form:"discordEnabledEvents"`
+
+	// Scheduled local backups: on/off, cron schedule, how many are kept, age/SSH public keys
+	// they are encrypted to (empty = unencrypted), and whether an encrypted one goes to Telegram.
+	BackupEnable        bool   `json:"backupEnable" form:"backupEnable"`
+	BackupSchedule      string `json:"backupSchedule" form:"backupSchedule" example:"@daily"`
+	BackupKeep          int    `json:"backupKeep" form:"backupKeep" validate:"gte=1,lte=1000"`
+	BackupAgeRecipients string `json:"backupAgeRecipients" form:"backupAgeRecipients"`
+	BackupTelegram      bool   `json:"backupTelegram" form:"backupTelegram"`
+
+	// Server health alert thresholds (events xray.down, xray.flapping, process.memory,
+	// disk.high, cert.expiring, backup.failed); a reminder repeats every alertRemindHours, 0 = never.
+	AlertXrayRestarts      int `json:"alertXrayRestarts" form:"alertXrayRestarts" validate:"gte=1,lte=100"`
+	AlertXrayRestartWindow int `json:"alertXrayRestartWindow" form:"alertXrayRestartWindow" validate:"gte=1,lte=1440"`
+	AlertMemory            int `json:"alertMemory" form:"alertMemory" validate:"gte=1,lte=100"`
+	AlertDisk              int `json:"alertDisk" form:"alertDisk" validate:"gte=1,lte=100"`
+	AlertCertDays          int `json:"alertCertDays" form:"alertCertDays" validate:"gte=1,lte=365"`
+	AlertRemindHours       int `json:"alertRemindHours" form:"alertRemindHours" validate:"gte=0,lte=720"`
 
 	OutboundDownThreshold int `json:"outboundDownThreshold" form:"outboundDownThreshold" validate:"gte=1,lte=100"`
 	NodeDownThreshold     int `json:"nodeDownThreshold" form:"nodeDownThreshold" validate:"gte=1,lte=100"`
@@ -390,6 +408,7 @@ func (s *AllSetting) CheckValid() error {
 		{"tgRunTime", s.TgRunTime},
 		{"discordRunTime", s.DiscordRunTime},
 		{"ldapSyncCron", s.LdapSyncCron},
+		{"backupSchedule", s.BackupSchedule},
 	} {
 		if strings.TrimSpace(sched.spec) == "" {
 			continue
@@ -397,6 +416,10 @@ func (s *AllSetting) CheckValid() error {
 		if _, err := cronspec.Parse(sched.spec); err != nil {
 			return common.NewError(sched.name+":", err)
 		}
+	}
+
+	if _, err := backup.ParseRecipients(s.BackupAgeRecipients); err != nil {
+		return common.NewError("backup encryption:", err)
 	}
 
 	if err := checkIPOrCIDRList(s.TrustedProxyCIDRs, "trusted proxy CIDR is not valid:"); err != nil {

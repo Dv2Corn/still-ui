@@ -231,7 +231,7 @@ var defaultValueMap = map[string]string{
 	"ldapDefaultLimitIP":     "0",
 
 	// Event bus — per-subscriber event filtering (empty = all disabled)
-	"tgEnabledEvents":   "login.attempt,cpu.high",
+	"tgEnabledEvents":   "login.attempt,cpu.high," + DefaultHealthAlertEvents,
 	"smtpEnabledEvents": "login.attempt,cpu.high",
 	"smtpCpu":           "80",
 	"smtpMemory":        "80",
@@ -263,7 +263,25 @@ var defaultValueMap = map[string]string{
 	"discordMemory":        "80",
 	"discordLang":          "en-US",
 	"discordEnabledEvents": "login.attempt,cpu.high",
+
+	// Scheduled local backups (still-ui)
+	"backupEnable":        "false",
+	"backupSchedule":      "@daily",
+	"backupKeep":          "14",
+	"backupAgeRecipients": "",
+	"backupTelegram":      "false",
+
+	// Server health alerts (still-ui): thresholds shared by every notifier
+	"alertXrayRestarts":      "3",
+	"alertXrayRestartWindow": "10",
+	"alertMemory":            "80",
+	"alertDisk":              "90",
+	"alertCertDays":          "7",
+	"alertRemindHours":       "6",
 }
+
+// DefaultHealthAlertEvents are the server health alerts a new panel sends to Telegram.
+const DefaultHealthAlertEvents = "xray.down,xray.flapping,process.memory,disk.high,cert.expiring,backup.failed"
 
 // SettingService provides business logic for application settings management.
 // It handles configuration storage, retrieval, and validation for all system settings.
@@ -653,6 +671,52 @@ func (s *SettingService) GetTgbotRuntime() (string, error) {
 
 func (s *SettingService) SetTgbotRuntime(time string) error {
 	return s.setString("tgRunTime", time)
+}
+
+// GetBackupEnable reports whether scheduled local backups are on.
+func (s *SettingService) GetBackupEnable() (bool, error) { return s.getBool("backupEnable") }
+
+// GetBackupSchedule is the cron spec of scheduled local backups.
+func (s *SettingService) GetBackupSchedule() (string, error) { return s.getString("backupSchedule") }
+
+// GetBackupKeep is how many local backups are kept.
+func (s *SettingService) GetBackupKeep() (int, error) { return s.getInt("backupKeep") }
+
+// GetBackupAgeRecipients are the public keys backups are encrypted to; empty means unencrypted.
+func (s *SettingService) GetBackupAgeRecipients() (string, error) {
+	return s.getString("backupAgeRecipients")
+}
+
+// GetBackupTelegram reports whether each encrypted scheduled backup is sent to the Telegram admins.
+func (s *SettingService) GetBackupTelegram() (bool, error) { return s.getBool("backupTelegram") }
+
+// HealthAlertThresholds are the limits the health alerts compare against.
+type HealthAlertThresholds struct {
+	XrayRestarts      int
+	XrayRestartWindow int // minutes
+	MemoryPercent     int
+	DiskPercent       int
+	CertDays          int
+	RemindHours       int
+}
+
+// GetHealthAlertThresholds reads every health alert threshold; an unreadable one keeps its default.
+func (s *SettingService) GetHealthAlertThresholds() HealthAlertThresholds {
+	read := func(key string) int {
+		if v, err := s.getInt(key); err == nil {
+			return v
+		}
+		v, _ := strconv.Atoi(defaultValueMap[key])
+		return v
+	}
+	return HealthAlertThresholds{
+		XrayRestarts:      read("alertXrayRestarts"),
+		XrayRestartWindow: read("alertXrayRestartWindow"),
+		MemoryPercent:     read("alertMemory"),
+		DiskPercent:       read("alertDisk"),
+		CertDays:          read("alertCertDays"),
+		RemindHours:       read("alertRemindHours"),
+	}
 }
 
 func (s *SettingService) GetTgBotBackup() (bool, error) {

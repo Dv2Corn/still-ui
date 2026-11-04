@@ -24,6 +24,7 @@ import {
   PlusOutlined,
   ReloadOutlined,
   SafetyOutlined,
+  SaveOutlined,
   SearchOutlined,
   SettingOutlined,
   SunOutlined,
@@ -425,6 +426,13 @@ export default function CommandPalette() {
         subtitle: t('pages.settings.discordSettings'),
         keywords: ['discord', 'bot', 'channel', 'notifications', 'alerts'],
         icon: <DiscordOutlined aria-hidden />,
+      },
+      {
+        path: '/settings#backups',
+        title: `${t('menu.settings')} · ${t('pages.settings.backupSettings')}`,
+        subtitle: t('pages.settings.backupSettings'),
+        keywords: ['backup', 'restore', 'age', 'encryption', 'schedule'],
+        icon: <SaveOutlined aria-hidden />,
       },
       {
         path: '/settings#subscription',

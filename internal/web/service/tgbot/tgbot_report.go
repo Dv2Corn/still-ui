@@ -1,6 +1,7 @@
 package tgbot
 
 import (
+	"errors"
 	"fmt"
 	"html"
 	"net"
@@ -118,6 +119,27 @@ func (t *Tgbot) SendBackupToAdmins() {
 	if configErr != nil {
 		logger.Warning("Cannot read the Xray config for the backup: ", configErr)
 	}
+	// With backup encryption keys set, neither file leaves the server in the clear.
+	if dbData != nil {
+		backups := &service.LocalBackupService{}
+		enc, encrypted, encErr := backups.EncryptForTelegram(dbData)
+		switch {
+		case encErr != nil:
+			logger.Error("Cannot encrypt the backup for Telegram, not sending it: ", encErr)
+			dbData = nil
+		case encrypted:
+			dbData, dbFilename = enc, dbFilename+".age"
+			if configErr == nil {
+				if config, _, configErr = backups.EncryptForTelegram(config); configErr != nil {
+					logger.Error("Cannot encrypt the Xray config for Telegram, not sending it: ", configErr)
+				}
+			}
+		}
+	}
+	configName := "config.json"
+	if strings.HasSuffix(dbFilename, ".age") {
+		configName += ".age"
+	}
 	admins := adminSnapshot()
 	for i, adminId := range admins {
 		if dbData == nil {
@@ -126,7 +148,7 @@ func (t *Tgbot) SendBackupToAdmins() {
 			t.sendDocumentWithCaption(adminId, dbData, dbFilename, t.backupSummary())
 			time.Sleep(500 * time.Millisecond)
 			if configErr == nil {
-				t.sendDocumentWithCaption(adminId, config, "config.json", "")
+				t.sendDocumentWithCaption(adminId, config, configName, "")
 			}
 		}
 		// Add delay between sends to avoid Telegram rate limits
@@ -350,4 +372,31 @@ func (t *Tgbot) notifyExhausted() {
 			}
 		}
 	}
+}
+
+// SendBackupFile sends a scheduled local backup (already encrypted) to every admin chat; it
+// fails only when no admin received it.
+func (t *Tgbot) SendBackupFile(name string, data []byte) error {
+	if !t.IsRunning() {
+		return service.ErrTelegramOff
+	}
+	admins := adminSnapshot()
+	if len(admins) == 0 {
+		return errors.New("no Telegram admin chat is set")
+	}
+	caption := t.I18nBot("tgbot.messages.hostname", "Hostname=="+hostname) +
+		t.I18nBot("tgbot.messages.backupTime", "Time=="+time.Now().Format("2006-01-02 15:04:05"))
+	sent := 0
+	for i, adminID := range admins {
+		if t.sendDocumentWithCaption(adminID, data, name, trimCaption(caption, botCaptionLimit)) {
+			sent++
+		}
+		if i < len(admins)-1 {
+			time.Sleep(time.Second)
+		}
+	}
+	if sent == 0 {
+		return errors.New("Telegram did not accept the file")
+	}
+	return nil
 }

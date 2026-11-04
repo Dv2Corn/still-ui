@@ -580,6 +580,14 @@ export const sections: readonly Section[] = [
       },
       {
         method: 'GET',
+        path: '/panel/api/server/localBackups',
+        summary:
+          'List the scheduled local backups on this server (newest first) and the outcome of the last one since the panel started. Restore one on the server with: still-ui restore <file>.',
+        response:
+          '{\n  "success": true,\n  "obj": {\n    "folder": "/etc/still-ui/backups",\n    "last": { "file": "still-ui-panel-20261104-033000.db.age", "size": 1048576, "encrypted": true, "time": 1793763000, "telegram": "sent" },\n    "backups": [ { "name": "still-ui-panel-20261104-033000.db.age", "size": 1048576, "time": "2026-11-04T03:30:00Z", "encrypted": true } ]\n  }\n}',
+      },
+      {
+        method: 'GET',
         path: '/panel/api/server/getMigration',
         summary:
           'Stream a cross-engine migration file as an attachment: a .dump (SQL text) on SQLite, or a .db SQLite database built from the live data on PostgreSQL.',
@@ -820,6 +828,14 @@ export const sections: readonly Section[] = [
             defaultValue: true,
           },
         ],
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/server/localBackup',
+        summary:
+          'Take a local backup now with the saved backup settings: a consistent database snapshot, encrypted to the configured age/SSH keys, rotated, and sent to Telegram when that is on. Returns the file written.',
+        response:
+          '{\n  "success": true,\n  "obj": { "file": "still-ui-panel-20261104-120000.db.age", "size": 1048576, "encrypted": true, "time": 1793793600 }\n}',
       },
       {
         method: 'POST',

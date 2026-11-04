@@ -3703,3 +3703,26 @@ func ValidateSQLiteDB(dbPath string) error {
 	}
 	return nil
 }
+
+// CopySQLiteFile writes a consistent copy of the SQLite database at src (WAL contents included)
+// to dst with VACUUM INTO; it needs no open panel database, so a stopped panel can use it.
+func CopySQLiteFile(src, dst string) error {
+	if _, err := os.Stat(src); err != nil {
+		return err
+	}
+	if _, err := os.Lstat(dst); err == nil {
+		return fmt.Errorf("sqlite copy destination already exists: %s", dst)
+	}
+	conn, err := sql.Open("sqlite3", src+"?_busy_timeout=10000")
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), backupSQLiteTimeout)
+	defer cancel()
+	if _, err := conn.ExecContext(ctx, "VACUUM INTO ?", dst); err != nil {
+		_ = os.Remove(dst)
+		return err
+	}
+	return os.Chmod(dst, 0o600)
+}

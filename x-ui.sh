@@ -3541,6 +3541,85 @@ migrate_db_prompt() {
     migrate_db "$input" "$output"
 }
 
+# still-ui backup: take a local backup now, with the panel's backup settings (folder, encryption
+# keys, how many to keep, Telegram); prints the file it wrote.
+backup_now() {
+    local bin="${xui_folder}/x-ui"
+    if [[ ! -x "$bin" ]] || ! "$bin" restore -h 2>&1 | grep -q -- '-identity'; then
+        LOGE "This still-ui build has no local backups yet: run still-ui update first."
+        return 1
+    fi
+    "$bin" backup
+}
+
+# still-ui restore <file> [key-file]: replace the panel database with a backup. The file is checked
+# (and decrypted, for an .age backup) before anything changes; the panel is stopped for the swap
+# and started again (with the still-xray service, Xray restarts once), and the database it had is
+# kept beside it as x-ui.db.before-restore-<time>.
+# Without a key file the private key of an encrypted backup is read from the terminal and never
+# written to disk.
+restore_backup() {
+    local file="$1" key="$2" bin="${xui_folder}/x-ui" rc was_running=0 key_text="" head
+    if [[ ! -x "$bin" ]] || ! "$bin" restore -h 2>&1 | grep -q -- '-identity'; then
+        LOGE "This still-ui build cannot restore local backups yet: run still-ui update first."
+        return 1
+    fi
+    if [[ -z "$file" ]]; then
+        echo -e "Usage: ${green}still-ui restore <backup file> [age or SSH private key file]${plain}"
+        find /etc/still-ui/backups -maxdepth 1 -name 'still-ui-*' -printf '%T@ %p\n' 2> /dev/null | sort -rn | head -n 10 | cut -d' ' -f2- | sed 's/^/  /'
+        return 1
+    fi
+    if [[ ! -f "$file" ]]; then
+        LOGE "Backup not found: ${file}"
+        return 1
+    fi
+    if [[ "${running_in_docker}" == "true" ]]; then
+        LOGE "In Docker the panel is the container's main process and cannot be stopped from inside."
+        LOGI "Use Backup & Restore on the panel's overview page, or stop the container and run x-ui restore against its volume."
+        return 1
+    fi
+    head=$(head -c 40 "$file" 2> /dev/null | tr -d '\0')
+    if [[ -z "$key" && ( "$head" == age-encryption.org/v1* || "$head" == *"BEGIN AGE ENCRYPTED FILE"* ) ]]; then
+        echo -e "${yellow}This backup is encrypted. Paste its private key (AGE-SECRET-KEY-...) and press Enter; it is not stored.${plain}"
+        read -rs key_text
+        echo
+        [[ -n "$key_text" ]] || { LOGE "No key given."; return 1; }
+    fi
+    confirm "Replace the panel database with ${file}? The current one is kept beside it." "n" || return 0
+
+    check_status > /dev/null 2>&1 && was_running=1
+    if [[ $was_running == 1 ]]; then
+        if [[ $release == "alpine" ]]; then rc-service still-ui stop; else systemctl stop still-ui; fi
+    fi
+    if [[ -n "$key_text" ]]; then
+        printf '%s\n' "$key_text" | "$bin" restore -force -file "$file" -identity -
+    elif [[ -n "$key" ]]; then
+        "$bin" restore -force -file "$file" -identity "$key"
+    else
+        "$bin" restore -force -file "$file"
+    fi
+    rc=$?
+    key_text=""
+    # The still-xray core keeps running while the panel is down, with the inbounds of the old
+    # database; a panel that took it over would only add to it. Stop it so the panel starts it
+    # again from the restored database: clients reconnect once.
+    if [[ $rc == 0 ]] && systemctl is-active --quiet still-xray 2> /dev/null; then
+        LOGI "Restarting Xray once to load the restored inbounds."
+        systemctl stop still-xray
+    fi
+    # A failed restore changed nothing: the panel comes back either way.
+    if [[ $was_running == 1 ]]; then
+        if [[ $release == "alpine" ]]; then rc-service still-ui start; else systemctl start still-ui; fi
+        sleep 2
+    fi
+    if [[ $rc == 0 ]]; then
+        LOGI "Restored. Check the panel; Xray picks up the restored inbounds when the panel starts."
+    else
+        LOGE "Restore failed; the database was not changed."
+    fi
+    return $rc
+}
+
 show_usage() {
     echo -e "┌────────────────────────────────────────────────────────────────┐
 │  ${blue}still-ui control menu usages (subcommands):${plain}                       │
@@ -3560,6 +3639,8 @@ show_usage() {
 │  ${blue}still-ui update-dev${plain}            - Update to Dev channel (latest)   │
 │  ${blue}still-ui update-all-geofiles${plain}   - Update all geo files             │
 │  ${blue}still-ui migrateDB [file]${plain}      - Convert .db <-> .dump (SQLite)   │
+│  ${blue}still-ui backup${plain}                - Take a local backup now          │
+│  ${blue}still-ui restore <file> [key]${plain}  - Restore a local backup           │
 │  ${blue}still-ui pgclient [ver]${plain}        - Upgrade pg_dump/pg_restore tools │
 │  ${blue}still-ui legacy${plain}                - Legacy version                   │
 │  ${blue}still-ui install${plain}               - Install                          │
@@ -3763,6 +3844,12 @@ if [[ $# -gt 0 ]]; then
             ;;
         "migrateDB")
             migrate_db "$2" "$3"
+            ;;
+        "backup")
+            check_install 0 && backup_now
+            ;;
+        "restore")
+            check_install 0 && restore_backup "$2" "$3"
             ;;
         "pgclient")
             pg_upgrade_client "$2"
