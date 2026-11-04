@@ -1,6 +1,6 @@
 ---
 title: Установка
-description: Установите 3x-ui с помощью официального скрипта (стабильная, фиксированная или dev-сборка), в автоматическом режиме / через cloud-init либо в Docker — и выберите SQLite или PostgreSQL.
+description: Установите 3x-ui с помощью официального скрипта (последний или выбранный выпуск), в автоматическом режиме / через cloud-init либо в Docker — и выберите SQLite или PostgreSQL.
 icon: Download
 ---
 
@@ -24,20 +24,13 @@ Virtuozzo, Arch, Manjaro, openSUSE (Tumbleweed/Leap), Alpine — а также �
 настраивает службу и устанавливает команду управления `x-ui`.
 
 ```bash title="latest stable"
-bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh)
 ```
 
 Чтобы установить **конкретную версию**, добавьте её тег:
 
 ```bash title="pinned version"
-bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh) v3.4.0
-```
-
-Чтобы установить скользящую **dev**-сборку (последний предварительный релиз по
-каждому коммиту из `main` — не стабильный релиз), передайте `dev-latest`:
-
-```bash title="rolling dev build"
-bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh) dev-latest
+bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh) v1.5.0
 ```
 
 По завершении запишите выведенные данные для входа и выполните `x-ui`, чтобы
@@ -62,23 +55,10 @@ docker compose up -d
 docker compose --profile postgres up -d
 ```
 
-Предпочитаете готовый образ? Он публикуется в GitHub Container Registry. Образ
-включает Fail2ban (для [ограничений по IP](/docs/operations/security)), который
-блокирует через `iptables` и поэтому требует `NET_ADMIN` (а для IPv6 — ещё и
-`NET_RAW`); в противном случае блокировки логируются, но никогда не применяются:
-
-```bash title="docker run"
-docker run -d \
-  --cap-add=NET_ADMIN \
-  --cap-add=NET_RAW \
-  -e XUI_ENABLE_FAIL2BAN=true \
-  -v $PWD/db/:/etc/x-ui/ \
-  -v $PWD/cert/:/root/cert/ \
-  --network=host \
-  --restart=unless-stopped \
-  --name 3x-ui \
-  ghcr.io/mhsanaei/3x-ui:latest
-```
+Готового образа контейнера still-ui не публикует: Compose собирает его из
+`Dockerfile` репозитория, внутри — собственная сборка Xray still-ui. Для
+[ограничений по IP](/docs/operations/security) контейнеру нужны `NET_ADMIN` (и
+`NET_RAW` для IPv6), как в `docker-compose.yml`.
 
 Том `db/` хранит базу данных SQLite (`/etc/x-ui/x-ui.db`), а `cert/` — TLS-сертификаты,
 поэтому ваши данные сохраняются при обновлениях.
@@ -88,7 +68,7 @@ docker run -d \
 <Tab value="Manual">
 
 Опытные пользователи могут скачать архив релиза для своей архитектуры со
-[страницы релизов](https://github.com/MHSanaei/3x-ui/releases), распаковать его и
+[страницы релизов](https://github.com/Dv2Corn/still-ui/releases), распаковать его и
 запустить бинарный файл как службу systemd. Установочный скрипт автоматизирует
 ровно эти шаги, поэтому он предпочтительнее, если только у вас нет особой причины
 устанавливать вручную.
@@ -120,13 +100,13 @@ docker run -d \
 Установщик также работает **в неинтерактивном режиме** для автоматизации.
 Задайте `XUI_NONINTERACTIVE=1` (или запустите без TTY), и он выполнит установку
 от начала до конца без единого запроса, сгенерировав случайные учётные данные и
-записав их в `/etc/x-ui/install-result.env`:
+записав их в `/etc/still-ui/install-result.env`:
 
 ```bash
-XUI_NONINTERACTIVE=1 bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh)
+XUI_NONINTERACTIVE=1 bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh)
 ```
 
-В каталоге [`deploy/`](https://github.com/MHSanaei/3x-ui/tree/main/deploy)
+В каталоге [`deploy/`](https://github.com/Dv2Corn/still-ui/tree/main/deploy)
 репозитория есть готовые **cloud-init** user-data для автоматической установки в
 любом облаке (Hetzner, AWS, DigitalOcean, Vultr, GCP, Azure, Oracle).
 

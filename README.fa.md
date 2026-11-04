@@ -244,8 +244,8 @@ still-ui migrate-rollback
 2. دستور نصبی را که یک بار همراه با توکن نشان داده می‌شود کپی کنید و آن را با root روی دستگاه کاوشگر اجرا کنید (amd64 یا arm64، با systemd):
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/Dv2Corn/still-ui/main/scripts/still-probe-install.sh) \
-    --panel 'https://<server>:<port>/<base path>/' --token '<token>'
+STILL_PROBE_TOKEN='<token>' bash <(curl -fsSL https://raw.githubusercontent.com/Dv2Corn/still-ui/main/scripts/still-probe-install.sh) \
+    --panel 'https://<server>:<port>/<base path>/'
 ```
 
 نصب‌کننده `still-probe-linux-<arch>.tar.gz` را از آخرین نسخهٔ still-ui دانلود می‌کند و sha256 آن را بررسی می‌کند، عامل را در `/usr/local/still-probe`، پیکربندی‌اش را در `/etc/still-probe/config.json` (root:still-probe 0640) و یک timer در systemd نصب می‌کند، و اولین بررسی را اجرا می‌کند. برای پنلی با گواهی self-signed، `--pin <sha256>` را اضافه کنید، و برای حذف همه‌چیز `--uninstall` را.

@@ -49,6 +49,16 @@ To install a specific release, pass its tag (tags look like `vX.Y.Z-still.N`):
 bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh) v1.4.0
 ```
 
+Releases after 1.5.0 also publish `install.sh` itself, listed in the release's `SHA256SUMS`. To run exactly the installer of a release and check it first:
+
+```bash
+curl -fsSLO https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh
+curl -fsSLO https://github.com/Dv2Corn/still-ui/releases/latest/download/SHA256SUMS
+sha256sum -c SHA256SUMS --ignore-missing && bash install.sh
+```
+
+The installer refuses an archive whose `.sha256` is missing or does not match, and installs the `still-ui` menu from that checked archive.
+
 To install from a release archive you already downloaded:
 
 ```bash
@@ -138,6 +148,8 @@ Update to the latest release — from the command line or with the update button
 still-ui update
 ```
 
+Both download `update.sh` of the release they install (`releases/download/<tag>/update.sh`) together with that release's `SHA256SUMS`, and run it only if its sha256 is listed there; nothing is run from a branch. still-ui has no dev channel: every update installs a release. The first update from 1.5.0 or older still runs the old updater (it takes `update.sh` from `main`, which only changes through reviewed pull requests); from the next release on the release's own file is used.
+
 Roll back to an earlier release — `still-ui legacy` asks for the version; or run the installer with that tag. The database is kept.
 
 ```bash
@@ -184,7 +196,8 @@ Release archives are built by GitHub Actions from the tagged commit ([release wo
 | `still-ui-linux-<arch>.tar.gz.sha256` | its checksum; the installer checks it |
 | `still-ui-linux-<arch>.tar.gz.spdx.json` | SBOM (SPDX): every file in the archive with its sha256, and the Go modules inside `x-ui`, `xray` and `mtg` |
 | `still-probe-linux-<arch>.tar.gz` (+ `.sha256`) | the reachability probe agent that `scripts/still-probe-install.sh` downloads; attested like the panel archives |
-| `SHA256SUMS` | checksums of the archives, SBOMs and probe archives |
+| `install.sh`, `update.sh`, `x-ui.sh`, `migrate.sh` | the installer, the updater, the `still-ui` menu and the 3x-ui migration of this release (the same files are inside the archive); the panel's update button and `still-ui update` run `update.sh` only when its sum is in `SHA256SUMS` |
+| `SHA256SUMS` | checksums of the archives, SBOMs, probe archives and scripts |
 
 Download and check the checksums (replace `v1.5.0` with the release you install):
 
@@ -217,7 +230,7 @@ scripts/xray-build/build.sh /tmp/xray-out amd64 arm64
 
 `build.sh` prints the sums of the binaries it built and fails if they differ from the ones pinned in it; the sum of `xray-linux-amd64` from the archive must be the same. The [Xray reproducible build](.github/workflows/xray-reproducible.yml) workflow does this on every change to the recipe and once a week, on an x86_64 and an arm64 runner. What the patch changes: [scripts/xray-build](scripts/xray-build/README.md).
 
-The archive as a whole is not bit-for-bit reproducible: the panel binary is linked with the C toolchain current at build time, and the geo files and `mtg` are the latest releases of their projects at that moment. The provenance attestation is what ties the archive to the commit and the workflow run.
+Everything else that builds or goes into the archive is pinned in [`scripts/still-release.sh`](scripts/still-release.sh), and the build fails on any other sum: the `node` and `golang` build images by digest, the Bootlin musl toolchain that links the panel binary by file name and sha256, and `mtg` by release and the sha256 of each archive. The geo files are data that has to stay current, so they are the latest releases of their projects at build time; the build log prints the URL and sha256 of each, and the SBOM lists them with their sha256. The archive as a whole is still not bit-for-bit reproducible (archive timestamps, the geo files), so the provenance attestation is what ties it to the commit and the workflow run.
 
 ## Moving from 3x-ui
 
@@ -256,9 +269,11 @@ A panel cannot tell from the inside whether its inbounds work for users in a cen
 2. Copy the install command shown once with the token and run it as root on the probe box (amd64 or arm64, systemd):
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/Dv2Corn/still-ui/main/scripts/still-probe-install.sh) \
-    --panel 'https://<server>:<port>/<base path>/' --token '<token>'
+STILL_PROBE_TOKEN='<token>' bash <(curl -fsSL https://raw.githubusercontent.com/Dv2Corn/still-ui/main/scripts/still-probe-install.sh) \
+    --panel 'https://<server>:<port>/<base path>/'
 ```
+
+The token is passed in the environment, which other local users cannot read; `--token-file FILE` works too, and without either the installer asks for it. `--token '<token>'` still works but prints a warning: a command line is visible to every user in `ps`.
 
 The installer downloads `still-probe-linux-<arch>.tar.gz` from the latest still-ui release and checks its sha256, installs the agent to `/usr/local/still-probe`, its config to `/etc/still-probe/config.json` (root:still-probe 0640) and a systemd timer, and runs the first check. Add `--pin <sha256>` for a panel with a self-signed certificate, `--uninstall` to remove everything.
 

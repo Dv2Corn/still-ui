@@ -1,18 +1,25 @@
-// Pure builders for 3x-ui install commands (script + Docker). No React/DOM.
+// Pure builders for still-ui install commands (script + Docker). No React/DOM.
 
 export type InstallMethod = 'script' | 'docker';
 
 export interface InstallOptions {
   method: InstallMethod;
-  /** A release tag like `v3.4.1`, or empty/`latest` for the latest release. */
+  /** A release tag like `v1.5.0`, or empty/`latest` for the latest release. */
   version: string;
   enableFail2ban: boolean;
   panelPort: string;
   webBasePath: string;
 }
 
-const REPO_RAW = 'https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh';
-const IMAGE = 'ghcr.io/mhsanaei/3x-ui:latest';
+const REPO_RAW = 'https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh';
+// still-ui publishes no container image: Docker builds one from the repository
+// (its Dockerfile pins still-ui's own Xray build) at the chosen release tag.
+const REPO_GIT = 'https://github.com/Dv2Corn/still-ui.git';
+const IMAGE = 'still-ui:local';
+
+function buildContext(version: string): string {
+  return `${REPO_GIT}#${isLatest(version) ? 'main' : version.trim()}`;
+}
 
 function isLatest(version: string): boolean {
   const v = version.trim().toLowerCase();
@@ -20,9 +27,9 @@ function isLatest(version: string): boolean {
 }
 
 /**
- * The one-line script install command. The master install script reads the
- * version as its first argument: empty = latest stable release, a tag like
- * `v3.4.0` = that release, and `dev-latest` = the rolling per-commit dev build.
+ * The one-line script install command. install.sh reads the version as its
+ * first argument: empty = the latest release, a tag like `v1.5.0` = that
+ * release. Either way it installs a release archive whose checksum matches.
  */
 export function buildScriptCommand(options: InstallOptions): string {
   if (isLatest(options.version)) {
@@ -31,7 +38,7 @@ export function buildScriptCommand(options: InstallOptions): string {
   return `bash <(curl -Ls ${REPO_RAW}) ${options.version.trim()}`;
 }
 
-/** A `docker run` command reflecting the chosen options. */
+/** `docker build` + `docker run` commands reflecting the chosen options. */
 export function buildDockerRun(options: InstallOptions): string {
   const lines = ['docker run -itd'];
   lines.push(`  -e XRAY_VMESS_AEAD_FORCED=false`);
@@ -43,9 +50,9 @@ export function buildDockerRun(options: InstallOptions): string {
   lines.push(`  -v $PWD/cert/:/root/cert/`);
   lines.push(`  --network=host`);
   lines.push(`  --restart=unless-stopped`);
-  lines.push(`  --name 3x-ui`);
+  lines.push(`  --name still-ui`);
   lines.push(`  ${IMAGE}`);
-  return lines.join(' \\\n');
+  return `docker build -t ${IMAGE} ${buildContext(options.version)}\n${lines.join(' \\\n')}`;
 }
 
 /** A `docker-compose.yml` reflecting the chosen options. */
@@ -60,9 +67,10 @@ export function buildDockerCompose(options: InstallOptions): string {
 
   return [
     `services:`,
-    `  3x-ui:`,
+    `  still-ui:`,
+    `    build: ${buildContext(options.version)}`,
     `    image: ${IMAGE}`,
-    `    container_name: 3x-ui`,
+    `    container_name: still-ui`,
     `    volumes:`,
     `      - ./db/:/etc/x-ui/`,
     `      - ./cert/:/root/cert/`,
