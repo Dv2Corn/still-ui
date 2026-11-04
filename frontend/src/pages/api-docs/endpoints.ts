@@ -703,7 +703,7 @@ export const sections: readonly Section[] = [
         method: 'POST',
         path: '/panel/api/server/setTorrentBlock',
         summary:
-          'Turn "Block torrents for clients" on or off. On: every generated Xray config routes sniffed BitTorrent to a blackhole first and enables content sniffing on client inbounds where it is off, and on Linux an nftables table drops BitTorrent signatures in egress the server originates and in forwarded AmneziaWG kernel-mode traffic, and cuts a peer endpoint only after that peer answers with BitTorrent itself. Xray is reconciled immediately. Returns the same object as GET /torrentBlock; a host without nft keeps the Xray half and reports the error.',
+          'Turn "Block torrents for clients" on or off. On: every generated Xray config routes sniffed BitTorrent to a blackhole first and enables content sniffing on client inbounds where it is off, and on Linux an nftables table drops BitTorrent signatures in egress the server originates and in forwarded AmneziaWG kernel-mode traffic, and cuts a peer endpoint only after that peer itself answers with a BitTorrent handshake or DHT response. Xray is reconciled immediately. Returns the same object as GET /torrentBlock; a host without nft keeps the Xray half and reports the error.',
         params: [
           {
             name: 'enable',

@@ -114,15 +114,17 @@ func Ruleset(protected []uint16) string {
 	w("\t\tmeta l4proto { tcp, udp } ip6 daddr . th dport @peer6 counter name peer_hit drop")
 	w("\t}")
 
-	// Replies from the remote side: handshake, DHT response, uTP ST_STATE.
+	// Replies: only the 20-byte handshake and the DHT response. uTP ST_STATE is two bytes any
+	// echoing UDP service can be made to send, and with ST_SYN dropped a real one never comes.
 	w("\tchain learn {")
 	w("\t\tmeta l4proto { tcp, udp } th sport %s return", serviceSet)
 	w("\t\tmeta l4proto { tcp, udp } th sport @protected return")
 	w("\t\tfib saddr type local return")
 	w("\t\tmeta l4proto tcp %s goto learn_peer", payload(btReply))
 	w("\t\tmeta l4proto udp %s goto learn_peer", payload(dhtResponse))
-	w("\t\tmeta l4proto udp udp length >= 28 @ih,0,8 0x21 @ih,8,8 < 3 goto learn_peer")
 	w("\t}")
+	// No "ct reply packets < N" here: loading it turns nf_conntrack_acct on for the whole
+	// network namespace and leaves it on (checked on kernel 6.8), so every flow pays for it.
 	w("\tchain learn_peer {")
 	w("\t\tmeta nfproto ipv4 update @learn4 { ip saddr limit rate over %s } drop", learnRate)
 	w("\t\tmeta nfproto ipv6 update @learn6 { ip6 saddr limit rate over %s } drop", learnRate)

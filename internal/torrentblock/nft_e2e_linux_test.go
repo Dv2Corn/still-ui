@@ -28,7 +28,7 @@ const (
 )
 
 // e2ePeerScript runs inside sutb-out: sinks record what arrives, responders answer
-// first with a BitTorrent reply (handshake, DHT response, uTP ST_STATE).
+// with a BitTorrent reply (handshake, DHT response) or a uTP-looking echo.
 const e2ePeerScript = `
 import socket, threading
 HS = b"\x13BitTorrent protocol" + bytes(8) + b"\xab" * 20 + b"-XX0000-000000000000"
@@ -60,7 +60,8 @@ def udp(port, reply, addr="0.0.0.0"):
         rec("udp%d" % port, d)
         if reply:
             s.sendto(reply, a)
-UTP_STATE = bytes([0x21, 0]) + bytes(18)
+# What an echoing UDP service returns when the client puts 0x21 0x01 first: looks like uTP ST_STATE.
+UTP_LIKE_ECHO = bytes([0x21, 0x01]) + b"echoed-client-chosen-bytes"
 DHT_R = b"d1:rd2:id20:" + b"x" * 20 + b"e1:t2:aa1:y1:re"
 for p in (443, 6881, 6882, 8080):
     threading.Thread(target=tcp, args=(p, False), daemon=True).start()
@@ -70,7 +71,7 @@ for p in (443, 6881, 6882, 6883):
     threading.Thread(target=udp, args=(p, None), daemon=True).start()
 # Bound to the address so the answer leaves from it and conntrack sees a reply.
 threading.Thread(target=udp, args=(6895, DHT_R, "198.51.100.10"), daemon=True).start()
-threading.Thread(target=udp, args=(6896, UTP_STATE, "198.51.100.10"), daemon=True).start()
+threading.Thread(target=udp, args=(6896, UTP_LIKE_ECHO, "198.51.100.10"), daemon=True).start()
 threading.Event().wait()
 `
 
@@ -257,9 +258,19 @@ func TestNftE2E(t *testing.T) {
 		if got := rxBytes("udp6895"); got != before+4 {
 			t.Fatalf("the learned DHT endpoint still got %d bytes, want %d", got, before+4)
 		}
-		sendUDP(t, e2eUDPPeer+":6896", []byte("ping"))
-		if !setHas(t, "peer4", e2eUDPPeer+" . 6896") {
-			t.Fatal("a uTP ST_STATE answer did not teach its endpoint")
+	})
+
+	// A client can make an echoing service answer with bytes of its choice; a reply that
+	// only looks like uTP must not get that service's endpoint cut for everyone.
+	t.Run("a uTP-looking echo is not learned", func(t *testing.T) {
+		before := rxBytes("udp6896")
+		sendUDP(t, e2eUDPPeer+":6896", []byte("query-1"))
+		sendUDP(t, e2eUDPPeer+":6896", []byte("query-2"))
+		if setHas(t, "peer4", e2eUDPPeer+" . 6896") {
+			t.Fatal("a 0x21 0x01 echo of 28 bytes was learned as a uTP peer")
+		}
+		if got := rxBytes("udp6896"); got != before+14 {
+			t.Fatalf("the echo service got %d bytes, want %d: it was cut", got, before+14)
 		}
 	})
 
@@ -274,8 +285,8 @@ func TestNftE2E(t *testing.T) {
 			}
 		}
 		c := m.Status().Counters
-		if c.Handshakes == 0 || c.DHT == 0 || c.Trackers == 0 || c.UTP == 0 || c.Learned < 3 || c.PeerDrops == 0 {
-			t.Fatalf("counters = %+v, want every signature, three learned peers and a peer drop", c)
+		if c.Handshakes == 0 || c.DHT == 0 || c.Trackers == 0 || c.UTP == 0 || c.Learned < 2 || c.PeerDrops == 0 {
+			t.Fatalf("counters = %+v, want every signature, two learned peers and a peer drop", c)
 		}
 		if httpsBefore && exec.Command("curl", "-sfo", "/dev/null", "-m", "8", "https://deb.debian.org/").Run() != nil {
 			t.Fatal("ordinary HTTPS stopped working with the table loaded")
