@@ -171,7 +171,8 @@ still-ui uninstall
 | `still-ui-linux-<arch>.tar.gz` | `install.sh` 和 `still-ui update` 下载的压缩包 |
 | `still-ui-linux-<arch>.tar.gz.sha256` | 它的校验和；安装脚本会核对 |
 | `still-ui-linux-<arch>.tar.gz.spdx.json` | SBOM（SPDX）：压缩包中的每个文件及其 sha256，以及 `x-ui`、`xray` 和 `mtg` 内含的 Go 模块 |
-| `SHA256SUMS` | 压缩包和 SBOM 的校验和 |
+| `still-probe-linux-<arch>.tar.gz`（及 `.sha256`） | 可达性检查代理程序，由 `scripts/still-probe-install.sh` 下载；与面板压缩包一样带有来源证明 |
+| `SHA256SUMS` | 压缩包、SBOM 和检查代理压缩包的校验和 |
 
 下载并核对校验和（把 `v1.5.0` 换成你要安装的版本）：
 
