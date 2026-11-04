@@ -21,6 +21,9 @@ export type addrFamily = z.infer<typeof addrFamilySchema>;
 export const payloadKeysSchema = z.array(z.string());
 export type payloadKeys = z.infer<typeof payloadKeysSchema>;
 
+export const reachTransitionSchema = z.number().int();
+export type reachTransition = z.infer<typeof reachTransitionSchema>;
+
 export const staticEgressResolverSchema = z.string();
 export type staticEgressResolver = z.infer<typeof staticEgressResolverSchema>;
 
@@ -1067,6 +1070,66 @@ export const ProbeResultUISchema = z.object({
   xrayVersion: z.string(),
 });
 export type ProbeResultUI = z.infer<typeof ProbeResultUISchema>;
+
+export const ReachHistoryPointSchema = z.object({
+  at: z.number().int(),
+  key: z.string(),
+  ok: z.boolean(),
+  totalMs: z.number().int(),
+  ttfbMs: z.number().int(),
+});
+export type ReachHistoryPoint = z.infer<typeof ReachHistoryPointSchema>;
+
+export const ReachProbeCreatedSchema = z.object({
+  probe: z.lazy(() => ReachProbeViewSchema),
+  token: z.string(),
+});
+export type ReachProbeCreated = z.infer<typeof ReachProbeCreatedSchema>;
+
+export const ReachProbeInputSchema = z.object({
+  directUrl: z.string(),
+  enabled: z.boolean().nullable().optional(),
+  inboundIds: z.array(z.number().int()),
+  intervalSec: z.number().int(),
+  name: z.string(),
+  testUrl: z.string(),
+});
+export type ReachProbeInput = z.infer<typeof ReachProbeInputSchema>;
+
+export const ReachProbeViewSchema = z.object({
+  agentVersion: z.string(),
+  clientEmail: z.string(),
+  createdAt: z.number().int(),
+  directUrl: z.string(),
+  enabled: z.boolean(),
+  id: z.number().int(),
+  inboundIds: z.array(z.number().int()),
+  intervalSec: z.number().int(),
+  lastSeenAt: z.number().int(),
+  name: z.string(),
+  stale: z.boolean(),
+  targets: z.array(z.lazy(() => ReachTargetViewSchema)),
+  testUrl: z.string(),
+});
+export type ReachProbeView = z.infer<typeof ReachProbeViewSchema>;
+
+export const ReachTargetViewSchema = z.object({
+  changedAt: z.number().int(),
+  checks7d: z.number().int(),
+  consecutiveFails: z.number().int(),
+  inboundId: z.number().int(),
+  key: z.string(),
+  label: z.string(),
+  lastAt: z.number().int(),
+  lastBytes: z.number().int(),
+  lastError: z.string(),
+  lastOk: z.boolean(),
+  lastTotalMs: z.number().int(),
+  lastTtfbMs: z.number().int(),
+  status: z.string(),
+  uptime7d: z.number(),
+});
+export type ReachTargetView = z.infer<typeof ReachTargetViewSchema>;
 
 export const ReadinessSchema = z.object({
   blockers: z.array(z.lazy(() => BlockerSchema)),

@@ -126,7 +126,8 @@
     "openMenu": "メニューを開く",
     "pinSidebar": "サイドバーを固定",
     "unpinSidebar": "サイドバーの固定を解除",
-    "subFormats": "Sub Formats"
+    "subFormats": "Sub Formats",
+    "probes": "プローブ"
   },
   "pages": {
     "login": {
@@ -1901,7 +1902,11 @@
       "subHostSortMode": "サブスクリプションのノード順序",
       "subHostSortInbound": "インバウンド順（既定）",
       "subHostSortHosts": "ホスト順",
-      "subHostSortModeDesc": "異なるインバウンド間でもホストページの順序に従います。サーバーが出力する順序を指定しますが、クライアントアプリが独自に並べ替える場合があります。"
+      "subHostSortModeDesc": "異なるインバウンド間でもホストページの順序に従います。サーバーが出力する順序を指定しますが、クライアントアプリが独自に並べ替える場合があります。",
+      "eventGroupProbe": "到達性プローブ",
+      "eventProbeDown": "インバウンド到達不可",
+      "eventProbeUp": "インバウンド復旧",
+      "eventProbeStale": "プローブ無応答"
     },
     "xray": {
       "importRules": "ルールをインポート",
@@ -2564,6 +2569,64 @@
         "badVlessRoute": "0〜65535 の単一の数値を入力してください"
       },
       "dragToReorder": "ドラッグして {name} を並べ替え"
+    },
+    "probes": {
+      "title": "到達性プローブ",
+      "intro": "プローブは、対象の国の中にある任意の Linux マシン（自宅サーバー、Raspberry Pi、安価な現地 VPS など）で動かす小さなエージェントです。数分ごとに実際のクライアントと同じようにインバウンド経由で接続し、テストファイルをダウンロードして結果をここに報告します。",
+      "alertsHint": "アラートは Telegram ボットで届きます。パネル設定 → Telegram で到達性プローブのイベントを有効にしてください。",
+      "addProbe": "プローブを追加",
+      "editProbe": "プローブを編集",
+      "empty": "プローブはまだありません。追加して、検閲されたネットワーク内のマシンでインストールコマンドを実行してください。",
+      "minutes": "分",
+      "directCheck": "直接チェック（VPN なし）",
+      "history7d": "7 日間",
+      "lastReport": "最終報告 {time}",
+      "neverReported": "まだ報告がありません",
+      "stale": "報告なし",
+      "rotateToken": "新しいトークン",
+      "rotateConfirm": "新しいトークンを発行しますか？現在のトークンはすぐに使えなくなります。プローブのクライアントにも新しい鍵が発行され、古い設定やリンクでは接続できなくなります。",
+      "clientNote": "パネルが管理するクライアント {email} として接続します。このクライアントは編集・削除しないでください。通信量や期間の制限はありません。",
+      "noResults": "まだ結果がありません",
+      "tokenTitle": "プローブのトークン",
+      "tokenOnce": "今すぐトークンをコピーしてください。パネルはハッシュしか保存しないため、再表示できません。",
+      "installCommand": "プローブ用マシンへのインストール（Linux、root で実行）:",
+      "installHint": "このコマンドはエージェントを Xray と systemd タイマーとともにインストールし、最初のチェックを実行します。",
+      "token": "トークン",
+      "deleteConfirm": "プローブ「{name}」を削除しますか？",
+      "deleteHint": "トークンは使えなくなり、クライアントはインバウンドから外され、履歴は削除されます。",
+      "fields": {
+        "name": "名前",
+        "inbounds": "インバウンド",
+        "testUrl": "テスト URL",
+        "directUrl": "直接 URL",
+        "interval": "間隔",
+        "target": "接続先",
+        "lastCheck": "最終チェック",
+        "latency": "最初のバイト / 合計",
+        "uptime": "稼働率（7 日間）"
+      },
+      "hints": {
+        "name": "プローブの設置場所。例: home-mobile",
+        "inbounds": "VLESS、VMess、Trojan、Shadowsocks、Hysteria のインバウンドを調べられます",
+        "testUrl": "各インバウンド経由でダウンロードします。約 100 KB より大きいファイルを使ってください。最初の数 KB の後で接続を切る検閲もあります。",
+        "directUrl": "任意: VPN なしでもアクセスします。例: 自分のサイトやサブスクリプションページ"
+      },
+      "errors": {
+        "name": "名前: 1〜64 文字、< > & は使えません",
+        "inbounds": "インバウンドを 1 つ以上選んでください",
+        "url": "http:// または https:// の URL を入力してください",
+        "interval": "1〜1440 分"
+      },
+      "status": {
+        "ok": "正常",
+        "fail": "到達不可",
+        "flaky": "1 回失敗",
+        "unknown": "データなし"
+      },
+      "toasts": {
+        "saved": "プローブを保存しました",
+        "deleted": "プローブを削除しました"
+      }
     }
   },
   "tgbot": {
@@ -2706,7 +2769,11 @@
       "qrLegendJSON": "{{ .Code }}. JSON サブスクリプション",
       "qrLegendLink": "{{ .Code }}. アプリのリンク {{ .App }}",
       "backupFailed": "データベースを読み取れませんでした。バックアップは送信されていません。",
-      "privateOnly": "🤖 このボットは個人チャットでのみ動作します。ダイレクトメッセージで開いてください。"
+      "privateOnly": "🤖 このボットは個人チャットでのみ動作します。ダイレクトメッセージで開いてください。",
+      "eventProbeDown": "プローブ {{ .Probe }}: {{ .Target }} に到達できません",
+      "eventProbeUp": "プローブ {{ .Probe }}: {{ .Target }} に再び到達できます",
+      "eventProbeBack": "プローブ {{ .Probe }} が報告を再開しました",
+      "eventProbeStale": "プローブ {{ .Probe }} から {{ .Minutes }} 分間報告がありません"
     },
     "buttons": {
       "closeKeyboard": "❌ キーボードを閉じる",

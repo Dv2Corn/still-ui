@@ -126,7 +126,8 @@
     "openMenu": "打开菜单",
     "pinSidebar": "固定侧边栏",
     "unpinSidebar": "取消固定侧边栏",
-    "subFormats": "Sub Formats"
+    "subFormats": "Sub Formats",
+    "probes": "探针"
   },
   "pages": {
     "login": {
@@ -1901,7 +1902,11 @@
       "subHostSortMode": "订阅节点排序",
       "subHostSortInbound": "入站顺序（默认）",
       "subHostSortHosts": "主机顺序",
-      "subHostSortModeDesc": "跨入站使用主机页面中的排序。此设置决定服务器输出顺序；客户端应用仍可能自行排序。"
+      "subHostSortModeDesc": "跨入站使用主机页面中的排序。此设置决定服务器输出顺序；客户端应用仍可能自行排序。",
+      "eventGroupProbe": "可达性探针",
+      "eventProbeDown": "入站不可达",
+      "eventProbeUp": "入站已恢复",
+      "eventProbeStale": "探针无响应"
     },
     "xray": {
       "importRules": "导入规则",
@@ -2564,6 +2569,64 @@
         "badVlessRoute": "请输入 0 到 65535 之间的单个数字"
       },
       "dragToReorder": "拖动以重新排列 {name}"
+    },
+    "probes": {
+      "title": "可达性探针",
+      "intro": "探针是一个小型代理程序，可运行在目标国家境内的任意 Linux 机器上：家用服务器、树莓派或便宜的本地 VPS。它每隔几分钟像真实客户端一样通过你的入站连接，下载一个测试文件，并把结果报告到这里。",
+      "alertsHint": "告警通过 Telegram 机器人发送：请在 面板设置 → Telegram 中开启可达性探针事件。",
+      "addProbe": "添加探针",
+      "editProbe": "编辑探针",
+      "empty": "还没有探针。添加一个，并在受审查网络内的机器上运行安装命令。",
+      "minutes": "分钟",
+      "directCheck": "直连检查（不经 VPN）",
+      "history7d": "7 天",
+      "lastReport": "最近报告 {time}",
+      "neverReported": "尚未报告",
+      "stale": "无报告",
+      "rotateToken": "新令牌",
+      "rotateConfirm": "要签发新令牌吗？当前令牌会立即失效。探针的客户端也会换用新密钥，旧的配置或链接将无法再连接。",
+      "clientNote": "以面板管理的客户端 {email} 连接。请勿编辑或删除该客户端；它没有流量和时间限制。",
+      "noResults": "暂无结果",
+      "tokenTitle": "探针令牌",
+      "tokenOnce": "请立即复制令牌：面板只保存其哈希，无法再次显示。",
+      "installCommand": "在探针机器上安装（Linux，root 身份）：",
+      "installHint": "该命令会安装代理程序、Xray 和 systemd 定时器，并运行第一次检查。",
+      "token": "令牌",
+      "deleteConfirm": "删除探针“{name}”？",
+      "deleteHint": "其令牌将失效，其客户端将从入站中移除，历史记录将被删除。",
+      "fields": {
+        "name": "名称",
+        "inbounds": "入站",
+        "testUrl": "测试 URL",
+        "directUrl": "直连 URL",
+        "interval": "间隔",
+        "target": "接入点",
+        "lastCheck": "最近检查",
+        "latency": "首字节 / 总计",
+        "uptime": "7 天可用率"
+      },
+      "hints": {
+        "name": "探针所在位置，例如 home-mobile",
+        "inbounds": "可探测 VLESS、VMess、Trojan、Shadowsocks 和 Hysteria 入站",
+        "testUrl": "通过每个入站下载。请使用大于约 100 KB 的文件：有些审查系统只在最初几 KB 之后才切断连接。",
+        "directUrl": "可选：也在不经 VPN 的情况下访问，例如你的网站或订阅页面"
+      },
+      "errors": {
+        "name": "名称：1 到 64 个字符，不能包含 < > &",
+        "inbounds": "请至少选择一个入站",
+        "url": "请输入 http:// 或 https:// 地址",
+        "interval": "1 到 1440 分钟"
+      },
+      "status": {
+        "ok": "正常",
+        "fail": "不可达",
+        "flaky": "失败一次",
+        "unknown": "无数据"
+      },
+      "toasts": {
+        "saved": "探针已保存",
+        "deleted": "探针已删除"
+      }
     }
   },
   "tgbot": {
@@ -2706,7 +2769,11 @@
       "qrLegendJSON": "{{ .Code }}. JSON 订阅",
       "qrLegendLink": "{{ .Code }}. 应用链接 {{ .App }}",
       "backupFailed": "无法读取数据库，未发送备份。",
-      "privateOnly": "🤖 此机器人仅在私聊中工作。请在私信中打开它。"
+      "privateOnly": "🤖 此机器人仅在私聊中工作。请在私信中打开它。",
+      "eventProbeDown": "探针 {{ .Probe }}：{{ .Target }} 不可达",
+      "eventProbeUp": "探针 {{ .Probe }}：{{ .Target }} 已恢复可达",
+      "eventProbeBack": "探针 {{ .Probe }} 已恢复报告",
+      "eventProbeStale": "探针 {{ .Probe }} 已 {{ .Minutes }} 分钟未报告"
     },
     "buttons": {
       "closeKeyboard": "❌ 关闭键盘",

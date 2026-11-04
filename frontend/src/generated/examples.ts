@@ -1096,6 +1096,113 @@ export const EXAMPLES: Record<string, unknown> = {
     "xrayState": "",
     "xrayVersion": "25.10.31"
   },
+  "ReachHistoryPoint": {
+    "at": 1736000000000,
+    "key": "1@vpn.example.com:443",
+    "ok": true,
+    "totalMs": 950,
+    "ttfbMs": 180
+  },
+  "ReachProbeCreated": {
+    "probe": {
+      "agentVersion": "1.4.0",
+      "clientEmail": "still-probe-k3m9x2qa",
+      "createdAt": 1736000000000,
+      "directUrl": "",
+      "enabled": true,
+      "id": 1,
+      "inboundIds": [
+        1,
+        2
+      ],
+      "intervalSec": 600,
+      "lastSeenAt": 1736000000000,
+      "name": "home-mobile",
+      "stale": false,
+      "targets": [
+        {
+          "changedAt": 1736000000000,
+          "checks7d": 1008,
+          "consecutiveFails": 0,
+          "inboundId": 1,
+          "key": "1@vpn.example.com:443",
+          "label": "VLESS-443",
+          "lastAt": 1736000000000,
+          "lastBytes": 262144,
+          "lastError": "",
+          "lastOk": true,
+          "lastTotalMs": 950,
+          "lastTtfbMs": 180,
+          "status": "ok",
+          "uptime7d": 99.4
+        }
+      ],
+      "testUrl": "https://speed.cloudflare.com/__down?bytes=262144"
+    },
+    "token": "8fJ2kQ..."
+  },
+  "ReachProbeInput": {
+    "directUrl": "https://example.com/",
+    "enabled": true,
+    "inboundIds": [
+      1,
+      2
+    ],
+    "intervalSec": 600,
+    "name": "home-mobile",
+    "testUrl": "https://speed.cloudflare.com/__down?bytes=262144"
+  },
+  "ReachProbeView": {
+    "agentVersion": "1.4.0",
+    "clientEmail": "still-probe-k3m9x2qa",
+    "createdAt": 1736000000000,
+    "directUrl": "",
+    "enabled": true,
+    "id": 1,
+    "inboundIds": [
+      1,
+      2
+    ],
+    "intervalSec": 600,
+    "lastSeenAt": 1736000000000,
+    "name": "home-mobile",
+    "stale": false,
+    "targets": [
+      {
+        "changedAt": 1736000000000,
+        "checks7d": 1008,
+        "consecutiveFails": 0,
+        "inboundId": 1,
+        "key": "1@vpn.example.com:443",
+        "label": "VLESS-443",
+        "lastAt": 1736000000000,
+        "lastBytes": 262144,
+        "lastError": "",
+        "lastOk": true,
+        "lastTotalMs": 950,
+        "lastTtfbMs": 180,
+        "status": "ok",
+        "uptime7d": 99.4
+      }
+    ],
+    "testUrl": "https://speed.cloudflare.com/__down?bytes=262144"
+  },
+  "ReachTargetView": {
+    "changedAt": 1736000000000,
+    "checks7d": 1008,
+    "consecutiveFails": 0,
+    "inboundId": 1,
+    "key": "1@vpn.example.com:443",
+    "label": "VLESS-443",
+    "lastAt": 1736000000000,
+    "lastBytes": 262144,
+    "lastError": "",
+    "lastOk": true,
+    "lastTotalMs": 950,
+    "lastTtfbMs": 180,
+    "status": "ok",
+    "uptime7d": 99.4
+  },
   "Readiness": {
     "blockers": [
       {

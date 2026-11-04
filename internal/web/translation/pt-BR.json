@@ -126,7 +126,8 @@
     "openMenu": "Abrir menu",
     "pinSidebar": "Fixar barra lateral",
     "unpinSidebar": "Desafixar barra lateral",
-    "subFormats": "Sub Formats"
+    "subFormats": "Sub Formats",
+    "probes": "Sondas"
   },
   "pages": {
     "login": {
@@ -1901,7 +1902,11 @@
       "subHostSortMode": "Ordem dos nós da assinatura",
       "subHostSortInbound": "Ordem das entradas (padrão)",
       "subHostSortHosts": "Ordem dos hosts",
-      "subHostSortModeDesc": "Segue a ordem da página de hosts entre diferentes entradas. Define a ordem emitida pelo servidor; os aplicativos clientes podem aplicar sua própria ordenação."
+      "subHostSortModeDesc": "Segue a ordem da página de hosts entre diferentes entradas. Define a ordem emitida pelo servidor; os aplicativos clientes podem aplicar sua própria ordenação.",
+      "eventGroupProbe": "Sondas de acessibilidade",
+      "eventProbeDown": "Entrada inacessível",
+      "eventProbeUp": "Entrada acessível de novo",
+      "eventProbeStale": "Sonda em silêncio"
     },
     "xray": {
       "importRules": "Importar regras",
@@ -2564,6 +2569,64 @@
         "badVlessRoute": "Insira um único número entre 0 e 65535"
       },
       "dragToReorder": "Arraste para reordenar {name}"
+    },
+    "probes": {
+      "title": "Sondas de acessibilidade",
+      "intro": "Uma sonda é um pequeno agente que você roda em qualquer máquina Linux dentro do país que importa: um servidor doméstico, um Raspberry Pi ou um VPS local barato. A cada poucos minutos ela se conecta pelas suas entradas como um cliente real, baixa um arquivo de teste e envia o resultado para cá.",
+      "alertsHint": "Os alertas chegam pelo bot do Telegram: ative os eventos de sondas de acessibilidade em Configurações do Painel → Telegram.",
+      "addProbe": "Adicionar sonda",
+      "editProbe": "Editar sonda",
+      "empty": "Nenhuma sonda ainda. Adicione uma e execute o comando de instalação em uma máquina dentro da rede censurada.",
+      "minutes": "min",
+      "directCheck": "Verificação direta (sem VPN)",
+      "history7d": "7 dias",
+      "lastReport": "último relatório {time}",
+      "neverReported": "ainda não enviou relatório",
+      "stale": "Sem relatórios",
+      "rotateToken": "Novo token",
+      "rotateConfirm": "Emitir um novo token? O atual para de funcionar imediatamente. O cliente da sonda também recebe chaves novas, então uma configuração ou link antigo deixa de conectar.",
+      "clientNote": "Conecta como o cliente gerenciado pelo painel {email}. Não edite nem exclua esse cliente; ele não tem limite de tráfego nem de tempo.",
+      "noResults": "Ainda sem resultados",
+      "tokenTitle": "Token da sonda",
+      "tokenOnce": "Copie o token agora: o painel guarda apenas o hash e não poderá mostrá-lo de novo.",
+      "installCommand": "Instalar na máquina da sonda (Linux, como root):",
+      "installHint": "O comando instala o agente com o Xray e um timer do systemd e executa a primeira verificação.",
+      "token": "Token",
+      "deleteConfirm": "Excluir a sonda \"{name}\"?",
+      "deleteHint": "O token para de funcionar, o cliente é removido das entradas e o histórico é apagado.",
+      "fields": {
+        "name": "Nome",
+        "inbounds": "Entradas",
+        "testUrl": "URL de teste",
+        "directUrl": "URL direta",
+        "interval": "Intervalo",
+        "target": "Ponto de acesso",
+        "lastCheck": "Última verificação",
+        "latency": "TTFB / total",
+        "uptime": "Disponibilidade, 7 dias"
+      },
+      "hints": {
+        "name": "Onde a sonda roda, por exemplo home-mobile",
+        "inbounds": "Entradas VLESS, VMess, Trojan, Shadowsocks e Hysteria podem ser sondadas",
+        "testUrl": "Baixado por cada entrada. Use um arquivo maior que uns 100 KB: alguns censores cortam a conexão só depois dos primeiros kilobytes.",
+        "directUrl": "Opcional: também acessado sem VPN, por exemplo seu site ou sua página de assinatura"
+      },
+      "errors": {
+        "name": "Nome: de 1 a 64 caracteres, sem < > &",
+        "inbounds": "Escolha pelo menos uma entrada",
+        "url": "Informe uma URL http:// ou https://",
+        "interval": "De 1 a 1440 minutos"
+      },
+      "status": {
+        "ok": "OK",
+        "fail": "Fora",
+        "flaky": "Uma falha",
+        "unknown": "Sem dados"
+      },
+      "toasts": {
+        "saved": "Sonda salva",
+        "deleted": "Sonda excluída"
+      }
     }
   },
   "tgbot": {
@@ -2706,7 +2769,11 @@
       "qrLegendJSON": "{{ .Code }}. Assinatura JSON",
       "qrLegendLink": "{{ .Code }}. Link do app {{ .App }}",
       "backupFailed": "Não foi possível ler o banco de dados; nenhum backup foi enviado.",
-      "privateOnly": "🤖 Este bot funciona apenas no chat privado. Abra-o em uma mensagem direta."
+      "privateOnly": "🤖 Este bot funciona apenas no chat privado. Abra-o em uma mensagem direta.",
+      "eventProbeDown": "Sonda {{ .Probe }}: {{ .Target }} NÃO está acessível",
+      "eventProbeUp": "Sonda {{ .Probe }}: {{ .Target }} está acessível de novo",
+      "eventProbeBack": "A sonda {{ .Probe }} voltou a enviar relatórios",
+      "eventProbeStale": "A sonda {{ .Probe }} não envia relatório há {{ .Minutes }} min"
     },
     "buttons": {
       "closeKeyboard": "❌ Fechar teclado",

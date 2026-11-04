@@ -4450,6 +4450,260 @@ export const SCHEMAS: Record<string, unknown> = {
     ],
     "type": "object"
   },
+  "ReachHistoryPoint": {
+    "properties": {
+      "at": {
+        "example": 1736000000000,
+        "format": "int64",
+        "type": "integer"
+      },
+      "key": {
+        "example": "1@vpn.example.com:443",
+        "type": "string"
+      },
+      "ok": {
+        "example": true,
+        "type": "boolean"
+      },
+      "totalMs": {
+        "example": 950,
+        "type": "integer"
+      },
+      "ttfbMs": {
+        "example": 180,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "at",
+      "key",
+      "ok",
+      "totalMs",
+      "ttfbMs"
+    ],
+    "type": "object"
+  },
+  "ReachProbeCreated": {
+    "description": "ReachProbeCreated carries the plaintext token, which is never shown again.",
+    "properties": {
+      "probe": {
+        "$ref": "#/components/schemas/ReachProbeView"
+      },
+      "token": {
+        "example": "8fJ2kQ...",
+        "type": "string"
+      }
+    },
+    "required": [
+      "probe",
+      "token"
+    ],
+    "type": "object"
+  },
+  "ReachProbeInput": {
+    "properties": {
+      "directUrl": {
+        "example": "https://example.com/",
+        "type": "string"
+      },
+      "enabled": {
+        "description": "Enabled is read by Update only; omitted keeps the probe's current state.",
+        "example": true,
+        "nullable": true,
+        "type": "boolean"
+      },
+      "inboundIds": {
+        "example": [
+          1,
+          2
+        ],
+        "items": {
+          "type": "integer"
+        },
+        "type": "array"
+      },
+      "intervalSec": {
+        "example": 600,
+        "type": "integer"
+      },
+      "name": {
+        "example": "home-mobile",
+        "type": "string"
+      },
+      "testUrl": {
+        "example": "https://speed.cloudflare.com/__down?bytes=262144",
+        "type": "string"
+      }
+    },
+    "required": [
+      "directUrl",
+      "inboundIds",
+      "intervalSec",
+      "name",
+      "testUrl"
+    ],
+    "type": "object"
+  },
+  "ReachProbeView": {
+    "properties": {
+      "agentVersion": {
+        "example": "1.4.0",
+        "type": "string"
+      },
+      "clientEmail": {
+        "example": "still-probe-k3m9x2qa",
+        "type": "string"
+      },
+      "createdAt": {
+        "example": 1736000000000,
+        "format": "int64",
+        "type": "integer"
+      },
+      "directUrl": {
+        "type": "string"
+      },
+      "enabled": {
+        "example": true,
+        "type": "boolean"
+      },
+      "id": {
+        "example": 1,
+        "type": "integer"
+      },
+      "inboundIds": {
+        "example": [
+          1,
+          2
+        ],
+        "items": {
+          "type": "integer"
+        },
+        "type": "array"
+      },
+      "intervalSec": {
+        "example": 600,
+        "type": "integer"
+      },
+      "lastSeenAt": {
+        "example": 1736000000000,
+        "format": "int64",
+        "type": "integer"
+      },
+      "name": {
+        "example": "home-mobile",
+        "type": "string"
+      },
+      "stale": {
+        "example": false,
+        "type": "boolean"
+      },
+      "targets": {
+        "items": {
+          "$ref": "#/components/schemas/ReachTargetView"
+        },
+        "type": "array"
+      },
+      "testUrl": {
+        "example": "https://speed.cloudflare.com/__down?bytes=262144",
+        "type": "string"
+      }
+    },
+    "required": [
+      "agentVersion",
+      "clientEmail",
+      "createdAt",
+      "directUrl",
+      "enabled",
+      "id",
+      "inboundIds",
+      "intervalSec",
+      "lastSeenAt",
+      "name",
+      "stale",
+      "targets",
+      "testUrl"
+    ],
+    "type": "object"
+  },
+  "ReachTargetView": {
+    "properties": {
+      "changedAt": {
+        "example": 1736000000000,
+        "format": "int64",
+        "type": "integer"
+      },
+      "checks7d": {
+        "example": 1008,
+        "type": "integer"
+      },
+      "consecutiveFails": {
+        "example": 0,
+        "type": "integer"
+      },
+      "inboundId": {
+        "example": 1,
+        "type": "integer"
+      },
+      "key": {
+        "example": "1@vpn.example.com:443",
+        "type": "string"
+      },
+      "label": {
+        "example": "VLESS-443",
+        "type": "string"
+      },
+      "lastAt": {
+        "example": 1736000000000,
+        "format": "int64",
+        "type": "integer"
+      },
+      "lastBytes": {
+        "example": 262144,
+        "format": "int64",
+        "type": "integer"
+      },
+      "lastError": {
+        "type": "string"
+      },
+      "lastOk": {
+        "example": true,
+        "type": "boolean"
+      },
+      "lastTotalMs": {
+        "example": 950,
+        "type": "integer"
+      },
+      "lastTtfbMs": {
+        "example": 180,
+        "type": "integer"
+      },
+      "status": {
+        "example": "ok",
+        "type": "string"
+      },
+      "uptime7d": {
+        "example": 99.4,
+        "type": "number"
+      }
+    },
+    "required": [
+      "changedAt",
+      "checks7d",
+      "consecutiveFails",
+      "inboundId",
+      "key",
+      "label",
+      "lastAt",
+      "lastBytes",
+      "lastError",
+      "lastOk",
+      "lastTotalMs",
+      "lastTtfbMs",
+      "status",
+      "uptime7d"
+    ],
+    "type": "object"
+  },
   "Readiness": {
     "description": "Readiness is the host's ability to run any kernel-mode inbound at all.",
     "properties": {

@@ -264,6 +264,7 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 	s.index = controller.NewIndexController(g)
 	s.panel = controller.NewXUIController(g)
 	s.api = controller.NewAPIController(g)
+	controller.NewReachProbeAgentController(g.Group("/probe/v1"))
 
 	// Initialize WebSocket hub
 	s.wsHub = websocket.NewHub()
@@ -315,6 +316,7 @@ const (
 	cadenceCertWatch     = "@every 1m"
 	cadenceTorrentBlock  = "@every 1m"
 	cadenceCheckHash     = "@every 2m"
+	cadenceReachStale    = "@every 1m"
 	// cpu.Percent samples over a full minute (blocking), so a finer cadence just
 	// stacks overlapping samplers; subscribers rate-limit alerts to 1/min anyway.
 	cadenceCPUAlarm    = "@every 1m"
@@ -380,6 +382,8 @@ func (s *Server) startTask(restartXray, forceXrayRestart bool, loc *time.Locatio
 	_, _ = s.cron.AddJob(cadenceOutboundSub, job.NewOutboundSubscriptionJob())
 
 	_, _ = s.cron.AddJob(cadenceReapOrphans, job.NewReapSyncOrphansJob())
+
+	_, _ = s.cron.AddJob(cadenceReachStale, job.NewReachProbeStaleJob())
 
 	// Warm permanent routing URLs immediately and refresh them outside the
 	// latency-sensitive subscription request path.

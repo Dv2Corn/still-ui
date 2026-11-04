@@ -143,6 +143,13 @@ func (t *Tgbot) formatEventMessage(e eventbus.Event) string {
 		}
 		return msg
 
+	case eventbus.EventProbeDown, eventbus.EventProbeUp, eventbus.EventProbeStale:
+		data, ok := e.Data.(*eventbus.ProbeHealthData)
+		if !ok {
+			return ""
+		}
+		return header + t.formatProbeEvent(e.Type, data)
+
 	case eventbus.EventCPUHigh:
 		if data, ok := e.Data.(*eventbus.SystemMetricData); ok {
 			tgCpu, err := t.settingService.GetTgCpu()
@@ -234,4 +241,29 @@ func (t *Tgbot) formatHealthAlert(eventType eventbus.EventType, data *eventbus.H
 		msg += "\n⏰ " + t.I18nBot("tgbot.messages.alertStill", "Since=="+data.Since.Local().Format("2006-01-02 15:04"))
 	}
 	return msg
+}
+
+// formatProbeEvent words a reachability probe alert; I18nBot escapes the values
+// for HTML mode, oneLine keeps an agent-sent error on its own line.
+func (t *Tgbot) formatProbeEvent(eventType eventbus.EventType, data *eventbus.ProbeHealthData) string {
+	probe, target := "Probe=="+oneLine(data.Probe), "Target=="+oneLine(data.Target)
+	switch eventType {
+	case eventbus.EventProbeDown:
+		msg := "🔴 " + t.I18nBot("tgbot.messages.eventProbeDown", probe, target)
+		if data.Error != "" {
+			msg += "\n" + t.I18nBot("tgbot.messages.eventErrorDetail", "Error=="+oneLine(data.Error))
+		}
+		return msg
+	case eventbus.EventProbeUp:
+		if data.Target == "" {
+			return "🟢 " + t.I18nBot("tgbot.messages.eventProbeBack", probe)
+		}
+		msg := "🟢 " + t.I18nBot("tgbot.messages.eventProbeUp", probe, target)
+		if data.LatencyMs > 0 {
+			msg += "\n" + t.I18nBot("tgbot.messages.eventDelayDetail", "Delay=="+strconv.Itoa(data.LatencyMs))
+		}
+		return msg
+	default:
+		return "⚠️ " + t.I18nBot("tgbot.messages.eventProbeStale", probe, "Minutes=="+strconv.Itoa(data.SilentFor))
+	}
 }

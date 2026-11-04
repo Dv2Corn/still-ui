@@ -126,7 +126,8 @@
     "openMenu": "Otvoriť menu",
     "pinSidebar": "Pripnúť bočné menu",
     "unpinSidebar": "Odopnúť bočné menu",
-    "subFormats": "Formáty odberu"
+    "subFormats": "Formáty odberu",
+    "probes": "Sondy"
   },
   "pages": {
     "login": {
@@ -2022,7 +2023,11 @@
       "subHostSortMode": "Poradie uzlov v predplatnom",
       "subHostSortInbound": "Poradie inboundov (predvolené)",
       "subHostSortHosts": "Poradie hostiteľov",
-      "subHostSortModeDesc": "Poradie hostiteľov sa riadi stránkou Hostitelia naprieč inboundmi. Určuje poradie, ktoré odosiela server; klientske aplikácie môžu použiť vlastné triedenie."
+      "subHostSortModeDesc": "Poradie hostiteľov sa riadi stránkou Hostitelia naprieč inboundmi. Určuje poradie, ktoré odosiela server; klientske aplikácie môžu použiť vlastné triedenie.",
+      "eventGroupProbe": "Sondy dostupnosti",
+      "eventProbeDown": "Vstup nedostupný",
+      "eventProbeUp": "Vstup opäť dostupný",
+      "eventProbeStale": "Sonda mlčí"
     },
     "xray": {
       "save": "Uložiť",
@@ -2564,6 +2569,64 @@
       "routingScript": "Skript smerovania",
       "routingScriptDesc": "Cesta k súboru .lua s funkciou HandleRoute, absolútna alebo vzhľadom na priečinok bin Xray. Skript vyberá každú trasu a Xray ignoruje všetky pravidlá vrátane pravidla api panelu. Vstup api preto smerujte na výstup api, inak prestanú fungovať štatistiky spotreby aj zmeny klientov za behu. Ak súbor chýba alebo je neplatný, Xray sa nespustí.",
       "routingScriptActive": "V časti {section} je nastavený skript smerovania, preto Xray tieto pravidlá ignoruje."
+    },
+    "probes": {
+      "title": "Sondy dostupnosti",
+      "intro": "Sonda je malý agent, ktorý spustíte na ľubovoľnom počítači s Linuxom v krajine, o ktorú vám ide: na domácom serveri, Raspberry Pi alebo lacnom miestnom VPS. Každých pár minút sa pripojí cez vaše vstupy ako skutočný klient, stiahne testovací súbor a pošle výsledok sem.",
+      "alertsHint": "Upozornenia chodia cez Telegram bota: zapnite udalosti sond dostupnosti v Nastavenia panelu → Telegram.",
+      "addProbe": "Pridať sondu",
+      "editProbe": "Upraviť sondu",
+      "empty": "Zatiaľ žiadne sondy. Pridajte jednu a spustite inštalačný príkaz na počítači v cenzurovanej sieti.",
+      "minutes": "min",
+      "directCheck": "Priama kontrola (bez VPN)",
+      "history7d": "7 dní",
+      "lastReport": "posledné hlásenie {time}",
+      "neverReported": "ešte sa neozvala",
+      "stale": "Bez hlásení",
+      "rotateToken": "Nový token",
+      "rotateConfirm": "Vydať nový token? Súčasný okamžite prestane fungovať. Klient sondy dostane aj nové kľúče, takže stará konfigurácia ani odkaz sa už nepripoja.",
+      "clientNote": "Pripája sa ako klient spravovaný panelom {email}. Tohto klienta neupravujte ani nemažte; nemá limit prenosu ani času.",
+      "noResults": "Zatiaľ žiadne výsledky",
+      "tokenTitle": "Token sondy",
+      "tokenOnce": "Skopírujte token teraz: panel si uchováva len jeho hash a znova ho zobraziť nevie.",
+      "installCommand": "Inštalácia na počítač sondy (Linux, ako root):",
+      "installHint": "Príkaz nainštaluje agenta s Xray a časovačom systemd a spustí prvú kontrolu.",
+      "token": "Token",
+      "deleteConfirm": "Odstrániť sondu „{name}“?",
+      "deleteHint": "Jej token prestane fungovať, jej klient sa odoberie zo vstupov a história sa vymaže.",
+      "fields": {
+        "name": "Názov",
+        "inbounds": "Vstupy",
+        "testUrl": "Testovacia URL",
+        "directUrl": "Priama URL",
+        "interval": "Interval",
+        "target": "Prístupový bod",
+        "lastCheck": "Posledná kontrola",
+        "latency": "Prvý bajt / spolu",
+        "uptime": "Dostupnosť za 7 dní"
+      },
+      "hints": {
+        "name": "Kde sonda beží, napríklad home-mobile",
+        "inbounds": "Skúšať sa dajú vstupy VLESS, VMess, Trojan, Shadowsocks a Hysteria",
+        "testUrl": "Sťahuje sa cez každý vstup. Použite súbor väčší ako asi 100 KB: niektoré cenzúrne systémy prerušia spojenie až po prvých kilobajtoch.",
+        "directUrl": "Voliteľné: otvára sa aj bez VPN, napríklad váš web alebo stránka predplatného"
+      },
+      "errors": {
+        "name": "Názov: 1 až 64 znakov, bez < > &",
+        "inbounds": "Vyberte aspoň jeden vstup",
+        "url": "Zadajte URL začínajúcu http:// alebo https://",
+        "interval": "Od 1 do 1440 minút"
+      },
+      "status": {
+        "ok": "OK",
+        "fail": "Nedostupné",
+        "flaky": "Raz zlyhalo",
+        "unknown": "Bez údajov"
+      },
+      "toasts": {
+        "saved": "Sonda uložená",
+        "deleted": "Sonda odstránená"
+      }
     }
   },
   "tgbot": {
@@ -2706,7 +2769,11 @@
       "qrLegendJSON": "{{ .Code }}. Predplatné JSON",
       "qrLegendLink": "{{ .Code }}. Odkaz pre aplikáciu {{ .App }}",
       "backupFailed": "Databázu sa nepodarilo prečítať; záloha nebola odoslaná.",
-      "privateOnly": "🤖 Tento bot funguje len v súkromnom chate. Otvorte ho, prosím, v priamej správe."
+      "privateOnly": "🤖 Tento bot funguje len v súkromnom chate. Otvorte ho, prosím, v priamej správe.",
+      "eventProbeDown": "Sonda {{ .Probe }}: {{ .Target }} je NEDOSTUPNÝ",
+      "eventProbeUp": "Sonda {{ .Probe }}: {{ .Target }} je opäť dostupný",
+      "eventProbeBack": "Sonda {{ .Probe }} opäť posiela hlásenia",
+      "eventProbeStale": "Sonda {{ .Probe }} sa neozvala {{ .Minutes }} min"
     },
     "buttons": {
       "closeKeyboard": "❌ Zavrieť klávesnicu",

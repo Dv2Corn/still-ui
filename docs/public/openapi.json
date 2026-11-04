@@ -4354,6 +4354,260 @@
         ],
         "type": "object"
       },
+      "ReachHistoryPoint": {
+        "properties": {
+          "at": {
+            "example": 1736000000000,
+            "format": "int64",
+            "type": "integer"
+          },
+          "key": {
+            "example": "1@vpn.example.com:443",
+            "type": "string"
+          },
+          "ok": {
+            "example": true,
+            "type": "boolean"
+          },
+          "totalMs": {
+            "example": 950,
+            "type": "integer"
+          },
+          "ttfbMs": {
+            "example": 180,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "at",
+          "key",
+          "ok",
+          "totalMs",
+          "ttfbMs"
+        ],
+        "type": "object"
+      },
+      "ReachProbeCreated": {
+        "description": "ReachProbeCreated carries the plaintext token, which is never shown again.",
+        "properties": {
+          "probe": {
+            "$ref": "#/components/schemas/ReachProbeView"
+          },
+          "token": {
+            "example": "8fJ2kQ...",
+            "type": "string"
+          }
+        },
+        "required": [
+          "probe",
+          "token"
+        ],
+        "type": "object"
+      },
+      "ReachProbeInput": {
+        "properties": {
+          "directUrl": {
+            "example": "https://example.com/",
+            "type": "string"
+          },
+          "enabled": {
+            "description": "Enabled is read by Update only; omitted keeps the probe's current state.",
+            "example": true,
+            "nullable": true,
+            "type": "boolean"
+          },
+          "inboundIds": {
+            "example": [
+              1,
+              2
+            ],
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "intervalSec": {
+            "example": 600,
+            "type": "integer"
+          },
+          "name": {
+            "example": "home-mobile",
+            "type": "string"
+          },
+          "testUrl": {
+            "example": "https://speed.cloudflare.com/__down?bytes=262144",
+            "type": "string"
+          }
+        },
+        "required": [
+          "directUrl",
+          "inboundIds",
+          "intervalSec",
+          "name",
+          "testUrl"
+        ],
+        "type": "object"
+      },
+      "ReachProbeView": {
+        "properties": {
+          "agentVersion": {
+            "example": "1.4.0",
+            "type": "string"
+          },
+          "clientEmail": {
+            "example": "still-probe-k3m9x2qa",
+            "type": "string"
+          },
+          "createdAt": {
+            "example": 1736000000000,
+            "format": "int64",
+            "type": "integer"
+          },
+          "directUrl": {
+            "type": "string"
+          },
+          "enabled": {
+            "example": true,
+            "type": "boolean"
+          },
+          "id": {
+            "example": 1,
+            "type": "integer"
+          },
+          "inboundIds": {
+            "example": [
+              1,
+              2
+            ],
+            "items": {
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "intervalSec": {
+            "example": 600,
+            "type": "integer"
+          },
+          "lastSeenAt": {
+            "example": 1736000000000,
+            "format": "int64",
+            "type": "integer"
+          },
+          "name": {
+            "example": "home-mobile",
+            "type": "string"
+          },
+          "stale": {
+            "example": false,
+            "type": "boolean"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/ReachTargetView"
+            },
+            "type": "array"
+          },
+          "testUrl": {
+            "example": "https://speed.cloudflare.com/__down?bytes=262144",
+            "type": "string"
+          }
+        },
+        "required": [
+          "agentVersion",
+          "clientEmail",
+          "createdAt",
+          "directUrl",
+          "enabled",
+          "id",
+          "inboundIds",
+          "intervalSec",
+          "lastSeenAt",
+          "name",
+          "stale",
+          "targets",
+          "testUrl"
+        ],
+        "type": "object"
+      },
+      "ReachTargetView": {
+        "properties": {
+          "changedAt": {
+            "example": 1736000000000,
+            "format": "int64",
+            "type": "integer"
+          },
+          "checks7d": {
+            "example": 1008,
+            "type": "integer"
+          },
+          "consecutiveFails": {
+            "example": 0,
+            "type": "integer"
+          },
+          "inboundId": {
+            "example": 1,
+            "type": "integer"
+          },
+          "key": {
+            "example": "1@vpn.example.com:443",
+            "type": "string"
+          },
+          "label": {
+            "example": "VLESS-443",
+            "type": "string"
+          },
+          "lastAt": {
+            "example": 1736000000000,
+            "format": "int64",
+            "type": "integer"
+          },
+          "lastBytes": {
+            "example": 262144,
+            "format": "int64",
+            "type": "integer"
+          },
+          "lastError": {
+            "type": "string"
+          },
+          "lastOk": {
+            "example": true,
+            "type": "boolean"
+          },
+          "lastTotalMs": {
+            "example": 950,
+            "type": "integer"
+          },
+          "lastTtfbMs": {
+            "example": 180,
+            "type": "integer"
+          },
+          "status": {
+            "example": "ok",
+            "type": "string"
+          },
+          "uptime7d": {
+            "example": 99.4,
+            "type": "number"
+          }
+        },
+        "required": [
+          "changedAt",
+          "checks7d",
+          "consecutiveFails",
+          "inboundId",
+          "key",
+          "label",
+          "lastAt",
+          "lastBytes",
+          "lastError",
+          "lastOk",
+          "lastTotalMs",
+          "lastTtfbMs",
+          "status",
+          "uptime7d"
+        ],
+        "type": "object"
+      },
       "Readiness": {
         "description": "Readiness is the host's ability to run any kernel-mode inbound at all.",
         "properties": {
@@ -4963,6 +5217,10 @@
     {
       "name": "Hosts",
       "description": "Per-inbound override endpoints. Each enabled host renders one extra subscription link/proxy with its own address/port/TLS, superseding the legacy externalProxy array. All endpoints under /panel/api/hosts."
+    },
+    {
+      "name": "Reachability probes",
+      "description": "External agents that test the inbounds from inside a censored network (cmd/still-probe). These endpoints manage the probes; the agents use probe/v1/job and probe/v1/report under the panel base path with their own Bearer token, which opens nothing under /panel/api."
     },
     {
       "name": "Backup",
@@ -13145,6 +13403,381 @@
                       "type": "string"
                     },
                     "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/probes/list": {
+      "get": {
+        "tags": [
+          "Reachability probes"
+        ],
+        "summary": "Every probe with the latest state of each tested endpoint and its 7-day uptime.",
+        "operationId": "get_panel_api_probes_list",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ReachProbeView"
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": [
+                    {
+                      "agentVersion": "1.4.0",
+                      "clientEmail": "still-probe-k3m9x2qa",
+                      "createdAt": 1736000000000,
+                      "directUrl": "",
+                      "enabled": true,
+                      "id": 1,
+                      "inboundIds": [
+                        1,
+                        2
+                      ],
+                      "intervalSec": 600,
+                      "lastSeenAt": 1736000000000,
+                      "name": "home-mobile",
+                      "stale": false,
+                      "targets": [
+                        {
+                          "changedAt": 1736000000000,
+                          "checks7d": 1008,
+                          "consecutiveFails": 0,
+                          "inboundId": 1,
+                          "key": "1@vpn.example.com:443",
+                          "label": "VLESS-443",
+                          "lastAt": 1736000000000,
+                          "lastBytes": 262144,
+                          "lastError": "",
+                          "lastOk": true,
+                          "lastTotalMs": 950,
+                          "lastTtfbMs": 180,
+                          "status": "ok",
+                          "uptime7d": 99.4
+                        }
+                      ],
+                      "testUrl": "https://speed.cloudflare.com/__down?bytes=262144"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/probes/history/{id}": {
+      "get": {
+        "tags": [
+          "Reachability probes"
+        ],
+        "summary": "One probe's results of the last seven days, oldest first.",
+        "operationId": "get_panel_api_probes_history_id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Probe ID.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ReachHistoryPoint"
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": [
+                    {
+                      "at": 1736000000000,
+                      "key": "1@vpn.example.com:443",
+                      "ok": true,
+                      "totalMs": 950,
+                      "ttfbMs": 180
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/probes/add": {
+      "post": {
+        "tags": [
+          "Reachability probes"
+        ],
+        "summary": "Create a probe and the panel-managed client it connects as. The response carries the plaintext token once; only its hash is stored.",
+        "operationId": "post_panel_api_probes_add",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "name": "home-1",
+                "inboundIds": [
+                  1
+                ],
+                "testUrl": "https://speed.cloudflare.com/__down?bytes=262144",
+                "directUrl": "",
+                "intervalSec": 600
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "$ref": "#/components/schemas/ReachProbeCreated"
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": {
+                    "probe": {
+                      "agentVersion": "1.4.0",
+                      "clientEmail": "still-probe-k3m9x2qa",
+                      "createdAt": 1736000000000,
+                      "directUrl": "",
+                      "enabled": true,
+                      "id": 1,
+                      "inboundIds": [
+                        1,
+                        2
+                      ],
+                      "intervalSec": 600,
+                      "lastSeenAt": 1736000000000,
+                      "name": "home-mobile",
+                      "stale": false,
+                      "targets": [
+                        {
+                          "changedAt": 1736000000000,
+                          "checks7d": 1008,
+                          "consecutiveFails": 0,
+                          "inboundId": 1,
+                          "key": "1@vpn.example.com:443",
+                          "label": "VLESS-443",
+                          "lastAt": 1736000000000,
+                          "lastBytes": 262144,
+                          "lastError": "",
+                          "lastOk": true,
+                          "lastTotalMs": 950,
+                          "lastTtfbMs": 180,
+                          "status": "ok",
+                          "uptime7d": 99.4
+                        }
+                      ],
+                      "testUrl": "https://speed.cloudflare.com/__down?bytes=262144"
+                    },
+                    "token": "8fJ2kQ..."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/probes/update/{id}": {
+      "post": {
+        "tags": [
+          "Reachability probes"
+        ],
+        "summary": "Change a probe's settings; its client is attached to the chosen inbounds and detached from the rest.",
+        "operationId": "post_panel_api_probes_update_id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Probe ID.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "name": "home-1",
+                "enabled": true,
+                "inboundIds": [
+                  1,
+                  2
+                ],
+                "testUrl": "https://speed.cloudflare.com/__down?bytes=262144",
+                "directUrl": "",
+                "intervalSec": 600
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/probes/del/{id}": {
+      "post": {
+        "tags": [
+          "Reachability probes"
+        ],
+        "summary": "Revoke a probe: its token stops working, its client and its history are deleted.",
+        "operationId": "post_panel_api_probes_del_id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Probe ID.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/probes/rotateToken/{id}": {
+      "post": {
+        "tags": [
+          "Reachability probes"
+        ],
+        "summary": "Issue a new token for a probe; the previous one stops working at once.",
+        "operationId": "post_panel_api_probes_rotateToken_id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Probe ID.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": {
+                    "token": "new-token-string"
                   }
                 }
               }
