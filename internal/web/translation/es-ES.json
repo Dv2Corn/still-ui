@@ -152,6 +152,7 @@
       "xraySwitch": "Versión",
       "xrayUpdates": "Actualizaciones de Xray",
       "xraySwitchClickDesk": "Elige sabiamente, ya que las versiones anteriores pueden no ser compatibles con las configuraciones actuales.",
+      "xraySwitchOfficialCore": "Este panel incluye la compilación de Xray de still-ui (v26.10.31 con un parche en REALITY). Cada versión de abajo es una versión oficial de Xray y reemplaza esa compilación. Xray oficial 26.9.9 y posteriores rechazan en REALITY a los clientes con la huella ios y a los clientes basados en sing-box, como Hiddify y Karing. Para volver a la compilación de still-ui, ejecuta still-ui update.",
       "updatePanel": "Actualizar panel",
       "panelUpdateDesc": "Esto actualizará still-ui a la última versión y reiniciará el servicio del panel.",
       "currentPanelVersion": "Versión actual del panel",

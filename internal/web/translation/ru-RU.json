@@ -152,6 +152,7 @@
       "xraySwitch": "Выбор версии",
       "xrayUpdates": "Обновления Xray",
       "xraySwitchClickDesk": "Важно: старые версии могут не поддерживать текущие настройки",
+      "xraySwitchOfficialCore": "В панели стоит сборка Xray от still-ui (v26.10.31 с правкой REALITY). Каждая версия ниже — официальный выпуск Xray, он заменит эту сборку. Официальный Xray 26.9.9 и новее не пускает в REALITY клиентов с отпечатком ios и клиентов на sing-box (Hiddify, Karing). Вернуть сборку still-ui — командой still-ui update.",
       "updatePanel": "Обновить панель",
       "panelUpdateDesc": "Это обновит still-ui до последнего релиза и перезапустит сервис панели.",
       "currentPanelVersion": "Текущая версия панели",

@@ -3,7 +3,7 @@
 #
 #   scripts/still-release.sh <output-dir> [amd64 arm64 ...]
 #
-# Needs bash, docker, curl, unzip, tar and sha256sum on a Linux x86_64 host.
+# Needs bash, docker, git, curl, tar and sha256sum on a Linux x86_64 host.
 # Produces <output-dir>/still-ui-linux-<arch>.tar.gz and a .sha256 next to it,
 # in the layout install.sh/update.sh expect (the same as 3x-ui's release
 # archives, with the top folder named still-ui):
@@ -15,12 +15,14 @@
 #   still-ui/bin/xray-linux-<arch>, mtg-linux-<arch>, geo*.dat
 #
 # Mirrors .github/workflows/release.yml: frontend with Node from .nvmrc, Go from
-# go.mod, Bootlin musl cross toolchains, Xray-core pinned below, geo files and
-# mtg-multi from their latest releases. Downloads are cached in
-# $STILL_RELEASE_CACHE (default ~/.cache/still-release).
+# go.mod, Bootlin musl cross toolchains, geo files and mtg-multi from their
+# latest releases. Xray is not downloaded: scripts/xray-build/build.sh builds
+# Xray-core v26.10.31 with still-ui's REALITY patch from source, pinned by
+# commit, Go version and sha256 (see scripts/xray-build/README.md). Downloads
+# and the Go caches are kept in $STILL_RELEASE_CACHE (default ~/.cache/still-release).
 set -euo pipefail
 
-XRAY_VERSION="${XRAY_VERSION:-v26.10.31}"
+XRAY_VERSION="v26.10.31 (still-ui build, scripts/xray-build)"
 
 die() { echo "still-release: $*" >&2; exit 1; }
 
@@ -52,14 +54,19 @@ docker run --rm -u "$UIDGID" -e HOME=/tmp -v "$CACHE/npm:/tmp/.npm" -v "$SRC:/sr
     || { tail -40 "$CACHE/frontend.log"; die "frontend build failed"; }
 [[ -f "$SRC/internal/web/dist/index.html" ]] || die "frontend build produced no internal/web/dist/index.html"
 
+# Xray core for every arch, from source (fails on a sha256 other than the pinned one).
+XRAY_DIR="$SRC/build-release/xray"
+XRAY_BUILD_GOCACHE="$CACHE/xray-go" "$SRC/scripts/xray-build/build.sh" "$XRAY_DIR" "${ARCHES[@]}" \
+    || die "xray build failed"
+
 # mtg-multi (MTProto sidecar): resolve the latest tag once.
 MTG_VER=$(curl -sf -o /dev/null -w '%{redirect_url}' "https://github.com/mhsanaei/mtg-multi/releases/latest" | sed -n 's#.*/releases/tag/##p')
 [[ -n "$MTG_VER" ]] || die "could not resolve the latest mtg-multi release"
 
 for arch in "${ARCHES[@]}"; do
     case "$arch" in
-        amd64) bootlin="x86-64"; xray_zip="64"; goarch="amd64" ;;
-        arm64) bootlin="aarch64"; xray_zip="arm64-v8a"; goarch="arm64" ;;
+        amd64) bootlin="x86-64"; goarch="amd64" ;;
+        arm64) bootlin="aarch64"; goarch="arm64" ;;
         *) die "unsupported arch $arch (amd64, arm64)" ;;
     esac
 
@@ -91,10 +98,8 @@ for arch in "${ARCHES[@]}"; do
     cp "$SRC/x-ui.sh" "$SRC/x-ui.rc" "$SRC/x-ui.service.debian" "$SRC/x-ui.service.arch" "$SRC/x-ui.service.rhel" "$SRC/still-xray.service" "$pkg/"
     chmod 755 "$pkg/x-ui" "$pkg/x-ui.sh"
 
-    fetch "https://github.com/XTLS/Xray-core/releases/download/${XRAY_VERSION}/Xray-linux-${xray_zip}.zip" "$CACHE/dl/Xray-${XRAY_VERSION}-linux-${xray_zip}.zip"
-    unzip -q -o "$CACHE/dl/Xray-${XRAY_VERSION}-linux-${xray_zip}.zip" xray -d "$stage"
-    mv "$stage/xray" "$pkg/bin/xray-linux-$arch"
-    chmod 755 "$pkg/bin/xray-linux-$arch"
+    # Patched Xray, built above; the build script already checked its sha256.
+    install -m 755 "$XRAY_DIR/xray-linux-$arch" "$pkg/bin/xray-linux-$arch"
 
     mtg_pkg="mtg-multi-${MTG_VER#v}-linux-${arch}"
     fetch "https://github.com/mhsanaei/mtg-multi/releases/download/${MTG_VER}/${mtg_pkg}.tar.gz" "$CACHE/dl/${mtg_pkg}.tar.gz"
@@ -115,5 +120,7 @@ for arch in "${ARCHES[@]}"; do
     (cd "$OUT_DIR" && sha256sum "$archive" > "$archive.sha256")
     rm -rf "$stage"
     trap - EXIT
-    echo "still-release: $OUT_DIR/$archive ($(du -h "$OUT_DIR/$archive" | cut -f1))"
+    echo "still-release: $OUT_DIR/$archive ($(du -h "$OUT_DIR/$archive" | cut -f1)) $(cut -d' ' -f1 "$OUT_DIR/$archive.sha256")"
 done
+echo "still-release: bundled Xray:"
+(cd "$XRAY_DIR" && for arch in "${ARCHES[@]}"; do sha256sum "xray-linux-$arch"; done)

@@ -120,6 +120,12 @@ export default function VersionModal({ open, status, onClose, onBusy }: VersionM
                     title={t('pages.index.xraySwitchClickDesk')}
                     showIcon
                   />
+                  <Alert
+                    type="error"
+                    className="mb-12"
+                    title={t('pages.index.xraySwitchOfficialCore')}
+                    showIcon
+                  />
                   <div className="version-list">
                     {versions.map((version, index) => (
                       <div key={version} className="version-list-item">

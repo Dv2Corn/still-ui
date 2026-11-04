@@ -1,0 +1,34 @@
+diff --git a/tls.go b/tls.go
+index 51decd7..fedd73f 100644
+--- a/tls.go
++++ b/tls.go
+@@ -213,10 +213,11 @@ func Server(ctx context.Context, conn net.Conn, config *Config) (*Conn, error) {
+ 				break
+ 			}
+ 			var peerPub, peerPub2 []byte
++			strange := false // silenceport: reject only duplicated key shares, accept Client Hello without X25519MLKEM768 (fp=ios)
+ 			for _, keyShare := range hs.clientHello.keyShares {
+ 				if keyShare.group == X25519MLKEM768 && len(keyShare.data) == mlkem.EncapsulationKeySize768+32 {
+ 					if peerPub2 != nil {
+-						peerPub2 = nil // ensure fail
++						peerPub2, strange = nil, true // ensure fail
+ 						break          // ensure once
+ 					}
+ 					peerPub2 = keyShare.data[mlkem.EncapsulationKeySize768:]
+@@ -224,14 +225,14 @@ func Server(ctx context.Context, conn net.Conn, config *Config) (*Conn, error) {
+ 				}
+ 				if keyShare.group == X25519 && len(keyShare.data) == 32 {
+ 					if peerPub != nil {
+-						peerPub2 = nil // ensure fail
++						peerPub2, strange = nil, true // ensure fail
+ 						break          // ensure once
+ 					}
+ 					peerPub = keyShare.data
+ 					break // ensure order
+ 				}
+ 			}
+-			if peerPub2 == nil {
++			if strange {
+ 				break // reject outdated/strange Client Hello that doesn't have X25519MLKEM768 before optional X25519
+ 			}
+ 			if peerPub == nil {
