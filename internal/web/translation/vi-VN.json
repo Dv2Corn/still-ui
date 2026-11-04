@@ -785,7 +785,18 @@
         "autoSystemWfpBlockLeakTooltip": "Chỉ Windows, cùng với Auto system routes: dns giữ DNS (cổng 53 và 853 và dịch vụ DNS Client) bên trong TUN và cần máy chủ DNS; windnsclient chỉ áp dụng cho dịch vụ đó; nhập tcp/CỔNG hoặc udp/CỔNG cho cổng khác; misconfigtun chặn phiên bản IP mà không tuyến nào đưa vào TUN.",
         "maxVersion": "Phiên bản tối đa",
         "headerName": "Tên header",
-        "headerValue": "Giá trị header"
+        "headerValue": "Giá trị header",
+        "preset": "Mẫu cài đặt",
+        "presetNone": "Không",
+        "presetHelp": "Giá trị cho người dùng trên mạng di động Nga có DPI và chế độ danh sách trắng. VLESS REALITY dùng dấu vân tay ios: ClientHello của nó (khoảng 517 byte) nằm gọn trong một đoạn TCP, còn các ClientHello lớn hơn bị mất đoạn thứ hai trên một số mạng. Xray của still-ui chấp nhận ios; Xray chính thức 26.9.9 trở lên từ chối nó. Hysteria2 chạy trên UDP, thường vẫn hoạt động khi TCP bị cắt.",
+        "presetOptions": {
+          "ruMobileReality": "Mạng di động (Nga): VLESS REALITY",
+          "ruMobileHysteria": "Mạng di động (Nga): Hysteria2 (UDP)"
+        },
+        "presetHints": {
+          "ruMobileReality": "Chọn đích bên dưới: Tìm mục tiêu kiểm tra các trang ứng viên từ máy chủ này. Nên chọn trang phổ biến và không bị chặn ở quốc gia của người dùng thay vì một trang nước ngoài nổi tiếng. Đặt flow xtls-rprx-vision cho người dùng.",
+          "ruMobileHysteria": "Đặt chứng chỉ bên dưới. UDP 443 thường vẫn hoạt động ở chế độ danh sách trắng, khi TCP bị cắt sau 12–16 KB đầu tiên. Làm rối bị tắt để hỗ trợ nhiều ứng dụng nhất."
+        }
       },
       "info": {
         "mode": "Chế độ",
@@ -1933,6 +1944,15 @@
       "outboundTestUrl": "URL kiểm tra outbound",
       "outboundTestUrlDesc": "URL dùng khi kiểm tra kết nối outbound",
       "Torrent": "Cấu hình sử dụng BitTorrent",
+      "TorrentDesc": "Chỉ lưu lượng qua Xray và chỉ trên inbound bật sniffing.",
+      "torrentBlock": {
+        "title": "Chặn torrent của người dùng",
+        "desc": "Mọi giao thức, kể cả AmneziaWG chế độ kernel: thêm quy tắc BitTorrent của Xray (bật sniffing nơi đang tắt) và bộ lọc nftables trên máy chủ này. Áp dụng ngay; người dùng không được thông báo.",
+        "unsupported": "Máy chủ này không chạy Linux: chỉ lưu lượng qua Xray bị chặn.",
+        "nftMissing": "Chưa cài nft: chỉ lưu lượng qua Xray bị chặn. Hãy cài gói nftables.",
+        "error": "Bộ lọc nftables chưa được nạp: {error}",
+        "counters": "Từ khi nạp bộ lọc: bắt được {caught} gói torrent, loại bỏ {dropped} gói tới các peer đã biết."
+      },
       "Inbounds": "Inbound",
       "Outbounds": "Outbound",
       "Balancers": "Cân bằng",

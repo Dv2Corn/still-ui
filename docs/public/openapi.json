@@ -6404,6 +6404,54 @@
         }
       }
     },
+    "/panel/api/server/torrentBlock": {
+      "get": {
+        "tags": [
+          "Server"
+        ],
+        "summary": "State of \"Block torrents for clients\": the stored toggle, whether this host can run the nftables filter (Linux with nft), whether its table is loaded, packet counters since it was loaded, and the last apply error if any.",
+        "operationId": "get_panel_api_server_torrentBlock",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": {
+                    "enabled": true,
+                    "supported": true,
+                    "nftInstalled": true,
+                    "active": true,
+                    "counters": {
+                      "handshakes": 3,
+                      "dht": 61,
+                      "trackers": 2,
+                      "utp": 276,
+                      "learned": 5,
+                      "peerDrops": 59811,
+                      "tunnelBans": 1
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/panel/api/server/cpuHistory/{bucket}": {
       "get": {
         "tags": [
@@ -7360,6 +7408,55 @@
                 },
                 "required": [
                   "dev"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/server/setTorrentBlock": {
+      "post": {
+        "tags": [
+          "Server"
+        ],
+        "summary": "Turn \"Block torrents for clients\" on or off. On: every generated Xray config routes sniffed BitTorrent to a blackhole first and enables content sniffing on client inbounds where it is off, and on Linux an nftables table drops BitTorrent signatures in egress the server originates and in forwarded AmneziaWG kernel-mode traffic, and cuts a peer endpoint only after that peer itself answers with a BitTorrent handshake or DHT response. Xray is reconciled immediately. Returns the same object as GET /torrentBlock; a host without nft keeps the Xray half and reports the error.",
+        "operationId": "post_panel_api_server_setTorrentBlock",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "enable": {
+                    "type": "boolean",
+                    "description": "true = block, false = stop blocking and remove the nftables table."
+                  }
+                },
+                "required": [
+                  "enable"
                 ]
               }
             }

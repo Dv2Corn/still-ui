@@ -785,7 +785,18 @@
         "autoSystemWfpBlockLeakTooltip": "Khusus Windows, bersama Auto system routes: dns menjaga DNS (port 53 dan 853 serta layanan DNS Client) tetap di dalam TUN dan butuh server DNS; windnsclient hanya mencakup layanan itu; ketik tcp/PORT atau udp/PORT untuk port lain; misconfigtun memblokir versi IP yang tidak dikirim rute mana pun ke TUN.",
         "maxVersion": "Versi maksimum",
         "headerName": "Nama header",
-        "headerValue": "Nilai header"
+        "headerValue": "Nilai header",
+        "preset": "Preset",
+        "presetNone": "Tidak ada",
+        "presetHelp": "Nilai untuk klien di jaringan seluler Rusia dengan DPI dan mode daftar putih. VLESS REALITY memakai sidik jari ios: ClientHello-nya (sekitar 517 byte) muat dalam satu segmen TCP, sedangkan yang lebih besar kehilangan segmen keduanya di beberapa jaringan. Xray milik still-ui menerima ios; Xray resmi 26.9.9 dan yang lebih baru menolaknya. Hysteria2 berjalan di atas UDP, yang sering tetap berfungsi saat TCP diputus.",
+        "presetOptions": {
+          "ruMobileReality": "Jaringan seluler (Rusia): VLESS REALITY",
+          "ruMobileHysteria": "Jaringan seluler (Rusia): Hysteria2 (UDP)"
+        },
+        "presetHints": {
+          "ruMobileReality": "Pilih target di bawah: Cari Target memeriksa situs kandidat dari server ini. Utamakan situs yang populer dan tidak diblokir di negara klien Anda, bukan satu situs asing terkenal. Beri klien flow xtls-rprx-vision.",
+          "ruMobileHysteria": "Atur sertifikat di bawah. UDP 443 sering tetap berfungsi dalam mode daftar putih, saat TCP diputus setelah 12–16 KB pertama. Obfuskasi dimatikan agar didukung lebih banyak klien."
+        }
       },
       "info": {
         "mode": "Mode",
@@ -1925,6 +1936,15 @@
       "outboundTestUrl": "URL tes outbound",
       "outboundTestUrlDesc": "URL yang digunakan saat menguji konektivitas outbound",
       "Torrent": "Blokir Protokol BitTorrent",
+      "TorrentDesc": "Hanya lalu lintas melalui Xray dan hanya pada inbound dengan sniffing aktif.",
+      "torrentBlock": {
+        "title": "Blokir torrent klien",
+        "desc": "Semua protokol, termasuk AmneziaWG mode kernel: menambahkan aturan BitTorrent Xray (menyalakan sniffing jika mati) dan filter nftables di server ini. Langsung berlaku; klien tidak diberi tahu.",
+        "unsupported": "Server ini bukan Linux: hanya lalu lintas melalui Xray yang diblokir.",
+        "nftMissing": "nft tidak terpasang: hanya lalu lintas melalui Xray yang diblokir. Pasang paket nftables.",
+        "error": "Filter nftables tidak dimuat: {error}",
+        "counters": "Sejak filter dimuat: {caught} paket torrent tertangkap, {dropped} paket ke peer yang dikenal dibuang."
+      },
       "Inbounds": "Inbound",
       "Outbounds": "Outbound",
       "importRules": "Impor aturan",

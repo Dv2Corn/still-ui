@@ -785,7 +785,18 @@
         "autoSystemWfpBlockLeakTooltip": "على ويندوز بس، مع Auto system routes: ‏dns بيخلّي DNS (البورتات 53 و853 وخدمة DNS Client) جوّه الـTUN ومحتاج سيرفرات DNS؛ ‏windnsclient بيغطي الخدمة دي بس؛ اكتب tcp/PORT أو udp/PORT لأي بورت تاني؛ وmisconfigtun بيمنع نسخة IP مفيش مسار بيوديها للـTUN.",
         "maxVersion": "الحد الأقصى للإصدار",
         "headerName": "اسم الترويسة",
-        "headerValue": "قيمة الترويسة"
+        "headerValue": "قيمة الترويسة",
+        "preset": "إعداد مسبق",
+        "presetNone": "بلا",
+        "presetHelp": "قيم لعملاء شبكات الجوال الروسية التي تستخدم DPI ووضع القائمة البيضاء. يستخدم VLESS REALITY بصمة ios: رسالة ClientHello الخاصة بها (نحو 517 بايت) تتسع في مقطع TCP واحد، بينما تفقد الرسائل الأكبر مقطعها الثاني في بعض الشبكات. يقبل Xray الخاص بـ still-ui بصمة ios، ويرفضها Xray الرسمي 26.9.9 وما بعده. يعمل Hysteria2 عبر UDP الذي يستمر غالبًا في العمل عند قطع TCP.",
+        "presetOptions": {
+          "ruMobileReality": "شبكات الجوال (روسيا): VLESS REALITY",
+          "ruMobileHysteria": "شبكات الجوال (روسيا): Hysteria2 (UDP)"
+        },
+        "presetHints": {
+          "ruMobileReality": "اختر هدفًا أدناه: يفحص «البحث عن أهداف» المواقع المرشحة من هذا الخادم. فضّل موقعًا شائعًا وغير محجوب في بلد عملائك بدلًا من موقع أجنبي واحد معروف. اضبط flow ‏xtls-rprx-vision للعملاء.",
+          "ruMobileHysteria": "اضبط الشهادة أدناه. يعمل UDP 443 غالبًا في وضع القائمة البيضاء عندما يُقطع TCP بعد أول 12–16 كيلوبايت. التمويه معطل لأوسع دعم للعملاء."
+        }
       },
       "info": {
         "mode": "الوضع",
@@ -1925,6 +1936,15 @@
       "outboundTestUrl": "رابط اختبار المخرج",
       "outboundTestUrlDesc": "الرابط المستخدم عند اختبار اتصال المخرج",
       "Torrent": "حظر بروتوكول التورنت",
+      "TorrentDesc": "حركة المرور عبر Xray فقط، وفي الواردات التي تم تفعيل sniffing فيها فقط.",
+      "torrentBlock": {
+        "title": "حظر التورنت للعملاء",
+        "desc": "جميع البروتوكولات، بما فيها AmneziaWG في وضع النواة: يضيف قاعدة BitTorrent في Xray (مع تفعيل sniffing حيث يكون معطلًا) ومرشح nftables على هذا الخادم. يُطبق فورًا؛ ولا يُبلَّغ العملاء.",
+        "unsupported": "هذا الخادم ليس Linux: تُحظر حركة المرور عبر Xray فقط.",
+        "nftMissing": "nft غير مثبت: تُحظر حركة المرور عبر Xray فقط. ثبّت حزمة nftables.",
+        "error": "مرشح nftables غير محمّل: {error}",
+        "counters": "منذ تحميل المرشح: تم التقاط {caught} حزمة تورنت، وإسقاط {dropped} حزمة إلى أقران معروفين."
+      },
       "Inbounds": "الواردات",
       "Outbounds": "الصادرات",
       "importRules": "استيراد القواعد",

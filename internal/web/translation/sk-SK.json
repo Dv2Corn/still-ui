@@ -786,7 +786,18 @@
         "autoSystemWfpBlockLeakTooltip": "Iba pre Windows s automatickými systémovými trasami: dns ponechá DNS (porty 53 a 853 a službu DNS Client) v TUN a vyžaduje DNS servery; windnsclient pokrýva iba túto službu; pre akýkoľvek iný port zadajte tcp/PORT alebo udp/PORT; misconfigtun zablokuje verziu IP, pre ktorú nevedie žiadna trasa do TUN.",
         "maxVersion": "Maximálna verzia",
         "headerName": "Názov hlavičky",
-        "headerValue": "Hodnota hlavičky"
+        "headerValue": "Hodnota hlavičky",
+        "preset": "Predvoľba",
+        "presetNone": "Žiadna",
+        "presetHelp": "Hodnoty pre klientov v ruských mobilných sieťach s DPI a režimom bieleho zoznamu. VLESS REALITY používa odtlačok ios: jeho ClientHello (asi 517 bajtov) sa zmestí do jedného segmentu TCP, kým väčším v niektorých sieťach stratí druhý segment. Xray v still-ui ios prijíma; oficiálny Xray 26.9.9 a novší ho odmieta. Hysteria2 beží cez UDP, ktoré často funguje aj vtedy, keď sa TCP preruší.",
+        "presetOptions": {
+          "ruMobileReality": "Mobilné siete (Rusko): VLESS REALITY",
+          "ruMobileHysteria": "Mobilné siete (Rusko): Hysteria2 (UDP)"
+        },
+        "presetHints": {
+          "ruMobileReality": "Nižšie vyberte cieľ: Nájsť ciele overí kandidátske stránky z tohto servera. Namiesto jednej známej zahraničnej stránky uprednostnite stránku populárnu a neblokovanú v krajine vašich klientov. Klientom nastavte flow xtls-rprx-vision.",
+          "ruMobileHysteria": "Nižšie nastavte certifikát. UDP 443 často funguje v režime bieleho zoznamu, keď sa TCP preruší po prvých 12–16 KB. Zahmlievanie je vypnuté pre čo najširšiu podporu klientov."
+        }
       },
       "info": {
         "mode": "Režim",
@@ -2046,6 +2057,15 @@
       "outboundTestUrl": "URL na test výstupov",
       "outboundTestUrlDesc": "URL použitá na overenie pripojenia cez výstup.",
       "Torrent": "Blokovať protokol BitTorrent",
+      "TorrentDesc": "Iba prevádzka cez Xray a iba na prichádzajúcich so zapnutým sniffingom.",
+      "torrentBlock": {
+        "title": "Blokovať torrenty klientov",
+        "desc": "Všetky protokoly vrátane AmneziaWG v režime jadra: pridá pravidlo BitTorrent v Xray (kde je sniffing vypnutý, zapne ho) a filter nftables na tomto serveri. Platí hneď; klienti nie sú upozornení.",
+        "unsupported": "Tento server nie je Linux: blokuje sa iba prevádzka cez Xray.",
+        "nftMissing": "nft nie je nainštalovaný: blokuje sa iba prevádzka cez Xray. Nainštalujte balík nftables.",
+        "error": "Filter nftables nie je načítaný: {error}",
+        "counters": "Od načítania filtra: zachytených {caught} torrentových paketov, zahodených {dropped} paketov k známym peerom."
+      },
       "Inbounds": "Vstupy",
       "Outbounds": "Výstupy",
       "Balancers": "Vyvažovanie záťaže",

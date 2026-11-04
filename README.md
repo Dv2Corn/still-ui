@@ -158,6 +158,22 @@ still-ui uninstall
 > [!WARNING]
 > `still-ui uninstall` also deletes the database in `/etc/still-ui`, just like 3x-ui does. Copy `/etc/still-ui/x-ui.db` somewhere safe first if you might need your inbounds and clients again.
 
+## Mobile networks in Russia
+
+Russian mobile operators inspect traffic (DPI), and in "whitelist" mode they cut most foreign TCP connections after the first 12–16 KB. Two things in still-ui help.
+
+**Presets for new inbounds.** In **Add Inbound**, pick a **Preset**:
+
+- **Mobile networks (Russia): VLESS REALITY** — VLESS on TCP 443 with REALITY, a fresh key pair and short IDs, and the `ios` fingerprint in the links and subscriptions of this inbound only (other new inbounds still start with `chrome`). The `ios` ClientHello is about 517 bytes and fits in one TCP segment; longer ones lose their second segment on some networks. still-ui's Xray accepts `ios`; official Xray 26.9.9 and newer refuses it. Then pick a target on the **Security** tab. **Find Targets** checks candidate sites from your server; prefer a site that is popular and not blocked in your clients' country over one well-known foreign site. Give clients the `xtls-rprx-vision` flow.
+- **Mobile networks (Russia): Hysteria2 (UDP)** — Hysteria2 on UDP 443 with the `h3` ALPN and no Salamander obfuscation, so that most clients can connect. UDP often keeps working in whitelist mode when TCP is cut. Set the certificate on the **Security** tab.
+
+**Block torrents for clients.** **Xray Configs → Routing → Basic Routing → Block torrents for clients.** It is off by default, and clients get no notice. When it is on:
+
+- Every Xray config sends BitTorrent (as Xray's sniffer sees it) to a blackhole before any other rule. Inbounds with sniffing off get content sniffing without destination override, because Xray only recognises BitTorrent when it sniffs.
+- On Linux with `nft`, the panel loads the nftables table `inet still_torrent_block`. It looks only at what the server sends out: connections the server itself opens, and traffic forwarded from AmneziaWG kernel-mode interfaces (`xui-awg*`), which never passes through Xray. Outgoing BitTorrent handshakes, DHT messages, UDP tracker connects and uTP SYNs are dropped; an AmneziaWG kernel-mode client that sent one keeps only ports 53/80/443/853 for 30 minutes (a client can only cut itself). A peer endpoint (address and port) is cut for 30 minutes only after that peer itself answers with a BitTorrent handshake or a DHT response, so a client cannot get some other site blocked by sending it a fake handshake. One risk remains: a TCP service that echoes what it receives back at the start of its reply can be made to send a 68-byte BitTorrent handshake, and then its own address and port are cut for 30 minutes. Answers from ports 53/80/443/853, from the panel, subscription, inbound, node and SSH ports, and from the server's own addresses are never learned, and each remote address can teach at most 30 endpoints a minute. The server's replies on connections that clients open to it are never inspected. The panel loads the table on start and again if it disappears; turning the option off removes it. Without `nft` (or not on Linux) only the Xray part works, and the page says so: install the `nftables` package. The Docker image includes it.
+
+BitTorrent encrypted inside a client's own extra tunnel cannot be seen. Traffic that Xray passes on to another proxy is covered by the Xray rule only. With nodes, turn the option on in each node's own panel.
+
 ## Verify a release
 
 Release archives are built by GitHub Actions from the tagged commit ([release workflow](.github/workflows/release.yml)), not on a developer's machine, and every archive comes with a signed [build provenance attestation](https://docs.github.com/actions/security-for-github-actions/using-artifact-attestations). Releases up to and including 1.4.0 were built by hand with `scripts/still-release.sh` and have only the `.sha256` files.

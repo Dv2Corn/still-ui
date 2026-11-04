@@ -785,7 +785,18 @@
         "autoSystemWfpBlockLeakTooltip": "僅限 Windows，需搭配自動系統路由：dns 讓 DNS（連接埠 53、853 及 DNS Client 服務）只走 TUN，需設定 DNS 伺服器；windnsclient 只針對該服務；其他連接埠請輸入 tcp/連接埠 或 udp/連接埠；misconfigtun 阻止沒有任何路由指向 TUN 的 IP 版本。",
         "maxVersion": "最高版本",
         "headerName": "標頭名稱",
-        "headerValue": "標頭值"
+        "headerValue": "標頭值",
+        "preset": "預設",
+        "presetNone": "無",
+        "presetHelp": "適用於俄羅斯行動網路（有 DPI 與白名單模式）用戶端的參數。VLESS REALITY 使用 ios 指紋：其 ClientHello（約 517 位元組）可放入一個 TCP 分段，較大的在部分網路中第二個分段會被丟棄。still-ui 的 Xray 接受 ios；官方 Xray 26.9.9 及更新版本會拒絕。Hysteria2 走 UDP，在 TCP 被切斷時往往仍可使用。",
+        "presetOptions": {
+          "ruMobileReality": "行動網路（俄羅斯）：VLESS REALITY",
+          "ruMobileHysteria": "行動網路（俄羅斯）：Hysteria2（UDP）"
+        },
+        "presetHints": {
+          "ruMobileReality": "請在下方選擇目標：「尋找目標」會從本伺服器檢測候選網站。優先選擇在用戶所在國家熱門且未被封鎖的網站，而非某個知名的境外網站。為用戶端設定 xtls-rprx-vision 流控。",
+          "ruMobileHysteria": "請在下方設定憑證。在白名單模式下，TCP 在前 12–16 KB 後被切斷時，UDP 443 往往仍可用。為相容更多用戶端，混淆已關閉。"
+        }
       },
       "info": {
         "mode": "模式",
@@ -1933,6 +1944,15 @@
       "outboundTestUrl": "出站測試 URL",
       "outboundTestUrlDesc": "測試出站連線時使用的 URL",
       "Torrent": "遮蔽 BitTorrent 協議",
+      "TorrentDesc": "僅限經過 Xray 的流量，且僅限開啟嗅探的入站。",
+      "torrentBlock": {
+        "title": "封鎖用戶端的 BT 下載",
+        "desc": "涵蓋所有協定，包括核心模式的 AmneziaWG：加入 Xray BitTorrent 規則（在關閉嗅探的入站上開啟嗅探），並在本伺服器上載入 nftables 過濾器。立即生效，不會通知用戶端。",
+        "unsupported": "本伺服器不是 Linux：僅封鎖經過 Xray 的流量。",
+        "nftMissing": "未安裝 nft：僅封鎖經過 Xray 的流量。請安裝 nftables 套件。",
+        "error": "nftables 過濾器未載入：{error}",
+        "counters": "自過濾器載入以來：攔截 {caught} 個 BT 封包，丟棄發往已知節點的 {dropped} 個封包。"
+      },
       "Inbounds": "入站",
       "Outbounds": "出站",
       "Balancers": "負載均衡",

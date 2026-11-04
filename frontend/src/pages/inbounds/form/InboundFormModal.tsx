@@ -13,6 +13,11 @@ import {
   withoutClients,
 } from '@/lib/xray/inbound-form-adapter';
 import { createDefaultInboundSettings } from '@/lib/xray/inbound-defaults';
+import {
+  INBOUND_PRESETS,
+  buildPresetInbound,
+  type InboundPreset,
+} from '@/lib/xray/inbound-presets';
 import { generateAwgObfuscation } from '@/lib/xray/amneziawg-obfuscation';
 import { composeInboundTag, isAutoInboundTag, type InboundTagInput } from '@/lib/xray/inbound-tag';
 import {
@@ -230,6 +235,7 @@ export default function InboundFormModal({
   const [scanning, setScanning] = useState(false);
   const [scanResult, setScanResult] = useState<RealityScanResult | null>(null);
   const [activeTab, setActiveTab] = useState('basic');
+  const [appliedPreset, setAppliedPreset] = useState<InboundPreset | null>(null);
   const {
     fallbacks,
     hasStoredFallbacks,
@@ -447,6 +453,7 @@ export default function InboundFormModal({
     savedInboundId.current = null;
     setScanResult(null);
     setActiveTab('basic');
+    setAppliedPreset(null);
     const initialTag = (initial.tag ?? '') as string;
     autoTagRef.current = isAutoInboundTag(initialTag, {
       port: initial.port ?? 0,
@@ -566,6 +573,16 @@ export default function InboundFormModal({
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [mode, methods]);
 
+  // A preset replaces the whole draft; the tag follows the new port and protocol.
+  const applyPreset = (preset: InboundPreset) => {
+    autoTagRef.current = true;
+    methods.reset(rawInboundToFormValues(buildPresetInbound(preset)));
+    setScanResult(null);
+    setAppliedPreset(preset);
+    setActiveTab('security');
+    if (preset === 'ruMobileReality') void genRealityKeypair();
+  };
+
   const saveValues = async () => {
     // settings.fallbacks has no bound field; shouldUnregister=false keeps it from
     // the reset object. An edit sends no clients: the server keeps the stored ones.
@@ -648,6 +665,25 @@ export default function InboundFormModal({
 
   const basicTab = (
     <>
+      {mode === 'add' && (
+        <Form.Item
+          htmlFor={`${uid}-preset`}
+          label={t('pages.inbounds.form.preset')}
+          tooltip={t('pages.inbounds.form.presetHelp')}
+        >
+          <Select
+            id={`${uid}-preset`}
+            value={appliedPreset ?? undefined}
+            placeholder={t('pages.inbounds.form.presetNone')}
+            options={INBOUND_PRESETS.map((p) => ({
+              value: p,
+              label: t(`pages.inbounds.form.presetOptions.${p}`),
+            }))}
+            onChange={(p: InboundPreset) => applyPreset(p)}
+          />
+        </Form.Item>
+      )}
+
       {mode === 'add' && (
         <FormField name="enable" label={t('enable')} valueProp="checked">
           <Switch id="inbound-enable" />
@@ -1034,6 +1070,15 @@ export default function InboundFormModal({
 
   const securityTab = (
     <>
+      {appliedPreset && (
+        <Alert
+          type="info"
+          showIcon
+          className="mb-12"
+          title={t(`pages.inbounds.form.presetHints.${appliedPreset}`)}
+        />
+      )}
+
       <Form.Item label={t('pages.inbounds.securityTab')}>
         <Radio.Group
           value={security}
