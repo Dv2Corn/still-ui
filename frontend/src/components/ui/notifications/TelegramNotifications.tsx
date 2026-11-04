@@ -5,6 +5,7 @@ import {
   DesktopOutlined,
   DashboardOutlined,
   SafetyOutlined,
+  RadarChartOutlined,
 } from '@ant-design/icons';
 import type { AllSetting } from '@/models/setting';
 import { NotificationLayout } from './NotificationLayout';
@@ -107,6 +108,15 @@ const GROUPS: NotificationGroupConfig[] = [
     icon: <SafetyOutlined aria-hidden />,
     title: 'eventGroupSecurity',
     events: [{ key: 'login.attempt', label: 'eventLoginAttempt', settingKey: '' }],
+  },
+  {
+    icon: <RadarChartOutlined aria-hidden />,
+    title: 'eventGroupProbe',
+    events: [
+      { key: 'probe.down', label: 'eventProbeDown', settingKey: '' },
+      { key: 'probe.up', label: 'eventProbeUp', settingKey: '' },
+      { key: 'probe.stale', label: 'eventProbeStale', settingKey: '' },
+    ],
   },
 ];
 
