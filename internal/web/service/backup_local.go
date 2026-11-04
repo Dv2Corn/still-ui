@@ -226,7 +226,7 @@ func pgDumpToFile(dst string) error {
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("pg_dump failed: %v: %s", err, strings.TrimSpace(stderr.String()))
+		return fmt.Errorf("pg_dump failed: %w: %s", err, strings.TrimSpace(stderr.String()))
 	}
 	_ = os.Chmod(dst, 0o600)
 	if restore, err := exec.LookPath("pg_restore"); err == nil {
@@ -365,7 +365,7 @@ func restorePostgresFile(dump, stamp string) (*RestoreResult, error) {
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("pg_restore failed, the database is unchanged: %v: %s", err, strings.TrimSpace(stderr.String()))
+		return nil, fmt.Errorf("pg_restore failed, the database is unchanged: %w: %s", err, strings.TrimSpace(stderr.String()))
 	}
 	return res, nil
 }

@@ -741,7 +741,7 @@ func truncateRunes(s string, n int) string {
 func cleanAgentVersion(v string) string {
 	v = truncateRunes(strings.TrimSpace(v), reachProbeMaxVersionLen)
 	for _, r := range v {
-		if !(r == '.' || r == '-' || r == '_' || r == '+' || unicode.IsLetter(r) || unicode.IsDigit(r)) || r > unicode.MaxASCII {
+		if (r != '.' && r != '-' && r != '_' && r != '+' && !unicode.IsLetter(r) && !unicode.IsDigit(r)) || r > unicode.MaxASCII {
 			return ""
 		}
 	}

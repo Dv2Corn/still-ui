@@ -45,7 +45,7 @@ func xrayUnitCheck(args []string) int {
 		fmt.Fprintln(os.Stderr, "cannot open the database:", err)
 		return unitCheckError
 	}
-	defer database.CloseDB()
+	defer func() { _ = database.CloseDB() }()
 	cfg, err := (&service.XrayService{}).GetXrayConfig()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "cannot build the Xray config:", err)
@@ -68,7 +68,7 @@ func runLocalBackup() int {
 		fmt.Fprintln(os.Stderr, "cannot open the database:", err)
 		return 1
 	}
-	defer database.CloseDB()
+	defer func() { _ = database.CloseDB() }()
 	res, err := (&service.LocalBackupService{}).Run()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "backup failed:", err)

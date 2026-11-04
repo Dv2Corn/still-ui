@@ -217,7 +217,7 @@ func (c *config) fetchJob() (*job, error) {
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest(http.MethodGet, c.endpoint("job"), nil)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, c.endpoint("job"), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -405,7 +405,7 @@ func (c *config) postReport(body []byte, socksPort int) error {
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequest(http.MethodPost, c.endpoint("report"), strings.NewReader(string(body)))
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, c.endpoint("report"), strings.NewReader(string(body)))
 	if err != nil {
 		return err
 	}

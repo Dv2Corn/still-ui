@@ -75,6 +75,11 @@ _openapi:
         panels. Use as a manual backup.'
       url: '#stream-a-full-database-backup-as-an-attachment-the-sqlite-db-file-on-sqlite-panels-or-a-pg_dump-custom-format-archive-dump-on-postgresql-panels-use-as-a-manual-backup'
     - depth: 2
+      title: 'List the scheduled local backups on this server (newest first) and the
+        outcome of the last one since the panel started. Restore one on the
+        server with: still-ui restore <file>.'
+      url: '#list-the-scheduled-local-backups-on-this-server-newest-first-and-the-outcome-of-the-last-one-since-the-panel-started-restore-one-on-the-server-with-still-ui-restore-file'
+    - depth: 2
       title: 'Stream a cross-engine migration file as an attachment: a .dump (SQL
         text) on SQLite, or a .db SQLite database built from the live data on
         PostgreSQL.'
@@ -161,6 +166,11 @@ _openapi:
         (.dump), a SQLite database (.db), or a SQLite migration dump. The panel
         restarts after restore. Destructive.
       url: '#restore-the-panel-db-from-an-uploaded-backup-multipart-form-field-name-db-sqlite-panels-accept-a-sqlite-database-db-or-a-sqlite-migration-dump-dump-postgresql-panels-accept-a-pg_dump-archive-dump-a-sqlite-database-db-or-a-sqlite-migration-dump-the-panel-restarts-after-restore-destructive'
+    - depth: 2
+      title: 'Take a local backup now with the saved backup settings: a consistent
+        database snapshot, encrypted to the configured age/SSH keys, rotated,
+        and sent to Telegram when that is on. Returns the file written.'
+      url: '#take-a-local-backup-now-with-the-saved-backup-settings-a-consistent-database-snapshot-encrypted-to-the-configured-agessh-keys-rotated-and-sent-to-telegram-when-that-is-on-returns-the-file-written'
     - depth: 2
       title: Generate a new ECH (Encrypted Client Hello) keypair and config list for
         the given SNI.
@@ -251,6 +261,10 @@ _openapi:
           SQLite panels, or a pg_dump custom-format archive (.dump) on
           PostgreSQL panels. Use as a manual backup.'
         id: stream-a-full-database-backup-as-an-attachment-the-sqlite-db-file-on-sqlite-panels-or-a-pg_dump-custom-format-archive-dump-on-postgresql-panels-use-as-a-manual-backup
+      - content: 'List the scheduled local backups on this server (newest first) and the
+          outcome of the last one since the panel started. Restore one on the
+          server with: still-ui restore <file>.'
+        id: list-the-scheduled-local-backups-on-this-server-newest-first-and-the-outcome-of-the-last-one-since-the-panel-started-restore-one-on-the-server-with-still-ui-restore-file
       - content: 'Stream a cross-engine migration file as an attachment: a .dump (SQL
           text) on SQLite, or a .db SQLite database built from the live data on
           PostgreSQL.'
@@ -318,6 +332,10 @@ _openapi:
           (.dump), a SQLite database (.db), or a SQLite migration dump. The
           panel restarts after restore. Destructive.
         id: restore-the-panel-db-from-an-uploaded-backup-multipart-form-field-name-db-sqlite-panels-accept-a-sqlite-database-db-or-a-sqlite-migration-dump-dump-postgresql-panels-accept-a-pg_dump-archive-dump-a-sqlite-database-db-or-a-sqlite-migration-dump-the-panel-restarts-after-restore-destructive
+      - content: 'Take a local backup now with the saved backup settings: a consistent
+          database snapshot, encrypted to the configured age/SSH keys, rotated,
+          and sent to Telegram when that is on. Returns the file written.'
+        id: take-a-local-backup-now-with-the-saved-backup-settings-a-consistent-database-snapshot-encrypted-to-the-configured-agessh-keys-rotated-and-sent-to-telegram-when-that-is-on-returns-the-file-written
       - content: Generate a new ECH (Encrypted Client Hello) keypair and config list for
           the given SNI.
         id: generate-a-new-ech-encrypted-client-hello-keypair-and-config-list-for-the-given-sni
@@ -357,7 +375,7 @@ export default function Layout(props) {
   return (
     <>
       {props.children}
-      <OpenAPIPage document="./public/openapi.json" webhooks={[]} operations={[{"path":"/panel/api/openapi.json","method":"get"},{"path":"/panel/api/server/status","method":"get"},{"path":"/panel/api/server/fail2banStatus","method":"get"},{"path":"/panel/api/server/torrentBlock","method":"get"},{"path":"/panel/api/server/cpuHistory/{bucket}","method":"get"},{"path":"/panel/api/server/history/{metric}/{bucket}","method":"get"},{"path":"/panel/api/server/xrayMetricsState","method":"get"},{"path":"/panel/api/server/xrayMetricsHistory/{metric}/{bucket}","method":"get"},{"path":"/panel/api/server/xrayObservatory","method":"get"},{"path":"/panel/api/server/xrayObservatoryHistory/{tag}/{bucket}","method":"get"},{"path":"/panel/api/server/getXrayVersion","method":"get"},{"path":"/panel/api/server/getPanelUpdateInfo","method":"get"},{"path":"/panel/api/server/getUpdateStatus","method":"get"},{"path":"/panel/api/server/getConfigJson","method":"get"},{"path":"/panel/api/server/getDb","method":"get"},{"path":"/panel/api/server/getMigration","method":"get"},{"path":"/panel/api/server/getNewUUID","method":"get"},{"path":"/panel/api/server/getWebCertFiles","method":"get"},{"path":"/panel/api/server/descendants","method":"get"},{"path":"/panel/api/server/getNewX25519Cert","method":"get"},{"path":"/panel/api/server/getNewmldsa65","method":"get"},{"path":"/panel/api/server/getNewmlkem768","method":"get"},{"path":"/panel/api/server/getNewVlessEnc","method":"get"},{"path":"/panel/api/server/stopXrayService","method":"post"},{"path":"/panel/api/server/restartXrayService","method":"post"},{"path":"/panel/api/server/installXray/{version}","method":"post"},{"path":"/panel/api/server/updatePanel","method":"post"},{"path":"/panel/api/server/setUpdateChannel","method":"post"},{"path":"/panel/api/server/setTorrentBlock","method":"post"},{"path":"/panel/api/server/updateGeofile","method":"post"},{"path":"/panel/api/server/updateGeofile/{fileName}","method":"post"},{"path":"/panel/api/server/logs/{count}","method":"post"},{"path":"/panel/api/server/xraylogs/{count}","method":"post"},{"path":"/panel/api/server/amneziawglogs/{count}","method":"post"},{"path":"/panel/api/server/importDB","method":"post"},{"path":"/panel/api/server/getNewEchCert","method":"post"},{"path":"/panel/api/server/getCertHash","method":"post"},{"path":"/panel/api/server/getRemoteCertHash","method":"post"},{"path":"/panel/api/server/scanRealityTarget","method":"post"},{"path":"/panel/api/server/scanRealityTargets","method":"post"},{"path":"/panel/api/server/clientIps","method":"get"},{"path":"/panel/api/server/clientIps","method":"post"}]} showTitle />
+      <OpenAPIPage document="./public/openapi.json" webhooks={[]} operations={[{"path":"/panel/api/openapi.json","method":"get"},{"path":"/panel/api/server/status","method":"get"},{"path":"/panel/api/server/fail2banStatus","method":"get"},{"path":"/panel/api/server/torrentBlock","method":"get"},{"path":"/panel/api/server/cpuHistory/{bucket}","method":"get"},{"path":"/panel/api/server/history/{metric}/{bucket}","method":"get"},{"path":"/panel/api/server/xrayMetricsState","method":"get"},{"path":"/panel/api/server/xrayMetricsHistory/{metric}/{bucket}","method":"get"},{"path":"/panel/api/server/xrayObservatory","method":"get"},{"path":"/panel/api/server/xrayObservatoryHistory/{tag}/{bucket}","method":"get"},{"path":"/panel/api/server/getXrayVersion","method":"get"},{"path":"/panel/api/server/getPanelUpdateInfo","method":"get"},{"path":"/panel/api/server/getUpdateStatus","method":"get"},{"path":"/panel/api/server/getConfigJson","method":"get"},{"path":"/panel/api/server/getDb","method":"get"},{"path":"/panel/api/server/localBackups","method":"get"},{"path":"/panel/api/server/getMigration","method":"get"},{"path":"/panel/api/server/getNewUUID","method":"get"},{"path":"/panel/api/server/getWebCertFiles","method":"get"},{"path":"/panel/api/server/descendants","method":"get"},{"path":"/panel/api/server/getNewX25519Cert","method":"get"},{"path":"/panel/api/server/getNewmldsa65","method":"get"},{"path":"/panel/api/server/getNewmlkem768","method":"get"},{"path":"/panel/api/server/getNewVlessEnc","method":"get"},{"path":"/panel/api/server/stopXrayService","method":"post"},{"path":"/panel/api/server/restartXrayService","method":"post"},{"path":"/panel/api/server/installXray/{version}","method":"post"},{"path":"/panel/api/server/updatePanel","method":"post"},{"path":"/panel/api/server/setUpdateChannel","method":"post"},{"path":"/panel/api/server/setTorrentBlock","method":"post"},{"path":"/panel/api/server/updateGeofile","method":"post"},{"path":"/panel/api/server/updateGeofile/{fileName}","method":"post"},{"path":"/panel/api/server/logs/{count}","method":"post"},{"path":"/panel/api/server/xraylogs/{count}","method":"post"},{"path":"/panel/api/server/amneziawglogs/{count}","method":"post"},{"path":"/panel/api/server/importDB","method":"post"},{"path":"/panel/api/server/localBackup","method":"post"},{"path":"/panel/api/server/getNewEchCert","method":"post"},{"path":"/panel/api/server/getCertHash","method":"post"},{"path":"/panel/api/server/getRemoteCertHash","method":"post"},{"path":"/panel/api/server/scanRealityTarget","method":"post"},{"path":"/panel/api/server/scanRealityTargets","method":"post"},{"path":"/panel/api/server/clientIps","method":"get"},{"path":"/panel/api/server/clientIps","method":"post"}]} showTitle />
     </>
   );
 }
