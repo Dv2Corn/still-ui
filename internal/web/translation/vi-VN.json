@@ -152,6 +152,7 @@
       "xraySwitch": "Phiên bản",
       "xrayUpdates": "Cập nhật Xray",
       "xraySwitchClickDesk": "Hãy lựa chọn thận trọng, vì các phiên bản cũ có thể không tương thích với các cấu hình hiện tại.",
+      "xraySwitchOfficialCore": "Bảng điều khiển này đi kèm bản Xray do still-ui biên dịch (v26.10.31 có bản vá REALITY). Mỗi phiên bản bên dưới là bản phát hành chính thức của Xray và sẽ thay thế bản này. Xray chính thức 26.9.9 trở lên từ chối máy khách REALITY dùng vân tay ios và máy khách dựa trên sing-box như Hiddify, Karing. Để quay lại bản của still-ui, hãy chạy still-ui update.",
       "updatePanel": "Cập nhật Panel",
       "panelUpdateDesc": "Điều này sẽ cập nhật still-ui lên bản phát hành mới nhất và khởi động lại dịch vụ panel.",
       "currentPanelVersion": "Phiên bản panel hiện tại",

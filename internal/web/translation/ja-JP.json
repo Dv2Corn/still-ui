@@ -152,6 +152,7 @@
       "xraySwitch": "バージョン",
       "xrayUpdates": "Xrayの更新",
       "xraySwitchClickDesk": "慎重に選択してください。古いバージョンは現在の設定と互換性がない可能性があります。",
+      "xraySwitchOfficialCore": "このパネルには still-ui 版の Xray（REALITY に修正を加えた v26.10.31）が同梱されています。下の各バージョンは Xray の公式リリースで、このビルドを置き換えます。公式の Xray 26.9.9 以降は、ios フィンガープリントの REALITY クライアントと、Hiddify や Karing などの sing-box 系クライアントを拒否します。still-ui 版に戻すには still-ui update を実行してください。",
       "updatePanel": "パネルを更新",
       "panelUpdateDesc": "これによりstill-uiが最新リリースに更新され、パネルサービスが再起動されます。",
       "currentPanelVersion": "現在のパネルバージョン",

@@ -152,6 +152,7 @@
       "xraySwitch": "Versi",
       "xrayUpdates": "Pembaruan Xray",
       "xraySwitchClickDesk": "Pilih dengan hati-hati, karena versi yang lebih lama mungkin tidak kompatibel dengan konfigurasi saat ini.",
+      "xraySwitchOfficialCore": "Panel ini menyertakan build Xray dari still-ui (v26.10.31 dengan patch REALITY). Setiap versi di bawah adalah rilis resmi Xray dan akan menggantikan build tersebut. Xray resmi 26.9.9 dan yang lebih baru menolak klien REALITY dengan fingerprint ios dan klien berbasis sing-box seperti Hiddify dan Karing. Untuk kembali ke build still-ui, jalankan still-ui update.",
       "updatePanel": "Perbarui Panel",
       "panelUpdateDesc": "Ini akan memperbarui still-ui ke rilis terbaru dan me-restart layanan panel.",
       "currentPanelVersion": "Versi panel saat ini",

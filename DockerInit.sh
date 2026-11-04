@@ -2,6 +2,13 @@
 set -e
 # $1 is Docker's TARGETARCH and $2 its TARGETVARIANT (v6/v7 on arm). The
 # platform names match the release archives and the mtg-multi packages.
+# $3 is the Xray binary built by scripts/xray-build/build.sh (the Dockerfile's
+# "xray" stage): still-ui ships its patched core, not the official release.
+XRAY_PREBUILT=${3:-}
+if [ -z "$XRAY_PREBUILT" ] || [ ! -f "$XRAY_PREBUILT" ]; then
+    echo "DockerInit: pass the Xray binary from scripts/xray-build/build.sh as the third argument" >&2
+    exit 1
+fi
 case $1 in
     amd64 | "")
         PLATFORM="amd64"
@@ -26,13 +33,6 @@ case $1 in
         exit 1
         ;;
 esac
-case $PLATFORM in
-    amd64) XRAY_ZIP="64" ;;
-    arm64) XRAY_ZIP="arm64-v8a" ;;
-    armv7) XRAY_ZIP="arm32-v7a" ;;
-    armv6) XRAY_ZIP="arm32-v6" ;;
-    386) XRAY_ZIP="32" ;;
-esac
 # The panel looks binaries up by GOARCH; on arm Xray's is "arm32"
 # (internal/xray/process.go) and mtg's plain "arm", as install.sh renames them.
 case $PLATFORM in
@@ -52,10 +52,7 @@ if [ -z "$MTG_MULTI_VER" ]; then
 fi
 mkdir -p build/bin
 cd build/bin
-curl -sfLRO "https://github.com/XTLS/Xray-core/releases/download/v26.10.31/Xray-linux-${XRAY_ZIP}.zip"
-unzip "Xray-linux-${XRAY_ZIP}.zip"
-rm -f "Xray-linux-${XRAY_ZIP}.zip" geoip.dat geosite.dat
-mv xray "${XRAY_BIN}"
+install -m 755 "$XRAY_PREBUILT" "${XRAY_BIN}"
 # mtg-multi (MTProto sidecar) ships prebuilt release binaries for every target
 # we package, so download and unpack the matching one instead of compiling.
 MTG_PKG="mtg-multi-${MTG_MULTI_VER#v}-linux-${PLATFORM}"

@@ -152,6 +152,7 @@
       "xraySwitch": "Version",
       "xrayUpdates": "Xray Updates",
       "xraySwitchClickDesk": "Choose carefully, as older versions may not be compatible with current configurations.",
+      "xraySwitchOfficialCore": "This panel ships the still-ui build of Xray (v26.10.31 with a REALITY patch). Every version below is an official Xray release and replaces that build. Official Xray 26.9.9 and newer refuse REALITY clients with the ios fingerprint and sing-box clients such as Hiddify and Karing. To get the still-ui build back, run still-ui update.",
       "updatePanel": "Update Panel",
       "panelUpdateDesc": "This will update still-ui itself to the latest release and restart the panel service.",
       "currentPanelVersion": "Current panel version",

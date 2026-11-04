@@ -152,6 +152,7 @@
       "xraySwitch": "版本",
       "xrayUpdates": "Xray 更新",
       "xraySwitchClickDesk": "请谨慎选择，因为较旧版本可能与当前配置不兼容",
+      "xraySwitchOfficialCore": "本面板自带 still-ui 构建的 Xray（v26.10.31，附带 REALITY 补丁）。下面列出的每个版本都是 Xray 官方发布版，会替换该构建。官方 Xray 26.9.9 及更新版本会拒绝使用 ios 指纹的 REALITY 客户端以及基于 sing-box 的客户端（如 Hiddify、Karing）。要恢复 still-ui 构建，请运行 still-ui update。",
       "updatePanel": "更新面板",
       "panelUpdateDesc": "这将把 still-ui 更新到最新版本并重启面板服务。",
       "currentPanelVersion": "当前面板版本",

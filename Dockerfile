@@ -10,6 +10,23 @@ COPY internal/web/translation /src/internal/web/translation
 RUN npm run build
 
 # ========================================================
+# Stage: Xray core (still-ui's patched build, scripts/xray-build)
+# ========================================================
+# Cross-compiled on the build host with the pinned Go image; amd64 and arm64
+# must match the sha256 pinned in scripts/xray-build/build.sh.
+FROM --platform=$BUILDPLATFORM golang:1.27.3@sha256:2920bb124f1a2e12a1d39f0cab756ae0068441ee1da7655dec7f5e374944095b AS xray
+ARG TARGETARCH
+ARG TARGETVARIANT
+WORKDIR /xray-build
+COPY scripts/xray-build/ ./
+RUN case "$TARGETARCH" in \
+      arm) if [ "$TARGETVARIANT" = "v6" ]; then arch="armv6"; else arch="armv7"; fi ;; \
+      *) arch="$TARGETARCH" ;; \
+    esac \
+  && XRAY_BUILD_NATIVE=1 ./build.sh /out "$arch" \
+  && mv "/out/xray-linux-$arch" /out/xray
+
+# ========================================================
 # Stage: Builder
 # ========================================================
 FROM golang:1.27-alpine AS builder
@@ -20,8 +37,7 @@ ARG TARGETVARIANT
 RUN apk --no-cache --update add \
   build-base \
   gcc \
-  curl \
-  unzip
+  curl
 
 COPY . .
 COPY --from=frontend /src/internal/web/dist ./internal/web/dist
@@ -29,7 +45,8 @@ COPY --from=frontend /src/internal/web/dist ./internal/web/dist
 ENV CGO_ENABLED=1
 ENV CGO_CFLAGS="-D_LARGEFILE64_SOURCE"
 RUN go build -ldflags "-w -s" -o build/x-ui main.go
-RUN ./DockerInit.sh "$TARGETARCH" "$TARGETVARIANT"
+COPY --from=xray /out/xray /tmp/xray-still
+RUN ./DockerInit.sh "$TARGETARCH" "$TARGETVARIANT" /tmp/xray-still && rm -f /tmp/xray-still
 
 # ========================================================
 # Stage: Final Image of 3x-ui

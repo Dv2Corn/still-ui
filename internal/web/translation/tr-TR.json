@@ -152,6 +152,7 @@
       "xraySwitch": "Sürüm",
       "xrayUpdates": "Xray Güncellemeleri",
       "xraySwitchClickDesk": "Dikkatli seçin, eski sürümler mevcut yapılandırmalarla uyumlu olmayabilir.",
+      "xraySwitchOfficialCore": "Bu panel, still-ui'nin Xray derlemesiyle gelir (REALITY yamalı v26.10.31). Aşağıdaki her sürüm resmi bir Xray sürümüdür ve bu derlemenin yerini alır. Resmi Xray 26.9.9 ve sonrası, ios parmak izli REALITY istemcilerini ve Hiddify, Karing gibi sing-box tabanlı istemcileri reddeder. still-ui derlemesine dönmek için still-ui update komutunu çalıştırın.",
       "updatePanel": "Paneli Güncelle",
       "panelUpdateDesc": "Bu işlem still-ui'yi en son sürüme güncelleyecek ve panel servisini yeniden başlatacaktır.",
       "currentPanelVersion": "Mevcut panel sürümü",

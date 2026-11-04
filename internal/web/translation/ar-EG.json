@@ -152,6 +152,7 @@
       "xraySwitch": "النسخة",
       "xrayUpdates": "تحديثات Xray",
       "xraySwitchClickDesk": "اختار بحذر، النسخ القديمة ممكن ما تتوافقش مع الإعدادات الحالية.",
+      "xraySwitchOfficialCore": "هذه اللوحة تأتي بنسخة Xray الخاصة بـ still-ui ‏(v26.10.31 مع تعديل على REALITY). كل إصدار في القائمة أدناه هو إصدار رسمي من Xray وسيحل محل هذه النسخة. إصدارات Xray الرسمية 26.9.9 وما بعدها ترفض عملاء REALITY ببصمة ios وعملاء sing-box مثل Hiddify وKaring. لاستعادة نسخة still-ui شغّل still-ui update.",
       "updatePanel": "تحديث البانل",
       "panelUpdateDesc": "ده هيحدث still-ui لآخر إصدار وهيعيد تشغيل خدمة البانل.",
       "currentPanelVersion": "إصدار البانل الحالي",
