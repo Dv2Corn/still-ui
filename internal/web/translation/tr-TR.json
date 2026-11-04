@@ -1913,6 +1913,15 @@
       "metricsListenDesc": "Xray'in Prometheus tarzı metriklerini bu adres:port üzerinde sunar (ör. 127.0.0.1:11111). Devre dışı bırakmak için boş bırakın. localhost'a bağlayın ve ters proxy ile sunun — kimlik doğrulaması yoktur.",
       "metricsTag": "Metrik Etiketi",
       "Torrent": "BitTorrent Protokolünü Engelle",
+      "TorrentDesc": "Yalnızca Xray üzerinden geçen trafik ve yalnızca sniffing açık gelenlerde.",
+      "torrentBlock": {
+        "title": "İstemcilerin torrentlerini engelle",
+        "desc": "AmneziaWG çekirdek modu dahil tüm protokoller: Xray BitTorrent kuralını ekler (kapalı olan yerlerde sniffing'i açar) ve bu sunucuya bir nftables filtresi kurar. Hemen uygulanır; istemcilere bildirilmez.",
+        "unsupported": "Bu sunucu Linux değil: yalnızca Xray üzerinden geçen trafik engellenir.",
+        "nftMissing": "nft kurulu değil: yalnızca Xray üzerinden geçen trafik engellenir. nftables paketini kurun.",
+        "error": "nftables filtresi yüklenmedi: {error}",
+        "counters": "Filtre yüklendiğinden beri: {caught} torrent paketi yakalandı, bilinen eşlere giden {dropped} paket düşürüldü."
+      },
       "Inbounds": "Gelen Bağlantılar",
       "Outbounds": "Giden Bağlantılar",
       "Balancers": "Dengeleyiciler",

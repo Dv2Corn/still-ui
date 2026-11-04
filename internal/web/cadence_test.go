@@ -27,6 +27,7 @@ func TestJobCadencesAreValidCronSpecs(t *testing.T) {
 		"cadenceCheckHash":     cadenceCheckHash,
 		"cadenceCPUAlarm":      cadenceCPUAlarm,
 		"cadenceCertWatch":     cadenceCertWatch,
+		"cadenceTorrentBlock":  cadenceTorrentBlock,
 	}
 	for name, spec := range cadences {
 		if _, err := cron.ParseStandard(spec); err != nil {

@@ -1913,6 +1913,15 @@
       "outboundTestUrl": "出站測試 URL",
       "outboundTestUrlDesc": "測試出站連線時使用的 URL",
       "Torrent": "遮蔽 BitTorrent 協議",
+      "TorrentDesc": "僅限經過 Xray 的流量，且僅限開啟嗅探的入站。",
+      "torrentBlock": {
+        "title": "封鎖用戶端的 BT 下載",
+        "desc": "涵蓋所有協定，包括核心模式的 AmneziaWG：加入 Xray BitTorrent 規則（在關閉嗅探的入站上開啟嗅探），並在本伺服器上載入 nftables 過濾器。立即生效，不會通知用戶端。",
+        "unsupported": "本伺服器不是 Linux：僅封鎖經過 Xray 的流量。",
+        "nftMissing": "未安裝 nft：僅封鎖經過 Xray 的流量。請安裝 nftables 套件。",
+        "error": "nftables 過濾器未載入：{error}",
+        "counters": "自過濾器載入以來：攔截 {caught} 個 BT 封包，丟棄發往已知節點的 {dropped} 個封包。"
+      },
       "Inbounds": "入站",
       "Outbounds": "出站",
       "Balancers": "負載均衡",

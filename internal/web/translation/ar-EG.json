@@ -1905,6 +1905,15 @@
       "outboundTestUrl": "رابط اختبار المخرج",
       "outboundTestUrlDesc": "الرابط المستخدم عند اختبار اتصال المخرج",
       "Torrent": "حظر بروتوكول التورنت",
+      "TorrentDesc": "حركة المرور عبر Xray فقط، وفي الواردات التي تم تفعيل sniffing فيها فقط.",
+      "torrentBlock": {
+        "title": "حظر التورنت للعملاء",
+        "desc": "جميع البروتوكولات، بما فيها AmneziaWG في وضع النواة: يضيف قاعدة BitTorrent في Xray (مع تفعيل sniffing حيث يكون معطلًا) ومرشح nftables على هذا الخادم. يُطبق فورًا؛ ولا يُبلَّغ العملاء.",
+        "unsupported": "هذا الخادم ليس Linux: تُحظر حركة المرور عبر Xray فقط.",
+        "nftMissing": "nft غير مثبت: تُحظر حركة المرور عبر Xray فقط. ثبّت حزمة nftables.",
+        "error": "مرشح nftables غير محمّل: {error}",
+        "counters": "منذ تحميل المرشح: تم التقاط {caught} حزمة تورنت، وإسقاط {dropped} حزمة إلى أقران معروفين."
+      },
       "Inbounds": "الواردات",
       "Outbounds": "الصادرات",
       "importRules": "استيراد القواعد",

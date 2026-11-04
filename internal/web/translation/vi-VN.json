@@ -1913,6 +1913,15 @@
       "outboundTestUrl": "URL kiểm tra outbound",
       "outboundTestUrlDesc": "URL dùng khi kiểm tra kết nối outbound",
       "Torrent": "Cấu hình sử dụng BitTorrent",
+      "TorrentDesc": "Chỉ lưu lượng qua Xray và chỉ trên inbound bật sniffing.",
+      "torrentBlock": {
+        "title": "Chặn torrent của người dùng",
+        "desc": "Mọi giao thức, kể cả AmneziaWG chế độ kernel: thêm quy tắc BitTorrent của Xray (bật sniffing nơi đang tắt) và bộ lọc nftables trên máy chủ này. Áp dụng ngay; người dùng không được thông báo.",
+        "unsupported": "Máy chủ này không chạy Linux: chỉ lưu lượng qua Xray bị chặn.",
+        "nftMissing": "Chưa cài nft: chỉ lưu lượng qua Xray bị chặn. Hãy cài gói nftables.",
+        "error": "Bộ lọc nftables chưa được nạp: {error}",
+        "counters": "Từ khi nạp bộ lọc: bắt được {caught} gói torrent, loại bỏ {dropped} gói tới các peer đã biết."
+      },
       "Inbounds": "Inbound",
       "Outbounds": "Outbound",
       "Balancers": "Cân bằng",

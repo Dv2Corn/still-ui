@@ -2026,6 +2026,15 @@
       "outboundTestUrl": "Outbound Test URL",
       "outboundTestUrlDesc": "URL used when testing outbound connectivity.",
       "Torrent": "Block BitTorrent Protocol",
+      "TorrentDesc": "Xray traffic only, and only on inbounds with sniffing on.",
+      "torrentBlock": {
+        "title": "Block torrents for clients",
+        "desc": "All protocols, including AmneziaWG kernel mode: adds the Xray BitTorrent rule (turning sniffing on where it is off) and an nftables filter on this server. Applies at once; clients are not notified.",
+        "unsupported": "This server is not Linux: only traffic through Xray is blocked.",
+        "nftMissing": "nft is not installed: only traffic through Xray is blocked. Install the nftables package.",
+        "error": "The nftables filter is not loaded: {error}",
+        "counters": "Since the filter loaded: {caught} torrent packets caught, {dropped} packets to known peers dropped."
+      },
       "Inbounds": "Inbounds",
       "Outbounds": "Outbounds",
       "Balancers": "Balancers",

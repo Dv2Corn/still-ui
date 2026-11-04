@@ -22,6 +22,8 @@ import {
   syncOutbound,
 } from '../basics/helpers';
 
+import TorrentBlockSetting from './TorrentBlockSetting';
+
 interface RoutingBasicProps {
   templateSettings: XraySettingsValue | null;
   setTemplateSettings: SetTemplate;
@@ -84,6 +86,7 @@ export default function RoutingBasic({ templateSettings, setTemplateSettings }: 
 
       <SettingListItem
         title={t('pages.xray.Torrent')}
+        description={t('pages.xray.TorrentDesc')}
         paddings="small"
         control={
           <Switch
@@ -99,6 +102,8 @@ export default function RoutingBasic({ templateSettings, setTemplateSettings }: 
           />
         }
       />
+
+      <TorrentBlockSetting />
 
       <SettingListItem
         title={t('pages.xray.blockips')}

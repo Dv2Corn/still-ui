@@ -31,6 +31,8 @@ type ServerController struct {
 	settingService     service.SettingService
 	panelService       panel.PanelService
 	xrayMetricsService service.XrayMetricsService
+	torrentBlock       service.TorrentBlockService
+	xrayService        service.XrayService
 }
 
 // NewServerController creates a new ServerController, initializes routes, and starts background tasks.
@@ -66,12 +68,14 @@ func (a *ServerController) initRouter(g *gin.RouterGroup) {
 	g.GET("/getNewVlessEnc", a.getNewVlessEnc)
 	g.GET("/clientIps", a.getClientIps)
 	g.GET("/fail2banStatus", a.getFail2banStatus)
+	g.GET("/torrentBlock", a.getTorrentBlock)
 
 	g.POST("/stopXrayService", a.stopXrayService)
 	g.POST("/restartXrayService", a.restartXrayService)
 	g.POST("/installXray/:version", a.installXray)
 	g.POST("/updatePanel", a.updatePanel)
 	g.POST("/setUpdateChannel", a.setUpdateChannel)
+	g.POST("/setTorrentBlock", a.setTorrentBlock)
 	g.POST("/updateGeofile", a.updateGeofile)
 	g.POST("/updateGeofile/:fileName", a.updateGeofile)
 	g.POST("/logs/:count", a.getLogs)
@@ -112,6 +116,33 @@ func (a *ServerController) status(c *gin.Context) { jsonObj(c, a.serverService.C
 
 func (a *ServerController) getFail2banStatus(c *gin.Context) {
 	jsonObj(c, a.serverService.GetFail2banStatus(), nil)
+}
+
+func (a *ServerController) getTorrentBlock(c *gin.Context) {
+	jsonObj(c, a.torrentBlock.Status(), nil)
+}
+
+type setTorrentBlockForm struct {
+	Enable bool `json:"enable" form:"enable"`
+}
+
+// setTorrentBlock flips "Block torrents for clients"; the routing rule and sniffing
+// live in the generated config, so the running core is reconciled right away.
+func (a *ServerController) setTorrentBlock(c *gin.Context) {
+	form := &setTorrentBlockForm{}
+	if err := c.ShouldBind(form); err != nil {
+		jsonMsg(c, "invalid data", err)
+		return
+	}
+	status, err := a.torrentBlock.SetEnabled(form.Enable)
+	if err != nil {
+		jsonMsg(c, I18nWeb(c, "pages.settings.toasts.modifySettings"), err)
+		return
+	}
+	if restartErr := a.xrayService.RestartXray(false); restartErr != nil {
+		logger.Warning("apply torrent block change failed:", restartErr)
+	}
+	jsonObj(c, status, nil)
 }
 
 func parseHistoryBucket(c *gin.Context) (int, bool) {

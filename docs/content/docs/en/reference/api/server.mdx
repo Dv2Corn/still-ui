@@ -24,6 +24,12 @@ _openapi:
         Fail2ban being installed.
       url: '#reports-whether-per-client-ip-limits-can-be-enforced-on-this-host-the-panel-uses-it-to-gate-the-ip-limit-field-since-enforcement-depends-on-fail2ban-being-installed'
     - depth: 2
+      title: 'State of "Block torrents for clients": the stored toggle, whether this
+        host can run the nftables filter (Linux with nft), whether its table is
+        loaded, packet counters since it was loaded, and the last apply error if
+        any.'
+      url: '#state-of-block-torrents-for-clients-the-stored-toggle-whether-this-host-can-run-the-nftables-filter-linux-with-nft-whether-its-table-is-loaded-packet-counters-since-it-was-loaded-and-the-last-apply-error-if-any'
+    - depth: 2
       title: 'Legacy: aggregated CPU history. Use /history/cpu/:bucket instead — same
         data with a uniform {t, v} shape.'
       url: '#legacy-aggregated-cpu-history-use-historycpubucket-instead--same-data-with-a-uniform-t-v-shape'
@@ -121,6 +127,15 @@ _openapi:
         dev release. Only effective on dev builds.
       url: '#toggle-the-panel-update-channel-between-stable-and-the-rolling-per-commit-dev-release-only-effective-on-dev-builds'
     - depth: 2
+      title: 'Turn "Block torrents for clients" on or off. On: every generated Xray
+        config routes sniffed BitTorrent to a blackhole first and enables
+        content sniffing on client inbounds where it is off, and on Linux an
+        nftables table drops BitTorrent signatures in egress the server
+        originates and in forwarded AmneziaWG kernel-mode traffic. Xray is
+        reconciled immediately. Returns the same object as GET /torrentBlock; a
+        host without nft keeps the Xray half and reports the error.'
+      url: '#turn-block-torrents-for-clients-on-or-off-on-every-generated-xray-config-routes-sniffed-bittorrent-to-a-blackhole-first-and-enables-content-sniffing-on-client-inbounds-where-it-is-off-and-on-linux-an-nftables-table-drops-bittorrent-signatures-in-egress-the-server-originates-and-in-forwarded-amneziawg-kernel-mode-traffic-xray-is-reconciled-immediately-returns-the-same-object-as-get-torrentblock-a-host-without-nft-keeps-the-xray-half-and-reports-the-error'
+    - depth: 2
       title: Refresh the default GeoIP / GeoSite data files. Use the /:fileName
         variant to update one file.
       url: '#refresh-the-default-geoip--geosite-data-files-use-the-filename-variant-to-update-one-file'
@@ -195,6 +210,11 @@ _openapi:
           panel uses it to gate the "IP Limit" field, since enforcement depends
           on Fail2ban being installed.
         id: reports-whether-per-client-ip-limits-can-be-enforced-on-this-host-the-panel-uses-it-to-gate-the-ip-limit-field-since-enforcement-depends-on-fail2ban-being-installed
+      - content: 'State of "Block torrents for clients": the stored toggle, whether this
+          host can run the nftables filter (Linux with nft), whether its table
+          is loaded, packet counters since it was loaded, and the last apply
+          error if any.'
+        id: state-of-block-torrents-for-clients-the-stored-toggle-whether-this-host-can-run-the-nftables-filter-linux-with-nft-whether-its-table-is-loaded-packet-counters-since-it-was-loaded-and-the-last-apply-error-if-any
       - content: 'Legacy: aggregated CPU history. Use /history/cpu/:bucket instead —
           same data with a uniform {t, v} shape.'
         id: legacy-aggregated-cpu-history-use-historycpubucket-instead--same-data-with-a-uniform-t-v-shape
@@ -268,6 +288,14 @@ _openapi:
       - content: Toggle the panel update channel between stable and the rolling
           per-commit dev release. Only effective on dev builds.
         id: toggle-the-panel-update-channel-between-stable-and-the-rolling-per-commit-dev-release-only-effective-on-dev-builds
+      - content: 'Turn "Block torrents for clients" on or off. On: every generated Xray
+          config routes sniffed BitTorrent to a blackhole first and enables
+          content sniffing on client inbounds where it is off, and on Linux an
+          nftables table drops BitTorrent signatures in egress the server
+          originates and in forwarded AmneziaWG kernel-mode traffic. Xray is
+          reconciled immediately. Returns the same object as GET /torrentBlock;
+          a host without nft keeps the Xray half and reports the error.'
+        id: turn-block-torrents-for-clients-on-or-off-on-every-generated-xray-config-routes-sniffed-bittorrent-to-a-blackhole-first-and-enables-content-sniffing-on-client-inbounds-where-it-is-off-and-on-linux-an-nftables-table-drops-bittorrent-signatures-in-egress-the-server-originates-and-in-forwarded-amneziawg-kernel-mode-traffic-xray-is-reconciled-immediately-returns-the-same-object-as-get-torrentblock-a-host-without-nft-keeps-the-xray-half-and-reports-the-error
       - content: Refresh the default GeoIP / GeoSite data files. Use the /:fileName
           variant to update one file.
         id: refresh-the-default-geoip--geosite-data-files-use-the-filename-variant-to-update-one-file
@@ -325,7 +353,7 @@ export default function Layout(props) {
   return (
     <>
       {props.children}
-      <OpenAPIPage document="./public/openapi.json" webhooks={[]} operations={[{"path":"/panel/api/openapi.json","method":"get"},{"path":"/panel/api/server/status","method":"get"},{"path":"/panel/api/server/fail2banStatus","method":"get"},{"path":"/panel/api/server/cpuHistory/{bucket}","method":"get"},{"path":"/panel/api/server/history/{metric}/{bucket}","method":"get"},{"path":"/panel/api/server/xrayMetricsState","method":"get"},{"path":"/panel/api/server/xrayMetricsHistory/{metric}/{bucket}","method":"get"},{"path":"/panel/api/server/xrayObservatory","method":"get"},{"path":"/panel/api/server/xrayObservatoryHistory/{tag}/{bucket}","method":"get"},{"path":"/panel/api/server/getXrayVersion","method":"get"},{"path":"/panel/api/server/getPanelUpdateInfo","method":"get"},{"path":"/panel/api/server/getUpdateStatus","method":"get"},{"path":"/panel/api/server/getConfigJson","method":"get"},{"path":"/panel/api/server/getDb","method":"get"},{"path":"/panel/api/server/getMigration","method":"get"},{"path":"/panel/api/server/getNewUUID","method":"get"},{"path":"/panel/api/server/getWebCertFiles","method":"get"},{"path":"/panel/api/server/descendants","method":"get"},{"path":"/panel/api/server/getNewX25519Cert","method":"get"},{"path":"/panel/api/server/getNewmldsa65","method":"get"},{"path":"/panel/api/server/getNewmlkem768","method":"get"},{"path":"/panel/api/server/getNewVlessEnc","method":"get"},{"path":"/panel/api/server/stopXrayService","method":"post"},{"path":"/panel/api/server/restartXrayService","method":"post"},{"path":"/panel/api/server/installXray/{version}","method":"post"},{"path":"/panel/api/server/updatePanel","method":"post"},{"path":"/panel/api/server/setUpdateChannel","method":"post"},{"path":"/panel/api/server/updateGeofile","method":"post"},{"path":"/panel/api/server/updateGeofile/{fileName}","method":"post"},{"path":"/panel/api/server/logs/{count}","method":"post"},{"path":"/panel/api/server/xraylogs/{count}","method":"post"},{"path":"/panel/api/server/amneziawglogs/{count}","method":"post"},{"path":"/panel/api/server/importDB","method":"post"},{"path":"/panel/api/server/getNewEchCert","method":"post"},{"path":"/panel/api/server/getCertHash","method":"post"},{"path":"/panel/api/server/getRemoteCertHash","method":"post"},{"path":"/panel/api/server/scanRealityTarget","method":"post"},{"path":"/panel/api/server/scanRealityTargets","method":"post"},{"path":"/panel/api/server/clientIps","method":"get"},{"path":"/panel/api/server/clientIps","method":"post"}]} showTitle />
+      <OpenAPIPage document="./public/openapi.json" webhooks={[]} operations={[{"path":"/panel/api/openapi.json","method":"get"},{"path":"/panel/api/server/status","method":"get"},{"path":"/panel/api/server/fail2banStatus","method":"get"},{"path":"/panel/api/server/torrentBlock","method":"get"},{"path":"/panel/api/server/cpuHistory/{bucket}","method":"get"},{"path":"/panel/api/server/history/{metric}/{bucket}","method":"get"},{"path":"/panel/api/server/xrayMetricsState","method":"get"},{"path":"/panel/api/server/xrayMetricsHistory/{metric}/{bucket}","method":"get"},{"path":"/panel/api/server/xrayObservatory","method":"get"},{"path":"/panel/api/server/xrayObservatoryHistory/{tag}/{bucket}","method":"get"},{"path":"/panel/api/server/getXrayVersion","method":"get"},{"path":"/panel/api/server/getPanelUpdateInfo","method":"get"},{"path":"/panel/api/server/getUpdateStatus","method":"get"},{"path":"/panel/api/server/getConfigJson","method":"get"},{"path":"/panel/api/server/getDb","method":"get"},{"path":"/panel/api/server/getMigration","method":"get"},{"path":"/panel/api/server/getNewUUID","method":"get"},{"path":"/panel/api/server/getWebCertFiles","method":"get"},{"path":"/panel/api/server/descendants","method":"get"},{"path":"/panel/api/server/getNewX25519Cert","method":"get"},{"path":"/panel/api/server/getNewmldsa65","method":"get"},{"path":"/panel/api/server/getNewmlkem768","method":"get"},{"path":"/panel/api/server/getNewVlessEnc","method":"get"},{"path":"/panel/api/server/stopXrayService","method":"post"},{"path":"/panel/api/server/restartXrayService","method":"post"},{"path":"/panel/api/server/installXray/{version}","method":"post"},{"path":"/panel/api/server/updatePanel","method":"post"},{"path":"/panel/api/server/setUpdateChannel","method":"post"},{"path":"/panel/api/server/setTorrentBlock","method":"post"},{"path":"/panel/api/server/updateGeofile","method":"post"},{"path":"/panel/api/server/updateGeofile/{fileName}","method":"post"},{"path":"/panel/api/server/logs/{count}","method":"post"},{"path":"/panel/api/server/xraylogs/{count}","method":"post"},{"path":"/panel/api/server/amneziawglogs/{count}","method":"post"},{"path":"/panel/api/server/importDB","method":"post"},{"path":"/panel/api/server/getNewEchCert","method":"post"},{"path":"/panel/api/server/getCertHash","method":"post"},{"path":"/panel/api/server/getRemoteCertHash","method":"post"},{"path":"/panel/api/server/scanRealityTarget","method":"post"},{"path":"/panel/api/server/scanRealityTargets","method":"post"},{"path":"/panel/api/server/clientIps","method":"get"},{"path":"/panel/api/server/clientIps","method":"post"}]} showTitle />
     </>
   );
 }

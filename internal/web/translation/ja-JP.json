@@ -1913,6 +1913,15 @@
       "outboundTestUrl": "アウトバウンドテスト URL",
       "outboundTestUrlDesc": "アウトバウンド接続テストに使用する URL。既定値",
       "Torrent": "BitTorrent プロトコルをブロック",
+      "TorrentDesc": "Xray を通るトラフィックのみ、かつスニッフィングが有効なインバウンドのみが対象です。",
+      "torrentBlock": {
+        "title": "クライアントのトレントをブロック",
+        "desc": "AmneziaWG カーネルモードを含むすべてのプロトコルが対象です。Xray の BitTorrent ルールを追加し（無効な所ではスニッフィングを有効化）、このサーバーに nftables フィルターを設定します。すぐに適用され、クライアントには通知されません。",
+        "unsupported": "このサーバーは Linux ではないため、Xray を通るトラフィックのみブロックされます。",
+        "nftMissing": "nft がインストールされていないため、Xray を通るトラフィックのみブロックされます。nftables パッケージをインストールしてください。",
+        "error": "nftables フィルターが読み込まれていません: {error}",
+        "counters": "フィルター読み込み以降: トレントのパケット {caught} 件を検出、既知のピア宛てのパケット {dropped} 件を破棄。"
+      },
       "Inbounds": "インバウンド",
       "Outbounds": "アウトバウンド",
       "Balancers": "負荷分散",

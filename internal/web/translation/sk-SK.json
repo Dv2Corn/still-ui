@@ -2026,6 +2026,15 @@
       "outboundTestUrl": "URL na test výstupov",
       "outboundTestUrlDesc": "URL použitá na overenie pripojenia cez výstup.",
       "Torrent": "Blokovať protokol BitTorrent",
+      "TorrentDesc": "Iba prevádzka cez Xray a iba na prichádzajúcich so zapnutým sniffingom.",
+      "torrentBlock": {
+        "title": "Blokovať torrenty klientov",
+        "desc": "Všetky protokoly vrátane AmneziaWG v režime jadra: pridá pravidlo BitTorrent v Xray (kde je sniffing vypnutý, zapne ho) a filter nftables na tomto serveri. Platí hneď; klienti nie sú upozornení.",
+        "unsupported": "Tento server nie je Linux: blokuje sa iba prevádzka cez Xray.",
+        "nftMissing": "nft nie je nainštalovaný: blokuje sa iba prevádzka cez Xray. Nainštalujte balík nftables.",
+        "error": "Filter nftables nie je načítaný: {error}",
+        "counters": "Od načítania filtra: zachytených {caught} torrentových paketov, zahodených {dropped} paketov k známym peerom."
+      },
       "Inbounds": "Vstupy",
       "Outbounds": "Výstupy",
       "Balancers": "Vyvažovanie záťaže",

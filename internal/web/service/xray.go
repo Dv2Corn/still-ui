@@ -297,6 +297,7 @@ func (s *XrayService) GetXrayConfig() (*xray.Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	clientInboundTags := make(map[string]struct{}, len(inbounds))
 	for _, inbound := range inbounds {
 		if !inbound.Enable {
 			continue
@@ -466,6 +467,7 @@ func (s *XrayService) GetXrayConfig() (*xray.Config, error) {
 
 		inboundConfig := inbound.GenXrayInboundConfig()
 		xrayConfig.InboundConfigs = append(xrayConfig.InboundConfigs, *inboundConfig)
+		clientInboundTags[inboundConfig.Tag] = struct{}{}
 	}
 	xrayConfig.InboundConfigs = dropInboundsRefusedByXDrive(xrayConfig.InboundConfigs)
 
@@ -530,6 +532,10 @@ func (s *XrayService) GetXrayConfig() (*xray.Config, error) {
 		logger.Warning("read nodes for egress injection failed:", err)
 	} else {
 		injectNodeEgresses(xrayConfig, nodes)
+	}
+
+	if (&TorrentBlockService{settingService: s.settingService}).Enabled() {
+		injectTorrentBlock(xrayConfig, clientInboundTags)
 	}
 
 	xrayConfig.RouterConfig = dropRefusedScript(xrayConfig.RouterConfig, "routing", routingScriptRefused)

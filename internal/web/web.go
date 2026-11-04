@@ -313,6 +313,7 @@ const (
 	cadenceRemoteRouting = "@every 5m"
 	cadenceXrayLogPrune  = "@every 10m"
 	cadenceCertWatch     = "@every 1m"
+	cadenceTorrentBlock  = "@every 1m"
 	cadenceCheckHash     = "@every 2m"
 	// cpu.Percent samples over a full minute (blocking), so a finer cadence just
 	// stacks overlapping samplers; subscribers rate-limit alerts to 1/min anyway.
@@ -336,6 +337,11 @@ func (s *Server) startTask(restartXray, forceXrayRestart bool, loc *time.Locatio
 	_, _ = s.cron.AddFunc(cadenceXrayRestart, func() {
 		s.xrayService.ApplyPendingRestart()
 	})
+
+	// "Block torrents for clients": reload the nftables table after a reboot or a ruleset flush.
+	torrentBlock := service.TorrentBlockService{}
+	go torrentBlock.EnsureHostFilter()
+	_, _ = s.cron.AddFunc(cadenceTorrentBlock, torrentBlock.EnsureHostFilter)
 
 	// Renewed TLS/Hysteria certificates: copy for the core, check what each inbound serves.
 	_, _ = s.cron.AddFunc(cadenceCertWatch, func() {

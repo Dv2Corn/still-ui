@@ -1905,6 +1905,15 @@
       "outboundTestUrl": "URL de prueba de outbound",
       "outboundTestUrlDesc": "URL usada al probar la conectividad del outbound",
       "Torrent": "Prohibir Uso de BitTorrent",
+      "TorrentDesc": "Solo tráfico a través de Xray y solo en entradas con sniffing activado.",
+      "torrentBlock": {
+        "title": "Bloquear torrents de clientes",
+        "desc": "Todos los protocolos, incluido AmneziaWG en modo kernel: añade la regla BitTorrent de Xray (activando sniffing donde esté desactivado) y un filtro nftables en este servidor. Se aplica al instante; no se avisa a los clientes.",
+        "unsupported": "Este servidor no es Linux: solo se bloquea el tráfico a través de Xray.",
+        "nftMissing": "nft no está instalado: solo se bloquea el tráfico a través de Xray. Instale el paquete nftables.",
+        "error": "El filtro nftables no está cargado: {error}",
+        "counters": "Desde que se cargó el filtro: {caught} paquetes torrent detectados, {dropped} paquetes a pares conocidos descartados."
+      },
       "Inbounds": "Entradas",
       "Outbounds": "Salidas",
       "Balancers": "Equilibradores",
