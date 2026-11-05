@@ -161,7 +161,7 @@ func TestProbeOrderJudgesEachHostEndpoint(t *testing.T) {
 	}
 }
 
-func clashDoc(t *testing.T, routing bool, rules string) map[string]any {
+func probeClashDoc(t *testing.T, routing bool, rules string) map[string]any {
 	t.Helper()
 	out, _, err := NewSubClashService(routing, rules, false, NewSubService("")).GetClash("s1", "req.example.com")
 	if err != nil {
@@ -187,7 +187,7 @@ func clashServers(doc map[string]any) string {
 	return strings.Join(out, " ")
 }
 
-func clashGroup(doc map[string]any, name string) []any {
+func probeClashGroup(doc map[string]any, name string) []any {
 	groups, _ := doc["proxy-groups"].([]any)
 	for _, g := range groups {
 		if m := g.(map[string]any); m["name"] == name {
@@ -201,22 +201,22 @@ func TestProbeOrderClash(t *testing.T) {
 	t.Run("reorder", func(t *testing.T) {
 		w := newProbeSubWorld(t, service.SubProbeOrderReorder)
 		w.down(w.a, "203.0.113.5")
-		doc := clashDoc(t, false, "")
+		doc := probeClashDoc(t, false, "")
 		if got := clashServers(doc); got != "4432 4431" {
 			t.Fatalf("proxies = %q", got)
 		}
-		if group := clashGroup(doc, "PROXY"); fmt.Sprint(group) != "[b-b@e a-a@e DIRECT]" {
+		if group := probeClashGroup(doc, "PROXY"); fmt.Sprint(group) != "[b-b@e a-a@e DIRECT]" {
 			t.Fatalf("PROXY group must start with the reachable proxy: %v", group)
 		}
 	})
 	t.Run("hide", func(t *testing.T) {
 		w := newProbeSubWorld(t, service.SubProbeOrderHide)
 		w.down(w.a, "203.0.113.5")
-		doc := clashDoc(t, false, "")
+		doc := probeClashDoc(t, false, "")
 		if got := clashServers(doc); got != "4432" {
 			t.Fatalf("proxies = %q", got)
 		}
-		if group := clashGroup(doc, "PROXY"); fmt.Sprint(group) != "[b-b@e DIRECT]" {
+		if group := probeClashGroup(doc, "PROXY"); fmt.Sprint(group) != "[b-b@e DIRECT]" {
 			t.Fatalf("PROXY group = %v, want the hidden proxy left out", group)
 		}
 	})
@@ -224,7 +224,7 @@ func TestProbeOrderClash(t *testing.T) {
 		w := newProbeSubWorld(t, service.SubProbeOrderHide)
 		w.down(w.a, "203.0.113.5")
 		w.down(w.b, "203.0.113.5")
-		if got := clashServers(clashDoc(t, false, "")); got != "4431 4432" {
+		if got := clashServers(probeClashDoc(t, false, "")); got != "4431 4432" {
 			t.Fatalf("proxies = %q, want the normal list", got)
 		}
 	})
@@ -233,7 +233,7 @@ func TestProbeOrderClash(t *testing.T) {
 		w := newProbeSubWorld(t, service.SubProbeOrderHide)
 		w.down(w.a, "203.0.113.5")
 		rules := "proxy-groups:\n  - name: PROXY\n    type: select\n    proxies: [a-a@e, b-b@e]\n"
-		if got := clashServers(clashDoc(t, true, rules)); got != "4432 4431" {
+		if got := clashServers(probeClashDoc(t, true, rules)); got != "4432 4431" {
 			t.Fatalf("proxies = %q, want the named proxy kept at the end", got)
 		}
 	})
@@ -256,7 +256,7 @@ func TestProbeOrderClash(t *testing.T) {
 	t.Run("custom routing without names still hides", func(t *testing.T) {
 		w := newProbeSubWorld(t, service.SubProbeOrderHide)
 		w.down(w.a, "203.0.113.5")
-		if got := clashServers(clashDoc(t, true, "- DOMAIN-SUFFIX,example.org,DIRECT\n")); got != "4432" {
+		if got := clashServers(probeClashDoc(t, true, "- DOMAIN-SUFFIX,example.org,DIRECT\n")); got != "4432" {
 			t.Fatalf("proxies = %q", got)
 		}
 	})
