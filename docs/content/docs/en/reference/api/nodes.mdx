@@ -80,9 +80,9 @@ _openapi:
         node's inbounds off until the reset). trafficMultiplier (0.1-100) scales
         the node's traffic added to client totals; the node's own counter stays
         raw. A change applies to traffic from that moment on; the master also
-        sends it to the node for its quota checks while the master is
-        unreachable.
-      url: '#set-a-nodes-monthly-traffic-limit-and-accounting-multiplier-trafficlimitbytes-0-means-no-limit-usage-counts-the-nodes-own-inbound-traffic-and-resets-at-midnight-on-trafficresetday-1-31-clamped-to-the-months-last-day-trafficwarnpercent-0--off-sends-a-telegram-alert-once-per-period-trafficlimitaction-is-notify-or-disable-turns-the-nodes-inbounds-off-until-the-reset-trafficmultiplier-01-100-scales-the-nodes-traffic-added-to-client-totals-the-nodes-own-counter-stays-raw-a-change-applies-to-traffic-from-that-moment-on-the-master-also-sends-it-to-the-node-for-its-quota-checks-while-the-master-is-unreachable'
+        sends it to the node, which bills its traffic since the master's last
+        count at it, so quotas hold while the master is unreachable.
+      url: '#set-a-nodes-monthly-traffic-limit-and-accounting-multiplier-trafficlimitbytes-0-means-no-limit-usage-counts-the-nodes-own-inbound-traffic-and-resets-at-midnight-on-trafficresetday-1-31-clamped-to-the-months-last-day-trafficwarnpercent-0--off-sends-a-telegram-alert-once-per-period-trafficlimitaction-is-notify-or-disable-turns-the-nodes-inbounds-off-until-the-reset-trafficmultiplier-01-100-scales-the-nodes-traffic-added-to-client-totals-the-nodes-own-counter-stays-raw-a-change-applies-to-traffic-from-that-moment-on-the-master-also-sends-it-to-the-node-which-bills-its-traffic-since-the-masters-last-count-at-it-so-quotas-hold-while-the-master-is-unreachable'
     - depth: 2
       title: Probe a node without saving it. Uses the body as connection details and
         returns the same heartbeat snapshot a registered node would have.
@@ -172,9 +172,10 @@ _openapi:
           disable (turns the node's inbounds off until the reset).
           trafficMultiplier (0.1-100) scales the node's traffic added to client
           totals; the node's own counter stays raw. A change applies to traffic
-          from that moment on; the master also sends it to the node for its
-          quota checks while the master is unreachable.
-        id: set-a-nodes-monthly-traffic-limit-and-accounting-multiplier-trafficlimitbytes-0-means-no-limit-usage-counts-the-nodes-own-inbound-traffic-and-resets-at-midnight-on-trafficresetday-1-31-clamped-to-the-months-last-day-trafficwarnpercent-0--off-sends-a-telegram-alert-once-per-period-trafficlimitaction-is-notify-or-disable-turns-the-nodes-inbounds-off-until-the-reset-trafficmultiplier-01-100-scales-the-nodes-traffic-added-to-client-totals-the-nodes-own-counter-stays-raw-a-change-applies-to-traffic-from-that-moment-on-the-master-also-sends-it-to-the-node-for-its-quota-checks-while-the-master-is-unreachable
+          from that moment on; the master also sends it to the node, which bills
+          its traffic since the master's last count at it, so quotas hold while
+          the master is unreachable.
+        id: set-a-nodes-monthly-traffic-limit-and-accounting-multiplier-trafficlimitbytes-0-means-no-limit-usage-counts-the-nodes-own-inbound-traffic-and-resets-at-midnight-on-trafficresetday-1-31-clamped-to-the-months-last-day-trafficwarnpercent-0--off-sends-a-telegram-alert-once-per-period-trafficlimitaction-is-notify-or-disable-turns-the-nodes-inbounds-off-until-the-reset-trafficmultiplier-01-100-scales-the-nodes-traffic-added-to-client-totals-the-nodes-own-counter-stays-raw-a-change-applies-to-traffic-from-that-moment-on-the-master-also-sends-it-to-the-node-which-bills-its-traffic-since-the-masters-last-count-at-it-so-quotas-hold-while-the-master-is-unreachable
       - content: Probe a node without saving it. Uses the body as connection details and
           returns the same heartbeat snapshot a registered node would have.
         id: probe-a-node-without-saving-it-uses-the-body-as-connection-details-and-returns-the-same-heartbeat-snapshot-a-registered-node-would-have

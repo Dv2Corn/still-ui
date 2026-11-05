@@ -403,7 +403,7 @@ export const sections: readonly Section[] = [
             in: 'body (json)',
             type: 'number',
             optional: true,
-            desc: "The master's billing multiplier for this node (0.1–100), kept per master. For that master's clients the node checks quotas by the master's fresh pushes, and by its own counters × this value only while no fresh push arrives.",
+            desc: "The master's billing multiplier for this node (0.1–100), kept per master. For that master's clients the node checks quotas by the master's last pushed count plus its own traffic since that push × this value (the node stores its counters with each push), so quotas hold while the master is unreachable.",
           },
         ],
         body: '{\n  "masterGuid": "9f6c2d-…",\n  "trafficMultiplier": 0.5,\n  "traffics": [\n    { "email": "alice", "up": 1048576, "down": 2097152 }\n  ]\n}',
@@ -1863,7 +1863,7 @@ export const sections: readonly Section[] = [
         method: 'POST',
         path: '/panel/api/nodes/trafficLimit/:id',
         summary:
-          "Set a node's monthly traffic limit and accounting multiplier. trafficLimitBytes 0 means no limit; usage counts the node's own inbound traffic and resets at midnight on trafficResetDay (1-31, clamped to the month's last day). trafficWarnPercent (0 = off) sends a Telegram alert once per period. trafficLimitAction is notify or disable (turns the node's inbounds off until the reset). trafficMultiplier (0.1-100) scales the node's traffic added to client totals; the node's own counter stays raw. A change applies to traffic from that moment on; the master also sends it to the node for its quota checks while the master is unreachable.",
+          "Set a node's monthly traffic limit and accounting multiplier. trafficLimitBytes 0 means no limit; usage counts the node's own inbound traffic and resets at midnight on trafficResetDay (1-31, clamped to the month's last day). trafficWarnPercent (0 = off) sends a Telegram alert once per period. trafficLimitAction is notify or disable (turns the node's inbounds off until the reset). trafficMultiplier (0.1-100) scales the node's traffic added to client totals; the node's own counter stays raw. A change applies to traffic from that moment on; the master also sends it to the node, which bills its traffic since the master's last count at it, so quotas hold while the master is unreachable.",
         params: [{ name: 'id', in: 'path', type: 'number', desc: 'Node ID.' }],
         body: '{\n  "trafficLimitBytes": 1099511627776,\n  "trafficResetDay": 1,\n  "trafficWarnPercent": 80,\n  "trafficLimitAction": "notify",\n  "trafficMultiplier": 1\n}',
       },

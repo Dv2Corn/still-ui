@@ -168,10 +168,12 @@ _openapi:
         (stored as managed by its panelGuid) or, with release=true, gives up
         ownership and leaves the current filter in place as the node's own.
         Allowed for node-sync tokens. serverAddress is the address the central
-        panel reaches the node at; the server block covers it too (it may be a
-        NAT address on no interface). Xray is reconciled when the filter or that
+        panel reaches the node at; if it is an IP literal and this panel owns
+        the filter, the server block covers it too (it may be a NAT address on
+        no interface). A release or push from a panel that does not own the
+        filter changes nothing. Xray is reconciled when the filter or that
         address changed. Returns the same object as GET /egressFilter."
-      url: '#node-side-of-the-egress-filter-a-central-panel-sets-this-nodes-filter-stored-as-managed-by-its-panelguid-or-with-releasetrue-gives-up-ownership-and-leaves-the-current-filter-in-place-as-the-nodes-own-allowed-for-node-sync-tokens-serveraddress-is-the-address-the-central-panel-reaches-the-node-at-the-server-block-covers-it-too-it-may-be-a-nat-address-on-no-interface-xray-is-reconciled-when-the-filter-or-that-address-changed-returns-the-same-object-as-get-egressfilter'
+      url: '#node-side-of-the-egress-filter-a-central-panel-sets-this-nodes-filter-stored-as-managed-by-its-panelguid-or-with-releasetrue-gives-up-ownership-and-leaves-the-current-filter-in-place-as-the-nodes-own-allowed-for-node-sync-tokens-serveraddress-is-the-address-the-central-panel-reaches-the-node-at-if-it-is-an-ip-literal-and-this-panel-owns-the-filter-the-server-block-covers-it-too-it-may-be-a-nat-address-on-no-interface-a-release-or-push-from-a-panel-that-does-not-own-the-filter-changes-nothing-xray-is-reconciled-when-the-filter-or-that-address-changed-returns-the-same-object-as-get-egressfilter'
     - depth: 2
       title: Refresh the default GeoIP / GeoSite data files. Use the /:fileName
         variant to update one file.
@@ -368,11 +370,12 @@ _openapi:
           filter (stored as managed by its panelGuid) or, with release=true,
           gives up ownership and leaves the current filter in place as the
           node's own. Allowed for node-sync tokens. serverAddress is the address
-          the central panel reaches the node at; the server block covers it too
-          (it may be a NAT address on no interface). Xray is reconciled when the
-          filter or that address changed. Returns the same object as GET
-          /egressFilter."
-        id: node-side-of-the-egress-filter-a-central-panel-sets-this-nodes-filter-stored-as-managed-by-its-panelguid-or-with-releasetrue-gives-up-ownership-and-leaves-the-current-filter-in-place-as-the-nodes-own-allowed-for-node-sync-tokens-serveraddress-is-the-address-the-central-panel-reaches-the-node-at-the-server-block-covers-it-too-it-may-be-a-nat-address-on-no-interface-xray-is-reconciled-when-the-filter-or-that-address-changed-returns-the-same-object-as-get-egressfilter
+          the central panel reaches the node at; if it is an IP literal and this
+          panel owns the filter, the server block covers it too (it may be a NAT
+          address on no interface). A release or push from a panel that does not
+          own the filter changes nothing. Xray is reconciled when the filter or
+          that address changed. Returns the same object as GET /egressFilter."
+        id: node-side-of-the-egress-filter-a-central-panel-sets-this-nodes-filter-stored-as-managed-by-its-panelguid-or-with-releasetrue-gives-up-ownership-and-leaves-the-current-filter-in-place-as-the-nodes-own-allowed-for-node-sync-tokens-serveraddress-is-the-address-the-central-panel-reaches-the-node-at-if-it-is-an-ip-literal-and-this-panel-owns-the-filter-the-server-block-covers-it-too-it-may-be-a-nat-address-on-no-interface-a-release-or-push-from-a-panel-that-does-not-own-the-filter-changes-nothing-xray-is-reconciled-when-the-filter-or-that-address-changed-returns-the-same-object-as-get-egressfilter
       - content: Refresh the default GeoIP / GeoSite data files. Use the /:fileName
           variant to update one file.
         id: refresh-the-default-geoip--geosite-data-files-use-the-filename-variant-to-update-one-file
