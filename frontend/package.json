@@ -46,7 +46,7 @@
     "codemirror": "^6.0.2",
     "dayjs": "^1.11.23",
     "i18next": "^26.7.1",
-    "otpauth": "^9.5.2",
+    "otpauth": "^9.6.0",
     "persian-calendar-suite": "^1.5.6",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
