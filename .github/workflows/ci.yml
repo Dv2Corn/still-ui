@@ -12,6 +12,8 @@ on:
       - "install.sh"
       - "deploy/test/installer-panel-port.sh"
       - "**.sh"
+      - "x-ui.service.*"
+      - "still-xray.service"
       - "scripts/**"
       - ".github/workflows/**"
       - ".github/scripts/**"
@@ -28,6 +30,8 @@ on:
       - "install.sh"
       - "deploy/test/installer-panel-port.sh"
       - "**.sh"
+      - "x-ui.service.*"
+      - "still-xray.service"
       - "scripts/**"
       - ".github/workflows/**"
       - ".github/scripts/**"
@@ -351,6 +355,7 @@ jobs:
             scripts/still-release.sh scripts/still-sbom.sh scripts/xray-build/build.sh
           shellcheck --severity=style migrate.sh deploy/test/migrate-unit.sh scripts/test-migrate.sh
           shellcheck --severity=style scripts/still-probe-install.sh deploy/test/release-scripts.sh
+          shellcheck --severity=style deploy/test/installer-unit.sh deploy/test/installer-mutations.sh deploy/test/installer-e2e.sh
           shellcheck --severity=error install.sh update.sh x-ui.sh
       - name: Installer panel port regression tests
         run: bash deploy/test/installer-panel-port.sh
@@ -358,6 +363,13 @@ jobs:
         run: bash deploy/test/migrate-unit.sh
       - name: Release script checksum gates
         run: bash deploy/test/release-scripts.sh
+      # install.sh, update.sh, x-ui.sh and the units, function by function, in a
+      # scratch root (the end-to-end run on real systems is installer-e2e.sh).
+      - name: Installer and lifecycle unit tests
+        run: bash deploy/test/installer-unit.sh
+      # Breaks each guarded behaviour in a copy and requires the tests above to fail.
+      - name: Installer test mutations
+        run: bash deploy/test/installer-mutations.sh -v
 
   frontend:
     runs-on: ubuntu-latest

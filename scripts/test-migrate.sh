@@ -19,7 +19,8 @@
 # ":pg" installs 3x-ui with a local PostgreSQL database (3.x installers only).
 # FLOOR_PROBE=1 lets migrate.sh try releases below its MIN_VERSION.
 # Needs incus with the images: remote and internet access in the containers.
-# Containers are named su-mig-<image>-<tag>[-<mode>] and deleted afterwards
+# Containers are named su-mig-<image>-<tag>[-<mode>] (STILL_TEST_CT_PREFIX
+# replaces su-mig) and deleted afterwards
 # (KEEP=1 keeps them), so several runs with different scenarios can go in parallel.
 # migrate.sh, install.sh and the seed helper come from this checkout.
 set -uo pipefail
@@ -269,7 +270,7 @@ run_case() { # ct image tag mode
 
 for scenario in "$@"; do
     IFS=: read -r image tag mode <<< "$scenario"
-    ct="su-mig-$(echo "${image}-${tag}${mode:+-$mode}" | tr -c 'a-z0-9\n' '-' | tr -s '-')"
+    ct="${STILL_TEST_CT_PREFIX:-su-mig}-$(echo "${image}-${tag}${mode:+-$mode}" | tr -c 'a-z0-9\n' '-' | tr -s '-')"
     if run_case "$ct" "$image" "$tag" "$mode"; then
         RESULTS+=("PASS $scenario")
     else
