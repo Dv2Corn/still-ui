@@ -6808,7 +6808,7 @@
                   },
                   "trafficMultiplier": {
                     "type": "integer",
-                    "description": "The master's billing multiplier for this node (0.1–100). The node bills its own counters at it in quota checks; 1 clears it."
+                    "description": "The master's billing multiplier for this node (0.1–100), kept per master. For that master's clients the node checks quotas by the master's fresh pushes, and by its own counters × this value only while no fresh push arrives."
                   }
                 },
                 "required": [
@@ -8433,7 +8433,7 @@
         "tags": [
           "Server"
         ],
-        "summary": "Node side of the egress filter: a central panel sets this node's filter (stored as managed by its panelGuid) or, with release=true, gives up ownership and leaves the current filter in place as the node's own. Allowed for node-sync tokens. Xray is reconciled when the filter changed. Returns the same object as GET /egressFilter.",
+        "summary": "Node side of the egress filter: a central panel sets this node's filter (stored as managed by its panelGuid) or, with release=true, gives up ownership and leaves the current filter in place as the node's own. Allowed for node-sync tokens. serverAddress is the address the central panel reaches the node at; the server block covers it too (it may be a NAT address on no interface). Xray is reconciled when the filter or that address changed. Returns the same object as GET /egressFilter.",
         "operationId": "post_panel_api_server_applyManagedEgressFilter",
         "requestBody": {
           "required": true,
@@ -8448,7 +8448,8 @@
                   "private": true,
                   "custom": []
                 },
-                "managedBy": "4b1c0f6e-2f6d-4c55-9a1e-0f3d7c2a9b10"
+                "managedBy": "4b1c0f6e-2f6d-4c55-9a1e-0f3d7c2a9b10",
+                "serverAddress": "203.0.113.9"
               }
             }
           }
@@ -13024,7 +13025,7 @@
         "tags": [
           "Nodes"
         ],
-        "summary": "Set a node's monthly traffic limit and accounting multiplier. trafficLimitBytes 0 means no limit; usage counts the node's own inbound traffic and resets at midnight on trafficResetDay (1-31, clamped to the month's last day). trafficWarnPercent (0 = off) sends a Telegram alert once per period. trafficLimitAction is notify or disable (turns the node's inbounds off until the reset). trafficMultiplier (0.1-100) scales the node's traffic added to client totals; the node's own counter stays raw, and the master sends the multiplier to the node so its own quota checks bill at it too.",
+        "summary": "Set a node's monthly traffic limit and accounting multiplier. trafficLimitBytes 0 means no limit; usage counts the node's own inbound traffic and resets at midnight on trafficResetDay (1-31, clamped to the month's last day). trafficWarnPercent (0 = off) sends a Telegram alert once per period. trafficLimitAction is notify or disable (turns the node's inbounds off until the reset). trafficMultiplier (0.1-100) scales the node's traffic added to client totals; the node's own counter stays raw. A change applies to traffic from that moment on; the master also sends it to the node for its quota checks while the master is unreachable.",
         "operationId": "post_panel_api_nodes_trafficLimit_id",
         "parameters": [
           {
