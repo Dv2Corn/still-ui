@@ -158,13 +158,16 @@ func (m *Manager) Ensure(d Desired) error {
 // Device in place via IpcSet); or the interface's own address(es)/effective
 // MTU changed -- S4 counts, the default MTU derives from it (these are fixed
 // at netstack-construction time, so the only option is closing the old
-// Device and building a fresh one).
+// Device and building a fresh one). I1-I5 also rebuild: amneziawg-go cannot
+// change them under live traffic without a data race (see
+// signaturePacketsFingerprint). Like an MTU edit, that resets the inbound's
+// open in-tunnel connections, which a rare admin edit of I1-I5 can afford.
 func (m *Manager) ensureLocked(d Desired) error {
 	inst, opts := d.Instance, d.Options
 	if opts.Logger == nil {
 		opts.Logger = verboseLoggerIfEnabled(inst.Id)
 	}
-	structFP := addressFingerprint(inst)
+	structFP := addressFingerprint(inst) + "|" + signaturePacketsFingerprint(inst.Obfuscation)
 
 	cur, exists := m.ifaces[inst.Id]
 	// Captured before either branch below: peers/AllowedIPs can change
@@ -203,7 +206,9 @@ func (m *Manager) ensureLocked(d Desired) error {
 			cur.portForwards.Reconcile(inst)
 			return nil
 		}
-		if err := cur.dev.IpcSet(conf); err != nil {
+		// I1-I5 are equal here (structFP), and must not be re-sent to a
+		// running Device -- see signaturePacketsFingerprint.
+		if err := cur.dev.IpcSet(withoutSignaturePackets(conf)); err != nil {
 			return fmt.Errorf("amneziawgnet: reconfigure inbound %d: %w", inst.Id, err)
 		}
 		oldPeers := cur.peers.Swap(NewPeerIndex(inst.Peers))
