@@ -215,6 +215,15 @@ func TestNodeEnrollGivesThePanelACertificateAndHandsOverAToken(t *testing.T) {
 	if got := apiTokens(t); len(got) != 1 {
 		t.Fatalf("%d API tokens after a refused enrollment, want the token it issued removed", len(got))
 	}
+	// Revoked while the master was adding the node: 401, and the new token goes too.
+	m.registerStatus = http.StatusUnauthorized
+	if err := enrollNode(context.Background(), m.invite(), nodeEnrollOptions{}, deps, &out); err == nil ||
+		!strings.Contains(err.Error(), "does not accept this invitation") {
+		t.Fatalf("register refused with 401: %v", err)
+	}
+	if got := apiTokens(t); len(got) != 1 {
+		t.Fatalf("%d API tokens after a 401 on register, want the token it issued removed", len(got))
+	}
 }
 
 func TestNodeEnrollNeverReplacesABrokenConfiguredCertificate(t *testing.T) {

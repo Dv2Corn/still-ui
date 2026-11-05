@@ -26,6 +26,7 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/util/crypto"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/netsafe"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/random"
+	"github.com/mhsanaei/3x-ui/v3/internal/web/runtime"
 )
 
 const (
@@ -342,18 +343,26 @@ func (s *NodeEnrollService) Enroll(ctx context.Context, token string, req *nodee
 // before it was spent; the agent gets no node and the invitation records why.
 func (s *NodeEnrollService) undoEnrollment(inviteID int, claimedAt int64, nodeID int, remoteIP string, cause error) error {
 	db := database.GetDB()
-	reason, ret := "revoked while the node was being added; the node was removed", ErrNodeInviteRevoked
+	reason, ret := "revoked while the node was being added", ErrNodeInviteRevoked
 	var inv model.NodeInvite
 	if err := db.Where("id = ?", inviteID).First(&inv).Error; err == nil && inv.RevokedAt == 0 {
-		reason, ret = "the claim lapsed before the node was added; the node was removed", ErrNodeInviteBusy
+		reason, ret = "the claim lapsed before the node was added", ErrNodeInviteBusy
 	}
 	if cause != nil {
-		reason, ret = "marking the invitation used failed; the node was removed", cause
+		reason, ret = "marking the invitation used failed", cause
 	}
+	reason += "; the node was removed"
 	if err := s.nodeService.Delete(nodeID); err != nil {
+		// Left in place, the node must hold no way into the agent's panel.
 		logger.Warningf("node enrollment: removing node #%d of invitation #%d: %v; disabling it", nodeID, inviteID, err)
-		if err := db.Model(&model.Node{}).Where("id = ?", nodeID).Update("enable", false).Error; err != nil {
+		reason = strings.TrimSuffix(reason, "; the node was removed") + "; the node could not be removed, disabled"
+		if err := db.Model(&model.Node{}).Where("id = ?", nodeID).Updates(map[string]any{
+			"enable": false, "api_token": "", "pinned_cert_sha256": "", "last_error": "enrollment undone: " + reason,
+		}).Error; err != nil {
 			logger.Warning("node enrollment: disabling node", nodeID, ":", err)
+		}
+		if mgr := runtime.GetManager(); mgr != nil {
+			mgr.InvalidateNode(nodeID)
 		}
 	}
 	if err := db.Model(&model.NodeInvite{}).Where("id = ? AND claimed_at = ?", inviteID, claimedAt).

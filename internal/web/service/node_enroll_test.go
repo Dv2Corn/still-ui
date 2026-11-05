@@ -345,3 +345,41 @@ func TestNodeEnrollRevokedMidwayAddsNoNode(t *testing.T) {
 		t.Fatalf("retry after revoke: %v", err)
 	}
 }
+
+// When the node added under a revoked invitation cannot be removed, it is left disabled and
+// holding no credentials for the agent's panel.
+func TestNodeEnrollRevokedMidwayUnremovableNodeKeepsNoCredentials(t *testing.T) {
+	f := newEnrollFixture(t)
+	_, inv := f.invite(t, NodeInviteInput{})
+	views, _ := f.svc.ListInvites()
+	id := views[0].Id
+	nodeID := 1 // the first node row; an inbound on it makes the removal refuse
+	f.accept = func(n *model.Node) error {
+		if n.TlsVerifyMode != "pin" {
+			return errors.New("x509: certificate signed by unknown authority")
+		}
+		if err := f.svc.RevokeInvite(id); err != nil {
+			t.Errorf("revoke during enrollment: %v", err)
+		}
+		ib := &model.Inbound{UserId: 1, Tag: "on-the-new-node", Port: 42999, Protocol: model.VLESS, NodeID: &nodeID}
+		if err := database.GetDB().Create(ib).Error; err != nil {
+			t.Errorf("attach an inbound: %v", err)
+		}
+		return nil
+	}
+	if _, err := f.svc.Enroll(context.Background(), inv.Token, goodRequest(), "203.0.113.7"); !errors.Is(err, ErrNodeInviteRevoked) {
+		t.Fatalf("Enroll: %v", err)
+	}
+	var nodes []model.Node
+	database.GetDB().Find(&nodes)
+	if len(nodes) != 1 || nodes[0].Id != nodeID {
+		t.Fatalf("nodes %+v: want the one node that could not be removed", nodes)
+	}
+	if n := nodes[0]; n.Enable || n.ApiToken != "" || n.PinnedCertSha256 != "" || !strings.Contains(n.LastError, "could not be removed") {
+		t.Fatalf("the unremovable node kept access: enable=%v token=%q pin=%q lastError=%q", n.Enable, n.ApiToken, n.PinnedCertSha256, n.LastError)
+	}
+	views, _ = f.svc.ListInvites()
+	if !strings.Contains(views[0].LastError, "revoked while the node was being added; the node could not be removed, disabled") {
+		t.Fatalf("audit row %+v", views[0])
+	}
+}
