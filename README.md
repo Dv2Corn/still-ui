@@ -215,10 +215,10 @@ Release archives are built by GitHub Actions from the tagged commit ([release wo
 | `install.sh`, `update.sh`, `x-ui.sh`, `migrate.sh` | the installer, the updater, the `still-ui` menu and the 3x-ui migration of this release (the same files are inside the archive); the panel's update button and `still-ui update` run `update.sh` only when its sum is in `SHA256SUMS` |
 | `SHA256SUMS` | checksums of the archives, SBOMs, probe archives and scripts |
 
-Download and check the checksums (replace `v1.5.1` with the release you install):
+Download and check the checksums (replace `v1.6.0` with the release you install):
 
 ```bash
-gh release download v1.5.1 -R Dv2Corn/still-ui -p 'still-ui-linux-amd64.tar.gz*' -p SHA256SUMS
+gh release download v1.6.0 -R Dv2Corn/still-ui -p 'still-ui-linux-amd64.tar.gz*' -p SHA256SUMS
 sha256sum -c SHA256SUMS --ignore-missing
 ```
 
@@ -226,7 +226,7 @@ Check that the archive was built by this repository's release workflow from that
 
 ```bash
 gh attestation verify still-ui-linux-amd64.tar.gz -R Dv2Corn/still-ui \
-  --signer-workflow Dv2Corn/still-ui/.github/workflows/release.yml --source-ref refs/tags/v1.5.1
+  --signer-workflow Dv2Corn/still-ui/.github/workflows/release.yml --source-ref refs/tags/v1.6.0
 ```
 
 The SBOM is attested too:
@@ -240,7 +240,7 @@ The Xray core inside the archive can be rebuilt bit for bit. On a Linux host wit
 ```bash
 tar -xzf still-ui-linux-amd64.tar.gz still-ui/bin/xray-linux-amd64
 sha256sum still-ui/bin/xray-linux-amd64
-git clone https://github.com/Dv2Corn/still-ui && cd still-ui && git checkout v1.5.1
+git clone https://github.com/Dv2Corn/still-ui && cd still-ui && git checkout v1.6.0
 scripts/xray-build/build.sh /tmp/xray-out amd64 arm64
 ```
 
