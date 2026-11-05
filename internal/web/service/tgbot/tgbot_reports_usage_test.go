@@ -329,7 +329,7 @@ func TestClientUsageDoesNotLoadTheInboundPerClient(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = db.Callback().Query().Remove("test:whole_inbound_rows") })
 
-	(&Tgbot{}).getClientUsage(ownerTgID, ownerTgID, screenSendNew)
+	(&Tgbot{}).getClientUsage(ownerTgID, ownerTgID, screenEditOrReplace)
 
 	if got := strings.Join(sent(), "\n"); !strings.Contains(got, "shared-inbound") {
 		t.Fatalf("no client listed with its inbound: %q", got)
