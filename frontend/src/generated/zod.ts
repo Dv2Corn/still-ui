@@ -18,9 +18,6 @@ export type Protocol = z.infer<typeof ProtocolSchema>;
 export const addrFamilySchema = z.number().int();
 export type addrFamily = z.infer<typeof addrFamilySchema>;
 
-export const payloadKeysSchema = z.array(z.string());
-export type payloadKeys = z.infer<typeof payloadKeysSchema>;
-
 export const reachTransitionSchema = z.number().int();
 export type reachTransition = z.infer<typeof reachTransitionSchema>;
 
