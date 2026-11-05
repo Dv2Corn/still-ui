@@ -6805,6 +6805,10 @@
                       "type": "object"
                     },
                     "description": "Client traffic rows; only email/up/down are read."
+                  },
+                  "trafficMultiplier": {
+                    "type": "integer",
+                    "description": "The master's billing multiplier for this node (0.1–100). The node bills its own counters at it in quota checks; 1 clears it."
                   }
                 },
                 "required": [
@@ -6814,6 +6818,7 @@
               },
               "example": {
                 "masterGuid": "9f6c2d-…",
+                "trafficMultiplier": 0.5,
                 "traffics": [
                   {
                     "email": "alice",
@@ -13019,7 +13024,7 @@
         "tags": [
           "Nodes"
         ],
-        "summary": "Set a node's monthly traffic limit and accounting multiplier. trafficLimitBytes 0 means no limit; usage counts the node's own inbound traffic and resets at midnight on trafficResetDay (1-31, clamped to the month's last day). trafficWarnPercent (0 = off) sends a Telegram alert once per period. trafficLimitAction is notify or disable (turns the node's inbounds off until the reset). trafficMultiplier (0.1-100) scales the node's traffic added to client totals; the node's own counter stays raw.",
+        "summary": "Set a node's monthly traffic limit and accounting multiplier. trafficLimitBytes 0 means no limit; usage counts the node's own inbound traffic and resets at midnight on trafficResetDay (1-31, clamped to the month's last day). trafficWarnPercent (0 = off) sends a Telegram alert once per period. trafficLimitAction is notify or disable (turns the node's inbounds off until the reset). trafficMultiplier (0.1-100) scales the node's traffic added to client totals; the node's own counter stays raw, and the master sends the multiplier to the node so its own quota checks bill at it too.",
         "operationId": "post_panel_api_nodes_trafficLimit_id",
         "parameters": [
           {

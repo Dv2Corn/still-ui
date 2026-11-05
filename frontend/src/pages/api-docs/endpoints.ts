@@ -398,8 +398,15 @@ export const sections: readonly Section[] = [
             type: 'object[]',
             desc: 'Client traffic rows; only email/up/down are read.',
           },
+          {
+            name: 'trafficMultiplier',
+            in: 'body (json)',
+            type: 'number',
+            optional: true,
+            desc: "The master's billing multiplier for this node (0.1–100). The node bills its own counters at it in quota checks; 1 clears it.",
+          },
         ],
-        body: '{\n  "masterGuid": "9f6c2d-…",\n  "traffics": [\n    { "email": "alice", "up": 1048576, "down": 2097152 }\n  ]\n}',
+        body: '{\n  "masterGuid": "9f6c2d-…",\n  "trafficMultiplier": 0.5,\n  "traffics": [\n    { "email": "alice", "up": 1048576, "down": 2097152 }\n  ]\n}',
         response: '{\n  "success": true\n}',
       },
       {
@@ -1856,7 +1863,7 @@ export const sections: readonly Section[] = [
         method: 'POST',
         path: '/panel/api/nodes/trafficLimit/:id',
         summary:
-          "Set a node's monthly traffic limit and accounting multiplier. trafficLimitBytes 0 means no limit; usage counts the node's own inbound traffic and resets at midnight on trafficResetDay (1-31, clamped to the month's last day). trafficWarnPercent (0 = off) sends a Telegram alert once per period. trafficLimitAction is notify or disable (turns the node's inbounds off until the reset). trafficMultiplier (0.1-100) scales the node's traffic added to client totals; the node's own counter stays raw.",
+          "Set a node's monthly traffic limit and accounting multiplier. trafficLimitBytes 0 means no limit; usage counts the node's own inbound traffic and resets at midnight on trafficResetDay (1-31, clamped to the month's last day). trafficWarnPercent (0 = off) sends a Telegram alert once per period. trafficLimitAction is notify or disable (turns the node's inbounds off until the reset). trafficMultiplier (0.1-100) scales the node's traffic added to client totals; the node's own counter stays raw, and the master sends the multiplier to the node so its own quota checks bill at it too.",
         params: [{ name: 'id', in: 'path', type: 'number', desc: 'Node ID.' }],
         body: '{\n  "trafficLimitBytes": 1099511627776,\n  "trafficResetDay": 1,\n  "trafficWarnPercent": 80,\n  "trafficLimitAction": "notify",\n  "trafficMultiplier": 1\n}',
       },

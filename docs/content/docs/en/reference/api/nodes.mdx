@@ -79,8 +79,9 @@ _openapi:
         once per period. trafficLimitAction is notify or disable (turns the
         node's inbounds off until the reset). trafficMultiplier (0.1-100) scales
         the node's traffic added to client totals; the node's own counter stays
-        raw.
-      url: '#set-a-nodes-monthly-traffic-limit-and-accounting-multiplier-trafficlimitbytes-0-means-no-limit-usage-counts-the-nodes-own-inbound-traffic-and-resets-at-midnight-on-trafficresetday-1-31-clamped-to-the-months-last-day-trafficwarnpercent-0--off-sends-a-telegram-alert-once-per-period-trafficlimitaction-is-notify-or-disable-turns-the-nodes-inbounds-off-until-the-reset-trafficmultiplier-01-100-scales-the-nodes-traffic-added-to-client-totals-the-nodes-own-counter-stays-raw'
+        raw, and the master sends the multiplier to the node so its own quota
+        checks bill at it too.
+      url: '#set-a-nodes-monthly-traffic-limit-and-accounting-multiplier-trafficlimitbytes-0-means-no-limit-usage-counts-the-nodes-own-inbound-traffic-and-resets-at-midnight-on-trafficresetday-1-31-clamped-to-the-months-last-day-trafficwarnpercent-0--off-sends-a-telegram-alert-once-per-period-trafficlimitaction-is-notify-or-disable-turns-the-nodes-inbounds-off-until-the-reset-trafficmultiplier-01-100-scales-the-nodes-traffic-added-to-client-totals-the-nodes-own-counter-stays-raw-and-the-master-sends-the-multiplier-to-the-node-so-its-own-quota-checks-bill-at-it-too'
     - depth: 2
       title: Probe a node without saving it. Uses the body as connection details and
         returns the same heartbeat snapshot a registered node would have.
@@ -169,8 +170,9 @@ _openapi:
           Telegram alert once per period. trafficLimitAction is notify or
           disable (turns the node's inbounds off until the reset).
           trafficMultiplier (0.1-100) scales the node's traffic added to client
-          totals; the node's own counter stays raw.
-        id: set-a-nodes-monthly-traffic-limit-and-accounting-multiplier-trafficlimitbytes-0-means-no-limit-usage-counts-the-nodes-own-inbound-traffic-and-resets-at-midnight-on-trafficresetday-1-31-clamped-to-the-months-last-day-trafficwarnpercent-0--off-sends-a-telegram-alert-once-per-period-trafficlimitaction-is-notify-or-disable-turns-the-nodes-inbounds-off-until-the-reset-trafficmultiplier-01-100-scales-the-nodes-traffic-added-to-client-totals-the-nodes-own-counter-stays-raw
+          totals; the node's own counter stays raw, and the master sends the
+          multiplier to the node so its own quota checks bill at it too.
+        id: set-a-nodes-monthly-traffic-limit-and-accounting-multiplier-trafficlimitbytes-0-means-no-limit-usage-counts-the-nodes-own-inbound-traffic-and-resets-at-midnight-on-trafficresetday-1-31-clamped-to-the-months-last-day-trafficwarnpercent-0--off-sends-a-telegram-alert-once-per-period-trafficlimitaction-is-notify-or-disable-turns-the-nodes-inbounds-off-until-the-reset-trafficmultiplier-01-100-scales-the-nodes-traffic-added-to-client-totals-the-nodes-own-counter-stays-raw-and-the-master-sends-the-multiplier-to-the-node-so-its-own-quota-checks-bill-at-it-too
       - content: Probe a node without saving it. Uses the body as connection details and
           returns the same heartbeat snapshot a registered node would have.
         id: probe-a-node-without-saving-it-uses-the-body-as-connection-details-and-returns-the-same-heartbeat-snapshot-a-registered-node-would-have
