@@ -10,6 +10,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"math/big"
+	"net"
 	"time"
 )
 
@@ -119,4 +120,33 @@ func LoadCAFromPEM(ca CertKeyPEM) (*x509.Certificate, crypto.Signer, error) {
 		return nil, nil, err
 	}
 	return cert, key, nil
+}
+
+// GenerateSelfSignedServerCert mints a P-256 server certificate for a node panel
+// that has none; the master pins it by hash, so its names are only informative.
+func GenerateSelfSignedServerCert(commonName string, ips []net.IP, dnsNames []string) (CertKeyPEM, error) {
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return CertKeyPEM{}, err
+	}
+	serial, err := randomSerial()
+	if err != nil {
+		return CertKeyPEM{}, err
+	}
+	now := time.Now()
+	tmpl := &x509.Certificate{
+		SerialNumber: serial,
+		Subject:      pkix.Name{CommonName: commonName},
+		NotBefore:    now.Add(-time.Hour),
+		NotAfter:     now.Add(nodeCertValidity),
+		KeyUsage:     x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		IPAddresses:  ips,
+		DNSNames:     dnsNames,
+	}
+	der, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, key.Public(), key)
+	if err != nil {
+		return CertKeyPEM{}, err
+	}
+	return marshalCertKey(der, key)
 }

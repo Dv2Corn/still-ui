@@ -983,6 +983,41 @@ export const NodeSchema = z.object({
 });
 export type Node = z.infer<typeof NodeSchema>;
 
+export const NodeInviteCreatedSchema = z.object({
+  invite: z.lazy(() => NodeInviteViewSchema),
+  secret: z.string(),
+});
+export type NodeInviteCreated = z.infer<typeof NodeInviteCreatedSchema>;
+
+export const NodeInviteInputSchema = z.object({
+  address: z.string(),
+  allowPrivateAddress: z.boolean(),
+  masterUrl: z.string(),
+  name: z.string(),
+  nodeAdmin: z.boolean(),
+  validMinutes: z.number().int(),
+});
+export type NodeInviteInput = z.infer<typeof NodeInviteInputSchema>;
+
+export const NodeInviteViewSchema = z.object({
+  address: z.string(),
+  allowPrivateAddress: z.boolean(),
+  attempts: z.number().int(),
+  createdAt: z.number().int(),
+  expiresAt: z.number().int(),
+  id: z.number().int(),
+  lastError: z.string(),
+  masterUrl: z.string(),
+  name: z.string(),
+  nodeAdmin: z.boolean(),
+  nodeId: z.number().int(),
+  revokedAt: z.number().int(),
+  status: z.string(),
+  usedAt: z.number().int(),
+  usedFromIp: z.string(),
+});
+export type NodeInviteView = z.infer<typeof NodeInviteViewSchema>;
+
 export const NodeMutationRequestSchema = z.object({
   address: z.string(),
   allowPrivateAddress: z.boolean(),

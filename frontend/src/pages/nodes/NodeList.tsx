@@ -20,6 +20,7 @@ import {
   ClusterOutlined,
   CloudDownloadOutlined,
   DashboardOutlined,
+  CodeOutlined,
   DeleteOutlined,
   EditOutlined,
   ExclamationCircleOutlined,
@@ -50,6 +51,7 @@ interface NodeListProps {
   selectedIds: number[];
   onSelectionChange: (ids: number[]) => void;
   onAdd: () => void;
+  onInvite: () => void;
   onMtls: () => void;
   onEdit: (node: NodeRecord) => void;
   onDelete: (node: NodeRecord) => void;
@@ -243,6 +245,7 @@ export default function NodeList({
   selectedIds,
   onSelectionChange,
   onAdd,
+  onInvite,
   onMtls,
   onEdit,
   onDelete,
@@ -682,6 +685,9 @@ export default function NodeList({
       <div className="toolbar">
         <Button type="primary" icon={<PlusOutlined aria-hidden />} onClick={onAdd}>
           {t('pages.nodes.addNode')}
+        </Button>
+        <Button icon={<CodeOutlined aria-hidden />} onClick={onInvite}>
+          {t('pages.nodes.invite.button')}
         </Button>
         <Button icon={<SafetyCertificateOutlined aria-hidden />} onClick={onMtls}>
           {t('pages.nodes.mtls.title')}

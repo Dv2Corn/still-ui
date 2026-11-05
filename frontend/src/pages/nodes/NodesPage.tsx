@@ -32,6 +32,7 @@ import AppSidebar from '@/layouts/AppSidebar';
 import NodeList from './NodeList';
 import NodeFormModal from './NodeFormModal';
 import NodeTrafficModal from './NodeTrafficModal';
+import NodeInviteModal from './NodeInviteModal';
 import { setMessageInstance } from '@/utils/messageBus';
 import { HttpUtil } from '@/utils';
 import type { PanelUpdateInfo } from '../index/PanelUpdateModal';
@@ -74,6 +75,7 @@ export default function NodesPage() {
   const [formNode, setFormNode] = useState<NodeRecord | null>(null);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [mtlsOpen, setMtlsOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
   const [trustCa, setTrustCa] = useState('');
   const [copyingCa, setCopyingCa] = useState(false);
   const [savingTrustCa, setSavingTrustCa] = useState(false);
@@ -324,6 +326,7 @@ export default function NodesPage() {
                       selectedIds={selectedIds}
                       onSelectionChange={setSelectedIds}
                       onAdd={onAdd}
+                      onInvite={() => setInviteOpen(true)}
                       onMtls={() => setMtlsOpen(true)}
                       onEdit={onEdit}
                       onDelete={onDelete}
@@ -357,6 +360,8 @@ export default function NodesPage() {
           save={setTrafficLimit}
           onClose={() => setTrafficNode(null)}
         />
+
+        <NodeInviteModal open={inviteOpen} onClose={() => setInviteOpen(false)} />
 
         <Modal
           open={mtlsOpen}

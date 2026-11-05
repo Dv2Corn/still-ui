@@ -674,6 +674,8 @@ func main() {
 		migrateDb()
 	case "encrypt-tokens":
 		encryptNodeTokens()
+	case "node-enroll":
+		os.Exit(runNodeEnroll(os.Args[2:], os.Stdin, os.Stdout, os.Stderr))
 	case "migrate-3xui":
 		os.Exit(panelmigrate.RunCLI(os.Args[2:], os.Stdout, os.Stderr))
 	case "migrate-db":
@@ -787,6 +789,8 @@ Commands:
     migrate-3xui   read-only inspection and consistent backup of a 3x-ui
                    database (used by migrate.sh)
     setting        set settings
+    node-enroll    add this panel as a node of a master; the invitation from the
+                   master's Nodes page is read from STILL_NODE_INVITE or stdin
     backup         take a local backup now, with the panel's backup settings
     restore        replace the database with a backup (-file F [-identity KEY|-]); stop the panel first
     xray-unit-check

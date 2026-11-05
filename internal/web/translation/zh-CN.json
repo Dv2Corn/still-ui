@@ -1220,7 +1220,9 @@
         "updateNoneEligible": "请至少选择一个在线且已启用的节点",
         "saveMtls": "保存节点 mTLS",
         "reloadMtls": "Reload master mTLS credential",
-        "trafficLimit": "保存流量上限"
+        "trafficLimit": "保存流量上限",
+        "inviteCreate": "创建节点邀请",
+        "inviteRevoke": "撤销节点邀请"
       },
       "tlsVerifyMode": "TLS 校验",
       "tlsVerifyModeHint": "面板如何校验节点的 HTTPS 证书。固定或跳过用于自签名证书（仅 https 节点）。",
@@ -1248,7 +1250,34 @@
       "pinnedCertPlaceholder": "base64 或 hex 的 SHA-256",
       "fetchPin": "获取",
       "pinFetched": "已获取节点当前证书",
-      "pinFetchFailed": "无法获取证书"
+      "pinFetchFailed": "无法获取证书",
+      "invite": {
+        "button": "用命令添加",
+        "title": "一条命令添加节点",
+        "intro": "创建一次性邀请，然后在新服务器上以 root 运行命令。它会在那里安装 still-ui，设为本面板的节点，并加入此列表。",
+        "addressHint": "留空则使用服务器连接时的来源地址。",
+        "addressPlaceholder": "服务器连接时的来源地址",
+        "masterUrl": "本面板供节点访问的地址",
+        "masterUrlHint": "新服务器会打开此 HTTPS 地址。命令会校验本面板的 TLS 密钥，因此自签名证书也可以。",
+        "validMinutes": "有效期（分钟）",
+        "nodeAdmin": "允许更新面板",
+        "nodeAdminHint": "节点会给本面板一个也能更新其 still-ui 的令牌。否则该令牌只能同步入站和客户端。",
+        "create": "创建邀请",
+        "once": "请立即复制命令：它只显示一次，在 {time} 前可使用一次。",
+        "command": "在新服务器上以 root 运行",
+        "another": "再创建一个",
+        "list": "邀请",
+        "details": "详情",
+        "usedFrom": "{time} 从 {ip} 使用，节点 #{id}",
+        "validUntil": "有效期至 {time}",
+        "revoke": "撤销",
+        "status": {
+          "pending": "等待中",
+          "used": "已使用",
+          "expired": "已过期",
+          "revoked": "已撤销"
+        }
+      }
     },
     "settings": {
       "defaultTag": "默认",

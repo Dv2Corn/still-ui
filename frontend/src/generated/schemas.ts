@@ -4080,6 +4080,146 @@ export const SCHEMAS: Record<string, unknown> = {
     ],
     "type": "object"
   },
+  "NodeInviteCreated": {
+    "description": "NodeInviteCreated carries the invitation string, shown once.",
+    "properties": {
+      "invite": {
+        "$ref": "#/components/schemas/NodeInviteView"
+      },
+      "secret": {
+        "example": "still-node1.\u003ctoken\u003e.\u003cpin\u003e.\u003curl\u003e",
+        "type": "string"
+      }
+    },
+    "required": [
+      "invite",
+      "secret"
+    ],
+    "type": "object"
+  },
+  "NodeInviteInput": {
+    "description": "NodeInviteInput is what the admin sets when making an invitation.",
+    "properties": {
+      "address": {
+        "type": "string"
+      },
+      "allowPrivateAddress": {
+        "example": false,
+        "type": "boolean"
+      },
+      "masterUrl": {
+        "description": "MasterUrl is the panel URL nodes reach this master at, as the admin\nopens it in a browser.",
+        "example": "https://panel.example.com:2053/path/",
+        "type": "string"
+      },
+      "name": {
+        "example": "de-fra-1",
+        "type": "string"
+      },
+      "nodeAdmin": {
+        "example": false,
+        "type": "boolean"
+      },
+      "validMinutes": {
+        "example": 30,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "address",
+      "allowPrivateAddress",
+      "masterUrl",
+      "name",
+      "nodeAdmin",
+      "validMinutes"
+    ],
+    "type": "object"
+  },
+  "NodeInviteView": {
+    "description": "NodeInviteView is one invitation as the Nodes page lists it. The token is\nnever part of it.",
+    "properties": {
+      "address": {
+        "type": "string"
+      },
+      "allowPrivateAddress": {
+        "example": false,
+        "type": "boolean"
+      },
+      "attempts": {
+        "example": 0,
+        "type": "integer"
+      },
+      "createdAt": {
+        "example": 1736000000,
+        "format": "int64",
+        "type": "integer"
+      },
+      "expiresAt": {
+        "example": 1736001800,
+        "format": "int64",
+        "type": "integer"
+      },
+      "id": {
+        "example": 3,
+        "type": "integer"
+      },
+      "lastError": {
+        "type": "string"
+      },
+      "masterUrl": {
+        "example": "https://panel.example.com:2053/path/",
+        "type": "string"
+      },
+      "name": {
+        "example": "de-fra-1",
+        "type": "string"
+      },
+      "nodeAdmin": {
+        "example": false,
+        "type": "boolean"
+      },
+      "nodeId": {
+        "example": 0,
+        "type": "integer"
+      },
+      "revokedAt": {
+        "example": 0,
+        "format": "int64",
+        "type": "integer"
+      },
+      "status": {
+        "description": "pending|used|expired|revoked",
+        "example": "pending",
+        "type": "string"
+      },
+      "usedAt": {
+        "example": 0,
+        "format": "int64",
+        "type": "integer"
+      },
+      "usedFromIp": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "address",
+      "allowPrivateAddress",
+      "attempts",
+      "createdAt",
+      "expiresAt",
+      "id",
+      "lastError",
+      "masterUrl",
+      "name",
+      "nodeAdmin",
+      "nodeId",
+      "revokedAt",
+      "status",
+      "usedAt",
+      "usedFromIp"
+    ],
+    "type": "object"
+  },
   "NodeMutationRequest": {
     "description": "NodeMutationRequest is the node write/probe contract. ApiToken is accepted\nonly as input. On update, nil means keep the stored token; replacement and\nclearing are explicit and mutually exclusive.",
     "properties": {

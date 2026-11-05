@@ -1786,6 +1786,28 @@ export const sections: readonly Section[] = [
       },
       {
         method: 'GET',
+        path: '/panel/api/nodes/invites',
+        summary:
+          'List node invitations (Nodes → Add with a command), newest first, with their status (pending, used, expired, revoked) and the audit of who used them. Tokens are never listed; invitations spent more than 30 days ago are dropped.',
+        responseSchema: 'NodeInviteView',
+        responseSchemaArray: true,
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/nodes/invites/create',
+        summary:
+          "Make a one-time node invitation. The panel reads its own TLS public key at masterUrl (https only) and puts its SHA-256 in the invitation, so the new node can verify this master even with a self-signed certificate. The secret is in this answer only; the panel stores the token's SHA-256. The node runs `install.sh node-enroll` with it and calls enroll/v1/node under the panel base path, which is the only route the token opens. validMinutes is 5-1440 (default 30); at most 20 invitations may be pending.",
+        body: '{\n  "name": "de-fra-1",\n  "address": "",\n  "allowPrivateAddress": false,\n  "nodeAdmin": false,\n  "validMinutes": 30,\n  "masterUrl": "https://panel.example.com:2053/path/"\n}',
+        responseSchema: 'NodeInviteCreated',
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/nodes/invites/revoke/:id',
+        summary: 'Revoke an unused node invitation: its token stops working at once.',
+        params: [{ name: 'id', in: 'path', type: 'number', desc: 'Invitation ID.' }],
+      },
+      {
+        method: 'GET',
         path: '/panel/api/nodes/get/:id',
         summary: 'Fetch a single node by ID.',
         params: [{ name: 'id', in: 'path', type: 'number', desc: 'Node ID.' }],

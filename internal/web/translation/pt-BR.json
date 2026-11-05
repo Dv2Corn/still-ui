@@ -1220,7 +1220,9 @@
         "updateNoneEligible": "Selecione pelo menos um nó online e ativo",
         "saveMtls": "Salvar mTLS do nó",
         "reloadMtls": "Reload master mTLS credential",
-        "trafficLimit": "Salvar limite de tráfego"
+        "trafficLimit": "Salvar limite de tráfego",
+        "inviteCreate": "Criar convite de nó",
+        "inviteRevoke": "Revogar convite de nó"
       },
       "tlsVerifyMode": "Verificação TLS",
       "tlsVerifyModeHint": "Como o painel valida o certificado HTTPS do nó. Fixar ou Ignorar são para certificados autoassinados (apenas nós https).",
@@ -1248,7 +1250,34 @@
       "pinnedCertPlaceholder": "SHA-256 em base64 ou hex",
       "fetchPin": "Obter",
       "pinFetched": "Certificado atual do nó obtido",
-      "pinFetchFailed": "Não foi possível obter o certificado"
+      "pinFetchFailed": "Não foi possível obter o certificado",
+      "invite": {
+        "button": "Adicionar com um comando",
+        "title": "Adicionar um nó com um comando",
+        "intro": "Crie um convite de uso único e execute o comando como root no novo servidor. Ele instala o still-ui, configura-o como nó deste painel e o adiciona a esta lista.",
+        "addressHint": "Deixe vazio para usar o endereço de onde o servidor se conecta.",
+        "addressPlaceholder": "Endereço de onde o servidor se conecta",
+        "masterUrl": "URL deste painel para os nós",
+        "masterUrlHint": "O novo servidor abre este endereço HTTPS. O comando verifica a chave TLS deste painel, então um certificado autoassinado também funciona.",
+        "validMinutes": "Válido por, minutos",
+        "nodeAdmin": "Permitir atualizar o painel",
+        "nodeAdminHint": "O nó entrega a este painel um token que também pode atualizar o still-ui dele. Caso contrário, o token só sincroniza entradas e clientes.",
+        "create": "Criar convite",
+        "once": "Copie o comando agora: ele é mostrado só uma vez. Funciona uma única vez, até {time}.",
+        "command": "Execute como root no novo servidor",
+        "another": "Criar outro",
+        "list": "Convites",
+        "details": "Detalhes",
+        "usedFrom": "Usado {time} a partir de {ip}, nó #{id}",
+        "validUntil": "Válido até {time}",
+        "revoke": "Revogar",
+        "status": {
+          "pending": "Aguardando",
+          "used": "Usado",
+          "expired": "Expirado",
+          "revoked": "Revogado"
+        }
+      }
     },
     "settings": {
       "defaultTag": "Padrão",

@@ -4106,6 +4106,146 @@
         ],
         "type": "object"
       },
+      "NodeInviteCreated": {
+        "description": "NodeInviteCreated carries the invitation string, shown once.",
+        "properties": {
+          "invite": {
+            "$ref": "#/components/schemas/NodeInviteView"
+          },
+          "secret": {
+            "example": "still-node1.<token>.<pin>.<url>",
+            "type": "string"
+          }
+        },
+        "required": [
+          "invite",
+          "secret"
+        ],
+        "type": "object"
+      },
+      "NodeInviteInput": {
+        "description": "NodeInviteInput is what the admin sets when making an invitation.",
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "allowPrivateAddress": {
+            "example": false,
+            "type": "boolean"
+          },
+          "masterUrl": {
+            "description": "MasterUrl is the panel URL nodes reach this master at, as the admin\nopens it in a browser.",
+            "example": "https://panel.example.com:2053/path/",
+            "type": "string"
+          },
+          "name": {
+            "example": "de-fra-1",
+            "type": "string"
+          },
+          "nodeAdmin": {
+            "example": false,
+            "type": "boolean"
+          },
+          "validMinutes": {
+            "example": 30,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "address",
+          "allowPrivateAddress",
+          "masterUrl",
+          "name",
+          "nodeAdmin",
+          "validMinutes"
+        ],
+        "type": "object"
+      },
+      "NodeInviteView": {
+        "description": "NodeInviteView is one invitation as the Nodes page lists it. The token is\nnever part of it.",
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "allowPrivateAddress": {
+            "example": false,
+            "type": "boolean"
+          },
+          "attempts": {
+            "example": 0,
+            "type": "integer"
+          },
+          "createdAt": {
+            "example": 1736000000,
+            "format": "int64",
+            "type": "integer"
+          },
+          "expiresAt": {
+            "example": 1736001800,
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "example": 3,
+            "type": "integer"
+          },
+          "lastError": {
+            "type": "string"
+          },
+          "masterUrl": {
+            "example": "https://panel.example.com:2053/path/",
+            "type": "string"
+          },
+          "name": {
+            "example": "de-fra-1",
+            "type": "string"
+          },
+          "nodeAdmin": {
+            "example": false,
+            "type": "boolean"
+          },
+          "nodeId": {
+            "example": 0,
+            "type": "integer"
+          },
+          "revokedAt": {
+            "example": 0,
+            "format": "int64",
+            "type": "integer"
+          },
+          "status": {
+            "description": "pending|used|expired|revoked",
+            "example": "pending",
+            "type": "string"
+          },
+          "usedAt": {
+            "example": 0,
+            "format": "int64",
+            "type": "integer"
+          },
+          "usedFromIp": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "address",
+          "allowPrivateAddress",
+          "attempts",
+          "createdAt",
+          "expiresAt",
+          "id",
+          "lastError",
+          "masterUrl",
+          "name",
+          "nodeAdmin",
+          "nodeId",
+          "revokedAt",
+          "status",
+          "usedAt",
+          "usedFromIp"
+        ],
+        "type": "object"
+      },
       "NodeMutationRequest": {
         "description": "NodeMutationRequest is the node write/probe contract. ApiToken is accepted\nonly as input. On update, nil means keep the stored token; replacement and\nclearing are explicit and mutually exclusive.",
         "properties": {
@@ -12258,6 +12398,177 @@
         ],
         "summary": "Validate the stored master mTLS client credential and invalidate cached transports. Each transport closes its old idle pool and rebuilds with the rotated certificate before its next request.",
         "operationId": "post_panel_api_nodes_mtls_reloadClient",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/nodes/invites": {
+      "get": {
+        "tags": [
+          "Nodes"
+        ],
+        "summary": "List node invitations (Nodes → Add with a command), newest first, with their status (pending, used, expired, revoked) and the audit of who used them. Tokens are never listed; invitations spent more than 30 days ago are dropped.",
+        "operationId": "get_panel_api_nodes_invites",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/NodeInviteView"
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": [
+                    {
+                      "address": "",
+                      "allowPrivateAddress": false,
+                      "attempts": 0,
+                      "createdAt": 1736000000,
+                      "expiresAt": 1736001800,
+                      "id": 3,
+                      "lastError": "",
+                      "masterUrl": "https://panel.example.com:2053/path/",
+                      "name": "de-fra-1",
+                      "nodeAdmin": false,
+                      "nodeId": 0,
+                      "revokedAt": 0,
+                      "status": "pending",
+                      "usedAt": 0,
+                      "usedFromIp": ""
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/nodes/invites/create": {
+      "post": {
+        "tags": [
+          "Nodes"
+        ],
+        "summary": "Make a one-time node invitation. The panel reads its own TLS public key at masterUrl (https only) and puts its SHA-256 in the invitation, so the new node can verify this master even with a self-signed certificate. The secret is in this answer only; the panel stores the token's SHA-256. The node runs `install.sh node-enroll` with it and calls enroll/v1/node under the panel base path, which is the only route the token opens. validMinutes is 5-1440 (default 30); at most 20 invitations may be pending.",
+        "operationId": "post_panel_api_nodes_invites_create",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "name": "de-fra-1",
+                "address": "",
+                "allowPrivateAddress": false,
+                "nodeAdmin": false,
+                "validMinutes": 30,
+                "masterUrl": "https://panel.example.com:2053/path/"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "$ref": "#/components/schemas/NodeInviteCreated"
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": {
+                    "invite": {
+                      "address": "",
+                      "allowPrivateAddress": false,
+                      "attempts": 0,
+                      "createdAt": 1736000000,
+                      "expiresAt": 1736001800,
+                      "id": 3,
+                      "lastError": "",
+                      "masterUrl": "https://panel.example.com:2053/path/",
+                      "name": "de-fra-1",
+                      "nodeAdmin": false,
+                      "nodeId": 0,
+                      "revokedAt": 0,
+                      "status": "pending",
+                      "usedAt": 0,
+                      "usedFromIp": ""
+                    },
+                    "secret": "still-node1.<token>.<pin>.<url>"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/nodes/invites/revoke/{id}": {
+      "post": {
+        "tags": [
+          "Nodes"
+        ],
+        "summary": "Revoke an unused node invitation: its token stops working at once.",
+        "operationId": "post_panel_api_nodes_invites_revoke_id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Invitation ID.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful response",

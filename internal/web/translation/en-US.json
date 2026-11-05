@@ -1341,7 +1341,9 @@
         "updateNoneEligible": "Select at least one online, enabled node",
         "saveMtls": "Save node mTLS",
         "reloadMtls": "Reload master mTLS credential",
-        "trafficLimit": "Save traffic limit"
+        "trafficLimit": "Save traffic limit",
+        "inviteCreate": "Make node invitation",
+        "inviteRevoke": "Revoke node invitation"
       },
       "tlsVerifyMode": "TLS verification",
       "tlsVerifyModeHint": "How the panel validates the node's HTTPS certificate. Pin or Skip are for self-signed certs (https nodes only).",
@@ -1369,7 +1371,34 @@
       "pinnedCertPlaceholder": "base64 or hex SHA-256",
       "fetchPin": "Fetch",
       "pinFetched": "Fetched the node's current certificate",
-      "pinFetchFailed": "Could not fetch the certificate"
+      "pinFetchFailed": "Could not fetch the certificate",
+      "invite": {
+        "button": "Add with a command",
+        "title": "Add a node with one command",
+        "intro": "Make a one-time invitation and run the command as root on the new server. It installs still-ui there, sets it up as a node of this panel and adds it to this list.",
+        "addressHint": "Leave empty to use the address the server connects from.",
+        "addressPlaceholder": "Address the server connects from",
+        "masterUrl": "This panel's URL for nodes",
+        "masterUrlHint": "The new server opens this HTTPS address. The command checks this panel's TLS key, so a self-signed certificate works too.",
+        "validMinutes": "Valid for, minutes",
+        "nodeAdmin": "Allow panel updates",
+        "nodeAdminHint": "The node gives this panel a token that may also update its still-ui. Otherwise the token may only sync inbounds and clients.",
+        "create": "Make invitation",
+        "once": "Copy the command now: it is shown only once. It works one time, until {time}.",
+        "command": "Run as root on the new server",
+        "another": "Make another",
+        "list": "Invitations",
+        "details": "Details",
+        "usedFrom": "Used {time} from {ip}, node #{id}",
+        "validUntil": "Valid until {time}",
+        "revoke": "Revoke",
+        "status": {
+          "pending": "Waiting",
+          "used": "Used",
+          "expired": "Expired",
+          "revoked": "Revoked"
+        }
+      }
     },
     "settings": {
       "defaultTag": "Default",

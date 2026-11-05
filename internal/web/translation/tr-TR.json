@@ -1220,7 +1220,9 @@
         "updateNoneEligible": "En az bir çevrimiçi ve etkin düğüm seçin",
         "saveMtls": "Düğüm mTLS kaydet",
         "reloadMtls": "Ana mTLS kimlik bilgilerini yeniden yükle",
-        "trafficLimit": "Trafik sınırını kaydet"
+        "trafficLimit": "Trafik sınırını kaydet",
+        "inviteCreate": "Düğüm daveti oluştur",
+        "inviteRevoke": "Düğüm davetini iptal et"
       },
       "tlsVerifyMode": "TLS Doğrulaması",
       "tlsVerifyModeHint": "Panelin düğümün HTTPS sertifikasını nasıl doğrulayacağını belirler. Sabitle veya Atla, kendinden imzalı sertifikalar içindir (yalnızca https düğümleri).",
@@ -1248,7 +1250,34 @@
       "pinnedCertPlaceholder": "base64 veya hex SHA-256",
       "fetchPin": "Getir",
       "pinFetched": "Düğümün geçerli sertifikası alındı",
-      "pinFetchFailed": "Sertifika alınamadı"
+      "pinFetchFailed": "Sertifika alınamadı",
+      "invite": {
+        "button": "Komutla ekle",
+        "title": "Tek komutla düğüm ekle",
+        "intro": "Tek kullanımlık bir davet oluşturun ve komutu yeni sunucuda root olarak çalıştırın. Komut oraya still-ui kurar, onu bu panelin düğümü yapar ve bu listeye ekler.",
+        "addressHint": "Sunucunun bağlandığı adresi kullanmak için boş bırakın.",
+        "addressPlaceholder": "Sunucunun bağlandığı adres",
+        "masterUrl": "Bu panelin düğümler için adresi",
+        "masterUrlHint": "Yeni sunucu bu HTTPS adresini açar. Komut bu panelin TLS anahtarını doğrular, bu yüzden kendinden imzalı sertifika da çalışır.",
+        "validMinutes": "Geçerlilik, dakika",
+        "nodeAdmin": "Panel güncellemesine izin ver",
+        "nodeAdminHint": "Düğüm bu panele, still-ui'sini güncelleyebilen bir belirteç verir. Aksi halde belirteç yalnızca gelenleri ve istemcileri eşitler.",
+        "create": "Davet oluştur",
+        "once": "Komutu şimdi kopyalayın: yalnızca bir kez gösterilir. {time} tarihine kadar bir kez çalışır.",
+        "command": "Yeni sunucuda root olarak çalıştırın",
+        "another": "Bir tane daha",
+        "list": "Davetler",
+        "details": "Ayrıntılar",
+        "usedFrom": "{time} tarihinde {ip} adresinden kullanıldı, düğüm #{id}",
+        "validUntil": "{time} tarihine kadar geçerli",
+        "revoke": "İptal et",
+        "status": {
+          "pending": "Bekliyor",
+          "used": "Kullanıldı",
+          "expired": "Süresi doldu",
+          "revoked": "İptal edildi"
+        }
+      }
     },
     "settings": {
       "defaultTag": "Varsayılan",

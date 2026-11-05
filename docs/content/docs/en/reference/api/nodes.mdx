@@ -28,6 +28,25 @@ _openapi:
         the rotated certificate before its next request.
       url: '#validate-the-stored-master-mtls-client-credential-and-invalidate-cached-transports-each-transport-closes-its-old-idle-pool-and-rebuilds-with-the-rotated-certificate-before-its-next-request'
     - depth: 2
+      title: List node invitations (Nodes → Add with a command), newest first, with
+        their status (pending, used, expired, revoked) and the audit of who used
+        them. Tokens are never listed; invitations spent more than 30 days ago
+        are dropped.
+      url: '#list-node-invitations-nodes--add-with-a-command-newest-first-with-their-status-pending-used-expired-revoked-and-the-audit-of-who-used-them-tokens-are-never-listed-invitations-spent-more-than-30-days-ago-are-dropped'
+    - depth: 2
+      title: Make a one-time node invitation. The panel reads its own TLS public key
+        at masterUrl (https only) and puts its SHA-256 in the invitation, so the
+        new node can verify this master even with a self-signed certificate. The
+        secret is in this answer only; the panel stores the token's SHA-256. The
+        node runs `install.sh node-enroll` with it and calls enroll/v1/node
+        under the panel base path, which is the only route the token opens.
+        validMinutes is 5-1440 (default 30); at most 20 invitations may be
+        pending.
+      url: '#make-a-one-time-node-invitation-the-panel-reads-its-own-tls-public-key-at-masterurl-https-only-and-puts-its-sha-256-in-the-invitation-so-the-new-node-can-verify-this-master-even-with-a-self-signed-certificate-the-secret-is-in-this-answer-only-the-panel-stores-the-tokens-sha-256-the-node-runs-installsh-node-enroll-with-it-and-calls-enrollv1node-under-the-panel-base-path-which-is-the-only-route-the-token-opens-validminutes-is-5-1440-default-30-at-most-20-invitations-may-be-pending'
+    - depth: 2
+      title: 'Revoke an unused node invitation: its token stops working at once.'
+      url: '#revoke-an-unused-node-invitation-its-token-stops-working-at-once'
+    - depth: 2
       title: Fetch a single node by ID.
       url: '#fetch-a-single-node-by-id'
     - depth: 2
@@ -98,6 +117,22 @@ _openapi:
           transports. Each transport closes its old idle pool and rebuilds with
           the rotated certificate before its next request.
         id: validate-the-stored-master-mtls-client-credential-and-invalidate-cached-transports-each-transport-closes-its-old-idle-pool-and-rebuilds-with-the-rotated-certificate-before-its-next-request
+      - content: List node invitations (Nodes → Add with a command), newest first, with
+          their status (pending, used, expired, revoked) and the audit of who
+          used them. Tokens are never listed; invitations spent more than 30
+          days ago are dropped.
+        id: list-node-invitations-nodes--add-with-a-command-newest-first-with-their-status-pending-used-expired-revoked-and-the-audit-of-who-used-them-tokens-are-never-listed-invitations-spent-more-than-30-days-ago-are-dropped
+      - content: Make a one-time node invitation. The panel reads its own TLS public key
+          at masterUrl (https only) and puts its SHA-256 in the invitation, so
+          the new node can verify this master even with a self-signed
+          certificate. The secret is in this answer only; the panel stores the
+          token's SHA-256. The node runs `install.sh node-enroll` with it and
+          calls enroll/v1/node under the panel base path, which is the only
+          route the token opens. validMinutes is 5-1440 (default 30); at most 20
+          invitations may be pending.
+        id: make-a-one-time-node-invitation-the-panel-reads-its-own-tls-public-key-at-masterurl-https-only-and-puts-its-sha-256-in-the-invitation-so-the-new-node-can-verify-this-master-even-with-a-self-signed-certificate-the-secret-is-in-this-answer-only-the-panel-stores-the-tokens-sha-256-the-node-runs-installsh-node-enroll-with-it-and-calls-enrollv1node-under-the-panel-base-path-which-is-the-only-route-the-token-opens-validminutes-is-5-1440-default-30-at-most-20-invitations-may-be-pending
+      - content: 'Revoke an unused node invitation: its token stops working at once.'
+        id: revoke-an-unused-node-invitation-its-token-stops-working-at-once
       - content: Fetch a single node by ID.
         id: fetch-a-single-node-by-id
       - content: Fetch a node's own web TLS certificate/key file paths (proxied to the
@@ -149,7 +184,7 @@ export default function Layout(props) {
   return (
     <>
       {props.children}
-      <OpenAPIPage document="./public/openapi.json" webhooks={[]} operations={[{"path":"/panel/api/nodes/list","method":"get"},{"path":"/panel/api/nodes/mtls/ca","method":"post"},{"path":"/panel/api/nodes/mtls/trustCA","method":"post"},{"path":"/panel/api/nodes/mtls/reloadClient","method":"post"},{"path":"/panel/api/nodes/get/{id}","method":"get"},{"path":"/panel/api/nodes/webCert/{id}","method":"get"},{"path":"/panel/api/nodes/add","method":"post"},{"path":"/panel/api/nodes/update/{id}","method":"post"},{"path":"/panel/api/nodes/del/{id}","method":"post"},{"path":"/panel/api/nodes/setEnable/{id}","method":"post"},{"path":"/panel/api/nodes/test","method":"post"},{"path":"/panel/api/nodes/certFingerprint","method":"post"},{"path":"/panel/api/nodes/inbounds","method":"post"},{"path":"/panel/api/nodes/probe/{id}","method":"post"},{"path":"/panel/api/nodes/updatePanel","method":"post"},{"path":"/panel/api/nodes/history/{id}/{metric}/{bucket}","method":"get"}]} showTitle />
+      <OpenAPIPage document="./public/openapi.json" webhooks={[]} operations={[{"path":"/panel/api/nodes/list","method":"get"},{"path":"/panel/api/nodes/mtls/ca","method":"post"},{"path":"/panel/api/nodes/mtls/trustCA","method":"post"},{"path":"/panel/api/nodes/mtls/reloadClient","method":"post"},{"path":"/panel/api/nodes/invites","method":"get"},{"path":"/panel/api/nodes/invites/create","method":"post"},{"path":"/panel/api/nodes/invites/revoke/{id}","method":"post"},{"path":"/panel/api/nodes/get/{id}","method":"get"},{"path":"/panel/api/nodes/webCert/{id}","method":"get"},{"path":"/panel/api/nodes/add","method":"post"},{"path":"/panel/api/nodes/update/{id}","method":"post"},{"path":"/panel/api/nodes/del/{id}","method":"post"},{"path":"/panel/api/nodes/setEnable/{id}","method":"post"},{"path":"/panel/api/nodes/test","method":"post"},{"path":"/panel/api/nodes/certFingerprint","method":"post"},{"path":"/panel/api/nodes/inbounds","method":"post"},{"path":"/panel/api/nodes/probe/{id}","method":"post"},{"path":"/panel/api/nodes/updatePanel","method":"post"},{"path":"/panel/api/nodes/history/{id}/{metric}/{bucket}","method":"get"}]} showTitle />
     </>
   );
 }
