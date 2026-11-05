@@ -52,7 +52,8 @@ func (s *InboundService) SetMasterBillingMultiplier(masterGuid string, m float64
 	if old, ok := readMasterBillingMultipliers(db)[masterGuid]; ok && old.M == m && now.Sub(time.UnixMilli(old.At)) < nodeBillingRefresh {
 		return nil
 	}
-	return submitTrafficWrite(func() error {
+	// Arrives with each master's periodic traffic push, so the background lane.
+	return submitTrafficWriteBackground(func() error {
 		return db.Transaction(func(tx *gorm.DB) error {
 			all := readMasterBillingMultipliers(tx)
 			cutoff := now.Add(-nodeBillingTTL).UnixMilli()

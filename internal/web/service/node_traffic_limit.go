@@ -236,7 +236,8 @@ func (s *NodeService) evaluateTrafficLimit(n *model.Node, now time.Time, loc *ti
 // node only stamps the period: what it counted so far belongs to the current one.
 func (s *NodeService) rollTrafficPeriod(n *model.Node, start int64) error {
 	first := n.TrafficPeriodStart == 0
-	return submitTrafficWrite(func() error {
+	// Periodic accounting, so the background lane: an operator's write goes first.
+	return submitTrafficWriteBackground(func() error {
 		updates := map[string]any{"traffic_period_start": start}
 		if !first {
 			updates["traffic_used"] = 0

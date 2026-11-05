@@ -280,3 +280,41 @@ func TestResetClientTrafficLimitByEmail_ReenablesDepletedClient(t *testing.T) {
 		t.Fatalf("%s: total = %d, want %d", email, got, 1<<30)
 	}
 }
+
+// A client living on several inbounds must come back on every one of them,
+// not only the inbound whose reset ran first.
+func TestResetTrafficByEmail_ReenablesEveryInboundOfTheClient(t *testing.T) {
+	setupBulkDB(t)
+	// The panel runs each inbound's reset on the serial traffic writer. Without
+	// it the fan-out runs the two resets side by side, and the second can read
+	// the record as still off after the first zeroed the counters, so it keeps
+	// the client off as if disabled by hand (about one run in ten).
+	resetTrafficWriterForTest(t)
+	StartTrafficWriter()
+	svc := &ClientService{}
+	inboundSvc := &InboundService{}
+
+	email := "renew-multi@x"
+	c := model.Client{
+		Email: email, ID: "11111111-1111-1111-1111-111111111111", SubID: email,
+		Enable: false, TotalGB: 1000,
+	}
+	ibA := mkInbound(t, 53201, model.VLESS, clientsSettings(t, []model.Client{c}))
+	ibB := mkInbound(t, 53202, model.VLESS, clientsSettings(t, []model.Client{c}))
+	for _, ib := range []*model.Inbound{ibA, ibB} {
+		if err := svc.SyncInbound(nil, ib.Id, []model.Client{c}); err != nil {
+			t.Fatalf("SyncInbound %d: %v", ib.Id, err)
+		}
+	}
+	mkTraffic(t, ibA.Id, email, 600, 500, 1000, 0, false)
+	forceRecordDisabled(t, svc, email)
+
+	if _, err := svc.ResetTrafficByEmail(inboundSvc, email); err != nil {
+		t.Fatalf("ResetTrafficByEmail: %v", err)
+	}
+	assertEnableEverywhere(t, svc, inboundSvc, ibA.Id, email, true)
+	assertEnableEverywhere(t, svc, inboundSvc, ibB.Id, email, true)
+	if got := trafficOf(t, email); !got.Enable || got.Up+got.Down != 0 {
+		t.Fatalf("%s: traffic row enable=%v used=%d, want enabled at 0", email, got.Enable, got.Up+got.Down)
+	}
+}

@@ -9,15 +9,10 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/util/common"
 )
 
-type clientUpdateBody struct {
-	model.Client
-	LimitHwid int `json:"limitHwid"`
-}
-
 // UpdateByEmailJSON applies a POST /clients/update body: an omitted key keeps the
-// stored value and an explicit zero or empty value clears it, but an omitted reverse clears.
+// stored value and an explicit zero, empty or null value clears it.
 func (s *ClientService) UpdateByEmailJSON(inboundSvc *InboundService, email string, body []byte, inboundFilter ...int) (bool, error) {
-	var req clientUpdateBody
+	var req clientPayloadWithHwid
 	if err := json.Unmarshal(body, &req); err != nil {
 		return false, err
 	}
@@ -33,16 +28,18 @@ func (s *ClientService) UpdateByEmailJSON(inboundSvc *InboundService, email stri
 	return s.update(inboundSvc, rec.Id, req.Client, req.LimitHwid, !keys.has("flow"), inboundFilter)
 }
 
-type payloadKeys []string
+// payloadKeys is a struct so tools/openapigen, which exports every named
+// non-struct type of this package, leaves it out of the generated frontend types.
+type payloadKeys struct{ names []string }
 
 func clientPayloadKeys(body []byte) payloadKeys {
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(body, &raw); err != nil {
-		return nil
+		return payloadKeys{}
 	}
-	keys := make(payloadKeys, 0, len(raw))
+	keys := payloadKeys{names: make([]string, 0, len(raw))}
 	for k := range raw {
-		keys = append(keys, k)
+		keys.names = append(keys.names, k)
 	}
 	return keys
 }
@@ -50,7 +47,7 @@ func clientPayloadKeys(body []byte) payloadKeys {
 // has matches keys the way encoding/json binds them to fields: case-insensitively,
 // so a body sending "limitIP" counts as carrying limitIp.
 func (k payloadKeys) has(name string) bool {
-	for _, key := range k {
+	for _, key := range k.names {
 		if strings.EqualFold(key, name) {
 			return true
 		}
@@ -58,8 +55,7 @@ func (k payloadKeys) has(name string) bool {
 	return false
 }
 
-// fillAbsentClientFields leaves flow to update (it is per inbound) and reverse alone:
-// model.Client drops an empty reverse on marshal, so its absence has always meant clear.
+// fillAbsentClientFields leaves flow to update, which keeps it per inbound.
 func fillAbsentClientFields(rec *model.ClientRecord, updated *model.Client, limitHwid *int, keys payloadKeys) {
 	stored := rec.ToClient()
 	if !keys.has("email") {
@@ -109,6 +105,9 @@ func fillAbsentClientFields(rec *model.ClientRecord, updated *model.Client, limi
 	}
 	if !keys.has("adTag") {
 		updated.AdTag = stored.AdTag
+	}
+	if !keys.has("reverse") {
+		updated.Reverse = stored.Reverse
 	}
 	if !keys.has("limitHwid") {
 		*limitHwid = rec.LimitHwid
