@@ -12,7 +12,17 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from link_filter import REMOVED, Policy, StaticChecker, filter_links, host_allowed, path_allowed
+from link_filter import (
+    FALLBACK_NOTE,
+    REMOVED,
+    Policy,
+    StaticChecker,
+    filter_links,
+    host_allowed,
+    path_allowed,
+    plain_fallback,
+    rendered_link_failures,
+)
 
 SCRIPT = Path(__file__).resolve().parent / "link_filter.py"
 GOOD = "0123456789abcdef0123456789abcdef01234567"  # on the default branch
@@ -274,6 +284,39 @@ class FilterTest(unittest.TestCase):
         self.assertEqual(n, 4)
         self.assertEqual(filter_links(out, POLICY), (out, 0))
 
+    def test_a_set_aside_span_is_never_a_link_target(self):
+        # <b> is a tag, set aside; GitHub may read it as the destination.
+        self.assertFiltered("[t](<b>)", f"t {REMOVED}", 1)
+        self.assertFiltered('[t](<b title="x">)', f"t {REMOVED}", 1)
+        self.assertFiltered("[x]: <b>", f"[x]: {REMOVED}", 1)
+        self.assertFiltered("> [x]: <i>", f"> [x]: {REMOVED}", 1)
+        # Even a kept autolink: as a destination it is not read as one.
+        self.assertFiltered("[x]: <https://github.com/Dv2Corn/still-ui>", f"[x]: {REMOVED}", 1)
+
+    def test_link_text_holding_link_syntax_drops_the_outer_link(self):
+        self.assertFiltered(
+            "[a [b](https://github.com/Dv2Corn/still-ui) c](https://github.com/Dv2Corn/still-ui/issues/1)",
+            f"a [b](https://github.com/Dv2Corn/still-ui) c {REMOVED}",
+            1,
+        )
+        self.assertFiltered("[a [b]: c](https://github.com/Dv2Corn/still-ui/issues/1)", f"a [b]: c {REMOVED}", 1)
+        out, n = filter_links("[a [b](//evil.example/x) c](https://github.com/Dv2Corn/still-ui/issues/1)", POLICY)
+        self.assertNotIn("evil", out)
+        self.assertEqual(n, 2)
+
+    def test_only_commonmark_open_tags_are_set_aside(self):
+        # Not a tag for CommonMark (a quoted attribute name, a value across a
+        # line): its text is Markdown, and the link in it is read.
+        for text in (
+            '<b "junk" title="[t](//evil.example/x)">',
+            '<b title="a\n[t](//evil.example/x)">',
+            "<b title=x\n\n[t](//evil.example/x)>",
+        ):
+            out, n = filter_links(text, POLICY)
+            self.assertNotIn("evil", out, text)
+            self.assertGreaterEqual(n, 1, text)
+        self.assertKept('<b title="[t](x)">bold</b>')
+
     def test_relative_links_resolve_against_the_page_they_are_posted_on(self):
         # Posted on https://github.com/Dv2Corn/still-ui/issues/1.
         for target in (
@@ -402,10 +445,63 @@ class FilterTest(unittest.TestCase):
             self.assertKept(text)
 
 
+class GateTest(unittest.TestCase):
+    def failures(self, rendered, policy=POLICY):
+        return rendered_link_failures(rendered, policy)
+
+    def test_allowed_rendering(self):
+        rendered = (
+            '<p><a href="https://github.com/Dv2Corn/still-ui/issues/12" class="issue-link">#12</a>'
+            '<a class="user-mention notranslate" href="https://github.com/Dv2Corn">@Dv2Corn</a>'
+            '<a class="team-mention" href="https://github.com/orgs/XTLS/teams/core">@XTLS/core</a>'
+            '<a href="#user-content-fn-1">1</a><a id="x" class="anchor" href="#heading"></a>'
+            f'<a href="https://github.com/Dv2Corn/still-ui/commit/{GOOD}"><tt>0123456</tt></a>'
+            '<a href="../pull/3">pr</a>'
+            '<a target="_blank" href="https://camo.githubusercontent.com/aa/bb">'
+            '<img src="https://camo.githubusercontent.com/aa/bb" '
+            'data-canonical-src="https://raw.githubusercontent.com/Dv2Corn/still-ui/main/a.png" style="max-width:100%"></a>'
+            '<img src="https://xtls.github.io/logo.png" srcset="https://xtls.github.io/a.png 1x, /Dv2Corn/still-ui/raw/main/b.png 2x">'
+            "</p>"
+        )
+        self.assertEqual(self.failures(rendered), 0)
+
+    def test_each_kind_of_bad_link_counts(self):
+        cases = {
+            '<a href="https://evil.example/">x</a>': 1,
+            '<a href="/attacker/repo">x</a>': 1,
+            '<a href="../../../attacker/repo">x</a>': 1,
+            f'<a href="https://github.com/Dv2Corn/still-ui/commit/{FORK}">x</a>': 1,
+            '<a href="https://github.com/Dv2Corn/still-ui/blob/0123abc/x">x</a>': 1,
+            '<a href="https://github.com/attacker">@attacker</a>': 1,  # not a mention link
+            '<a class="user-mention" href="https://github.com/attacker/repo">@x</a>': 1,
+            '<a href="mailto:a@evil.example">a</a>': 1,
+            '<img src="https://camo.githubusercontent.com/aa">': 1,  # no data-canonical-src
+            '<img src="https://camo.githubusercontent.com/aa" data-canonical-src="https://evil.example/a.png">': 2,
+            '<a href="https://camo.githubusercontent.com/zz"><img src="https://camo.githubusercontent.com/aa" '
+            'data-canonical-src="https://raw.githubusercontent.com/Dv2Corn/still-ui/main/a.png"></a>': 1,
+            '<img srcset="https://xtls.github.io/a.png 1x, https://evil.example/b.png 2x">': 1,
+            '<video poster="//evil.example/p.png"></video>': 1,
+            '<form action="https://evil.example/"><button formaction="/attacker/r">x</button></form>': 2,
+            '<blockquote cite="https://evil.example/"></blockquote>': 1,
+            '<a href="HTTPS://EVIL.EXAMPLE">x</a><a href=" https://evil.example ">y</a>': 2,
+            '<a href="https://evil&#46;example/">x</a>': 1,
+        }
+        for rendered, expected in cases.items():
+            self.assertEqual(self.failures(rendered), expected, rendered)
+
+    def test_fallback_renders_no_link(self):
+        text = "a [x](https://evil.example)\n~~~~~~~ b\n```\n<a href=x>"
+        out = plain_fallback(text)
+        self.assertTrue(out.startswith(FALLBACK_NOTE + "\n\n~~~~~~~~\n"), out)
+        self.assertTrue(out.endswith("\n<a href=x>\n~~~~~~~~\n"), out)
+        self.assertEqual(plain_fallback("x"), FALLBACK_NOTE + "\n\n~~~~\nx\n~~~~\n")
+
+
 FAKE_GH = r"""#!/bin/sh
 # Answers `gh api PATH --jq EXPR` from $FAKE_API/<PATH with / as _>; a missing
-# file is a 404.
+# file is a 404. `gh api markdown` gets the text on stdin.
 echo "$*" >> "$FAKE_API/calls.log"
+[ "$2" = markdown ] && cat > "$FAKE_API/markdown.in"
 f="$FAKE_API/$(printf '%s' "$2" | tr '/' '_')"
 [ "$1" = api ] && [ -f "$f" ] || { echo "gh: Not Found (HTTP 404)" >&2; exit 1; }
 cat "$f"
@@ -456,6 +552,30 @@ class CliTest(unittest.TestCase):
         self.assertIn("Removed 3 link(s)", proc.stdout)
         # One lookup of the default branch, whatever the number of links.
         self.assertEqual(sum(c == "api repos/o/r --jq .default_branch" for c in self.calls), 1)
+
+    def test_gate_posts_the_text_when_the_rendering_is_clean(self):
+        api = {"markdown": '<p>Fixed in <a href="https://github.com/o/r/issues/2">#2</a>.</p>'}
+        proc, out = self.run_cli("Fixed in #2.\n", "--gate", "--repo", "o/r", "--base", "https://github.com/o/r/issues/7", api=api)
+        self.assertEqual((proc.returncode, out, proc.stdout), (0, "Fixed in #2.\n", ""))
+        self.assertIn("api markdown -X POST -F text=@- -f mode=gfm -f context=o/r", self.calls)
+
+    def test_gate_falls_back_when_a_rendered_link_fails(self):
+        api = {"markdown": '<p><a href="https://github.com/attacker/repo">x</a></p>'}
+        proc, out = self.run_cli("x\n", "--gate", "--repo", "o/r", "--base", "https://github.com/o/r/issues/7", api=api)
+        self.assertEqual(out, FALLBACK_NOTE + "\n\n~~~~\nx\n~~~~\n")
+        self.assertIn("::warning::1 link(s) in the rendered reply", proc.stdout)
+        self.assertNotIn("attacker", proc.stdout)
+
+    def test_gate_falls_back_when_rendering_fails(self):
+        proc, out = self.run_cli("x\n", "--gate", "--no-filter", "--repo", "o/r", "--base", "https://github.com/o/r/pull/7")
+        self.assertEqual(out, FALLBACK_NOTE + "\n\n~~~~\nx\n~~~~\n")
+        self.assertIn("Could not render", proc.stdout)
+
+    def test_no_filter_skips_the_text_pass(self):
+        api = {"markdown": "<p>x</p>"}
+        proc, out = self.run_cli("https://evil.example\n", "--gate", "--no-filter", api=api)
+        # The (crafted) rendering shows no link, so the text is posted as it is.
+        self.assertEqual(out, "https://evil.example\n")
 
     def test_the_reviewed_head_needs_no_api(self):
         proc, out = self.run_cli(

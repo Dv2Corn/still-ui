@@ -419,10 +419,12 @@ jobs:
           # the reply carries, then put this run's id above the closing marker.
           # Links outside the allowlist go first: an issue may have steered the
           # model into citing an attacker's site. Relative links resolve
-          # against this issue's page; refs are checked with the API.
+          # against this issue's page; refs are checked with the API. --gate
+          # then has GitHub render the result and checks every link in that
+          # HTML; if one fails, the reply is posted as plain text.
           reply="$RUNNER_TEMP/reply.md"
           grep -vE '^[[:space:]]*<!-- claude-issue:run [0-9]+ -->[[:space:]]*$' "$body" | sed '$d' > "$RUNNER_TEMP/prose.md"
-          python3 -I .github/scripts/link_filter.py --repo "$REPO" --base "https://github.com/${REPO}/issues/${ISSUE}" \
+          python3 -I .github/scripts/link_filter.py --gate --repo "$REPO" --base "https://github.com/${REPO}/issues/${ISSUE}" \
             "$RUNNER_TEMP/prose.md" "$reply"
           printf '<!-- claude-issue:run %s -->\n<!-- claude-issue:analyst -->\n' "$GITHUB_RUN_ID" >> "$reply"
           gh issue comment "$ISSUE" -R "$REPO" --body-file "$reply"

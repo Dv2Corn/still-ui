@@ -66,10 +66,17 @@ class PostJobTest(unittest.TestCase):
             self.assertNotIn("path:", with_block, name)
             self.assertNotIn("allow-unsafe-pr-checkout", with_block, name)
             # Nothing else from the checkout runs but the link filter.
-            self.assertEqual(re.findall(r"\.github/scripts/[\w.-]+", job.replace("sparse-checkout: .github/scripts", "")),
-                             [".github/scripts/link_filter.py"], name)
+            self.assertEqual(set(re.findall(r"\.github/scripts/[\w.-]+", job.replace("sparse-checkout: .github/scripts", ""))),
+                             {".github/scripts/link_filter.py"}, name)
             step = job[job.index(step_name) :]
             self.assertLess(step.index("python3 -I .github/scripts/link_filter.py"), step.index(comment), name)
+            # The rendering gate checks the very file that is posted.
+            gate = re.search(r"link_filter\.py --(?:no-filter --)?gate .*?\n?.*?\"\$\{?(\w+)\}?\"\n", step[: step.index(comment)], re.S)
+            self.assertIsNotNone(gate, name)
+            posted = re.search(r"--body-file \"\$(\w+)\"", step).group(1)
+            self.assertEqual(gate.group(1), posted, name)
+            if "awk" in step:
+                self.assertLess(step.index("awk"), step.index("--gate"), name)
 
 
 if __name__ == "__main__":

@@ -634,7 +634,10 @@ Before posting, both `post` jobs replace every link outside an allowlist with "(
 repository, MHSanaei/3x-ui and XTLS/*, and there a commit only by the default branch, a tag, a
 full SHA the default branch contains (checked with `gh api`, failing closed) or the reviewed
 head; plus docs.github.com and xtls.github.io. Relative links are resolved against the issue or
-PR page; e-mail addresses go too. So a hostile issue or PR cannot get its link posted by the bot.
+PR page; e-mail addresses go too. That text pass is cosmetic; the boundary is the gate after
+it: GitHub renders the finished reply (`gh api markdown`), every URL in that HTML is checked
+against the same rules, and if one fails (or the render fails) the reply is posted as plain
+text in a fence. So a hostile issue or PR cannot get its link posted by the bot.
 
 ---
 

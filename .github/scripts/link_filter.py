@@ -24,11 +24,23 @@ e.g. https://github.com/OWNER/REPO/issues/7) and pass the same rules; `#anchor`
 links stay. E-mail addresses and mailto:/xmpp:/tel:/sms: links go. Anything
 that does not clearly pass is removed, so the filter errs towards removing.
 
+Two layers:
+- the text pass (filter_links) reads the Markdown with patterns and removes
+  what fails. It is cosmetics: it keeps the reply readable, but a pattern
+  reader can always disagree with GitHub's renderer somewhere;
+- the gate (--gate) is the security boundary. It has GitHub render the
+  finished text (`gh api markdown`, mode gfm, in this repository's context),
+  reads every URL attribute of the returned HTML (href, src, srcset,
+  data-canonical-src, ...; camo image URLs only through a data-canonical-src
+  that passes) and checks each against the same policy. If any fails, or the
+  render fails, OUT is the text as plain text inside a fence that renders no
+  link, under one line saying why.
+
 Usage: python3 -I link_filter.py [--repo OWNER/REPO] [--base URL]
-                                  [--head-sha SHA] IN OUT
-Writes the filtered text to OUT. When it removed anything, prints one GitHub
-`::warning::` with the count; the links themselves are never printed, since
-they are attacker text. Stdlib only: the post job installs nothing.
+                                  [--head-sha SHA] [--gate] [--no-filter] IN OUT
+Writes the result to OUT. Prints one GitHub `::warning::` per layer that
+acted, with counts only: the links themselves are attacker text and never
+printed. Stdlib only: the post job installs nothing.
 """
 
 from __future__ import annotations
@@ -39,6 +51,7 @@ import re
 import subprocess
 import sys
 from dataclasses import dataclass, field
+from html.parser import HTMLParser
 from urllib.parse import quote, unquote, urljoin
 
 REMOVED = "(link removed)"
@@ -372,6 +385,17 @@ _URL_ATTRS = frozenset(
 )
 _SPACE = " \t\n\r\f"
 
+# A CommonMark raw-HTML open tag (spec 6.6), kept narrower than the spec:
+# quoted values hold no line ending. Only such a span is set aside.
+_CM_WS = r"(?:[ \t]+\n?[ \t]*|\n[ \t]*)"
+_CM_OPT_WS = r"[ \t]*\n?[ \t]*"
+_CM_OPEN_TAG = re.compile(
+    r"<[A-Za-z][A-Za-z0-9-]*"
+    rf"(?:{_CM_WS}[A-Za-z_:][A-Za-z0-9_.:-]*(?:{_CM_OPT_WS}={_CM_OPT_WS}"
+    r"(?:[^\s\"'=<>`]+|'[^'\n]*'|\"[^\"\n]*\"))?)*"
+    rf"{_CM_OPT_WS}/?>"
+)
+
 
 def scan_start_tag(text: str, i: int) -> tuple[int, list[tuple[str, str]]] | None:
     """Reads the start tag at text[i] (`<` then a letter) the way an HTML5
@@ -423,6 +447,10 @@ class _Filter:
         self.kept: list[str] = []
 
     def allowed(self, target: str, *, relative_ok: bool = True) -> bool:
+        # A span set aside below is never a link target: GitHub may not read
+        # it as the span this pass did (fail closed).
+        if _P_OPEN in target or _P_CLOSE in target:
+            return False
         return target_allowed(target, self.policy, relative_ok=relative_ok)
 
     def drop(self, keep: str = "") -> str:
@@ -441,7 +469,7 @@ class _Filter:
     # <https://host/...> and <user@host>: CommonMark autolinks. No e-mail
     # domain is allowed.
     _AUTOLINK = re.compile(
-        r"<([A-Za-z][A-Za-z0-9+.-]{1,31}:[^\s<>]*)>"
+        r"<([A-Za-z][A-Za-z0-9+.-]{1,31}:[^\s<>\x00-\x1f\x7f]*)>"
         r"|<[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
         r"(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*>"
     )
@@ -476,8 +504,10 @@ class _Filter:
             )
             if bad:
                 out.append(text[pos:i] + self.drop())
-            elif re.match(r"<[A-Za-z][A-Za-z0-9-]*[\s/>]", text[i:end]):
-                # A real tag stays as it is; its quoted values are read only here.
+            elif _CM_OPEN_TAG.fullmatch(text, i, end):
+                # A CommonMark raw-HTML open tag stays as it is; its quoted
+                # values are read only here. Anything GitHub might read as
+                # text instead is left to the passes below.
                 out.append(text[pos:i] + self.protect(self.scan(text[i:end], quoted=True)))
             else:
                 # Not a tag GitHub renders (`<https://...>` with a space): the
@@ -503,7 +533,9 @@ class _Filter:
             target = m.group(3)
             if target.startswith("<") and target.endswith(">"):
                 target = target[1:-1]
-            if not self.allowed(target):
+            # Link text holding link syntax may be parsed differently by
+            # GitHub: the outer link goes and the inner ones are read below.
+            if not self.allowed(target) or "](" in m.group(2) or "]:" in m.group(2):
                 return self.drop(m.group(2))
             # The link stays; URLs in its text are checked on their own.
             s, a, b = m.start(), m.start(2), m.end(2)
@@ -523,8 +555,6 @@ class _Filter:
     def reference_definitions(self, text: str) -> str:
         def repl(m: re.Match[str]) -> str:
             target = m.group(1)
-            if target.startswith(_P_OPEN):
-                return m.group(0)
             if target.startswith("<") and target.endswith(">"):
                 target = target[1:-1]
             if self.allowed(target):
@@ -590,11 +620,121 @@ def filter_links(text: str, policy: Policy | None = None) -> tuple[str, int]:
     return out, f.removed
 
 
+# --- The gate: what GitHub renders is what is checked. ---------------------
+
+# Every attribute of rendered HTML that holds a URL.
+_GATE_ATTRS = _URL_ATTRS | {"data-canonical-src"}
+_CAMO = re.compile(r"^https?://camo\.githubusercontent\.com/", re.I)
+_USER_MENTION = re.compile(r"^https://github\.com/[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})/?$")
+_TEAM_MENTION = re.compile(r"^https://github\.com/orgs/[A-Za-z0-9-]+/teams/[A-Za-z0-9._-]+/?$")
+
+
+class _LinkCollector(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.links: list[tuple[str, dict[str, str], str, str]] = []
+
+    def handle_starttag(self, tag, attrs):
+        attributes: dict[str, str] = {}
+        for name, value in attrs:
+            attributes.setdefault(name.lower(), value or "")
+        for name, value in attrs:
+            name = name.lower()
+            if name not in _GATE_ATTRS or value is None:
+                continue
+            if name in ("srcset", "imagesrcset"):
+                urls = [part.split()[0] for part in value.split(",") if part.split()]
+            elif name == "ping":
+                urls = value.split()
+            else:
+                urls = [value]
+            for url in urls or [value]:
+                self.links.append((tag.lower(), attributes, name, url))
+
+    handle_startendtag = handle_starttag
+
+
+def rendered_link_failures(rendered: str, policy: Policy | None = None) -> int:
+    """How many URLs in GitHub's rendering of the reply fail the policy. A
+    camo (image proxy) URL passes only as the src of an image whose
+    data-canonical-src passes, and then also as the href of the link GitHub
+    wraps around it; a mention passes as a link to a profile or team page."""
+    policy = policy or _DEFAULT_POLICY
+    collector = _LinkCollector()
+    collector.feed(rendered)
+    collector.close()
+    camo_ok = {
+        url
+        for tag, attributes, name, url in collector.links
+        if name == "src" and _CAMO.match(url) and attributes.get("data-canonical-src")
+        and target_allowed(attributes["data-canonical-src"], policy)
+    }
+    failures = 0
+    for tag, attributes, name, url in collector.links:
+        url = url.strip()
+        classes = attributes.get("class", "").split()
+        if _CAMO.match(url):
+            ok = url in camo_ok
+        elif tag == "a" and name == "href" and "user-mention" in classes:
+            ok = bool(_USER_MENTION.match(url))
+        elif tag == "a" and name == "href" and "team-mention" in classes:
+            ok = bool(_TEAM_MENTION.match(url))
+        else:
+            ok = target_allowed(url, policy)
+        failures += not ok
+    return failures
+
+
+def render_markdown(text: str, repo: str) -> str | None:
+    """GitHub's rendering of `text` as a comment in `repo`, or None on any error."""
+    try:
+        proc = subprocess.run(
+            ["gh", "api", "markdown", "-X", "POST", "-F", "text=@-", "-f", "mode=gfm", "-f", f"context={repo}"],
+            input=text, capture_output=True, text=True, timeout=60,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return proc.stdout if proc.returncode == 0 else None
+
+
+FALLBACK_NOTE = "Links in this reply were removed for safety, so it is shown as plain text."
+
+
+def plain_fallback(text: str) -> str:
+    """`text` inside a tilde fence longer than any run of tildes in it, so
+    nothing in it can close the fence: GitHub renders it as text, no link."""
+    longest = max((len(run) for run in re.findall(r"~+", text)), default=0)
+    fence = "~" * max(4, longest + 1)
+    if not text.endswith("\n"):
+        text += "\n"
+    return f"{FALLBACK_NOTE}\n\n{fence}\n{text}{fence}\n"
+
+
+def gate(text: str, policy: Policy) -> str:
+    """Returns `text` if every link GitHub renders from it passes, else the
+    plain fallback."""
+    rendered = render_markdown(text, policy.repo)
+    if rendered is None:
+        print("::warning::Could not render the reply to check its links; it was posted as plain text.")
+        return plain_fallback(text)
+    try:
+        failures = rendered_link_failures(rendered, policy)
+    except Exception:  # noqa: BLE001 - any parse trouble fails closed
+        failures = -1
+    if failures:
+        count = "Some" if failures < 0 else str(failures)
+        print(f"::warning::{count} link(s) in the rendered reply are outside the allowlist; it was posted as plain text.")
+        return plain_fallback(text)
+    return text
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description="Remove links outside the allowlist from a bot reply.")
     parser.add_argument("--repo", default=DEFAULT_REPO, help="OWNER/REPO the reply is posted in")
     parser.add_argument("--base", default="", help="URL of the issue or pull request the reply is posted on")
     parser.add_argument("--head-sha", default="", help="commit under review, which may be linked")
+    parser.add_argument("--gate", action="store_true", help="check GitHub's rendering; fall back to plain text")
+    parser.add_argument("--no-filter", action="store_true", help="skip the text pass (the input already had it)")
     parser.add_argument("src")
     parser.add_argument("dst")
     args = parser.parse_args(argv[1:])
@@ -603,14 +743,17 @@ def main(argv: list[str]) -> int:
     policy = Policy(repo=args.repo, base=args.base, head_sha=args.head_sha, checker=GhChecker())
     with open(args.src, encoding="utf-8", errors="replace", newline="") as fh:
         text = fh.read()
-    out, removed = filter_links(text, policy)
+    if not args.no_filter:
+        text, removed = filter_links(text, policy)
+        if removed:
+            print(
+                f"::warning::Removed {removed} link(s) outside the allowlist (this repository, "
+                "MHSanaei/3x-ui and XTLS on GitHub; docs.github.com; xtls.github.io) from the reply before posting it."
+            )
+    if args.gate:
+        text = gate(text, policy)
     with open(args.dst, "w", encoding="utf-8", newline="") as fh:
-        fh.write(out)
-    if removed:
-        print(
-            f"::warning::Removed {removed} link(s) outside the allowlist (this repository, "
-            "MHSanaei/3x-ui and XTLS on GitHub; docs.github.com; xtls.github.io) from the reply before posting it."
-        )
+        fh.write(text)
     return 0
 
 

@@ -31,6 +31,11 @@ case "$1 $2" in
   "issue view") cat "$FAKE/issue.json" ;;
   "label list") jq -r '.[]' "$FAKE/repo-labels.json" ;;
   "issue edit"|"issue close") echo "$*" >> "$FAKE/writes.log" ;;
+  "api markdown")
+    # The rendering gate: the text arrives on stdin.
+    cat > "$FAKE/render-input.md"
+    if [ -f "$FAKE/render-error" ]; then echo "gh: HTTP 502" >&2; exit 1; fi
+    if [ -f "$FAKE/render.html" ]; then cat "$FAKE/render.html"; else echo '<p>rendered</p>'; fi ;;
   "api repos/"*)
     # $FAKE/api/<path with / as _>.json is the response; none is a 404.
     f="$FAKE/api/$(printf '%s' "$2" | tr '/' '_').json"
@@ -63,7 +68,7 @@ def bot(body: str) -> dict:
 
 @unittest.skipUnless(shutil.which("jq") and shutil.which("bash"), "needs jq and bash")
 class AnalystPostTest(unittest.TestCase):
-    def run_step(self, reply, actions, issue, comments, title_at_start="Old title", api=None):
+    def run_step(self, reply, actions, issue, comments, title_at_start="Old title", api=None, render=None, render_error=False):
         tmp = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, tmp)
         (tmp / "bin").mkdir()
@@ -76,6 +81,11 @@ class AnalystPostTest(unittest.TestCase):
             (tmp / "analyst" / "actions.json").write_text(json.dumps(actions))
         (tmp / "issue.json").write_text(json.dumps(issue))
         (tmp / "repo-labels.json").write_text(json.dumps(["bug", "triage", "clarification needed", "duplicate"]))
+        if render is not None:
+            (tmp / "render.html").write_text(render)
+        if render_error:
+            (tmp / "render-error").write_text("")
+        self.tmp = tmp
         (tmp / "api").mkdir()
         responses = {"repos/owner/repo/issues/7/comments": comments, **(api or {})}
         for path, response in responses.items():
@@ -183,6 +193,44 @@ class AnalystPostTest(unittest.TestCase):
         reply = "https://github.com/owner/repo/blob/main/x.go\n<!-- claude-issue:analyst -->\n"
         posted, _, out = self.run_step(reply, None, self.OPEN, [])
         self.assertEqual(posted, f"(link removed)\n<!-- claude-issue:run {RUN_ID} -->\n<!-- claude-issue:analyst -->\n")
+
+    FALLBACK = (
+        "Links in this reply were removed for safety, so it is shown as plain text.\n\n"
+        "~~~~\nAnalysis.\n~~~~\n"
+        f"<!-- claude-issue:run {RUN_ID} -->\n<!-- claude-issue:analyst -->\n"
+    )
+
+    def test_a_link_that_slips_into_the_rendering_posts_plain_text(self):
+        reply = "Analysis.\n<!-- claude-issue:analyst -->\n"
+        posted, _, out = self.run_step(reply, None, self.OPEN, [], render='<p><a href="https://evil.example/x">Analysis</a>.</p>')
+        self.assertEqual(posted, self.FALLBACK)
+        self.assertIn("::warning::1 link(s) in the rendered reply are outside the allowlist", out)
+        self.assertNotIn("evil", out)
+        # GitHub rendered the filtered text, sent on stdin, in this repository's context.
+        self.assertEqual((self.tmp / "render-input.md").read_text(), "Analysis.\n")
+        self.assertIn("api markdown -X POST -F text=@- -f mode=gfm -f context=owner/repo", self.calls)
+
+    def test_a_fork_commit_github_links_by_itself_posts_plain_text(self):
+        reply = "Analysis.\n<!-- claude-issue:analyst -->\n"
+        rendered = f'<p>See <a href="https://github.com/owner/repo/commit/{self.FORK}"><tt>{self.FORK[:7]}</tt></a>.</p>'
+        posted, _, out = self.run_step(reply, None, self.OPEN, [], api=self.API, render=rendered)
+        self.assertEqual(posted, self.FALLBACK)
+
+    def test_a_render_error_posts_plain_text(self):
+        posted, _, out = self.run_step("Analysis.\n<!-- claude-issue:analyst -->\n", None, self.OPEN, [], render_error=True)
+        self.assertEqual(posted, self.FALLBACK)
+        self.assertIn("::warning::Could not render the reply to check its links", out)
+
+    def test_a_clean_rendering_posts_the_markdown(self):
+        rendered = (
+            '<p>Analysis. <a class="issue-link js-issue-link" href="https://github.com/owner/repo/issues/12">#12</a> '
+            '<a class="user-mention notranslate" href="https://github.com/maintainer">@maintainer</a> '
+            f'<a href="https://github.com/owner/repo/commit/{self.GOOD}"><tt>0123456</tt></a> '
+            '<a href="#user-content-fn-1">1</a></p>'
+        )
+        posted, _, out = self.run_step("Analysis.\n<!-- claude-issue:analyst -->\n", None, self.OPEN, [], api=self.API, render=rendered)
+        self.assertEqual(posted, f"Analysis.\n<!-- claude-issue:run {RUN_ID} -->\n<!-- claude-issue:analyst -->\n")
+        self.assertNotIn("::warning::", out)
 
     def test_a_reply_without_foreign_links_is_posted_unchanged_and_quietly(self):
         reply = "Fixed in https://github.com/XTLS/Xray-core/pull/1 (see https://xtls.github.io/config/).\n<!-- claude-issue:analyst -->\n"
