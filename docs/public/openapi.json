@@ -8137,14 +8137,15 @@
         "tags": [
           "Server"
         ],
-        "summary": "Download and install the specified Xray version. Pass \"latest\" for the newest release.",
+        "summary": "Download and install an official Xray release from getXrayVersion.",
         "operationId": "post_panel_api_server_installXray_version",
+        "description": "Replaces still-ui's own Xray build (status xray.stillBuild). Official REALITY 26.9.9 and newer refuses Xray clients with the ios, edge or qq fingerprint, every sing-box client and mihomo without support-x25519mlkem768. The panel's version dialog makes the admin confirm this first; the endpoint itself installs without asking. Run still-ui update on the server to restore the still-ui build.",
         "parameters": [
           {
             "name": "version",
             "in": "path",
             "required": true,
-            "description": "Xray tag (e.g. v25.10.31) or \"latest\".",
+            "description": "Xray tag from getXrayVersion (e.g. v26.10.31).",
             "schema": {
               "type": "string"
             }
@@ -18108,7 +18109,8 @@
                 "xray": {
                   "state": "running",
                   "errorMsg": "",
-                  "version": "25.10.31"
+                  "version": "26.10.31",
+                  "stillBuild": true
                 },
                 "amneziawg": {
                   "configured": false,

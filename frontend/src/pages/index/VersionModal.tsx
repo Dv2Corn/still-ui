@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Button, Collapse, Modal, Radio, Spin, Tag, Tooltip } from 'antd';
+import { Alert, Button, Checkbox, Collapse, Modal, Radio, Spin, Tag, Tooltip } from 'antd';
 import { ReloadOutlined } from '@ant-design/icons';
 
 import { HttpUtil } from '@/utils';
@@ -21,6 +21,10 @@ interface VersionModalProps {
   onBusy: (e: BusyEvent) => void;
 }
 
+// The entry for still-ui's own Xray build. The panel cannot install it (only
+// `still-ui update` does); every tag from getXrayVersion is an official release.
+const STILL_BUILD = 'still-ui';
+
 const GEOFILES = [
   'geosite.dat',
   'geoip.dat',
@@ -36,6 +40,8 @@ export default function VersionModal({ open, status, onClose, onBusy }: VersionM
   const [activeKey, setActiveKey] = useState<string | string[]>('1');
   const [versions, setVersions] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [understood, setUnderstood] = useState(false);
 
   const fetchVersions = useCallback(async () => {
     try {
@@ -49,29 +55,35 @@ export default function VersionModal({ open, status, onClose, onBusy }: VersionM
   const [wasOpen, setWasOpen] = useState(false);
   if (open !== wasOpen) {
     setWasOpen(open);
-    if (open) setLoading(true);
+    if (open) {
+      setLoading(true);
+      setSelected(null);
+      setUnderstood(false);
+    }
   }
 
   useEffect(() => {
     if (open) void fetchVersions();
   }, [open, fetchVersions]);
 
-  function switchXrayVersion(version: string) {
-    modal.confirm({
-      title: t('pages.index.xraySwitchVersionDialog'),
-      content: t('pages.index.xraySwitchVersionDialogDesc').replace('#version#', version),
-      okText: t('confirm'),
-      cancelText: t('cancel'),
-      onOk: async () => {
-        onClose();
-        onBusy({ busy: true, tip: t('pages.index.dontRefresh') });
-        try {
-          await HttpUtil.post(`/panel/api/server/installXray/${version}`);
-        } finally {
-          onBusy({ busy: false });
-        }
-      },
-    });
+  const stillBuild = !!status?.xray?.stillBuild;
+  const installed = stillBuild ? STILL_BUILD : `v${status?.xray?.version}`;
+  const current = selected ?? installed;
+  const officialVersion = selected !== null && selected !== STILL_BUILD ? selected : null;
+
+  function select(entry: string) {
+    if (entry !== selected) setUnderstood(false);
+    setSelected(entry);
+  }
+
+  async function installOfficial(version: string) {
+    onClose();
+    onBusy({ busy: true, tip: t('pages.index.dontRefresh') });
+    try {
+      await HttpUtil.post(`/panel/api/server/installXray/${version}`);
+    } finally {
+      onBusy({ busy: false });
+    }
   }
 
   function updateGeofile(fileName: string) {
@@ -120,23 +132,88 @@ export default function VersionModal({ open, status, onClose, onBusy }: VersionM
                     title={t('pages.index.xraySwitchClickDesk')}
                     showIcon
                   />
-                  <Alert
-                    type="error"
-                    className="mb-12"
-                    title={t('pages.index.xraySwitchOfficialCore')}
-                    showIcon
-                  />
-                  <div className="version-list">
+                  <div className="version-list" data-testid="xray-still-build">
+                    <div className="version-list-item">
+                      <div className="version-still">
+                        <div>
+                          <Tag color="gold">{t('pages.index.xrayStillBuildTitle')}</Tag>
+                          {stillBuild && status?.xray?.version && (
+                            <Tag>{`v${status.xray.version}`}</Tag>
+                          )}
+                          {stillBuild && <Tag color="blue">{t('pages.index.xrayInstalled')}</Tag>}
+                        </div>
+                        <div className="version-still-desc">
+                          {t('pages.index.xrayStillBuildDesc')}
+                        </div>
+                      </div>
+                      <Radio
+                        checked={current === STILL_BUILD}
+                        aria-label={t('pages.index.xrayStillBuildTitle')}
+                        onClick={() => select(STILL_BUILD)}
+                      />
+                    </div>
+                  </div>
+                  {selected === STILL_BUILD && !stillBuild && (
+                    <Alert
+                      type="info"
+                      className="mt-12"
+                      title={t('pages.index.xrayStillBuildBack')}
+                      showIcon
+                    />
+                  )}
+                  <div className="version-section-title">
+                    {t('pages.index.xrayOfficialReleases')}
+                  </div>
+                  <div className="version-list" data-testid="xray-official-list">
                     {versions.map((version, index) => (
                       <div key={version} className="version-list-item">
-                        <Tag color={index % 2 === 0 ? 'purple' : 'green'}>{version}</Tag>
+                        <div>
+                          <Tag color={index % 2 === 0 ? 'purple' : 'green'}>{version}</Tag>
+                          {!stillBuild && version === installed && (
+                            <Tag color="blue">{t('pages.index.xrayInstalled')}</Tag>
+                          )}
+                        </div>
                         <Radio
-                          checked={version === `v${status?.xray?.version}`}
-                          onClick={() => switchXrayVersion(version)}
+                          checked={version === current}
+                          aria-label={version}
+                          onClick={() => select(version)}
                         />
                       </div>
                     ))}
                   </div>
+                  {officialVersion && (
+                    <div className="official-warning" data-testid="xray-official-warning">
+                      <Alert
+                        type="warning"
+                        showIcon
+                        title={t('pages.index.xrayOfficialWarnTitle').replace(
+                          '#version#',
+                          officialVersion,
+                        )}
+                        description={t('pages.index.xrayOfficialWarnDesc')}
+                      />
+                      <Checkbox
+                        className="mt-12"
+                        checked={understood}
+                        onChange={(e) => setUnderstood(e.target.checked)}
+                      >
+                        {t('pages.index.xrayOfficialConfirm')}
+                      </Checkbox>
+                      <div className="actions-row">
+                        <Button
+                          type="primary"
+                          danger
+                          disabled={!understood}
+                          onClick={() => void installOfficial(officialVersion)}
+                        >
+                          {t('pages.index.xrayInstallVersion').replace(
+                            '#version#',
+                            officialVersion,
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </>
               ),
             },

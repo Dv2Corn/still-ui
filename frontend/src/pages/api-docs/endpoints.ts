@@ -673,14 +673,15 @@ export const sections: readonly Section[] = [
       {
         method: 'POST',
         path: '/panel/api/server/installXray/:version',
-        summary:
-          'Download and install the specified Xray version. Pass "latest" for the newest release.',
+        summary: 'Download and install an official Xray release from getXrayVersion.',
+        description:
+          "Replaces still-ui's own Xray build (status xray.stillBuild). Official REALITY 26.9.9 and newer refuses Xray clients with the ios, edge or qq fingerprint, every sing-box client and mihomo without support-x25519mlkem768. The panel's version dialog makes the admin confirm this first; the endpoint itself installs without asking. Run still-ui update on the server to restore the still-ui build.",
         params: [
           {
             name: 'version',
             in: 'path',
             type: 'string',
-            desc: 'Xray tag (e.g. v25.10.31) or "latest".',
+            desc: 'Xray tag from getXrayVersion (e.g. v26.10.31).',
           },
         ],
       },
