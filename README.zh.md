@@ -174,10 +174,10 @@ still-ui uninstall
 | `still-probe-linux-<arch>.tar.gz`（及 `.sha256`） | 可达性检查代理程序，由 `scripts/still-probe-install.sh` 下载；与面板压缩包一样带有来源证明 |
 | `SHA256SUMS` | 压缩包、SBOM 和检查代理压缩包的校验和 |
 
-下载并核对校验和（把 `v1.5.0` 换成你要安装的版本）：
+下载并核对校验和（把 `v1.5.1` 换成你要安装的版本）：
 
 ```bash
-gh release download v1.5.0 -R Dv2Corn/still-ui -p 'still-ui-linux-amd64.tar.gz*' -p SHA256SUMS
+gh release download v1.5.1 -R Dv2Corn/still-ui -p 'still-ui-linux-amd64.tar.gz*' -p SHA256SUMS
 sha256sum -c SHA256SUMS --ignore-missing
 ```
 
@@ -185,7 +185,7 @@ sha256sum -c SHA256SUMS --ignore-missing
 
 ```bash
 gh attestation verify still-ui-linux-amd64.tar.gz -R Dv2Corn/still-ui \
-  --signer-workflow Dv2Corn/still-ui/.github/workflows/release.yml --source-ref refs/tags/v1.5.0
+  --signer-workflow Dv2Corn/still-ui/.github/workflows/release.yml --source-ref refs/tags/v1.5.1
 ```
 
 SBOM 同样附有证明：
@@ -199,7 +199,7 @@ gh attestation verify still-ui-linux-amd64.tar.gz -R Dv2Corn/still-ui --predicat
 ```bash
 tar -xzf still-ui-linux-amd64.tar.gz still-ui/bin/xray-linux-amd64
 sha256sum still-ui/bin/xray-linux-amd64
-git clone https://github.com/Dv2Corn/still-ui && cd still-ui && git checkout v1.5.0
+git clone https://github.com/Dv2Corn/still-ui && cd still-ui && git checkout v1.5.1
 scripts/xray-build/build.sh /tmp/xray-out amd64 arm64
 ```
 

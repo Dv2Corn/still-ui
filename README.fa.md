@@ -174,10 +174,10 @@ still-ui uninstall
 | `still-probe-linux-<arch>.tar.gz` (+ `.sha256`) | عامل بررسی دسترس‌پذیری که `scripts/still-probe-install.sh` دانلودش می‌کند؛ مانند آرشیوهای پنل attestation دارد |
 | `SHA256SUMS` | checksum آرشیوها، SBOMها و آرشیوهای عامل بررسی |
 
-دانلود و بررسی checksumها (به‌جای `v1.5.0` نسخه‌ای را بگذارید که نصب می‌کنید):
+دانلود و بررسی checksumها (به‌جای `v1.5.1` نسخه‌ای را بگذارید که نصب می‌کنید):
 
 ```bash
-gh release download v1.5.0 -R Dv2Corn/still-ui -p 'still-ui-linux-amd64.tar.gz*' -p SHA256SUMS
+gh release download v1.5.1 -R Dv2Corn/still-ui -p 'still-ui-linux-amd64.tar.gz*' -p SHA256SUMS
 sha256sum -c SHA256SUMS --ignore-missing
 ```
 
@@ -185,7 +185,7 @@ sha256sum -c SHA256SUMS --ignore-missing
 
 ```bash
 gh attestation verify still-ui-linux-amd64.tar.gz -R Dv2Corn/still-ui \
-  --signer-workflow Dv2Corn/still-ui/.github/workflows/release.yml --source-ref refs/tags/v1.5.0
+  --signer-workflow Dv2Corn/still-ui/.github/workflows/release.yml --source-ref refs/tags/v1.5.1
 ```
 
 برای SBOM هم گواهی صادر شده است:
@@ -199,7 +199,7 @@ gh attestation verify still-ui-linux-amd64.tar.gz -R Dv2Corn/still-ui --predicat
 ```bash
 tar -xzf still-ui-linux-amd64.tar.gz still-ui/bin/xray-linux-amd64
 sha256sum still-ui/bin/xray-linux-amd64
-git clone https://github.com/Dv2Corn/still-ui && cd still-ui && git checkout v1.5.0
+git clone https://github.com/Dv2Corn/still-ui && cd still-ui && git checkout v1.5.1
 scripts/xray-build/build.sh /tmp/xray-out amd64 arm64
 ```
 
