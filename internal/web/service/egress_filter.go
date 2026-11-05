@@ -119,7 +119,7 @@ func (s *EgressFilterService) Settings() EgressFilterSettings {
 		logger.Warning("egress filter: stored setting unreadable, nothing is blocked: ", err)
 		return EgressFilterSettings{}
 	}
-	if f, err := out.Filter.Normalize(); err == nil {
+	if f, err := out.Normalize(); err == nil {
 		out.Filter = f
 	} else {
 		logger.Warning("egress filter: stored custom list unreadable, ignoring it: ", err)
@@ -261,7 +261,7 @@ func (s *EgressFilterService) templatePrivateBlocked() bool {
 // the host table and hands the filter to the chosen nodes. The Xray half follows from
 // the next config build, so the caller restarts Xray.
 func (s *EgressFilterService) SetLocal(in EgressFilterSettings) (EgressFilterStatus, error) {
-	f, err := in.Filter.Normalize()
+	f, err := in.Normalize()
 	if err != nil {
 		return EgressFilterStatus{}, err
 	}
@@ -306,10 +306,10 @@ func (s *EgressFilterService) ApplyManaged(req ManagedEgressFilterRequest) (chan
 	if err != nil {
 		return false, err
 	}
-	if cur.ManagedBy == req.ManagedBy && cur.Filter.Fingerprint() == f.Fingerprint() {
+	if cur.ManagedBy == req.ManagedBy && cur.Fingerprint() == f.Fingerprint() {
 		return false, nil
 	}
-	changed = cur.Filter.Fingerprint() != f.Fingerprint()
+	changed = cur.Fingerprint() != f.Fingerprint()
 	cur.Filter = f
 	cur.ManagedBy = req.ManagedBy
 	cur.ManagedAt = time.Now().Unix()
@@ -434,7 +434,7 @@ func (s *EgressFilterService) SyncNodes(force bool) {
 	if err != nil || guid == "" {
 		return
 	}
-	fp := settings.Filter.Fingerprint()
+	fp := settings.Fingerprint()
 	now := time.Now()
 
 	type job struct {
