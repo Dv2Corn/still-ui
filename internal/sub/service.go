@@ -98,6 +98,11 @@ type SubService struct {
 	// probe is the probes' verdict on the endpoints, read lazily by probeVerdicts.
 	probe       *service.ReachSubVerdicts
 	probeLoaded bool
+	// remarkCalls is the identity of every templated body remark of this render pass, in order;
+	// remarkFullAt, set for a second pass, names the remark that carries the full template per
+	// identity (probe_remarks.go).
+	remarkCalls  []string
+	remarkFullAt map[string]int
 }
 
 // tuicLinkInstance indexes a decoded TUIC inbound's clients by email
@@ -154,6 +159,7 @@ func (s *SubService) PrepareForRequest(host string) {
 	s.hostGroupOrders = nil
 	s.sharedGroupSni = nil
 	s.probe, s.probeLoaded = nil, false
+	s.remarkCalls, s.remarkFullAt = nil, nil
 	s.rendered = 0
 	mode, _ := s.settingService.GetSubHostSortMode()
 	s.hostsFirst = mode == "hosts-first"
@@ -603,6 +609,7 @@ func (s *SubService) getSubs(subId string) ([]string, []string, int64, xray.Clie
 				continue
 			}
 			var link string
+			remarksFrom := s.remarkMark()
 			if s.hostsFirst {
 				variants, closed := s.clientHostVariants(inbound, client, "raw")
 				if closed {
@@ -630,7 +637,7 @@ func (s *SubService) getSubs(subId string) ([]string, []string, int64, xray.Clie
 				link = s.GetLink(inbound, client.Email)
 			}
 			if !s.hostsFirst && s.keepLink(link) {
-				panelLinks = append(panelLinks, subLink{link, inbound.Id})
+				panelLinks = append(panelLinks, subLink{link, inbound.Id, s.remarkSince(remarksFrom)})
 			}
 			emails = append(emails, client.Email)
 			seenEmails[client.Email] = struct{}{}
@@ -641,12 +648,16 @@ func (s *SubService) getSubs(subId string) ([]string, []string, int64, xray.Clie
 			if s.rendered.spent() {
 				break
 			}
+			remarksFrom := s.remarkMark()
 			if link := entry.render(); s.keepLink(link) {
-				panelLinks = append(panelLinks, subLink{link, entry.inboundID})
+				panelLinks = append(panelLinks, subLink{link, entry.inboundID, s.remarkSince(remarksFrom)})
 			}
 		}
 	}
-	result, probeDemoted := arrangeSubLinks(s.probeVerdicts(), panelLinks)
+	result, probeDemoted, servedRemarks := arrangeSubLinks(s.probeVerdicts(), panelLinks)
+	if s.rerenderForRemarks(servedRemarks) {
+		return s.getSubs(subId)
+	}
 	for _, ext := range externalLinks {
 		if ext.Enable {
 			hasEnabledClient = true

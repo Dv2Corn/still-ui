@@ -43,6 +43,10 @@ func (s *SubClashService) GetClashLegacy(subId string, host string) (string, str
 func (s *SubClashService) getClash(subId string, host string, legacy bool) (string, string, error) {
 	subReq := s.SubService.ForRequest(host)
 	subReq.subscriptionBody = true
+	return s.renderClash(subReq, subId, host, legacy)
+}
+
+func (s *SubClashService) renderClash(subReq *SubService, subId string, host string, legacy bool) (string, string, error) {
 	inbounds, err := subReq.getInboundsBySubId(subId)
 	if err != nil {
 		return "", "", err
@@ -108,20 +112,29 @@ func (s *SubClashService) getClash(subId string, host string, legacy bool) (stri
 				injectExternalProxy(&clone, effectiveEps)
 				effective = &clone
 			}
-			for _, proxy := range s.budgetedProxies(subReq, effective, client, host) {
-				panelProxies = append(panelProxies, clashProxy{proxy, inbound.Id})
+			remarksFrom := subReq.remarkMark()
+			rendered := s.budgetedProxies(subReq, effective, client, host)
+			remarks := splitRemarkSpan(subReq.remarkSince(remarksFrom), len(rendered))
+			for i, proxy := range rendered {
+				panelProxies = append(panelProxies, clashProxy{proxy, inbound.Id, remarks[i]})
 			}
 		}
 	}
 	if subReq.hostsFirst {
 		for _, entry := range orderedSubValues(ordered) {
-			for _, proxy := range entry.render() {
-				panelProxies = append(panelProxies, clashProxy{proxy, entry.inboundID})
+			remarksFrom := subReq.remarkMark()
+			rendered := entry.render()
+			remarks := splitRemarkSpan(subReq.remarkSince(remarksFrom), len(rendered))
+			for i, proxy := range rendered {
+				panelProxies = append(panelProxies, clashProxy{proxy, entry.inboundID, remarks[i]})
 			}
 		}
 	}
 	verdicts := subReq.probeVerdicts()
 	kept, demoted, hidden := probeArrange(verdicts, panelProxies, clashProxyDown(verdicts))
+	if subReq.rerenderForRemarks(clashServedRemarks(kept, hidden, legacy)) {
+		return s.renderClash(subReq, subId, host, legacy)
+	}
 	proxies, probeHidden := clashProxyMaps(kept), clashProxyMaps(hidden)
 	for _, ext := range externalLinks {
 		if ext.Enable {

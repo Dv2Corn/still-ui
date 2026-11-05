@@ -88,6 +88,7 @@ func probeArrange[T any](verdicts *service.ReachSubVerdicts, items []T, down fun
 type subLink struct {
 	link      string
 	inboundID int
+	remarks   remarkSpan
 }
 
 func probeLinkDown(verdicts *service.ReachSubVerdicts) func(subLink) bool {
@@ -104,13 +105,15 @@ func probeLinkDown(verdicts *service.ReachSubVerdicts) func(subLink) bool {
 	}
 }
 
-// arrangeSubLinks splits multi-endpoint entries into lines so each endpoint is judged alone.
-func arrangeSubLinks(verdicts *service.ReachSubVerdicts, entries []subLink) (kept, demoted []string) {
+// arrangeSubLinks splits multi-endpoint entries into lines so each endpoint is judged alone. It
+// also returns the remarks of the kept lines in order, for the first-link remark (probe_remarks.go).
+func arrangeSubLinks(verdicts *service.ReachSubVerdicts, entries []subLink) (kept, demoted []string, keptRemarks []remarkSpan) {
 	if verdicts == nil {
 		for _, e := range entries {
 			kept = append(kept, e.link)
+			keptRemarks = append(keptRemarks, e.remarks)
 		}
-		return kept, nil
+		return kept, nil, keptRemarks
 	}
 	var lines []subLink
 	for _, e := range entries {
@@ -118,18 +121,21 @@ func arrangeSubLinks(verdicts *service.ReachSubVerdicts, entries []subLink) (kep
 			lines = append(lines, e)
 			continue
 		}
-		for _, line := range splitLinkLines(e.link) {
-			lines = append(lines, subLink{line, e.inboundID})
+		split := splitLinkLines(e.link)
+		remarks := splitRemarkSpan(e.remarks, len(split))
+		for i, line := range split {
+			lines = append(lines, subLink{line, e.inboundID, remarks[i]})
 		}
 	}
 	keep, demote, _ := probeArrange(verdicts, lines, probeLinkDown(verdicts))
 	for _, l := range keep {
 		kept = append(kept, l.link)
+		keptRemarks = append(keptRemarks, l.remarks)
 	}
 	for _, l := range demote {
 		demoted = append(demoted, l.link)
 	}
-	return kept, demoted
+	return kept, demoted, keptRemarks
 }
 
 // clashProxyRender is a hosts-first Clash variant rendered in final order, with its inbound.
@@ -142,6 +148,7 @@ type clashProxyRender struct {
 type clashProxy struct {
 	proxy     map[string]any
 	inboundID int
+	remarks   remarkSpan
 }
 
 func clashProxyDown(verdicts *service.ReachSubVerdicts) func(clashProxy) bool {
@@ -153,6 +160,24 @@ func clashProxyDown(verdicts *service.ReachSubVerdicts) func(clashProxy) bool {
 		}
 		return verdicts.Unreachable(p.inboundID, server, port)
 	}
+}
+
+// clashServedRemarks lists the remarks of the panel proxies a Clash profile serves first: the
+// kept ones, or for a legacy profile the kept ones it can show, else the hidden ones it falls back on.
+func clashServedRemarks(kept, hidden []clashProxy, legacy bool) []remarkSpan {
+	pick := func(entries []clashProxy) []remarkSpan {
+		var out []remarkSpan
+		for _, e := range entries {
+			if !legacy || legacyClashProxy(e.proxy) != nil {
+				out = append(out, e.remarks)
+			}
+		}
+		return out
+	}
+	if served := pick(kept); len(served) > 0 || !legacy {
+		return served
+	}
+	return pick(hidden)
 }
 
 func clashProxyMaps(entries []clashProxy) []map[string]any {
@@ -280,13 +305,17 @@ func arrangeJSONEntries(verdicts *service.ReachSubVerdicts, entries []subConfigE
 	out := entries[:0]
 	for i, entry := range entries {
 		configs := entry.configs[:0:0]
+		var remarks []remarkSpan
 		for j, config := range entry.configs {
 			if !drop[ref{i, j}] {
 				configs = append(configs, config)
+				if j < len(entry.remarks) {
+					remarks = append(remarks, entry.remarks[j])
+				}
 			}
 		}
 		if len(configs) > 0 {
-			entry.configs = configs
+			entry.configs, entry.remarks = configs, remarks
 			out = append(out, entry)
 		}
 	}

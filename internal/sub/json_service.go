@@ -118,6 +118,10 @@ func (s *SubJsonService) bakedTemplate() map[string]any {
 func (s *SubJsonService) GetJson(subId string, host string, alwaysReturnArray bool) (string, string, error) {
 	subReq := s.SubService.ForRequest(host)
 	subReq.subscriptionBody = true
+	return s.renderJson(subReq, subId, host, alwaysReturnArray)
+}
+
+func (s *SubJsonService) renderJson(subReq *SubService, subId string, host string, alwaysReturnArray bool) (string, string, error) {
 	inbounds, err := subReq.getInboundsBySubId(subId)
 	if err != nil {
 		return "", "", err
@@ -163,6 +167,7 @@ func (s *SubJsonService) GetJson(subId string, host string, alwaysReturnArray bo
 		}
 
 		var inboundConfigs []json_util.RawMessage
+		var inboundRemarks []remarkSpan
 		for _, client := range clients {
 			if client.Enable {
 				hasEnabledClient = true
@@ -173,8 +178,10 @@ func (s *SubJsonService) GetJson(subId string, host string, alwaysReturnArray bo
 				hasBoundClosed = hasBoundClosed || closed
 				for _, variant := range variants {
 					render := func() subConfigEntry {
+						remarksFrom := subReq.remarkMark()
 						configs := s.budgetedConfig(subReq, variant.inbound(subReq, inbound), client, host)
-						return subConfigEntry{sortIndex: inbound.SubSortIndex, id: inbound.Id, configs: configs, hostOrder: variant.order}
+						remarks := splitRemarkSpan(subReq.remarkSince(remarksFrom), len(configs))
+						return subConfigEntry{sortIndex: inbound.SubSortIndex, id: inbound.Id, configs: configs, remarks: remarks, hostOrder: variant.order}
 					}
 					ordered = append(ordered, orderedSubEntry[func() subConfigEntry]{variant.order, render})
 				}
@@ -191,13 +198,17 @@ func (s *SubJsonService) GetJson(subId string, host string, alwaysReturnArray bo
 				injectExternalProxy(&clone, effectiveEps)
 				effective = &clone
 			}
-			inboundConfigs = append(inboundConfigs, s.budgetedConfig(subReq, effective, client, host)...)
+			remarksFrom := subReq.remarkMark()
+			configs := s.budgetedConfig(subReq, effective, client, host)
+			inboundConfigs = append(inboundConfigs, configs...)
+			inboundRemarks = append(inboundRemarks, splitRemarkSpan(subReq.remarkSince(remarksFrom), len(configs))...)
 		}
 		if len(inboundConfigs) > 0 {
 			entries = append(entries, subConfigEntry{
 				sortIndex: inbound.SubSortIndex,
 				id:        inbound.Id,
 				configs:   inboundConfigs,
+				remarks:   inboundRemarks,
 			})
 		}
 	}
@@ -242,14 +253,21 @@ func (s *SubJsonService) GetJson(subId string, host string, alwaysReturnArray bo
 		}
 	}
 	var probeDemoted []json_util.RawMessage
+	var servedRemarks []remarkSpan
 	for _, entry := range entries {
 		for i, config := range entry.configs {
 			if i < len(entry.probeDemoted) && entry.probeDemoted[i] {
 				probeDemoted = append(probeDemoted, config)
 			} else {
 				configArray = append(configArray, config)
+				if i < len(entry.remarks) {
+					servedRemarks = append(servedRemarks, entry.remarks[i])
+				}
 			}
 		}
+	}
+	if subReq.rerenderForRemarks(servedRemarks) {
+		return s.renderJson(subReq, subId, host, alwaysReturnArray)
 	}
 	for _, ext := range externalLinks {
 		if ext.Enable {
@@ -329,6 +347,8 @@ type subConfigEntry struct {
 	configs   []json_util.RawMessage
 	// probeDemoted marks configs the probes report down; they go to the end of the subscription.
 	probeDemoted []bool
+	// remarks are the templated remarks each config carries (probe_remarks.go); nil for balancers.
+	remarks []remarkSpan
 }
 
 const (
