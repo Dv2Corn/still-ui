@@ -516,7 +516,13 @@ check_config() {
     if [[ -z "$server_ip" ]]; then
         echo -e "${yellow}Could not auto-detect server IP from any provider.${plain}"
         while [[ -z "$server_ip" ]]; do
-            read -rp "Please enter your server's public IPv4 address: " server_ip
+            # No terminal (a script, a pipe): print the URL with a placeholder
+            # instead of asking forever.
+            if ! read -rp "Please enter your server's public IPv4 address: " server_ip; then
+                echo
+                server_ip="SERVER_IP"
+                break
+            fi
             server_ip="${server_ip// /}"
             if [[ ! "$server_ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
                 echo -e "${red}Invalid IPv4 address. Please try again.${plain}"

@@ -140,6 +140,14 @@ def inbounds():
         "settings": {"clients": [client(1, "pm", id=str(uuid.uuid4()), security="auto")]},
         "streamSettings": {"network": "tcp", "security": "none", "tcpSettings": {"header": {"type": "none"}}},
     }
+    # Only on request (--only mixed): a SOCKS/HTTP inbound without auth on
+    # 127.0.0.1, which deploy/test/installer-e2e.sh downloads through while
+    # the panel restarts.
+    yield "mixed", {
+        "port": 24441, "protocol": "mixed",
+        "settings": {"auth": "noauth", "accounts": [], "udp": False, "ip": "127.0.0.1"},
+        "streamSettings": {},
+    }
     server_priv, server_pub = wg_keypair()
     awg_clients = []
     for i in (1, 2):
@@ -188,7 +196,7 @@ def main():
     listed = call("/panel/api/inbounds/list").get("obj") or []
     taken = {ib.get("port") for ib in listed}
     for name, ib in inbounds():
-        if ib["port"] in taken or (ONLY and name not in ONLY) or (name == "post-migration" and name not in ONLY):
+        if ib["port"] in taken or (ONLY and name not in ONLY) or (name in ("post-migration", "mixed") and name not in ONLY):
             continue
         body = {"up": 0, "down": 0, "total": 0, "remark": name, "enable": True, "expiryTime": 0, "listen": "",
                 "port": ib["port"], "protocol": ib["protocol"], "settings": json.dumps(ib["settings"]),
