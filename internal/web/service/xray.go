@@ -534,6 +534,12 @@ func (s *XrayService) GetXrayConfig() (*xray.Config, error) {
 		injectNodeEgresses(xrayConfig, nodes)
 	}
 
+	// Before the torrent rule, which then still comes first; both only blackhole.
+	egress := &EgressFilterService{settingService: s.settingService, inboundService: s.inboundService}
+	if f, own := egress.xrayInputs(); f.Any() {
+		injectEgressFilter(xrayConfig, egressClientTags(xrayConfig, inbounds), f, own)
+	}
+
 	if (&TorrentBlockService{settingService: s.settingService}).Enabled() {
 		injectTorrentBlock(xrayConfig, clientInboundTags)
 	}

@@ -6939,6 +6939,79 @@
         }
       }
     },
+    "/panel/api/server/egressFilter": {
+      "get": {
+        "tags": [
+          "Server"
+        ],
+        "summary": "State of the egress filter: the stored settings (managedBy is set when a central panel owns them), the TCP ports \"server\" blocks (panel and SSH), whether the template already blackholes geoip:private, whether this host can run the nftables half and has it loaded, its packet counters, the last apply error, and how far each node is with this panel's filter.",
+        "operationId": "get_panel_api_server_egressFilter",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": {
+                    "settings": {
+                      "smtp": true,
+                      "mailSubmission": false,
+                      "private": true,
+                      "server": true,
+                      "custom": [
+                        "203.0.113.0/24",
+                        "6667"
+                      ],
+                      "nodeScope": "all",
+                      "nodeIds": null
+                    },
+                    "host": {
+                      "supported": true,
+                      "nftInstalled": true,
+                      "active": true,
+                      "counters": {
+                        "mail": 12,
+                        "private": 0,
+                        "server": 3,
+                        "custom": 0
+                      }
+                    },
+                    "hostNeeded": true,
+                    "serverPorts": [
+                      22,
+                      2053
+                    ],
+                    "templatePrivateBlocked": true,
+                    "nodes": [
+                      {
+                        "id": 1,
+                        "name": "de-1",
+                        "wanted": "apply",
+                        "synced": true,
+                        "at": 1793750400
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/panel/api/server/cpuHistory/{bucket}": {
       "get": {
         "tags": [
@@ -7996,6 +8069,153 @@
                 "required": [
                   "enable"
                 ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/server/setEgressFilter": {
+      "post": {
+        "tags": [
+          "Server"
+        ],
+        "summary": "Store this panel's egress filter and apply it. Every generated Xray config gets blackhole rules ahead of all others for client inbounds (mail ports, geoip:private unless the template already blocks it, loopback and the panel/SSH ports of this server, custom addresses and ports), and on Linux the nftables table inet still_egress_filter refuses the same for AmneziaWG kernel-mode clients. DNS (port 53) is never blocked. nodeScope \"all\" or \"selected\" (with nodeIds) hands the filter to those nodes; nodes leaving the scope get theirs released. Xray is reconciled immediately. Returns the same object as GET /egressFilter; an invalid custom entry is refused.",
+        "operationId": "post_panel_api_server_setEgressFilter",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "smtp": true,
+                "mailSubmission": false,
+                "private": true,
+                "server": true,
+                "custom": [
+                  "203.0.113.0/24",
+                  "6667",
+                  "1000-2000"
+                ],
+                "nodeScope": "selected",
+                "nodeIds": [
+                  1,
+                  3
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": {
+                    "settings": {
+                      "smtp": true,
+                      "mailSubmission": false,
+                      "private": true,
+                      "server": true,
+                      "custom": [
+                        "203.0.113.0/24",
+                        "6667"
+                      ],
+                      "nodeScope": "all",
+                      "nodeIds": null
+                    },
+                    "host": {
+                      "supported": true,
+                      "nftInstalled": true,
+                      "active": true,
+                      "counters": {
+                        "mail": 12,
+                        "private": 0,
+                        "server": 3,
+                        "custom": 0
+                      }
+                    },
+                    "hostNeeded": true,
+                    "serverPorts": [
+                      22,
+                      2053
+                    ],
+                    "templatePrivateBlocked": true,
+                    "nodes": [
+                      {
+                        "id": 1,
+                        "name": "de-1",
+                        "wanted": "apply",
+                        "synced": true,
+                        "at": 1793750400
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/server/applyManagedEgressFilter": {
+      "post": {
+        "tags": [
+          "Server"
+        ],
+        "summary": "Node side of the egress filter: a central panel sets this node's filter (stored as managed by its panelGuid) or, with release=true, gives up ownership and leaves the current filter in place as the node's own. Allowed for node-sync tokens. Xray is reconciled when the filter changed. Returns the same object as GET /egressFilter.",
+        "operationId": "post_panel_api_server_applyManagedEgressFilter",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "filter": {
+                  "smtp": true,
+                  "private": true,
+                  "custom": []
+                },
+                "managedBy": "4b1c0f6e-2f6d-4c55-9a1e-0f3d7c2a9b10"
               }
             }
           }

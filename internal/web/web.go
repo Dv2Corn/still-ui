@@ -315,6 +315,7 @@ const (
 	cadenceXrayLogPrune  = "@every 10m"
 	cadenceCertWatch     = "@every 1m"
 	cadenceTorrentBlock  = "@every 1m"
+	cadenceEgressFilter  = "@every 1m"
 	cadenceCheckHash     = "@every 2m"
 	cadenceReachStale    = "@every 1m"
 	// cpu.Percent samples over a full minute (blocking), so a finer cadence just
@@ -346,6 +347,18 @@ func (s *Server) startTask(restartXray, forceXrayRestart bool, loc *time.Locatio
 	torrentBlock := service.TorrentBlockService{}
 	go torrentBlock.EnsureHostFilter()
 	_, _ = s.cron.AddFunc(cadenceTorrentBlock, torrentBlock.EnsureHostFilter)
+
+	// "Egress filter": reload its nftables table after a reboot or a ruleset flush, and
+	// hand the filter to nodes that missed it (offline, restarted, refused).
+	egressFilter := service.EgressFilterService{}
+	go func() {
+		egressFilter.EnsureHostFilter()
+		egressFilter.SyncNodes(false)
+	}()
+	_, _ = s.cron.AddFunc(cadenceEgressFilter, func() {
+		egressFilter.EnsureHostFilter()
+		egressFilter.SyncNodes(false)
+	})
 
 	// Renewed TLS/Hysteria certificates: copy for the core, check what each inbound serves.
 	_, _ = s.cron.AddFunc(cadenceCertWatch, func() {

@@ -725,6 +725,13 @@ func (r *Remote) RestartXray(ctx context.Context) error {
 	return err
 }
 
+// ApplyManagedEgressFilter hands the node this panel's egress filter (or releases
+// it); the node stores it as managed by this panel and reconciles its own Xray.
+func (r *Remote) ApplyManagedEgressFilter(ctx context.Context, body any) error {
+	_, err := r.do(ctx, http.MethodPost, "panel/api/server/applyManagedEgressFilter", body)
+	return err
+}
+
 // UpdatePanel asks the node to run its own official self-updater (update.sh)
 // and restart onto the latest release. The node returns as soon as the job is
 // launched; the new version surfaces on the next heartbeat. still-ui publishes

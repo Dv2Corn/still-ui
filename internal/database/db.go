@@ -1526,6 +1526,23 @@ func seedRandomSubscriptionPaths() error {
 	})
 }
 
+// FreshEgressFilter is the egress filter a new install starts with: outgoing SMTP
+// (port 25) blocked. No client device sends mail to port 25 itself (mail apps submit on
+// 465/587, which stay open), while spam from VPN clients on it gets servers suspended.
+// Existing installs keep the filter off until the operator turns it on.
+const FreshEgressFilter = `{"smtp":true}`
+
+func seedFreshEgressFilter() error {
+	var count int64
+	if err := db.Model(&model.Setting{}).Where("key = ?", "egressFilter").Count(&count).Error; err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+	return db.Create(&model.Setting{Key: "egressFilter", Value: FreshEgressFilter}).Error
+}
+
 func runSeeders(isUsersEmpty bool) error {
 	empty, err := isTableEmpty("history_of_seeders")
 	if err != nil {
@@ -1543,6 +1560,9 @@ func runSeeders(isUsersEmpty bool) error {
 			if err := db.Create(&model.HistoryOfSeeders{SeederName: name}).Error; err != nil {
 				return err
 			}
+		}
+		if err := seedFreshEgressFilter(); err != nil {
+			return err
 		}
 		return seedApiTokens()
 	}

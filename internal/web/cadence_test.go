@@ -29,6 +29,7 @@ func TestJobCadencesAreValidCronSpecs(t *testing.T) {
 		"cadenceCertWatch":     cadenceCertWatch,
 		"cadenceHealthAlerts":  cadenceHealthAlerts,
 		"cadenceTorrentBlock":  cadenceTorrentBlock,
+		"cadenceEgressFilter":  cadenceEgressFilter,
 		"cadenceReachStale":    cadenceReachStale,
 	}
 	for name, spec := range cadences {
