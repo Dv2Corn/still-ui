@@ -26,7 +26,7 @@ func params(s string) []string {
 // I18nBot("...") literals does not see them: every locale must carry each one, with the
 // same template parameters as English (a misspelt one renders as "<no value>").
 func TestHealthAlertMessagesInEveryLocale(t *testing.T) {
-	keys := []string{"alertCertExpired", "alertStill"}
+	keys := []string{"alertCertExpired", "alertStill", "alertNodeTrafficWarn", "alertNodeTrafficLimit", "alertNodeTrafficLimitOff", "alertNodeTrafficBack"}
 	for _, pair := range healthAlertKeys {
 		keys = append(keys, pair[0], pair[1])
 	}
@@ -79,6 +79,10 @@ func TestHealthAlertMessageChoice(t *testing.T) {
 		{eventbus.EventCertExpiring, &eventbus.HealthAlertData{Phase: "raised", Params: map[string]string{"Hours": "-2"}}, "alertCertExpired"},
 		{eventbus.EventCertExpiring, &eventbus.HealthAlertData{Phase: "resolved", Params: map[string]string{"Hours": "2000"}}, "alertCertRenewed"},
 		{eventbus.EventCPUHigh, &eventbus.HealthAlertData{Phase: "raised"}, ""},
+		{eventbus.EventNodeTraffic, &eventbus.HealthAlertData{Phase: "raised", Params: map[string]string{"Level": "warn", "Action": "disable"}}, "alertNodeTrafficWarn"},
+		{eventbus.EventNodeTraffic, &eventbus.HealthAlertData{Phase: "raised", Params: map[string]string{"Level": "limit", "Action": "notify"}}, "alertNodeTrafficLimit"},
+		{eventbus.EventNodeTraffic, &eventbus.HealthAlertData{Phase: "raised", Params: map[string]string{"Level": "limit", "Action": "disable"}}, "alertNodeTrafficLimitOff"},
+		{eventbus.EventNodeTraffic, &eventbus.HealthAlertData{Phase: "resolved", Params: map[string]string{"Level": "under", "Action": "disable"}}, "alertNodeTrafficBack"},
 	}
 	for _, c := range cases {
 		if got, _ := healthAlertMessage(c.event, c.data); got != c.want {

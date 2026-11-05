@@ -87,6 +87,9 @@ var defaultValueMap = map[string]string{
 	"subCalendarExpireInclusive":  "false",
 	"subExpiredTemplate":          DefaultSubExpiredTemplate,
 	"subTrafficDepletedTemplate":  DefaultSubTrafficDepletedTemplate,
+	"subProbeOrder":               SubProbeOrderOff,
+	"subProbeMinAgents":           "0",
+	"subProbeStaleMinutes":        strconv.Itoa(SubProbeStaleMinutesDefault),
 	"timeLocation":                "Local",
 	"tgBotEnable":                 "false",
 	"tgBotToken":                  "",
@@ -211,6 +214,7 @@ var defaultValueMap = map[string]string{
 	"xrayOutboundTestUrl":         "https://www.google.com/generate_204",
 	"panelOutbound":               "",
 	"torrentBlock":                "false",
+	"egressFilter":                "",
 	"devChannelEnable":            "false",
 
 	// LDAP defaults
@@ -237,7 +241,7 @@ var defaultValueMap = map[string]string{
 	"ldapDefaultLimitIP":     "0",
 
 	// Event bus — per-subscriber event filtering (empty = all disabled)
-	"tgEnabledEvents":   "login.attempt,cpu.high," + DefaultHealthAlertEvents,
+	"tgEnabledEvents":   "login.attempt,cpu.high," + DefaultHealthAlertEvents + ",node.traffic",
 	"smtpEnabledEvents": "login.attempt,cpu.high",
 	"smtpCpu":           "80",
 	"smtpMemory":        "80",
@@ -1743,6 +1747,9 @@ func (s *SettingService) UpdateAllSetting(allSetting *entity.AllSetting, clears 
 	case "inbound-first", "hosts-first":
 	default:
 		return errors.New("subscription host sort mode must be inbound-first or hosts-first")
+	}
+	if err := normalizeSubProbeSettings(allSetting); err != nil {
+		return err
 	}
 	switch allSetting.SubProfileMode {
 	case "", SubProfileModeNone, SubProfileModeBuiltin, SubProfileModeCustom:

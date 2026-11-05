@@ -16,6 +16,9 @@ const (
 	// Node health (heartbeat-driven)
 	EventNodeDown EventType = "node.down"
 	EventNodeUp   EventType = "node.up"
+	// EventNodeTraffic is a node's traffic quota crossing its warning or limit level, or
+	// dropping back under it (still-ui). Data is *HealthAlertData with a Level param.
+	EventNodeTraffic EventType = "node.traffic"
 
 	// System health
 	EventCPUHigh    EventType = "cpu.high"

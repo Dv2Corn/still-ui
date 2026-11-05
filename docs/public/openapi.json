@@ -567,6 +567,22 @@
             "minimum": 1,
             "type": "integer"
           },
+          "subProbeMinAgents": {
+            "example": 0,
+            "maximum": 10,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "subProbeOrder": {
+            "example": "off",
+            "type": "string"
+          },
+          "subProbeStaleMinutes": {
+            "example": 30,
+            "maximum": 1440,
+            "minimum": 5,
+            "type": "integer"
+          },
           "subProfileMode": {
             "type": "string"
           },
@@ -842,6 +858,9 @@
           "subListen",
           "subPath",
           "subPort",
+          "subProbeMinAgents",
+          "subProbeOrder",
+          "subProbeStaleMinutes",
           "subProfileMode",
           "subProfileUrl",
           "subRoutingRules",
@@ -1443,6 +1462,22 @@
             "minimum": 1,
             "type": "integer"
           },
+          "subProbeMinAgents": {
+            "example": 0,
+            "maximum": 10,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "subProbeOrder": {
+            "example": "off",
+            "type": "string"
+          },
+          "subProbeStaleMinutes": {
+            "example": 30,
+            "maximum": 1440,
+            "minimum": 5,
+            "type": "integer"
+          },
           "subProfileMode": {
             "type": "string"
           },
@@ -1726,6 +1761,9 @@
           "subListen",
           "subPath",
           "subPort",
+          "subProbeMinAgents",
+          "subProbeOrder",
+          "subProbeStaleMinutes",
           "subProfileMode",
           "subProfileUrl",
           "subRoutingRules",
@@ -3946,6 +3984,41 @@
             ],
             "type": "string"
           },
+          "trafficLimitAction": {
+            "example": "notify",
+            "type": "string"
+          },
+          "trafficLimitBytes": {
+            "description": "Per-node traffic quota (master-local billing policy, never pushed to the node).\nTrafficUsed is raw bytes through the node's own inbounds since TrafficPeriodStart.",
+            "example": 0,
+            "format": "int64",
+            "type": "integer"
+          },
+          "trafficLimited": {
+            "type": "boolean"
+          },
+          "trafficMultiplier": {
+            "example": 1,
+            "type": "number"
+          },
+          "trafficPeriodStart": {
+            "example": 0,
+            "format": "int64",
+            "type": "integer"
+          },
+          "trafficResetDay": {
+            "example": 1,
+            "type": "integer"
+          },
+          "trafficUsed": {
+            "example": 0,
+            "format": "int64",
+            "type": "integer"
+          },
+          "trafficWarnPercent": {
+            "example": 80,
+            "type": "integer"
+          },
           "transitive": {
             "type": "boolean"
           },
@@ -4017,11 +4090,159 @@
           "scheme",
           "status",
           "tlsVerifyMode",
+          "trafficLimitAction",
+          "trafficLimitBytes",
+          "trafficLimited",
+          "trafficMultiplier",
+          "trafficPeriodStart",
+          "trafficResetDay",
+          "trafficUsed",
+          "trafficWarnPercent",
           "updatedAt",
           "uptimeSecs",
           "xrayError",
           "xrayState",
           "xrayVersion"
+        ],
+        "type": "object"
+      },
+      "NodeInviteCreated": {
+        "description": "NodeInviteCreated carries the invitation string, shown once.",
+        "properties": {
+          "invite": {
+            "$ref": "#/components/schemas/NodeInviteView"
+          },
+          "secret": {
+            "example": "still-node1.<token>.<pin>.<url>",
+            "type": "string"
+          }
+        },
+        "required": [
+          "invite",
+          "secret"
+        ],
+        "type": "object"
+      },
+      "NodeInviteInput": {
+        "description": "NodeInviteInput is what the admin sets when making an invitation.",
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "allowPrivateAddress": {
+            "example": false,
+            "type": "boolean"
+          },
+          "masterUrl": {
+            "description": "MasterUrl is the panel URL nodes reach this master at, as the admin\nopens it in a browser.",
+            "example": "https://panel.example.com:2053/path/",
+            "type": "string"
+          },
+          "name": {
+            "example": "de-fra-1",
+            "type": "string"
+          },
+          "nodeAdmin": {
+            "example": false,
+            "type": "boolean"
+          },
+          "validMinutes": {
+            "example": 30,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "address",
+          "allowPrivateAddress",
+          "masterUrl",
+          "name",
+          "nodeAdmin",
+          "validMinutes"
+        ],
+        "type": "object"
+      },
+      "NodeInviteView": {
+        "description": "NodeInviteView is one invitation as the Nodes page lists it. The token is\nnever part of it.",
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "allowPrivateAddress": {
+            "example": false,
+            "type": "boolean"
+          },
+          "attempts": {
+            "example": 0,
+            "type": "integer"
+          },
+          "createdAt": {
+            "example": 1736000000,
+            "format": "int64",
+            "type": "integer"
+          },
+          "expiresAt": {
+            "example": 1736001800,
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "example": 3,
+            "type": "integer"
+          },
+          "lastError": {
+            "type": "string"
+          },
+          "masterUrl": {
+            "example": "https://panel.example.com:2053/path/",
+            "type": "string"
+          },
+          "name": {
+            "example": "de-fra-1",
+            "type": "string"
+          },
+          "nodeAdmin": {
+            "example": false,
+            "type": "boolean"
+          },
+          "nodeId": {
+            "example": 0,
+            "type": "integer"
+          },
+          "revokedAt": {
+            "example": 0,
+            "format": "int64",
+            "type": "integer"
+          },
+          "status": {
+            "description": "pending|used|expired|revoked",
+            "example": "pending",
+            "type": "string"
+          },
+          "usedAt": {
+            "example": 0,
+            "format": "int64",
+            "type": "integer"
+          },
+          "usedFromIp": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "address",
+          "allowPrivateAddress",
+          "attempts",
+          "createdAt",
+          "expiresAt",
+          "id",
+          "lastError",
+          "masterUrl",
+          "name",
+          "nodeAdmin",
+          "nodeId",
+          "revokedAt",
+          "status",
+          "usedAt",
+          "usedFromIp"
         ],
         "type": "object"
       },
@@ -4265,6 +4486,42 @@
             "example": "verify",
             "type": "string"
           },
+          "trafficLimitAction": {
+            "example": "notify",
+            "type": "string"
+          },
+          "trafficLimitBytes": {
+            "description": "Traffic quota: TrafficUsed is raw bytes this period; TrafficNextReset is unix ms.",
+            "example": 1099511627776,
+            "format": "int64",
+            "type": "integer"
+          },
+          "trafficLimited": {
+            "example": false,
+            "type": "boolean"
+          },
+          "trafficMultiplier": {
+            "example": 1,
+            "type": "number"
+          },
+          "trafficNextReset": {
+            "example": 1700000000000,
+            "format": "int64",
+            "type": "integer"
+          },
+          "trafficResetDay": {
+            "example": 1,
+            "type": "integer"
+          },
+          "trafficUsed": {
+            "example": 53687091200,
+            "format": "int64",
+            "type": "integer"
+          },
+          "trafficWarnPercent": {
+            "example": 80,
+            "type": "integer"
+          },
           "transitive": {
             "example": false,
             "type": "boolean"
@@ -4332,6 +4589,14 @@
           "scheme",
           "status",
           "tlsVerifyMode",
+          "trafficLimitAction",
+          "trafficLimitBytes",
+          "trafficLimited",
+          "trafficMultiplier",
+          "trafficNextReset",
+          "trafficResetDay",
+          "trafficUsed",
+          "trafficWarnPercent",
           "updatedAt",
           "uptimeSecs",
           "xrayError",
@@ -4671,6 +4936,10 @@
             "example": false,
             "type": "boolean"
           },
+          "subIgnored": {
+            "description": "SubIgnored says why subscriptions do not use this probe now: silent, allFailing or \"\".",
+            "type": "string"
+          },
           "targets": {
             "items": {
               "$ref": "#/components/schemas/ReachTargetView"
@@ -4694,6 +4963,7 @@
           "lastSeenAt",
           "name",
           "stale",
+          "subIgnored",
           "targets",
           "testUrl"
         ],
@@ -4755,6 +5025,19 @@
             "example": "ok",
             "type": "string"
           },
+          "subFailAgents": {
+            "example": 2,
+            "type": "integer"
+          },
+          "subNeedAgents": {
+            "example": 2,
+            "type": "integer"
+          },
+          "subState": {
+            "description": "SubState is what subscriptions do with this endpoint: demoted, hidden, unconfirmed or \"\".",
+            "example": "demoted",
+            "type": "string"
+          },
           "uptime7d": {
             "example": 99.4,
             "type": "number"
@@ -4774,6 +5057,9 @@
           "lastTotalMs",
           "lastTtfbMs",
           "status",
+          "subFailAgents",
+          "subNeedAgents",
+          "subState",
           "uptime7d"
         ],
         "type": "object"
@@ -6519,6 +6805,10 @@
                       "type": "object"
                     },
                     "description": "Client traffic rows; only email/up/down are read."
+                  },
+                  "trafficMultiplier": {
+                    "type": "integer",
+                    "description": "The master's billing multiplier for this node (0.1–100), kept per master. For that master's clients the node checks quotas by the master's last pushed count plus its own traffic since that push × this value (the node stores its counters with each push), so quotas hold while the master is unreachable."
                   }
                 },
                 "required": [
@@ -6528,6 +6818,7 @@
               },
               "example": {
                 "masterGuid": "9f6c2d-…",
+                "trafficMultiplier": 0.5,
                 "traffics": [
                   {
                     "email": "alice",
@@ -6872,6 +7163,79 @@
                       "peerDrops": 59811,
                       "tunnelBans": 1
                     }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/server/egressFilter": {
+      "get": {
+        "tags": [
+          "Server"
+        ],
+        "summary": "State of the egress filter: the stored settings (managedBy is set when a central panel owns them), the TCP ports \"server\" blocks (panel and SSH), whether the template already blackholes geoip:private, whether this host can run the nftables half and has it loaded, its packet counters, the last apply error, and how far each node is with this panel's filter.",
+        "operationId": "get_panel_api_server_egressFilter",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": {
+                    "settings": {
+                      "smtp": true,
+                      "mailSubmission": false,
+                      "private": true,
+                      "server": true,
+                      "custom": [
+                        "203.0.113.0/24",
+                        "6667"
+                      ],
+                      "nodeScope": "all",
+                      "nodeIds": null
+                    },
+                    "host": {
+                      "supported": true,
+                      "nftInstalled": true,
+                      "active": true,
+                      "counters": {
+                        "mail": 12,
+                        "private": 0,
+                        "server": 3,
+                        "custom": 0
+                      }
+                    },
+                    "hostNeeded": true,
+                    "serverPorts": [
+                      22,
+                      2053
+                    ],
+                    "templatePrivateBlocked": true,
+                    "nodes": [
+                      {
+                        "id": 1,
+                        "name": "de-1",
+                        "wanted": "apply",
+                        "synced": true,
+                        "at": 1793750400
+                      }
+                    ]
                   }
                 }
               }
@@ -7778,14 +8142,15 @@
         "tags": [
           "Server"
         ],
-        "summary": "Download and install the specified Xray version. Pass \"latest\" for the newest release.",
+        "summary": "Download and install an official Xray release from getXrayVersion.",
         "operationId": "post_panel_api_server_installXray_version",
+        "description": "Replaces still-ui's own Xray build (status xray.stillBuild). Official REALITY 26.9.9 and newer refuses Xray clients with the ios, edge or qq fingerprint, every sing-box client and mihomo without support-x25519mlkem768. The panel's version dialog makes the admin confirm this first; the endpoint itself installs without asking. Run still-ui update on the server to restore the still-ui build.",
         "parameters": [
           {
             "name": "version",
             "in": "path",
             "required": true,
-            "description": "Xray tag (e.g. v25.10.31) or \"latest\".",
+            "description": "Xray tag from getXrayVersion (e.g. v26.10.31).",
             "schema": {
               "type": "string"
             }
@@ -7937,6 +8302,154 @@
                 "required": [
                   "enable"
                 ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/server/setEgressFilter": {
+      "post": {
+        "tags": [
+          "Server"
+        ],
+        "summary": "Store this panel's egress filter and apply it. Every generated Xray config gets blackhole rules ahead of all others for client inbounds (mail ports, geoip:private unless the template already blocks it, loopback and the panel/SSH ports of this server, custom addresses and ports), and on Linux the nftables table inet still_egress_filter refuses the same for AmneziaWG kernel-mode clients. DNS (port 53) is never blocked. nodeScope \"all\" or \"selected\" (with nodeIds) hands the filter to those nodes; nodes leaving the scope get theirs released. Xray is reconciled immediately. Returns the same object as GET /egressFilter; an invalid custom entry is refused.",
+        "operationId": "post_panel_api_server_setEgressFilter",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "smtp": true,
+                "mailSubmission": false,
+                "private": true,
+                "server": true,
+                "custom": [
+                  "203.0.113.0/24",
+                  "6667",
+                  "1000-2000"
+                ],
+                "nodeScope": "selected",
+                "nodeIds": [
+                  1,
+                  3
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": {
+                    "settings": {
+                      "smtp": true,
+                      "mailSubmission": false,
+                      "private": true,
+                      "server": true,
+                      "custom": [
+                        "203.0.113.0/24",
+                        "6667"
+                      ],
+                      "nodeScope": "all",
+                      "nodeIds": null
+                    },
+                    "host": {
+                      "supported": true,
+                      "nftInstalled": true,
+                      "active": true,
+                      "counters": {
+                        "mail": 12,
+                        "private": 0,
+                        "server": 3,
+                        "custom": 0
+                      }
+                    },
+                    "hostNeeded": true,
+                    "serverPorts": [
+                      22,
+                      2053
+                    ],
+                    "templatePrivateBlocked": true,
+                    "nodes": [
+                      {
+                        "id": 1,
+                        "name": "de-1",
+                        "wanted": "apply",
+                        "synced": true,
+                        "at": 1793750400
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/server/applyManagedEgressFilter": {
+      "post": {
+        "tags": [
+          "Server"
+        ],
+        "summary": "Node side of the egress filter: a central panel sets this node's filter (stored as managed by its panelGuid) or, with release=true, gives up ownership and leaves the current filter in place as the node's own. Allowed for node-sync tokens. serverAddress is the address the central panel reaches the node at; if it is an IP literal and this panel owns the filter, the server block covers it too (it may be a NAT address on no interface). A release or push from a panel that does not own the filter changes nothing. Xray is reconciled when the filter or that address changed. Returns the same object as GET /egressFilter.",
+        "operationId": "post_panel_api_server_applyManagedEgressFilter",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "filter": {
+                  "smtp": true,
+                  "private": true,
+                  "custom": []
+                },
+                "managedBy": "4b1c0f6e-2f6d-4c55-9a1e-0f3d7c2a9b10",
+                "serverAddress": "203.0.113.9"
               }
             }
           }
@@ -11780,6 +12293,14 @@
                       "scheme": "https",
                       "status": "online",
                       "tlsVerifyMode": "verify",
+                      "trafficLimitAction": "notify",
+                      "trafficLimitBytes": 1099511627776,
+                      "trafficLimited": false,
+                      "trafficMultiplier": 1,
+                      "trafficNextReset": 1700000000000,
+                      "trafficResetDay": 1,
+                      "trafficUsed": 53687091200,
+                      "trafficWarnPercent": 80,
                       "transitive": false,
                       "unavailableMetrics": [
                         ""
@@ -11907,6 +12428,177 @@
         }
       }
     },
+    "/panel/api/nodes/invites": {
+      "get": {
+        "tags": [
+          "Nodes"
+        ],
+        "summary": "List node invitations (Nodes → Add with a command), newest first, with their status (pending, used, expired, revoked) and the audit of who used them. Tokens are never listed; invitations spent more than 30 days ago are dropped.",
+        "operationId": "get_panel_api_nodes_invites",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/NodeInviteView"
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": [
+                    {
+                      "address": "",
+                      "allowPrivateAddress": false,
+                      "attempts": 0,
+                      "createdAt": 1736000000,
+                      "expiresAt": 1736001800,
+                      "id": 3,
+                      "lastError": "",
+                      "masterUrl": "https://panel.example.com:2053/path/",
+                      "name": "de-fra-1",
+                      "nodeAdmin": false,
+                      "nodeId": 0,
+                      "revokedAt": 0,
+                      "status": "pending",
+                      "usedAt": 0,
+                      "usedFromIp": ""
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/nodes/invites/create": {
+      "post": {
+        "tags": [
+          "Nodes"
+        ],
+        "summary": "Make a one-time node invitation. The panel reads its own TLS public key at masterUrl (https only) and puts its SHA-256 in the invitation, so the new node can verify this master even with a self-signed certificate. The secret is in this answer only; the panel stores the token's SHA-256. The node runs `install.sh node-enroll` with it and calls enroll/v1/node under the panel base path, which is the only route the token opens. validMinutes is 5-1440 (default 30); at most 20 invitations may be pending.",
+        "operationId": "post_panel_api_nodes_invites_create",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "name": "de-fra-1",
+                "address": "",
+                "allowPrivateAddress": false,
+                "nodeAdmin": false,
+                "validMinutes": 30,
+                "masterUrl": "https://panel.example.com:2053/path/"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "$ref": "#/components/schemas/NodeInviteCreated"
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": {
+                    "invite": {
+                      "address": "",
+                      "allowPrivateAddress": false,
+                      "attempts": 0,
+                      "createdAt": 1736000000,
+                      "expiresAt": 1736001800,
+                      "id": 3,
+                      "lastError": "",
+                      "masterUrl": "https://panel.example.com:2053/path/",
+                      "name": "de-fra-1",
+                      "nodeAdmin": false,
+                      "nodeId": 0,
+                      "revokedAt": 0,
+                      "status": "pending",
+                      "usedAt": 0,
+                      "usedFromIp": ""
+                    },
+                    "secret": "still-node1.<token>.<pin>.<url>"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/nodes/invites/revoke/{id}": {
+      "post": {
+        "tags": [
+          "Nodes"
+        ],
+        "summary": "Revoke an unused node invitation: its token stops working at once.",
+        "operationId": "post_panel_api_nodes_invites_revoke_id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Invitation ID.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/panel/api/nodes/get/{id}": {
       "get": {
         "tags": [
@@ -11984,6 +12676,14 @@
                     "scheme": "https",
                     "status": "online",
                     "tlsVerifyMode": "verify",
+                    "trafficLimitAction": "notify",
+                    "trafficLimitBytes": 1099511627776,
+                    "trafficLimited": false,
+                    "trafficMultiplier": 1,
+                    "trafficNextReset": 1700000000000,
+                    "trafficResetDay": 1,
+                    "trafficUsed": 53687091200,
+                    "trafficWarnPercent": 80,
                     "transitive": false,
                     "unavailableMetrics": [
                       ""
@@ -12137,6 +12837,14 @@
                     "scheme": "https",
                     "status": "online",
                     "tlsVerifyMode": "verify",
+                    "trafficLimitAction": "notify",
+                    "trafficLimitBytes": 1099511627776,
+                    "trafficLimited": false,
+                    "trafficMultiplier": 1,
+                    "trafficNextReset": 1700000000000,
+                    "trafficResetDay": 1,
+                    "trafficUsed": 53687091200,
+                    "trafficWarnPercent": 80,
                     "transitive": false,
                     "unavailableMetrics": [
                       ""
@@ -12285,6 +12993,64 @@
               },
               "example": {
                 "enable": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/nodes/trafficLimit/{id}": {
+      "post": {
+        "tags": [
+          "Nodes"
+        ],
+        "summary": "Set a node's monthly traffic limit and accounting multiplier. trafficLimitBytes 0 means no limit; usage counts the node's own inbound traffic and resets at midnight on trafficResetDay (1-31, clamped to the month's last day). trafficWarnPercent (0 = off) sends a Telegram alert once per period. trafficLimitAction is notify or disable (turns the node's inbounds off until the reset). trafficMultiplier (0.1-100) scales the node's traffic added to client totals; the node's own counter stays raw. A change applies to traffic from that moment on; the master also sends it to the node, which bills its traffic since the master's last count at it, so quotas hold while the master is unreachable.",
+        "operationId": "post_panel_api_nodes_trafficLimit_id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Node ID.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "trafficLimitBytes": 1099511627776,
+                "trafficResetDay": 1,
+                "trafficWarnPercent": 80,
+                "trafficLimitAction": "notify",
+                "trafficMultiplier": 1
               }
             }
           }
@@ -13718,6 +14484,7 @@
                       "lastSeenAt": 1736000000000,
                       "name": "home-mobile",
                       "stale": false,
+                      "subIgnored": "",
                       "targets": [
                         {
                           "changedAt": 1736000000000,
@@ -13733,6 +14500,9 @@
                           "lastTotalMs": 950,
                           "lastTtfbMs": 180,
                           "status": "ok",
+                          "subFailAgents": 2,
+                          "subNeedAgents": 2,
+                          "subState": "demoted",
                           "uptime7d": 99.4
                         }
                       ],
@@ -13867,6 +14637,7 @@
                       "lastSeenAt": 1736000000000,
                       "name": "home-mobile",
                       "stale": false,
+                      "subIgnored": "",
                       "targets": [
                         {
                           "changedAt": 1736000000000,
@@ -13882,6 +14653,9 @@
                           "lastTotalMs": 950,
                           "lastTtfbMs": 180,
                           "status": "ok",
+                          "subFailAgents": 2,
+                          "subNeedAgents": 2,
+                          "subState": "demoted",
                           "uptime7d": 99.4
                         }
                       ],
@@ -17341,7 +18115,8 @@
                 "xray": {
                   "state": "running",
                   "errorMsg": "",
-                  "version": "25.10.31"
+                  "version": "26.10.31",
+                  "stillBuild": true
                 },
                 "amneziawg": {
                   "configured": false,
@@ -17742,6 +18517,14 @@
                   "scheme": "https",
                   "status": "online",
                   "tlsVerifyMode": "verify",
+                  "trafficLimitAction": "notify",
+                  "trafficLimitBytes": 1099511627776,
+                  "trafficLimited": false,
+                  "trafficMultiplier": 1,
+                  "trafficNextReset": 1700000000000,
+                  "trafficResetDay": 1,
+                  "trafficUsed": 53687091200,
+                  "trafficWarnPercent": 80,
                   "transitive": false,
                   "unavailableMetrics": [
                     ""

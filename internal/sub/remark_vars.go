@@ -652,7 +652,15 @@ func (s *SubService) effectiveTemplate(client model.Client) string {
 		s.usageShown = map[string]bool{}
 	}
 	key := templateInfoKey(client)
-	if s.subInfoNodeEnable || s.usageShown[key] {
+	call := len(s.remarkCalls)
+	s.remarkCalls = append(s.remarkCalls, key)
+	full := !s.subInfoNodeEnable && !s.usageShown[key]
+	if s.remarkFullAt != nil && !s.subInfoNodeEnable {
+		// Second pass after the probe ordering: the entry now served first carries it.
+		at, ok := s.remarkFullAt[key]
+		full = ok && at == call
+	}
+	if !full {
 		remove := firstLinkOnlyBodyTokens
 		if s.showIdentityOnAllLinks {
 			remove = usageInfoTokens

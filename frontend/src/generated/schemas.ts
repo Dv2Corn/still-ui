@@ -541,6 +541,22 @@ export const SCHEMAS: Record<string, unknown> = {
         "minimum": 1,
         "type": "integer"
       },
+      "subProbeMinAgents": {
+        "example": 0,
+        "maximum": 10,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "subProbeOrder": {
+        "example": "off",
+        "type": "string"
+      },
+      "subProbeStaleMinutes": {
+        "example": 30,
+        "maximum": 1440,
+        "minimum": 5,
+        "type": "integer"
+      },
       "subProfileMode": {
         "type": "string"
       },
@@ -816,6 +832,9 @@ export const SCHEMAS: Record<string, unknown> = {
       "subListen",
       "subPath",
       "subPort",
+      "subProbeMinAgents",
+      "subProbeOrder",
+      "subProbeStaleMinutes",
       "subProfileMode",
       "subProfileUrl",
       "subRoutingRules",
@@ -1417,6 +1436,22 @@ export const SCHEMAS: Record<string, unknown> = {
         "minimum": 1,
         "type": "integer"
       },
+      "subProbeMinAgents": {
+        "example": 0,
+        "maximum": 10,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "subProbeOrder": {
+        "example": "off",
+        "type": "string"
+      },
+      "subProbeStaleMinutes": {
+        "example": 30,
+        "maximum": 1440,
+        "minimum": 5,
+        "type": "integer"
+      },
       "subProfileMode": {
         "type": "string"
       },
@@ -1700,6 +1735,9 @@ export const SCHEMAS: Record<string, unknown> = {
       "subListen",
       "subPath",
       "subPort",
+      "subProbeMinAgents",
+      "subProbeOrder",
+      "subProbeStaleMinutes",
       "subProfileMode",
       "subProfileUrl",
       "subRoutingRules",
@@ -3920,6 +3958,41 @@ export const SCHEMAS: Record<string, unknown> = {
         ],
         "type": "string"
       },
+      "trafficLimitAction": {
+        "example": "notify",
+        "type": "string"
+      },
+      "trafficLimitBytes": {
+        "description": "Per-node traffic quota (master-local billing policy, never pushed to the node).\nTrafficUsed is raw bytes through the node's own inbounds since TrafficPeriodStart.",
+        "example": 0,
+        "format": "int64",
+        "type": "integer"
+      },
+      "trafficLimited": {
+        "type": "boolean"
+      },
+      "trafficMultiplier": {
+        "example": 1,
+        "type": "number"
+      },
+      "trafficPeriodStart": {
+        "example": 0,
+        "format": "int64",
+        "type": "integer"
+      },
+      "trafficResetDay": {
+        "example": 1,
+        "type": "integer"
+      },
+      "trafficUsed": {
+        "example": 0,
+        "format": "int64",
+        "type": "integer"
+      },
+      "trafficWarnPercent": {
+        "example": 80,
+        "type": "integer"
+      },
       "transitive": {
         "type": "boolean"
       },
@@ -3991,11 +4064,159 @@ export const SCHEMAS: Record<string, unknown> = {
       "scheme",
       "status",
       "tlsVerifyMode",
+      "trafficLimitAction",
+      "trafficLimitBytes",
+      "trafficLimited",
+      "trafficMultiplier",
+      "trafficPeriodStart",
+      "trafficResetDay",
+      "trafficUsed",
+      "trafficWarnPercent",
       "updatedAt",
       "uptimeSecs",
       "xrayError",
       "xrayState",
       "xrayVersion"
+    ],
+    "type": "object"
+  },
+  "NodeInviteCreated": {
+    "description": "NodeInviteCreated carries the invitation string, shown once.",
+    "properties": {
+      "invite": {
+        "$ref": "#/components/schemas/NodeInviteView"
+      },
+      "secret": {
+        "example": "still-node1.\u003ctoken\u003e.\u003cpin\u003e.\u003curl\u003e",
+        "type": "string"
+      }
+    },
+    "required": [
+      "invite",
+      "secret"
+    ],
+    "type": "object"
+  },
+  "NodeInviteInput": {
+    "description": "NodeInviteInput is what the admin sets when making an invitation.",
+    "properties": {
+      "address": {
+        "type": "string"
+      },
+      "allowPrivateAddress": {
+        "example": false,
+        "type": "boolean"
+      },
+      "masterUrl": {
+        "description": "MasterUrl is the panel URL nodes reach this master at, as the admin\nopens it in a browser.",
+        "example": "https://panel.example.com:2053/path/",
+        "type": "string"
+      },
+      "name": {
+        "example": "de-fra-1",
+        "type": "string"
+      },
+      "nodeAdmin": {
+        "example": false,
+        "type": "boolean"
+      },
+      "validMinutes": {
+        "example": 30,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "address",
+      "allowPrivateAddress",
+      "masterUrl",
+      "name",
+      "nodeAdmin",
+      "validMinutes"
+    ],
+    "type": "object"
+  },
+  "NodeInviteView": {
+    "description": "NodeInviteView is one invitation as the Nodes page lists it. The token is\nnever part of it.",
+    "properties": {
+      "address": {
+        "type": "string"
+      },
+      "allowPrivateAddress": {
+        "example": false,
+        "type": "boolean"
+      },
+      "attempts": {
+        "example": 0,
+        "type": "integer"
+      },
+      "createdAt": {
+        "example": 1736000000,
+        "format": "int64",
+        "type": "integer"
+      },
+      "expiresAt": {
+        "example": 1736001800,
+        "format": "int64",
+        "type": "integer"
+      },
+      "id": {
+        "example": 3,
+        "type": "integer"
+      },
+      "lastError": {
+        "type": "string"
+      },
+      "masterUrl": {
+        "example": "https://panel.example.com:2053/path/",
+        "type": "string"
+      },
+      "name": {
+        "example": "de-fra-1",
+        "type": "string"
+      },
+      "nodeAdmin": {
+        "example": false,
+        "type": "boolean"
+      },
+      "nodeId": {
+        "example": 0,
+        "type": "integer"
+      },
+      "revokedAt": {
+        "example": 0,
+        "format": "int64",
+        "type": "integer"
+      },
+      "status": {
+        "description": "pending|used|expired|revoked",
+        "example": "pending",
+        "type": "string"
+      },
+      "usedAt": {
+        "example": 0,
+        "format": "int64",
+        "type": "integer"
+      },
+      "usedFromIp": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "address",
+      "allowPrivateAddress",
+      "attempts",
+      "createdAt",
+      "expiresAt",
+      "id",
+      "lastError",
+      "masterUrl",
+      "name",
+      "nodeAdmin",
+      "nodeId",
+      "revokedAt",
+      "status",
+      "usedAt",
+      "usedFromIp"
     ],
     "type": "object"
   },
@@ -4239,6 +4460,42 @@ export const SCHEMAS: Record<string, unknown> = {
         "example": "verify",
         "type": "string"
       },
+      "trafficLimitAction": {
+        "example": "notify",
+        "type": "string"
+      },
+      "trafficLimitBytes": {
+        "description": "Traffic quota: TrafficUsed is raw bytes this period; TrafficNextReset is unix ms.",
+        "example": 1099511627776,
+        "format": "int64",
+        "type": "integer"
+      },
+      "trafficLimited": {
+        "example": false,
+        "type": "boolean"
+      },
+      "trafficMultiplier": {
+        "example": 1,
+        "type": "number"
+      },
+      "trafficNextReset": {
+        "example": 1700000000000,
+        "format": "int64",
+        "type": "integer"
+      },
+      "trafficResetDay": {
+        "example": 1,
+        "type": "integer"
+      },
+      "trafficUsed": {
+        "example": 53687091200,
+        "format": "int64",
+        "type": "integer"
+      },
+      "trafficWarnPercent": {
+        "example": 80,
+        "type": "integer"
+      },
       "transitive": {
         "example": false,
         "type": "boolean"
@@ -4306,6 +4563,14 @@ export const SCHEMAS: Record<string, unknown> = {
       "scheme",
       "status",
       "tlsVerifyMode",
+      "trafficLimitAction",
+      "trafficLimitBytes",
+      "trafficLimited",
+      "trafficMultiplier",
+      "trafficNextReset",
+      "trafficResetDay",
+      "trafficUsed",
+      "trafficWarnPercent",
       "updatedAt",
       "uptimeSecs",
       "xrayError",
@@ -4645,6 +4910,10 @@ export const SCHEMAS: Record<string, unknown> = {
         "example": false,
         "type": "boolean"
       },
+      "subIgnored": {
+        "description": "SubIgnored says why subscriptions do not use this probe now: silent, allFailing or \"\".",
+        "type": "string"
+      },
       "targets": {
         "items": {
           "$ref": "#/components/schemas/ReachTargetView"
@@ -4668,6 +4937,7 @@ export const SCHEMAS: Record<string, unknown> = {
       "lastSeenAt",
       "name",
       "stale",
+      "subIgnored",
       "targets",
       "testUrl"
     ],
@@ -4729,6 +4999,19 @@ export const SCHEMAS: Record<string, unknown> = {
         "example": "ok",
         "type": "string"
       },
+      "subFailAgents": {
+        "example": 2,
+        "type": "integer"
+      },
+      "subNeedAgents": {
+        "example": 2,
+        "type": "integer"
+      },
+      "subState": {
+        "description": "SubState is what subscriptions do with this endpoint: demoted, hidden, unconfirmed or \"\".",
+        "example": "demoted",
+        "type": "string"
+      },
       "uptime7d": {
         "example": 99.4,
         "type": "number"
@@ -4748,6 +5031,9 @@ export const SCHEMAS: Record<string, unknown> = {
       "lastTotalMs",
       "lastTtfbMs",
       "status",
+      "subFailAgents",
+      "subNeedAgents",
+      "subState",
       "uptime7d"
     ],
     "type": "object"

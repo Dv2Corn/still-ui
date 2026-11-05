@@ -11,7 +11,7 @@ export interface InstallOptions {
   webBasePath: string;
 }
 
-const REPO_RAW = 'https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh';
+const INSTALLER_URL = 'https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh';
 // still-ui publishes no container image: Docker builds one from the repository
 // (its Dockerfile pins still-ui's own Xray build) at the chosen release tag.
 const REPO_GIT = 'https://github.com/Dv2Corn/still-ui.git';
@@ -33,9 +33,9 @@ function isLatest(version: string): boolean {
  */
 export function buildScriptCommand(options: InstallOptions): string {
   if (isLatest(options.version)) {
-    return `bash <(curl -Ls ${REPO_RAW})`;
+    return `bash <(curl -Ls ${INSTALLER_URL})`;
   }
-  return `bash <(curl -Ls ${REPO_RAW}) ${options.version.trim()}`;
+  return `bash <(curl -Ls ${INSTALLER_URL}) ${options.version.trim()}`;
 }
 
 /** `docker build` + `docker run` commands reflecting the chosen options. */

@@ -134,6 +134,9 @@ func (j *NodeTrafficSyncJob) Run() {
 	}
 	wg.Wait()
 
+	// After the merges, so a crossing is acted on in the tick that counted it.
+	j.nodeService.EvaluateTrafficLimits(time.Now())
+
 	needRestart, clientsDisabled, err := j.inboundService.AddTraffic(nil, nil)
 	if err != nil {
 		logger.Warning("node traffic sync: depletion check failed:", err)
@@ -348,7 +351,7 @@ func (j *NodeTrafficSyncJob) maybePushGlobals(mgr *runtime.Manager, nodes []*mod
 			defer func() { <-sem }()
 			ctx, cancel := context.WithTimeout(context.Background(), nodeTrafficSyncRequestTimeout)
 			defer cancel()
-			if err := remote.PushGlobalClientTraffics(ctx, masterGuid, traffics); err != nil {
+			if err := remote.PushGlobalClientTraffics(ctx, masterGuid, traffics, service.NodeBillingMultiplier(n)); err != nil {
 				// An old-build node without the endpoint answers 404 — not worth a
 				// warning every cycle.
 				if strings.Contains(err.Error(), "HTTP 404") {

@@ -94,6 +94,10 @@ type ReachTargetView struct {
 	LastBytes        int64   `json:"lastBytes" example:"262144"`
 	Checks7d         int     `json:"checks7d" example:"1008"`
 	Uptime7d         float64 `json:"uptime7d" example:"99.4"`
+	// SubState is what subscriptions do with this endpoint: demoted, hidden, unconfirmed or "".
+	SubState      string `json:"subState" example:"demoted"`
+	SubFailAgents int    `json:"subFailAgents" example:"2"`
+	SubNeedAgents int    `json:"subNeedAgents" example:"2"`
 }
 
 type ReachProbeView struct {
@@ -110,6 +114,8 @@ type ReachProbeView struct {
 	Stale        bool              `json:"stale" example:"false"`
 	CreatedAt    int64             `json:"createdAt" example:"1736000000000"`
 	Targets      []ReachTargetView `json:"targets"`
+	// SubIgnored says why subscriptions do not use this probe now: silent, allFailing or "".
+	SubIgnored string `json:"subIgnored" example:""`
 }
 
 // ReachProbeCreated carries the plaintext token, which is never shown again.
@@ -615,6 +621,11 @@ func (s *ReachProbeService) List() ([]ReachProbeView, error) {
 		}
 		out = append(out, *v)
 	}
+	verdicts, err := s.SubscriptionVerdicts((&SettingService{}).SubProbePolicy())
+	if err != nil {
+		return nil, err
+	}
+	annotateSubscriptionState(out, verdicts)
 	return out, nil
 }
 
@@ -757,16 +768,8 @@ func reachJobTarget(ib *model.Inbound, shareLink string, manyEndpoints bool) (Re
 		return ReachJobTarget{}, false
 	}
 	ob := parsed.Outbound
-	settings, _ := ob["settings"].(map[string]any)
-	address, _ := settings["address"].(string)
-	port := 0
-	switch p := settings["port"].(type) {
-	case int:
-		port = p
-	case float64:
-		port = int(p)
-	}
-	if address == "" || port <= 0 {
+	address, port, ok := link.Endpoint(ob)
+	if !ok {
 		return ReachJobTarget{}, false
 	}
 	endpoint := net.JoinHostPort(address, strconv.Itoa(port))

@@ -225,13 +225,18 @@ class AnalystPostTest(unittest.TestCase):
     def test_a_clean_rendering_posts_the_markdown(self):
         rendered = (
             '<p>Analysis. <a class="issue-link js-issue-link" href="https://github.com/owner/repo/issues/12">#12</a> '
-            '<a class="user-mention notranslate" href="https://github.com/maintainer">@maintainer</a> '
+            '<a class="user-mention notranslate" href="https://github.com/reporter">@reporter</a> '
             f'<a href="https://github.com/owner/repo/commit/{self.GOOD}"><tt>0123456</tt></a> '
             '<a href="#user-content-fn-1">1</a></p>'
         )
         posted, _, out = self.run_step("Analysis.\n<!-- claude-issue:analyst -->\n", None, self.OPEN, [], api=self.API, render=rendered)
         self.assertEqual(posted, f"Analysis.\n<!-- claude-issue:run {RUN_ID} -->\n<!-- claude-issue:analyst -->\n")
         self.assertNotIn("::warning::", out)
+
+    def test_a_rendered_mention_of_anyone_else_posts_plain_text(self):
+        rendered = '<p>Analysis. <a class="user-mention notranslate" href="https://github.com/maintainer">@maintainer</a></p>'
+        posted, _, _ = self.run_step("Analysis.\n<!-- claude-issue:analyst -->\n", None, self.OPEN, [], api=self.API, render=rendered)
+        self.assertTrue(posted.startswith("Links in this reply were removed for safety"), posted)
 
     def test_mentions_and_references_are_neutralised_before_posting(self):
         reply = (

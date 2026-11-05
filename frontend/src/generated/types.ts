@@ -175,6 +175,9 @@ export interface AllSetting {
   subListen: string;
   subPath: string;
   subPort: number;
+  subProbeMinAgents: number;
+  subProbeOrder: string;
+  subProbeStaleMinutes: number;
   subProfileMode: string;
   subProfileUrl: string;
   subRoutingRules: string;
@@ -382,6 +385,9 @@ export interface AllSettingView {
   subListen: string;
   subPath: string;
   subPort: number;
+  subProbeMinAgents: number;
+  subProbeOrder: string;
+  subProbeStaleMinutes: number;
   subProfileMode: string;
   subProfileUrl: string;
   subRoutingRules: string;
@@ -898,6 +904,14 @@ export interface Node {
   scheme: string;
   status: string;
   tlsVerifyMode: string;
+  trafficLimitAction: string;
+  trafficLimitBytes: number;
+  trafficLimited: boolean;
+  trafficMultiplier: number;
+  trafficPeriodStart: number;
+  trafficResetDay: number;
+  trafficUsed: number;
+  trafficWarnPercent: number;
   transitive?: boolean;
   unavailableMetrics?: string[];
   updatedAt: number;
@@ -906,6 +920,38 @@ export interface Node {
   xrayError: string;
   xrayState: string;
   xrayVersion: string;
+}
+
+export interface NodeInviteCreated {
+  invite: NodeInviteView;
+  secret: string;
+}
+
+export interface NodeInviteInput {
+  address: string;
+  allowPrivateAddress: boolean;
+  masterUrl: string;
+  name: string;
+  nodeAdmin: boolean;
+  validMinutes: number;
+}
+
+export interface NodeInviteView {
+  address: string;
+  allowPrivateAddress: boolean;
+  attempts: number;
+  createdAt: number;
+  expiresAt: number;
+  id: number;
+  lastError: string;
+  masterUrl: string;
+  name: string;
+  nodeAdmin: boolean;
+  nodeId: number;
+  revokedAt: number;
+  status: string;
+  usedAt: number;
+  usedFromIp: string;
 }
 
 export interface NodeMutationRequest {
@@ -963,6 +1009,14 @@ export interface NodeView {
   scheme: string;
   status: string;
   tlsVerifyMode: string;
+  trafficLimitAction: string;
+  trafficLimitBytes: number;
+  trafficLimited: boolean;
+  trafficMultiplier: number;
+  trafficNextReset: number;
+  trafficResetDay: number;
+  trafficUsed: number;
+  trafficWarnPercent: number;
   transitive?: boolean;
   unavailableMetrics?: string[];
   updatedAt: number;
@@ -1048,6 +1102,7 @@ export interface ReachProbeView {
   lastSeenAt: number;
   name: string;
   stale: boolean;
+  subIgnored: string;
   targets: ReachTargetView[];
   testUrl: string;
 }
@@ -1066,6 +1121,9 @@ export interface ReachTargetView {
   lastTotalMs: number;
   lastTtfbMs: number;
   status: string;
+  subFailAgents: number;
+  subNeedAgents: number;
+  subState: string;
   uptime7d: number;
 }
 

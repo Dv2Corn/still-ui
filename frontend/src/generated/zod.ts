@@ -197,6 +197,9 @@ export const AllSettingSchema = z.object({
   subListen: z.string(),
   subPath: z.string(),
   subPort: z.number().int().min(1).max(65535),
+  subProbeMinAgents: z.number().int().min(0).max(10),
+  subProbeOrder: z.string(),
+  subProbeStaleMinutes: z.number().int().min(5).max(1440),
   subProfileMode: z.string(),
   subProfileUrl: z.string(),
   subRoutingRules: z.string(),
@@ -405,6 +408,9 @@ export const AllSettingViewSchema = z.object({
   subListen: z.string(),
   subPath: z.string(),
   subPort: z.number().int().min(1).max(65535),
+  subProbeMinAgents: z.number().int().min(0).max(10),
+  subProbeOrder: z.string(),
+  subProbeStaleMinutes: z.number().int().min(5).max(1440),
   subProfileMode: z.string(),
   subProfileUrl: z.string(),
   subRoutingRules: z.string(),
@@ -958,6 +964,14 @@ export const NodeSchema = z.object({
   scheme: z.enum(['http', 'https']),
   status: z.string(),
   tlsVerifyMode: z.enum(['verify', 'skip', 'pin', 'mtls']),
+  trafficLimitAction: z.string(),
+  trafficLimitBytes: z.number().int(),
+  trafficLimited: z.boolean(),
+  trafficMultiplier: z.number(),
+  trafficPeriodStart: z.number().int(),
+  trafficResetDay: z.number().int(),
+  trafficUsed: z.number().int(),
+  trafficWarnPercent: z.number().int(),
   transitive: z.boolean().optional(),
   unavailableMetrics: z.array(z.string()).optional(),
   updatedAt: z.number().int(),
@@ -968,6 +982,41 @@ export const NodeSchema = z.object({
   xrayVersion: z.string(),
 });
 export type Node = z.infer<typeof NodeSchema>;
+
+export const NodeInviteCreatedSchema = z.object({
+  invite: z.lazy(() => NodeInviteViewSchema),
+  secret: z.string(),
+});
+export type NodeInviteCreated = z.infer<typeof NodeInviteCreatedSchema>;
+
+export const NodeInviteInputSchema = z.object({
+  address: z.string(),
+  allowPrivateAddress: z.boolean(),
+  masterUrl: z.string(),
+  name: z.string(),
+  nodeAdmin: z.boolean(),
+  validMinutes: z.number().int(),
+});
+export type NodeInviteInput = z.infer<typeof NodeInviteInputSchema>;
+
+export const NodeInviteViewSchema = z.object({
+  address: z.string(),
+  allowPrivateAddress: z.boolean(),
+  attempts: z.number().int(),
+  createdAt: z.number().int(),
+  expiresAt: z.number().int(),
+  id: z.number().int(),
+  lastError: z.string(),
+  masterUrl: z.string(),
+  name: z.string(),
+  nodeAdmin: z.boolean(),
+  nodeId: z.number().int(),
+  revokedAt: z.number().int(),
+  status: z.string(),
+  usedAt: z.number().int(),
+  usedFromIp: z.string(),
+});
+export type NodeInviteView = z.infer<typeof NodeInviteViewSchema>;
 
 export const NodeMutationRequestSchema = z.object({
   address: z.string(),
@@ -1025,6 +1074,14 @@ export const NodeViewSchema = z.object({
   scheme: z.string(),
   status: z.string(),
   tlsVerifyMode: z.string(),
+  trafficLimitAction: z.string(),
+  trafficLimitBytes: z.number().int(),
+  trafficLimited: z.boolean(),
+  trafficMultiplier: z.number(),
+  trafficNextReset: z.number().int(),
+  trafficResetDay: z.number().int(),
+  trafficUsed: z.number().int(),
+  trafficWarnPercent: z.number().int(),
   transitive: z.boolean().optional(),
   unavailableMetrics: z.array(z.string()).optional(),
   updatedAt: z.number().int(),
@@ -1118,6 +1175,7 @@ export const ReachProbeViewSchema = z.object({
   lastSeenAt: z.number().int(),
   name: z.string(),
   stale: z.boolean(),
+  subIgnored: z.string(),
   targets: z.array(z.lazy(() => ReachTargetViewSchema)),
   testUrl: z.string(),
 });
@@ -1137,6 +1195,9 @@ export const ReachTargetViewSchema = z.object({
   lastTotalMs: z.number().int(),
   lastTtfbMs: z.number().int(),
   status: z.string(),
+  subFailAgents: z.number().int(),
+  subNeedAgents: z.number().int(),
+  subState: z.string(),
   uptime7d: z.number(),
 });
 export type ReachTargetView = z.infer<typeof ReachTargetViewSchema>;

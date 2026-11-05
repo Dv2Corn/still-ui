@@ -1,12 +1,26 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Badge, Button, Card, Dropdown, Modal, Space, Switch, Table, Tag, Tooltip } from 'antd';
+import {
+  Badge,
+  Button,
+  Card,
+  Dropdown,
+  Modal,
+  Progress,
+  Space,
+  Switch,
+  Table,
+  Tag,
+  Tooltip,
+} from 'antd';
 import type { BadgeProps } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
   ApartmentOutlined,
   ClusterOutlined,
   CloudDownloadOutlined,
+  DashboardOutlined,
+  CodeOutlined,
   DeleteOutlined,
   EditOutlined,
   ExclamationCircleOutlined,
@@ -24,6 +38,8 @@ import {
 import NodeHistoryPanel from './NodeHistoryPanel';
 import type { NodeRecord } from '@/api/queries/useNodesQuery';
 import { isPanelUpdateAvailable } from '@/lib/panel-version';
+import { IntlUtil, SizeFormatter } from '@/utils';
+import { trafficPercent } from './nodeTraffic';
 import { activateOnKey } from '@/utils/a11y';
 import './NodeList.css';
 
@@ -35,11 +51,13 @@ interface NodeListProps {
   selectedIds: number[];
   onSelectionChange: (ids: number[]) => void;
   onAdd: () => void;
+  onInvite: () => void;
   onMtls: () => void;
   onEdit: (node: NodeRecord) => void;
   onDelete: (node: NodeRecord) => void;
   onProbe: (node: NodeRecord) => void;
   onToggleEnable: (node: NodeRecord, next: boolean) => void;
+  onTrafficLimit?: (node: NodeRecord) => void;
   onUpdateNode: (node: NodeRecord) => void;
   onUpdateSelected: () => void;
 }
@@ -154,6 +172,53 @@ function formatUptime(secs?: number, available = true): string {
   return `${mins}m`;
 }
 
+function resetDate(ms?: number): string {
+  if (!ms) return '-';
+  return IntlUtil.formatDate(ms).split(/[ ,]+/)[0] || '-';
+}
+
+// The node's traffic this period against its quota; without a limit just the count.
+function NodeTraffic({ node }: { node: NodeRecord }) {
+  const { t } = useTranslation();
+  const used = SizeFormatter.sizeFormat(node.trafficUsed);
+  const limit = node.trafficLimitBytes ?? 0;
+  if (limit <= 0) {
+    return <span className="node-traffic">{t('pages.nodes.trafficNoLimit', { used })}</span>;
+  }
+  const pct = trafficPercent(node);
+  const warnAt = node.trafficWarnPercent ?? 0;
+  const warned = pct < 100 && warnAt > 0 && pct >= warnAt;
+  const date = resetDate(node.trafficNextReset);
+  return (
+    <Tooltip
+      title={
+        node.trafficLimited
+          ? t('pages.nodes.trafficLimitedTip', { date })
+          : t('pages.nodes.trafficNextReset', { date })
+      }
+    >
+      <span className="node-traffic">
+        <span>
+          {t('pages.nodes.trafficUsage', { used, limit: SizeFormatter.sizeFormat(limit) })}
+        </span>
+        {node.trafficLimited && (
+          <Tag color="red" style={{ margin: 0 }}>
+            {t('pages.nodes.trafficLimited')}
+          </Tag>
+        )}
+        <Progress
+          percent={pct}
+          size="small"
+          showInfo={false}
+          status={pct >= 100 ? 'exception' : 'normal'}
+          strokeColor={warned ? 'var(--ant-color-warning)' : undefined}
+          aria-label={t('pages.nodes.traffic')}
+        />
+      </span>
+    </Tooltip>
+  );
+}
+
 // Stable per language: the columns memo depends on it, and a fresh function each
 // render rebuilt every column, re-rendering all rows on each heartbeat push.
 function useRelativeTime() {
@@ -180,11 +245,13 @@ export default function NodeList({
   selectedIds,
   onSelectionChange,
   onAdd,
+  onInvite,
   onMtls,
   onEdit,
   onDelete,
   onProbe,
   onToggleEnable,
+  onTrafficLimit,
   onUpdateNode,
   onUpdateSelected,
 }: NodeListProps) {
@@ -253,7 +320,7 @@ export default function NodeList({
       {
         title: t('pages.nodes.actions'),
         align: 'center',
-        width: 190,
+        width: 220,
         render: (_value, record) =>
           record.transitive ? (
             <Tooltip
@@ -286,6 +353,18 @@ export default function NodeList({
                     icon={<CloudDownloadOutlined aria-hidden />}
                     aria-label={t('pages.nodes.updatePanel')}
                     onClick={() => onUpdateNode(record)}
+                  />
+                </Tooltip>
+              )}
+              {onTrafficLimit && (
+                <Tooltip title={t('pages.nodes.trafficLimit')}>
+                  <Button
+                    type="text"
+                    size="small"
+                    style={{ fontSize: 16 }}
+                    icon={<DashboardOutlined aria-hidden />}
+                    aria-label={t('pages.nodes.trafficLimit')}
+                    onClick={() => onTrafficLimit(record)}
                   />
                 </Tooltip>
               )}
@@ -518,6 +597,18 @@ export default function NodeList({
         ),
       },
       {
+        title: t('pages.nodes.traffic'),
+        dataIndex: 'trafficUsed',
+        align: 'center',
+        width: 170,
+        render: (_value, record) =>
+          record.transitive ? (
+            <span style={{ opacity: 0.4 }}>—</span>
+          ) : (
+            <NodeTraffic node={record} />
+          ),
+      },
+      {
         title: t('pages.nodes.latency'),
         dataIndex: 'latencyMs',
         align: 'center',
@@ -539,6 +630,7 @@ export default function NodeList({
       relativeTime,
       latestVersion,
       onToggleEnable,
+      onTrafficLimit,
       onProbe,
       onEdit,
       onDelete,
@@ -593,6 +685,9 @@ export default function NodeList({
       <div className="toolbar">
         <Button type="primary" icon={<PlusOutlined aria-hidden />} onClick={onAdd}>
           {t('pages.nodes.addNode')}
+        </Button>
+        <Button icon={<CodeOutlined aria-hidden />} onClick={onInvite}>
+          {t('pages.nodes.invite.button')}
         </Button>
         <Button icon={<SafetyCertificateOutlined aria-hidden />} onClick={onMtls}>
           {t('pages.nodes.mtls.title')}
@@ -693,6 +788,20 @@ export default function NodeList({
                                         </>
                                       ),
                                       onClick: () => onUpdateNode(record),
+                                    },
+                                  ]
+                                : []),
+                              ...(onTrafficLimit
+                                ? [
+                                    {
+                                      key: 'traffic',
+                                      label: (
+                                        <>
+                                          <DashboardOutlined aria-hidden />{' '}
+                                          {t('pages.nodes.trafficLimit')}
+                                        </>
+                                      ),
+                                      onClick: () => onTrafficLimit(record),
                                     },
                                   ]
                                 : []),
@@ -863,6 +972,10 @@ export default function NodeList({
                       {statsNode.onlineCount} {t('online')}
                     </Tag>
                   ) : null}
+                </div>
+                <div className="stat-row">
+                  <span className="stat-label">{t('pages.nodes.traffic')}</span>
+                  <NodeTraffic node={statsNode} />
                 </div>
                 <div className="stat-row">
                   <span className="stat-label">{t('pages.nodes.lastHeartbeat')}</span>

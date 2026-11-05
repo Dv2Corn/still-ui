@@ -901,6 +901,21 @@ type Node struct {
 
 	DownNotified bool `json:"-" gorm:"column:down_notified;default:false"`
 
+	// Per-node traffic quota (master-local billing policy, never pushed to the node).
+	// TrafficUsed is raw bytes through the node's own inbounds since TrafficPeriodStart.
+	TrafficLimitBytes  int64   `json:"trafficLimitBytes" gorm:"column:traffic_limit_bytes;default:0" example:"0"`
+	TrafficResetDay    int     `json:"trafficResetDay" gorm:"column:traffic_reset_day;default:1" example:"1"`
+	TrafficWarnPercent int     `json:"trafficWarnPercent" gorm:"column:traffic_warn_percent;default:80" example:"80"`
+	TrafficLimitAction string  `json:"trafficLimitAction" gorm:"column:traffic_limit_action;default:notify" example:"notify"`
+	TrafficMultiplier  float64 `json:"trafficMultiplier" gorm:"column:traffic_multiplier;default:1" example:"1"`
+	TrafficUsed        int64   `json:"trafficUsed" gorm:"column:traffic_used;default:0" example:"0"`
+	TrafficPeriodStart int64   `json:"trafficPeriodStart" gorm:"column:traffic_period_start;default:0" example:"0"`
+	TrafficLimited     bool    `json:"trafficLimited" gorm:"column:traffic_limited;default:false"`
+	// TrafficAlertLevel is the last announced level (0 under, 1 warning, 2 limit), so a
+	// restart does not repeat it; TrafficDisabledInbounds are the ids the limit turned off.
+	TrafficAlertLevel       int   `json:"-" gorm:"column:traffic_alert_level;default:0"`
+	TrafficDisabledInbounds []int `json:"-" gorm:"serializer:json;column:traffic_disabled_inbounds"`
+
 	InboundCount  int `json:"inboundCount" gorm:"-" example:"5"`
 	ClientCount   int `json:"clientCount" gorm:"-" example:"27"`
 	OnlineCount   int `json:"onlineCount" gorm:"-" example:"3"`

@@ -39,12 +39,17 @@ func (s *InboundService) AcceptGlobalTraffic(masterGuid string, traffics []*xray
 
 	return submitTrafficWrite(func() error {
 		db := database.GetDB()
-		known := make([]string, 0, len(emails))
+		// The own counters at this push are the base later traffic is billed from (node billing).
+		type ownCounters struct {
+			Email    string
+			Up, Down int64
+		}
+		var known []ownCounters
 		for _, batch := range chunkStrings(emails, sqlInChunk) {
-			var page []string
+			var page []ownCounters
 			if err := db.Model(xray.ClientTraffic{}).
 				Where("email IN ?", batch).
-				Pluck("email", &page).Error; err != nil {
+				Select("email", "up", "down").Scan(&page).Error; err != nil {
 				return err
 			}
 			known = append(known, page...)
@@ -57,17 +62,19 @@ func (s *InboundService) AcceptGlobalTraffic(masterGuid string, traffics []*xray
 		updatedAt := now.UnixMilli()
 		heartbeatCutoff := now.Add(-globalTrafficHeartbeatInterval).UnixMilli()
 		rows := make([]model.ClientGlobalTraffic, 0, len(known))
-		for _, email := range known {
-			t := byEmail[email]
+		for _, own := range known {
+			t := byEmail[own.Email]
 			if t == nil {
 				continue
 			}
 			rows = append(rows, model.ClientGlobalTraffic{
 				MasterGuid: masterGuid,
-				Email:      email,
+				Email:      own.Email,
 				Up:         t.Up,
 				Down:       t.Down,
 				UpdatedAt:  updatedAt,
+				BaseUp:     &own.Up,
+				BaseDown:   &own.Down,
 			})
 		}
 
@@ -75,14 +82,15 @@ func (s *InboundService) AcceptGlobalTraffic(masterGuid string, traffics []*xray
 			for _, batch := range chunkGlobalRows(rows, 200) {
 				if err := tx.Clauses(clause.OnConflict{
 					Columns:   []clause.Column{{Name: "master_guid"}, {Name: "email"}},
-					DoUpdates: clause.AssignmentColumns([]string{"up", "down", "updated_at"}),
+					DoUpdates: clause.AssignmentColumns([]string{"up", "down", "updated_at", "base_up", "base_down"}),
 					Where: clause.Where{Exprs: []clause.Expression{clause.Expr{
 						SQL: `(client_global_traffics.up IS NULL
 							OR client_global_traffics.up <> excluded.up
 							OR client_global_traffics.down IS NULL
 							OR client_global_traffics.down <> excluded.down
 							OR client_global_traffics.updated_at IS NULL
-							OR client_global_traffics.updated_at <= ?)`,
+							OR client_global_traffics.updated_at <= ?
+							OR client_global_traffics.base_up IS NULL)`,
 						Vars: []any{heartbeatCutoff},
 					}}},
 				}).Create(&batch).Error; err != nil {

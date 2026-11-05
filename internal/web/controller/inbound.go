@@ -407,10 +407,18 @@ func (a *InboundController) pushClientTraffics(c *gin.Context) {
 	var req struct {
 		MasterGuid string          `json:"masterGuid"`
 		Traffics   json.RawMessage `json:"traffics"`
+		// TrafficMultiplier is what the master bills this panel's traffic at (absent: an older master).
+		TrafficMultiplier *float64 `json:"trafficMultiplier"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
 		return
+	}
+	if req.TrafficMultiplier != nil {
+		if err := a.inboundService.SetMasterBillingMultiplier(req.MasterGuid, *req.TrafficMultiplier); err != nil {
+			jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
+			return
+		}
 	}
 	traffics, err := json_util.DecodeCappedList[*xray.ClientTraffic](req.Traffics, maxPushedClientTraffics)
 	if err != nil {

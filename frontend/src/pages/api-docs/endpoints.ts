@@ -398,8 +398,15 @@ export const sections: readonly Section[] = [
             type: 'object[]',
             desc: 'Client traffic rows; only email/up/down are read.',
           },
+          {
+            name: 'trafficMultiplier',
+            in: 'body (json)',
+            type: 'number',
+            optional: true,
+            desc: "The master's billing multiplier for this node (0.1–100), kept per master. For that master's clients the node checks quotas by the master's last pushed count plus its own traffic since that push × this value (the node stores its counters with each push), so quotas hold while the master is unreachable.",
+          },
         ],
-        body: '{\n  "masterGuid": "9f6c2d-…",\n  "traffics": [\n    { "email": "alice", "up": 1048576, "down": 2097152 }\n  ]\n}',
+        body: '{\n  "masterGuid": "9f6c2d-…",\n  "trafficMultiplier": 0.5,\n  "traffics": [\n    { "email": "alice", "up": 1048576, "down": 2097152 }\n  ]\n}',
         response: '{\n  "success": true\n}',
       },
       {
@@ -466,6 +473,14 @@ export const sections: readonly Section[] = [
           'State of "Block torrents for clients": the stored toggle, whether this host can run the nftables filter (Linux with nft), whether its table is loaded, packet counters since it was loaded, and the last apply error if any.',
         response:
           '{\n  "success": true,\n  "obj": {\n    "enabled": true,\n    "supported": true,\n    "nftInstalled": true,\n    "active": true,\n    "counters": {\n      "handshakes": 3,\n      "dht": 61,\n      "trackers": 2,\n      "utp": 276,\n      "learned": 5,\n      "peerDrops": 59811,\n      "tunnelBans": 1\n    }\n  }\n}',
+      },
+      {
+        method: 'GET',
+        path: '/panel/api/server/egressFilter',
+        summary:
+          'State of the egress filter: the stored settings (managedBy is set when a central panel owns them), the TCP ports "server" blocks (panel and SSH), whether the template already blackholes geoip:private, whether this host can run the nftables half and has it loaded, its packet counters, the last apply error, and how far each node is with this panel\'s filter.',
+        response:
+          '{\n  "success": true,\n  "obj": {\n    "settings": {\n      "smtp": true,\n      "mailSubmission": false,\n      "private": true,\n      "server": true,\n      "custom": ["203.0.113.0/24", "6667"],\n      "nodeScope": "all",\n      "nodeIds": null\n    },\n    "host": {\n      "supported": true,\n      "nftInstalled": true,\n      "active": true,\n      "counters": { "mail": 12, "private": 0, "server": 3, "custom": 0 }\n    },\n    "hostNeeded": true,\n    "serverPorts": [22, 2053],\n    "templatePrivateBlocked": true,\n    "nodes": [{ "id": 1, "name": "de-1", "wanted": "apply", "synced": true, "at": 1793750400 }]\n  }\n}',
       },
       {
         method: 'GET',
@@ -665,14 +680,15 @@ export const sections: readonly Section[] = [
       {
         method: 'POST',
         path: '/panel/api/server/installXray/:version',
-        summary:
-          'Download and install the specified Xray version. Pass "latest" for the newest release.',
+        summary: 'Download and install an official Xray release from getXrayVersion.',
+        description:
+          "Replaces still-ui's own Xray build (status xray.stillBuild). Official REALITY 26.9.9 and newer refuses Xray clients with the ios, edge or qq fingerprint, every sing-box client and mihomo without support-x25519mlkem768. The panel's version dialog makes the admin confirm this first; the endpoint itself installs without asking. Run still-ui update on the server to restore the still-ui build.",
         params: [
           {
             name: 'version',
             in: 'path',
             type: 'string',
-            desc: 'Xray tag (e.g. v25.10.31) or "latest".',
+            desc: 'Xray tag from getXrayVersion (e.g. v26.10.31).',
           },
         ],
       },
@@ -721,6 +737,22 @@ export const sections: readonly Section[] = [
           },
         ],
         body: 'enable=true',
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/server/setEgressFilter',
+        summary:
+          'Store this panel\'s egress filter and apply it. Every generated Xray config gets blackhole rules ahead of all others for client inbounds (mail ports, geoip:private unless the template already blocks it, loopback and the panel/SSH ports of this server, custom addresses and ports), and on Linux the nftables table inet still_egress_filter refuses the same for AmneziaWG kernel-mode clients. DNS (port 53) is never blocked. nodeScope "all" or "selected" (with nodeIds) hands the filter to those nodes; nodes leaving the scope get theirs released. Xray is reconciled immediately. Returns the same object as GET /egressFilter; an invalid custom entry is refused.',
+        body: '{\n  "smtp": true,\n  "mailSubmission": false,\n  "private": true,\n  "server": true,\n  "custom": ["203.0.113.0/24", "6667", "1000-2000"],\n  "nodeScope": "selected",\n  "nodeIds": [1, 3]\n}',
+        response:
+          '{\n  "success": true,\n  "obj": {\n    "settings": {\n      "smtp": true,\n      "mailSubmission": false,\n      "private": true,\n      "server": true,\n      "custom": ["203.0.113.0/24", "6667"],\n      "nodeScope": "all",\n      "nodeIds": null\n    },\n    "host": {\n      "supported": true,\n      "nftInstalled": true,\n      "active": true,\n      "counters": { "mail": 12, "private": 0, "server": 3, "custom": 0 }\n    },\n    "hostNeeded": true,\n    "serverPorts": [22, 2053],\n    "templatePrivateBlocked": true,\n    "nodes": [{ "id": 1, "name": "de-1", "wanted": "apply", "synced": true, "at": 1793750400 }]\n  }\n}',
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/server/applyManagedEgressFilter',
+        summary:
+          "Node side of the egress filter: a central panel sets this node's filter (stored as managed by its panelGuid) or, with release=true, gives up ownership and leaves the current filter in place as the node's own. Allowed for node-sync tokens. serverAddress is the address the central panel reaches the node at; if it is an IP literal and this panel owns the filter, the server block covers it too (it may be a NAT address on no interface). A release or push from a panel that does not own the filter changes nothing. Xray is reconciled when the filter or that address changed. Returns the same object as GET /egressFilter.",
+        body: '{\n  "filter": { "smtp": true, "private": true, "custom": [] },\n  "managedBy": "4b1c0f6e-2f6d-4c55-9a1e-0f3d7c2a9b10",\n  "serverAddress": "203.0.113.9"\n}',
       },
       {
         method: 'POST',
@@ -1762,6 +1794,28 @@ export const sections: readonly Section[] = [
       },
       {
         method: 'GET',
+        path: '/panel/api/nodes/invites',
+        summary:
+          'List node invitations (Nodes → Add with a command), newest first, with their status (pending, used, expired, revoked) and the audit of who used them. Tokens are never listed; invitations spent more than 30 days ago are dropped.',
+        responseSchema: 'NodeInviteView',
+        responseSchemaArray: true,
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/nodes/invites/create',
+        summary:
+          "Make a one-time node invitation. The panel reads its own TLS public key at masterUrl (https only) and puts its SHA-256 in the invitation, so the new node can verify this master even with a self-signed certificate. The secret is in this answer only; the panel stores the token's SHA-256. The node runs `install.sh node-enroll` with it and calls enroll/v1/node under the panel base path, which is the only route the token opens. validMinutes is 5-1440 (default 30); at most 20 invitations may be pending.",
+        body: '{\n  "name": "de-fra-1",\n  "address": "",\n  "allowPrivateAddress": false,\n  "nodeAdmin": false,\n  "validMinutes": 30,\n  "masterUrl": "https://panel.example.com:2053/path/"\n}',
+        responseSchema: 'NodeInviteCreated',
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/nodes/invites/revoke/:id',
+        summary: 'Revoke an unused node invitation: its token stops working at once.',
+        params: [{ name: 'id', in: 'path', type: 'number', desc: 'Invitation ID.' }],
+      },
+      {
+        method: 'GET',
         path: '/panel/api/nodes/get/:id',
         summary: 'Fetch a single node by ID.',
         params: [{ name: 'id', in: 'path', type: 'number', desc: 'Node ID.' }],
@@ -1804,6 +1858,14 @@ export const sections: readonly Section[] = [
         summary: 'Pause or resume traffic sync with this node.',
         params: [{ name: 'id', in: 'path', type: 'number', desc: 'Node ID.' }],
         body: '{\n  "enable": true\n}',
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/nodes/trafficLimit/:id',
+        summary:
+          "Set a node's monthly traffic limit and accounting multiplier. trafficLimitBytes 0 means no limit; usage counts the node's own inbound traffic and resets at midnight on trafficResetDay (1-31, clamped to the month's last day). trafficWarnPercent (0 = off) sends a Telegram alert once per period. trafficLimitAction is notify or disable (turns the node's inbounds off until the reset). trafficMultiplier (0.1-100) scales the node's traffic added to client totals; the node's own counter stays raw. A change applies to traffic from that moment on; the master also sends it to the node, which bills its traffic since the master's last count at it, so quotas hold while the master is unreachable.",
+        params: [{ name: 'id', in: 'path', type: 'number', desc: 'Node ID.' }],
+        body: '{\n  "trafficLimitBytes": 1099511627776,\n  "trafficResetDay": 1,\n  "trafficWarnPercent": 80,\n  "trafficLimitAction": "notify",\n  "trafficMultiplier": 1\n}',
       },
       {
         method: 'POST',

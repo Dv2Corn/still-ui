@@ -145,7 +145,10 @@ type process struct {
 	done chan struct{}
 
 	version string
-	apiPort int
+	// stillBuild is true when the binary's `-version` line names the still-ui
+	// build (StillBuildName); the panel warns before replacing it.
+	stillBuild bool
+	apiPort    int
 
 	// onlineClients is the set of emails active on THIS panel's own xray
 	// within the online grace window. It is derived only from local xray
@@ -323,6 +326,14 @@ func (p *process) GetXrayVersion() string {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return p.version
+}
+
+// IsStillBuild reports whether the core's `-version` line names the still-ui
+// build rather than an official Xray release.
+func (p *process) IsStillBuild() bool {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.stillBuild
 }
 
 // GetAPIPort returns the API port used by the Xray process.
@@ -688,19 +699,37 @@ func CheckConfig(binaryPath string, cfg *Config) error {
 	return nil
 }
 
+// StillBuildName is the core.build name scripts/xray-build/build.sh links in; it is part of
+// the pinned binary sums, so it cannot change without a new build.
+const StillBuildName = "sp-ios"
+
+// parseXrayVersion reads "Xray 26.10.31 (Xray, Penetrates Everything.) sp-ios (go…)" into the
+// version and whether the build name after the codename is StillBuildName.
+func parseXrayVersion(data []byte) (version string, stillBuild bool) {
+	version = "Unknown"
+	line, _, _ := bytes.Cut(data, []byte("\n"))
+	if datas := bytes.Split(line, []byte(" ")); len(datas) > 1 {
+		version = string(datas[1])
+	}
+	if _, rest, ok := bytes.Cut(line, []byte(") ")); ok {
+		build, _, _ := bytes.Cut(rest, []byte(" "))
+		stillBuild = string(build) == StillBuildName
+	}
+	return version, stillBuild
+}
+
 // refreshVersion updates the version string by running the Xray binary with -version.
 func (p *process) refreshVersion() {
-	version := "Unknown"
+	version, stillBuild := "Unknown", false
 	ctx, cancel := context.WithTimeout(context.Background(), xrayVersionTimeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, GetBinaryPath(), "-version")
 	if data, err := cmd.Output(); err == nil {
-		if datas := bytes.Split(data, []byte(" ")); len(datas) > 1 {
-			version = string(datas[1])
-		}
+		version, stillBuild = parseXrayVersion(data)
 	}
 	p.mu.Lock()
 	p.version = version
+	p.stillBuild = stillBuild
 	p.mu.Unlock()
 }
 

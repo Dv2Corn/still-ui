@@ -39,6 +39,42 @@ and emitting `node.up` / `node.down` events (see the
   those as read-only **transitive** sub-nodes (Node 1 → Node 2 → Node 3).
 </Callout>
 
+### Add a node with one command
+
+**Nodes → Add with a command** makes a one-time invitation and shows one
+command to run as root on the new server:
+
+```bash
+STILL_NODE_INVITE='still-node1.…' bash <(curl -fsSL https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh) node-enroll
+```
+
+The command asks the master whether the invitation is valid, installs the
+latest still-ui release (its archive checksum is verified), gives the new
+panel a self-signed certificate when it has none, issues an API token on it
+(`node-sync`, or `node-admin` with **Allow panel updates**) and registers the
+node. The master checks it can reach the node with that token before adding
+it, pins the node's certificate (or verifies it when the system trusts it),
+and the invitation stops working.
+
+- **Security.** The invitation carries the SHA-256 of the master's TLS public
+  key, so the new server talks only to this master, even when the master's
+  certificate is self-signed. The invitation is single use, valid 30 minutes
+  by default (5 minutes to 24 hours), stored only as a hash, revocable, and
+  opens nothing but the enrollment route; repeated wrong tokens from one
+  address are refused for 10 minutes.
+- **Secret.** Pass the invitation in `STILL_NODE_INVITE` or on standard input,
+  never as an argument: other users can read a command line. The command is
+  shown once; copy it before closing the dialog.
+- **Address.** Leave the address empty to use the one the server connects
+  from, or set it (also `STILL_NODE_ADDRESS`) when the master reaches the node
+  elsewhere. A private address needs **Allow private address**.
+- **Audit.** The dialog lists every invitation with its status, when and from
+  where it was used and the node it created; used ones stay for 30 days.
+- To cut a node off, delete its `master-enroll-…` API token on the node.
+
+On a server where still-ui is already installed, the panel binary does the
+same: `STILL_NODE_INVITE=… /usr/local/still-ui/x-ui node-enroll`.
+
 ### Mutual TLS (mTLS) between master and node
 
 For the strongest trust, use `tlsVerifyMode = mtls` (requires `https`):

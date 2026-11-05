@@ -164,6 +164,9 @@ export const EXAMPLES: Record<string, unknown> = {
     "subListen": "",
     "subPath": "",
     "subPort": 1,
+    "subProbeMinAgents": 0,
+    "subProbeOrder": "off",
+    "subProbeStaleMinutes": 30,
     "subProfileMode": "",
     "subProfileUrl": "",
     "subRoutingRules": "",
@@ -370,6 +373,9 @@ export const EXAMPLES: Record<string, unknown> = {
     "subListen": "",
     "subPath": "",
     "subPort": 1,
+    "subProbeMinAgents": 0,
+    "subProbeOrder": "off",
+    "subProbeStaleMinutes": 30,
     "subProfileMode": "",
     "subProfileUrl": "",
     "subRoutingRules": "",
@@ -987,6 +993,14 @@ export const EXAMPLES: Record<string, unknown> = {
     "scheme": "https",
     "status": "online",
     "tlsVerifyMode": "verify",
+    "trafficLimitAction": "notify",
+    "trafficLimitBytes": 0,
+    "trafficLimited": false,
+    "trafficMultiplier": 1,
+    "trafficPeriodStart": 0,
+    "trafficResetDay": 1,
+    "trafficUsed": 0,
+    "trafficWarnPercent": 80,
     "transitive": false,
     "unavailableMetrics": [
       ""
@@ -997,6 +1011,51 @@ export const EXAMPLES: Record<string, unknown> = {
     "xrayError": "",
     "xrayState": "",
     "xrayVersion": "25.10.31"
+  },
+  "NodeInviteCreated": {
+    "invite": {
+      "address": "",
+      "allowPrivateAddress": false,
+      "attempts": 0,
+      "createdAt": 1736000000,
+      "expiresAt": 1736001800,
+      "id": 3,
+      "lastError": "",
+      "masterUrl": "https://panel.example.com:2053/path/",
+      "name": "de-fra-1",
+      "nodeAdmin": false,
+      "nodeId": 0,
+      "revokedAt": 0,
+      "status": "pending",
+      "usedAt": 0,
+      "usedFromIp": ""
+    },
+    "secret": "still-node1.\u003ctoken\u003e.\u003cpin\u003e.\u003curl\u003e"
+  },
+  "NodeInviteInput": {
+    "address": "",
+    "allowPrivateAddress": false,
+    "masterUrl": "https://panel.example.com:2053/path/",
+    "name": "de-fra-1",
+    "nodeAdmin": false,
+    "validMinutes": 30
+  },
+  "NodeInviteView": {
+    "address": "",
+    "allowPrivateAddress": false,
+    "attempts": 0,
+    "createdAt": 1736000000,
+    "expiresAt": 1736001800,
+    "id": 3,
+    "lastError": "",
+    "masterUrl": "https://panel.example.com:2053/path/",
+    "name": "de-fra-1",
+    "nodeAdmin": false,
+    "nodeId": 0,
+    "revokedAt": 0,
+    "status": "pending",
+    "usedAt": 0,
+    "usedFromIp": ""
   },
   "NodeMutationRequest": {
     "address": "",
@@ -1056,6 +1115,14 @@ export const EXAMPLES: Record<string, unknown> = {
     "scheme": "https",
     "status": "online",
     "tlsVerifyMode": "verify",
+    "trafficLimitAction": "notify",
+    "trafficLimitBytes": 1099511627776,
+    "trafficLimited": false,
+    "trafficMultiplier": 1,
+    "trafficNextReset": 1700000000000,
+    "trafficResetDay": 1,
+    "trafficUsed": 53687091200,
+    "trafficWarnPercent": 80,
     "transitive": false,
     "unavailableMetrics": [
       ""
@@ -1129,6 +1196,7 @@ export const EXAMPLES: Record<string, unknown> = {
       "lastSeenAt": 1736000000000,
       "name": "home-mobile",
       "stale": false,
+      "subIgnored": "",
       "targets": [
         {
           "changedAt": 1736000000000,
@@ -1144,6 +1212,9 @@ export const EXAMPLES: Record<string, unknown> = {
           "lastTotalMs": 950,
           "lastTtfbMs": 180,
           "status": "ok",
+          "subFailAgents": 2,
+          "subNeedAgents": 2,
+          "subState": "demoted",
           "uptime7d": 99.4
         }
       ],
@@ -1177,6 +1248,7 @@ export const EXAMPLES: Record<string, unknown> = {
     "lastSeenAt": 1736000000000,
     "name": "home-mobile",
     "stale": false,
+    "subIgnored": "",
     "targets": [
       {
         "changedAt": 1736000000000,
@@ -1192,6 +1264,9 @@ export const EXAMPLES: Record<string, unknown> = {
         "lastTotalMs": 950,
         "lastTtfbMs": 180,
         "status": "ok",
+        "subFailAgents": 2,
+        "subNeedAgents": 2,
+        "subState": "demoted",
         "uptime7d": 99.4
       }
     ],
@@ -1211,6 +1286,9 @@ export const EXAMPLES: Record<string, unknown> = {
     "lastTotalMs": 950,
     "lastTtfbMs": 180,
     "status": "ok",
+    "subFailAgents": 2,
+    "subNeedAgents": 2,
+    "subState": "demoted",
     "uptime7d": 99.4
   },
   "Readiness": {

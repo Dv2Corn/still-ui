@@ -188,6 +188,16 @@ func (s *XrayService) GetXrayVersion() string {
 	return process.GetXrayVersion()
 }
 
+// IsStillXrayBuild reports whether the local core is still-ui's own Xray build
+// (scripts/xray-build) rather than an official release.
+func (s *XrayService) IsStillXrayBuild() bool {
+	process := currentXrayProcess()
+	if process == nil {
+		return false
+	}
+	return process.IsStillBuild()
+}
+
 // RemoveIndex removes an element at the specified index from a slice.
 // Returns a new slice with the element removed.
 func RemoveIndex(s []any, index int) []any {
@@ -532,6 +542,12 @@ func (s *XrayService) GetXrayConfig() (*xray.Config, error) {
 		logger.Warning("read nodes for egress injection failed:", err)
 	} else {
 		injectNodeEgresses(xrayConfig, nodes)
+	}
+
+	// Before the torrent rule, which then still comes first; both only blackhole.
+	egress := &EgressFilterService{settingService: s.settingService, inboundService: s.inboundService}
+	if f, own := egress.xrayInputs(); f.Any() {
+		injectEgressFilter(xrayConfig, egressClientTags(xrayConfig, inbounds), f, own)
 	}
 
 	if (&TorrentBlockService{settingService: s.settingService}).Enabled() {

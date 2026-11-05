@@ -134,6 +134,7 @@ systemd-detect-virt() { log_call "systemd-detect-virt $*"; [[ "${IN_CONTAINER:-0
 rc-service() { log_call "rc-service $*"; }
 rc-update() { log_call "rc-update $*"; }
 pkill() { log_call "pkill $*"; return 0; }
+nft() { log_call "nft $*"; }
 # install(1) without the ownership flags: the tests do not run as root.
 install() {
     local args=()
@@ -920,6 +921,7 @@ program_gone() {
     called "systemctl disable --now still-xray"
     called "userdel still-xray"
     called "systemctl daemon-reload"
+    called "nft delete table inet still_egress_filter"
     local p
     for p in "$xui_service/still-ui.service" "$xui_service/still-ui.service.d" "$xui_service/still-xray.service" \
         "$xui_service/still-xray.service.d" "$R/etc/still-xray" "$R/var/log/still-xray" "$xui_folder" "$R/usr/bin/still-ui"; do

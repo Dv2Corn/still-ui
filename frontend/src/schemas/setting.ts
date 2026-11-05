@@ -13,6 +13,9 @@ export type SubHostSortMode = z.infer<typeof SubHostSortModeSchema>;
 export const SubClashAutoGroupTypeSchema = z.enum(['url-test', 'fallback']);
 export type SubClashAutoGroupType = z.infer<typeof SubClashAutoGroupTypeSchema>;
 
+export const SubProbeOrderSchema = z.enum(['off', 'reorder', 'hide']);
+export type SubProbeOrder = z.infer<typeof SubProbeOrderSchema>;
+
 export const AllSettingSchema = z
   .object({
     webListen: z.string().optional(),
@@ -33,6 +36,9 @@ export const AllSettingSchema = z
     subShowIdentityOnAllLinks: z.boolean().optional(),
     subInfoNodeEnable: z.boolean().optional(),
     subHostSortMode: SubHostSortModeSchema.optional(),
+    subProbeOrder: SubProbeOrderSchema.optional(),
+    subProbeMinAgents: z.number().int().min(0).max(10).optional(),
+    subProbeStaleMinutes: z.number().int().min(5).max(1440).optional(),
     subCalendarExpireInclusive: z.boolean().optional(),
     subExpiredTemplate: z.string().optional(),
     subTrafficDepletedTemplate: z.string().optional(),

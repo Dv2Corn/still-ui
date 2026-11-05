@@ -516,7 +516,11 @@ func (s *InboundService) setRemoteTrafficLocked(nodeID int, snap *runtime.Traffi
 	// origin (an inbound the node forwards from its own sub-node) is kept as-is,
 	// so a chained Node1->Node2->Node3 still attributes Node3's inbounds to Node3.
 	var nodeRow model.Node
-	db.Select("guid", "config_dirty", "inbound_sync_mode", "inbound_tags").Where("id = ?", nodeID).First(&nodeRow)
+	db.Select("guid", "config_dirty", "inbound_sync_mode", "inbound_tags", "traffic_multiplier").Where("id = ?", nodeID).First(&nodeRow)
+	// Applied where node traffic enters client totals; baselines and the node's own
+	// usage stay raw, so a retried snapshot (delta 0) bills nothing twice.
+	billing := effectiveTrafficMultiplier(nodeRow.TrafficMultiplier)
+	var nodeOwnUsed int64
 	// Re-read inside the serialized writer: a client added while this snapshot
 	// was in flight marks the node dirty after the caller sampled the flag.
 	dirty = dirty || nodeRow.ConfigDirty
@@ -1066,6 +1070,19 @@ func (s *InboundService) setRemoteTrafficLocked(nodeID int, snap *runtime.Traffi
 		var snapExpiries map[string]int64
 		attachedOnNode, membershipKnown := snapshotAttachedEmails(snapIb.Settings)
 		usageOnly := claims.usageOnlyIn(rawSettings[snapIb])
+		ownInbound := originGuidFor(snapIb) == selfKey
+		// advanceBaseline is the one place a node counter is consumed, so the node's own
+		// usage grows exactly by what the stored baseline moves past.
+		advanceBaseline := func(email string, canon nodeTrafficCounter) error {
+			if base, seen := nodeBaselines[email]; seen && ownInbound {
+				nodeOwnUsed = addTrafficClamped(addTrafficClamped(nodeOwnUsed, canon.Up-base.Up), canon.Down-base.Down)
+			}
+			if err := s.upsertNodeBaseline(tx, nodeID, email, canon.Up, canon.Down); err != nil {
+				return err
+			}
+			nodeBaselines[email] = canon
+			return nil
+		}
 		if membershipKnown {
 			maps.Copy(attachedOnNode, usageOnly)
 		}
@@ -1094,6 +1111,14 @@ func (s *InboundService) setRemoteTrafficLocked(nodeID int, snap *runtime.Traffi
 					deltaDown = 0
 				}
 			}
+			deltaUp, deltaDown = scaleNodeTraffic(deltaUp, billing), scaleNodeTraffic(deltaDown, billing)
+			// Off ×1 a node's disable latches only on this master's own billed count: its
+			// counter × today's multiplier would re-bill traffic from before a change.
+			latchCanon := canon
+			if billing != 1 {
+				latchCanon = nodeTrafficCounter{}
+			}
+			latchUsed := latchCanon.Up + latchCanon.Down
 
 			if _, rowExists := statByEmail[cs.Email]; !rowExists {
 				if dirty {
@@ -1110,7 +1135,7 @@ func (s *InboundService) setRemoteTrafficLocked(nodeID int, snap *runtime.Traffi
 				}
 				var seedUp, seedDown int64
 				if isNewInbound && !isClientEmailTombstoned(cs.Email) {
-					seedUp, seedDown = canon.Up, canon.Down
+					seedUp, seedDown = scaleNodeTraffic(canon.Up, billing), scaleNodeTraffic(canon.Down, billing)
 				}
 				row := &xray.ClientTraffic{
 					InboundId:    c.Id,
@@ -1135,10 +1160,9 @@ func (s *InboundService) setRemoteTrafficLocked(nodeID int, snap *runtime.Traffi
 				centralCSByEmail[cs.Email] = row
 				statByEmail[cs.Email] = row
 				structuralChange = true
-				if err := s.upsertNodeBaseline(tx, nodeID, cs.Email, canon.Up, canon.Down); err != nil {
+				if err := advanceBaseline(cs.Email, canon); err != nil {
 					return false, err
 				}
-				nodeBaselines[cs.Email] = nodeTrafficCounter{Up: canon.Up, Down: canon.Down}
 				continue
 			}
 
@@ -1148,7 +1172,7 @@ func (s *InboundService) setRemoteTrafficLocked(nodeID int, snap *runtime.Traffi
 				// Only a real latch to disabled is structural; one-way merge never
 				// re-enables from the node.
 				enableChanged := !clientFrozen && existing.Enable && !cs.Enable &&
-					!nodeDisableIsStale(existing, canon.Up+canon.Down, now, deltaUp, deltaDown)
+					!nodeDisableIsStale(existing, latchUsed, now, deltaUp, deltaDown)
 				metaChanged := !clientFrozen && (existing.Total != cs.Total || existing.Reset != cs.Reset || existing.ResetWeekday != cs.ResetWeekday)
 				if enableChanged || metaChanged || expiryChanged {
 					structuralChange = true
@@ -1169,6 +1193,7 @@ func (s *InboundService) setRemoteTrafficLocked(nodeID int, snap *runtime.Traffi
 			if renewed {
 				// A renewal starts a fresh quota window: adopt the node's counters
 				// and enable state, drop stale pushes (mirrors autoRenewClients).
+				billedUp, billedDown := scaleNodeTraffic(canon.Up, billing), scaleNodeTraffic(canon.Down, billing)
 				if err := tx.Exec(
 					fmt.Sprintf(
 						`UPDATE client_traffics
@@ -1177,7 +1202,7 @@ func (s *InboundService) setRemoteTrafficLocked(nodeID int, snap *runtime.Traffi
 						 WHERE email = ?`,
 						database.GreatestExpr("last_online", "?"),
 					),
-					canon.Up, canon.Down, cs.Enable, cs.Total,
+					billedUp, billedDown, cs.Enable, cs.Total,
 					cs.ExpiryTime, cs.Reset, cs.ResetDay, cs.ResetWeekday, cs.ResetCount,
 					cs.LastOnline, cs.Email,
 				).Error; err != nil {
@@ -1186,8 +1211,8 @@ func (s *InboundService) setRemoteTrafficLocked(nodeID int, snap *runtime.Traffi
 				if err := clearGlobalTraffic(tx, cs.Email); err != nil {
 					return false, err
 				}
-				existing.Up = canon.Up
-				existing.Down = canon.Down
+				existing.Up = billedUp
+				existing.Down = billedDown
 				existing.Enable = cs.Enable
 				existing.Total = cs.Total
 				existing.ExpiryTime = cs.ExpiryTime
@@ -1206,7 +1231,7 @@ func (s *InboundService) setRemoteTrafficLocked(nodeID int, snap *runtime.Traffi
 				next.Down = clampTrafficCounter(row.Down + deltaDown)
 				next.LastOnline = max(row.LastOnline, cs.LastOnline)
 				if !clientFrozen {
-					if !cs.Enable && !nodeDisableIsStale(row, canon.Up+canon.Down, now, deltaUp, deltaDown) {
+					if !cs.Enable && !nodeDisableIsStale(row, latchUsed, now, deltaUp, deltaDown) {
 						next.Enable = false
 					}
 					next.ExpiryTime = mergeActivationExpiry(row.ExpiryTime, cs.ExpiryTime)
@@ -1216,7 +1241,7 @@ func (s *InboundService) setRemoteTrafficLocked(nodeID int, snap *runtime.Traffi
 				// A multi-attached client is reported once per inbound and an idle one
 				// every tick: rewriting an unchanged row only holds its lock longer.
 				if next != *row {
-					if err := s.mergeNodeClientTraffic(tx, cs, canon, clientFrozen, deltaUp, deltaDown, now); err != nil {
+					if err := s.mergeNodeClientTraffic(tx, cs, latchCanon, clientFrozen, deltaUp, deltaDown, now); err != nil {
 						return false, err
 					}
 					*row = next
@@ -1230,10 +1255,9 @@ func (s *InboundService) setRemoteTrafficLocked(nodeID int, snap *runtime.Traffi
 			if seen && base == canon {
 				continue
 			}
-			if err := s.upsertNodeBaseline(tx, nodeID, cs.Email, canon.Up, canon.Down); err != nil {
+			if err := advanceBaseline(cs.Email, canon); err != nil {
 				return false, err
 			}
-			nodeBaselines[cs.Email] = nodeTrafficCounter{Up: canon.Up, Down: canon.Down}
 		}
 
 		for k, existing := range centralCS {
@@ -1442,6 +1466,15 @@ func (s *InboundService) setRemoteTrafficLocked(nodeID int, snap *runtime.Traffi
 
 	if err := liftActivatedClientRecordExpiries(tx); err != nil {
 		logger.Warning("setRemoteTraffic: lift activated expiries failed:", err)
+	}
+
+	if nodeOwnUsed > 0 {
+		if err := tx.Exec(
+			fmt.Sprintf("UPDATE nodes SET traffic_used = %s WHERE id = ?", database.ClampedAddExpr("traffic_used")),
+			nodeOwnUsed, nodeID,
+		).Error; err != nil {
+			return false, err
+		}
 	}
 
 	if err := tx.Commit().Error; err != nil {

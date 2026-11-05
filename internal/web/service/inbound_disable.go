@@ -99,9 +99,9 @@ func depletedCond(tx *gorm.DB) (string, []any) {
 		Where("updated_at >= ?", freshSince).
 		Limit(1).Count(&probe).Error
 	if err == nil && probe > 0 {
-		return depletedClientsCond, []any{now.UnixMilli(), freshSince}
+		return withBilledQuota(tx, depletedClientsCond, []any{now.UnixMilli(), freshSince})
 	}
-	return depletedClientsCondLocal, []any{now.UnixMilli()}
+	return withBilledQuota(tx, depletedClientsCondLocal, []any{now.UnixMilli()})
 }
 
 func (s *InboundService) disableInvalidClients(tx *gorm.DB, mutationBatch *trafficMutationBatch) (bool, int64, []int, error) {
@@ -326,8 +326,9 @@ func lifecycleDisabledEmails(tx *gorm.DB, rows []xray.ClientTraffic) (map[string
 	if err != nil {
 		return nil, err
 	}
-	// Cross-panel usage depletes too (depletedClientsCond); the overlay raises
-	// the counters in place, so callers hand it copies.
+	// Own counters in billed bytes, then cross-panel usage (depletedClientsCond); both
+	// rewrite the rows in place, so callers hand it copies.
+	billedUsage(tx, rows)
 	overlayGlobalTrafficValues(tx, rows)
 	disabled := make(map[string]struct{}, len(rows))
 	for i := range rows {

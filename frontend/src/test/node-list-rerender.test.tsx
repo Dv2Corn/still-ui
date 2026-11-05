@@ -49,6 +49,7 @@ describe('NodeList re-render', () => {
       selectedIds: [] as number[],
       onSelectionChange: noop,
       onAdd: noop,
+      onInvite: noop,
       onMtls: noop,
       onEdit: noop,
       onDelete: noop,

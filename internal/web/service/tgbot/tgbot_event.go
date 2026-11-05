@@ -213,6 +213,9 @@ var healthAlertKeys = map[eventbus.EventType][2]string{
 // healthAlertMessage picks the message and its icon: the problem, or its fix; a certificate
 // already past its date says "expired" rather than "expires in -1 days".
 func healthAlertMessage(eventType eventbus.EventType, data *eventbus.HealthAlertData) (key, icon string) {
+	if eventType == eventbus.EventNodeTraffic && data != nil {
+		return nodeTrafficAlertMessage(data)
+	}
 	keys, ok := healthAlertKeys[eventType]
 	if !ok || data == nil {
 		return "", ""
@@ -224,6 +227,20 @@ func healthAlertMessage(eventType eventbus.EventType, data *eventbus.HealthAlert
 		return "alertCertExpired", "🔴 "
 	}
 	return keys[0], "🔴 "
+}
+
+// nodeTrafficAlertMessage has three problem wordings: nearing the limit, at it, and at
+// it with the node's inbounds turned off until the reset.
+func nodeTrafficAlertMessage(data *eventbus.HealthAlertData) (key, icon string) {
+	switch {
+	case data.Phase == "resolved":
+		return "alertNodeTrafficBack", "🟢 "
+	case data.Params["Level"] == "warn":
+		return "alertNodeTrafficWarn", "⚠️ "
+	case data.Params["Action"] == "disable":
+		return "alertNodeTrafficLimitOff", "🔴 "
+	}
+	return "alertNodeTrafficLimit", "🔴 "
 }
 
 // formatHealthAlert renders one health alert in the bot's language.

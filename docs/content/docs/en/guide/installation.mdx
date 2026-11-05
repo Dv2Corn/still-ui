@@ -23,13 +23,13 @@ The official script is the recommended path. During installation it generates a
 and installs the `x-ui` management command.
 
 ```bash title="latest stable"
-bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh)
+bash <(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh)
 ```
 
 Install a **specific version** by appending its tag:
 
 ```bash title="pinned version"
-bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh) v1.5.0
+bash <(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh) v1.5.0
 ```
 
 When it finishes, note the printed login details and run `x-ui` to open the
@@ -100,7 +100,7 @@ prompts, generating random credentials and writing them to
 `/etc/still-ui/install-result.env`:
 
 ```bash
-XUI_NONINTERACTIVE=1 bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh)
+XUI_NONINTERACTIVE=1 bash <(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh)
 ```
 
 The repo's [`deploy/`](https://github.com/Dv2Corn/still-ui/tree/main/deploy)

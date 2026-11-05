@@ -22,6 +22,14 @@ export interface RemoteInboundOption {
   port?: number;
 }
 
+export interface NodeTrafficLimitPayload {
+  trafficLimitBytes: number;
+  trafficResetDay: number;
+  trafficWarnPercent: number;
+  trafficLimitAction: 'notify' | 'disable';
+  trafficMultiplier: number;
+}
+
 export function useNodeMutations() {
   const queryClient = useQueryClient();
   const invalidate = () => {
@@ -69,6 +77,16 @@ export function useNodeMutations() {
     },
   });
 
+  const trafficLimitMut = useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: NodeTrafficLimitPayload }) =>
+      HttpUtil.post(`/panel/api/nodes/trafficLimit/${id}`, payload, {
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    onSuccess: (msg) => {
+      if (msg?.success) invalidate();
+    },
+  });
+
   const updatePanelsMut = useMutation({
     mutationFn: ({ ids, dev }: { ids: number[]; dev: boolean }) =>
       HttpUtil.post<NodeUpdateResult[]>(
@@ -88,6 +106,8 @@ export function useNodeMutations() {
     update: (id: number, payload: Partial<NodeRecord>) => updateMut.mutateAsync({ id, payload }),
     remove: (id: number) => removeMut.mutateAsync(id),
     setEnable: (id: number, enable: boolean) => setEnableMut.mutateAsync({ id, enable }),
+    setTrafficLimit: (id: number, payload: NodeTrafficLimitPayload) =>
+      trafficLimitMut.mutateAsync({ id, payload }),
     probe: (id: number) => probeMut.mutateAsync(id),
     updatePanels: (ids: number[], dev: boolean): Promise<Msg<NodeUpdateResult[]>> =>
       updatePanelsMut.mutateAsync({ ids, dev }),

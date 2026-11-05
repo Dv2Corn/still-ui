@@ -65,6 +65,7 @@ func migrationModels() []any {
 		&model.ReachProbe{},
 		&model.ReachProbeResult{},
 		&model.ReachProbeTarget{},
+		&model.NodeInvite{},
 	}
 }
 

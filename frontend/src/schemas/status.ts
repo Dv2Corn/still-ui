@@ -48,6 +48,7 @@ export const XrayInfoSchema = z
     state: z.string(),
     errorMsg: z.string(),
     version: z.string(),
+    stillBuild: z.boolean(),
     color: z.string(),
     certificates: z.array(XrayCertificateSchema),
   })

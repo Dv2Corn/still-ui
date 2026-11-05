@@ -17,14 +17,14 @@ const base: InstallOptions = {
 describe('buildScriptCommand', () => {
   it("uses still-ui's install.sh for the latest version", () => {
     expect(buildScriptCommand(base)).toBe(
-      'bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh)',
+      'bash <(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh)',
     );
   });
 
   it('pins a specific version by passing the tag to install.sh', () => {
     const cmd = buildScriptCommand({ ...base, version: 'v1.5.0' });
     expect(cmd).toBe(
-      'bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh) v1.5.0',
+      'bash <(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh) v1.5.0',
     );
   });
 

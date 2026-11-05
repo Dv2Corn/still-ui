@@ -43,6 +43,10 @@ func (s *SubClashService) GetClashLegacy(subId string, host string) (string, str
 func (s *SubClashService) getClash(subId string, host string, legacy bool) (string, string, error) {
 	subReq := s.SubService.ForRequest(host)
 	subReq.subscriptionBody = true
+	return s.renderClash(subReq, subId, host, legacy)
+}
+
+func (s *SubClashService) renderClash(subReq *SubService, subId string, host string, legacy bool) (string, string, error) {
 	inbounds, err := subReq.getInboundsBySubId(subId)
 	if err != nil {
 		return "", "", err
@@ -55,8 +59,8 @@ func (s *SubClashService) getClash(subId string, host string, legacy bool) (stri
 		return "", "", nil
 	}
 
-	var proxies []map[string]any
-	var ordered []orderedSubEntry[func() []map[string]any]
+	var panelProxies []clashProxy
+	var ordered []orderedSubEntry[clashProxyRender]
 	var hasInactiveExternal bool
 	var hasBoundClosed bool
 	var hasEnabledClient bool
@@ -93,7 +97,7 @@ func (s *SubClashService) getClash(subId string, host string, legacy bool) (stri
 					render := func() []map[string]any {
 						return s.budgetedProxies(subReq, variant.inbound(subReq, inbound), client, host)
 					}
-					ordered = append(ordered, orderedSubEntry[func() []map[string]any]{variant.order, render})
+					ordered = append(ordered, orderedSubEntry[clashProxyRender]{variant.order, clashProxyRender{inbound.Id, render}})
 				}
 				continue
 			}
@@ -108,14 +112,30 @@ func (s *SubClashService) getClash(subId string, host string, legacy bool) (stri
 				injectExternalProxy(&clone, effectiveEps)
 				effective = &clone
 			}
-			proxies = append(proxies, s.budgetedProxies(subReq, effective, client, host)...)
+			remarksFrom := subReq.remarkMark()
+			rendered := s.budgetedProxies(subReq, effective, client, host)
+			remarks := splitRemarkSpan(subReq.remarkSince(remarksFrom), len(rendered))
+			for i, proxy := range rendered {
+				panelProxies = append(panelProxies, clashProxy{proxy, inbound.Id, remarks[i]})
+			}
 		}
 	}
 	if subReq.hostsFirst {
-		for _, render := range orderedSubValues(ordered) {
-			proxies = append(proxies, render()...)
+		for _, entry := range orderedSubValues(ordered) {
+			remarksFrom := subReq.remarkMark()
+			rendered := entry.render()
+			remarks := splitRemarkSpan(subReq.remarkSince(remarksFrom), len(rendered))
+			for i, proxy := range rendered {
+				panelProxies = append(panelProxies, clashProxy{proxy, entry.inboundID, remarks[i]})
+			}
 		}
 	}
+	verdicts := subReq.probeVerdicts()
+	kept, demoted, hidden := probeArrange(verdicts, panelProxies, clashProxyDown(verdicts))
+	if subReq.rerenderForRemarks(clashServedRemarks(kept, hidden, legacy)) {
+		return s.renderClash(subReq, subId, host, legacy)
+	}
+	proxies, probeHidden := clashProxyMaps(kept), clashProxyMaps(hidden)
 	for _, ext := range externalLinks {
 		if ext.Enable {
 			hasEnabledClient = true
@@ -138,11 +158,16 @@ func (s *SubClashService) getClash(subId string, host string, legacy bool) (stri
 		}
 	}
 
+	proxies = append(proxies, clashProxyMaps(demoted)...)
+
 	if len(proxies) == 0 && !hasInactiveExternal && !hasBoundClosed {
 		return "", "", nil
 	}
 	if legacy {
 		proxies = legacyClashProxies(proxies)
+		if probeHidden = legacyClashProxies(probeHidden); len(proxies) == 0 {
+			proxies, probeHidden = probeHidden, nil
+		}
 		if len(proxies) == 0 {
 			return "", "", errNoLegacyClashProxies
 		}
@@ -223,6 +248,8 @@ func (s *SubClashService) getClash(subId string, host string, legacy bool) (stri
 			return "", "", err
 		}
 	}
+
+	keepReferencedProbeHidden(config, proxies, probeHidden)
 
 	finalYAML, err := marshalClashYAML(config)
 	if err != nil {

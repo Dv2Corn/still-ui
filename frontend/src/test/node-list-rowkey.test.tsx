@@ -28,6 +28,7 @@ describe('NodeList desktop table row keys', () => {
         selectedIds={[]}
         onSelectionChange={noop}
         onAdd={noop}
+        onInvite={noop}
         onMtls={noop}
         onEdit={noop}
         onDelete={noop}

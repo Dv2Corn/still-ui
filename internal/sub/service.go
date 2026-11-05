@@ -95,6 +95,13 @@ type SubService struct {
 	// settingsByInbound: one decode per request, not one per link of a subId.
 	tuicByInbound            map[int]*tuicLinkInstance
 	amneziaWGServerByInbound map[int]*amneziawg.ServerSettings
+	// probe is the probes' verdict on the endpoints, read lazily by probeVerdicts.
+	probe       *service.ReachSubVerdicts
+	probeLoaded bool
+	// remarkCalls: identity of each templated remark this pass, in order; remarkFullAt (second pass)
+	// names the remark carrying the full template per identity (probe_remarks.go).
+	remarkCalls  []string
+	remarkFullAt map[string]int
 }
 
 // tuicLinkInstance indexes a decoded TUIC inbound's clients by email
@@ -150,6 +157,8 @@ func (s *SubService) PrepareForRequest(host string) {
 	s.hostsByInbound = nil
 	s.hostGroupOrders = nil
 	s.sharedGroupSni = nil
+	s.probe, s.probeLoaded = nil, false
+	s.remarkCalls, s.remarkFullAt = nil, nil
 	s.rendered = 0
 	mode, _ := s.settingService.GetSubHostSortMode()
 	s.hostsFirst = mode == "hosts-first"
@@ -553,8 +562,8 @@ func (s *SubService) resolveInfoNodeRemark(subId string, uniqueEmails []string, 
 }
 
 func (s *SubService) getSubs(subId string) ([]string, []string, int64, xray.ClientTraffic, error) {
-	var result []string
-	var ordered []orderedSubEntry[func() string]
+	var panelLinks []subLink
+	var ordered []orderedSubEntry[subLinkRender]
 	var emails []string
 	var traffic xray.ClientTraffic
 	var hasEnabledClient bool
@@ -599,6 +608,7 @@ func (s *SubService) getSubs(subId string) ([]string, []string, int64, xray.Clie
 				continue
 			}
 			var link string
+			remarksFrom := s.remarkMark()
 			if s.hostsFirst {
 				variants, closed := s.clientHostVariants(inbound, client, "raw")
 				if closed {
@@ -612,7 +622,7 @@ func (s *SubService) getSubs(subId string) ([]string, []string, int64, xray.Clie
 						}
 						return s.GetLink(inbound, client.Email)
 					}
-					ordered = append(ordered, orderedSubEntry[func() string]{variant.order, render})
+					ordered = append(ordered, orderedSubEntry[subLinkRender]{variant.order, subLinkRender{inbound.Id, render}})
 				}
 			} else if effectiveEps, bound := s.clientHostEndpoints(inbound, client, "raw", hostEps); bound && len(effectiveEps) == 0 {
 				seenEmails[client.Email] = struct{}{}
@@ -626,21 +636,26 @@ func (s *SubService) getSubs(subId string) ([]string, []string, int64, xray.Clie
 				link = s.GetLink(inbound, client.Email)
 			}
 			if !s.hostsFirst && s.keepLink(link) {
-				result = append(result, link)
+				panelLinks = append(panelLinks, subLink{link, inbound.Id, s.remarkSince(remarksFrom)})
 			}
 			emails = append(emails, client.Email)
 			seenEmails[client.Email] = struct{}{}
 		}
 	}
 	if s.hostsFirst {
-		for _, render := range orderedSubValues(ordered) {
+		for _, entry := range orderedSubValues(ordered) {
 			if s.rendered.spent() {
 				break
 			}
-			if link := render(); s.keepLink(link) {
-				result = append(result, link)
+			remarksFrom := s.remarkMark()
+			if link := entry.render(); s.keepLink(link) {
+				panelLinks = append(panelLinks, subLink{link, entry.inboundID, s.remarkSince(remarksFrom)})
 			}
 		}
+	}
+	result, probeDemoted, servedRemarks := arrangeSubLinks(s.probeVerdicts(), panelLinks)
+	if s.rerenderForRemarks(servedRemarks) {
+		return s.getSubs(subId)
 	}
 	for _, ext := range externalLinks {
 		if ext.Enable {
@@ -661,6 +676,8 @@ func (s *SubService) getSubs(subId string) ([]string, []string, int64, xray.Clie
 			}
 		}
 	}
+
+	result = append(result, probeDemoted...)
 
 	uniqueEmails := make([]string, 0, len(seenEmails))
 	for e := range seenEmails {

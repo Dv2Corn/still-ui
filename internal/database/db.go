@@ -91,6 +91,7 @@ func allModels() []any {
 		&model.ReachProbe{},
 		&model.ReachProbeResult{},
 		&model.ReachProbeTarget{},
+		&model.NodeInvite{},
 	}
 }
 
@@ -214,6 +215,9 @@ func initModels() error {
 		return err
 	}
 	if err := migrateSyncOrphanColumns(); err != nil {
+		return err
+	}
+	if err := migrateNodeTrafficLimitColumns(); err != nil {
 		return err
 	}
 	if err := migrateClientEmailLowerIndex(); err != nil {
@@ -413,6 +417,35 @@ func migrateSyncOrphanColumns() error {
 		return err
 	}
 	return db.Exec("UPDATE clients SET sync_orphaned_by = 0 WHERE sync_orphaned_by IS NULL").Error
+}
+
+// Backfills the NULLs an older SQLite ALTER TABLE may leave in the node quota columns, so a
+// NULL multiplier never reads as 0 nor a NULL action as an unknown one (still-ui).
+func migrateNodeTrafficLimitColumns() error {
+	defaults := []struct {
+		column string
+		value  any
+	}{
+		{"traffic_limit_bytes", 0},
+		{"traffic_reset_day", 1},
+		{"traffic_warn_percent", 80},
+		{"traffic_limit_action", "notify"},
+		{"traffic_multiplier", 1},
+		{"traffic_used", 0},
+		{"traffic_period_start", 0},
+		{"traffic_limited", false},
+		{"traffic_alert_level", 0},
+		{"traffic_disabled_inbounds", "[]"},
+	}
+	for _, d := range defaults {
+		if !db.Migrator().HasColumn(&model.Node{}, d.column) {
+			continue
+		}
+		if err := db.Table("nodes").Where(d.column+" IS NULL").UpdateColumn(d.column, d.value).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // The client identity checks match emails case-insensitively; without an
@@ -1526,6 +1559,21 @@ func seedRandomSubscriptionPaths() error {
 	})
 }
 
+// FreshEgressFilter blocks outgoing SMTP (port 25) on new installs: mail apps submit on 465/587,
+// while client spam on 25 gets servers suspended. Existing installs keep the filter off.
+const FreshEgressFilter = `{"smtp":true}`
+
+func seedFreshEgressFilter() error {
+	var count int64
+	if err := db.Model(&model.Setting{}).Where("key = ?", "egressFilter").Count(&count).Error; err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+	return db.Create(&model.Setting{Key: "egressFilter", Value: FreshEgressFilter}).Error
+}
+
 func runSeeders(isUsersEmpty bool) error {
 	empty, err := isTableEmpty("history_of_seeders")
 	if err != nil {
@@ -1543,6 +1591,9 @@ func runSeeders(isUsersEmpty bool) error {
 			if err := db.Create(&model.HistoryOfSeeders{SeederName: name}).Error; err != nil {
 				return err
 			}
+		}
+		if err := seedFreshEgressFilter(); err != nil {
+			return err
 		}
 		return seedApiTokens()
 	}

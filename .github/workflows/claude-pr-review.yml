@@ -667,12 +667,14 @@ jobs:
           out=$(mktemp)
           awk '/^[ \t]*(```|~~~)/ { if (!open) print "_[Code removed: this review does not propose code.]_"; open = !open; next } !open' \
             "$linked" > "$out"
-          # The security boundary: GitHub renders the finished body and every
-          # link in that HTML is checked; if one fails, the review is posted
-          # as plain text. After the awk, so the awk cannot strip that fence.
+          # The security boundary: the text pass runs again on what the awk
+          # left (its fences differ from the filter's, so text the first pass
+          # read as code can be prose now), then GitHub renders the body and
+          # every link in that HTML is checked; if one fails, the review is
+          # posted as plain text. After the awk, so the awk cannot strip that fence.
           checked=$(mktemp)
-          python3 -I .github/scripts/link_filter.py --no-filter --gate --repo "$REPO" --base "https://github.com/${REPO}/pull/${PR}" \
-            --head-sha "$HEAD_SHA" "$out" "$checked"
+          python3 -I .github/scripts/link_filter.py --gate --repo "$REPO" --base "https://github.com/${REPO}/pull/${PR}" \
+            --head-sha "$HEAD_SHA" --author "$AUTHOR" "$out" "$checked"
           gh pr comment "$PR" --repo "$REPO" --body-file "$checked"
           if grep -qE '^[[:space:]]*(```|~~~)' "$BODY"; then
             echo "::error::Removed fenced code from the review of #${PR} before posting it: the review must not propose code."

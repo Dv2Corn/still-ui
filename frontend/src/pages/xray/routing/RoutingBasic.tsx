@@ -22,6 +22,7 @@ import {
   syncOutbound,
 } from '../basics/helpers';
 
+import EgressFilterSetting from './EgressFilterSetting';
 import TorrentBlockSetting from './TorrentBlockSetting';
 
 interface RoutingBasicProps {
@@ -104,6 +105,8 @@ export default function RoutingBasic({ templateSettings, setTemplateSettings }: 
       />
 
       <TorrentBlockSetting />
+
+      <EgressFilterSetting />
 
       <SettingListItem
         title={t('pages.xray.blockips')}
