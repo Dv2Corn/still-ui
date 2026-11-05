@@ -121,19 +121,34 @@ func sqlFactor(m float64) string {
 	return f
 }
 
-// withBilledQuota rewrites the own-counter quota test of cond per client: a client a master
-// bills at m≠1 is judged by that master's fresh push only, else by its own counters × m.
+// billingRowsSince bounds the pushed rows that tie a client to a master: a master that stopped
+// pushing an email for the TTL no longer sets its multiplier.
+func billingRowsSince(db *gorm.DB) int64 {
+	return db.NowFunc().Add(-nodeBillingTTL).UnixMilli()
+}
+
+// sinceBaseSQL is the own counter's growth since the push (all of it after a reset, none on old rows).
+func sinceBaseSQL(col string) string {
+	return "(CASE WHEN g.base_" + col + " IS NULL THEN 0 WHEN client_traffics." + col + " >= g.base_" + col +
+		" THEN client_traffics." + col + " - g.base_" + col + " ELSE client_traffics." + col + " END)"
+}
+
+// withBilledQuota rewrites the own-counter quota test of cond per client: a client whose lowest
+// multiplier m≠1 is judged by that master's last count plus m × own traffic since that push.
 func withBilledQuota(db *gorm.DB, cond string, args []any) (string, []any) {
 	tiers := billingTiers(db)
 	if len(tiers) == 0 {
 		return cond, args
 	}
 	const own = "up + down >= total"
+	since := billingRowsSince(db)
 	has := func(op string) string {
-		return "EXISTS (SELECT 1 FROM client_global_traffics b WHERE b.email = client_traffics.email AND b.master_guid " + op + " ?)"
+		return "EXISTS (SELECT 1 FROM client_global_traffics b WHERE b.email = client_traffics.email AND b.updated_at >= ? AND b.master_guid " + op + " ?)"
 	}
-	noFresh := "NOT EXISTS (SELECT 1 FROM client_global_traffics f WHERE f.email = client_traffics.email AND f.updated_at >= ?)"
-	freshSince := globalTrafficFreshSince(db.NowFunc())
+	billed := func(f string) string {
+		return "EXISTS (SELECT 1 FROM client_global_traffics g WHERE g.email = client_traffics.email AND g.updated_at >= ? AND g.master_guid IN ?" +
+			" AND g.up + g.down + ROUND(" + f + " * " + sinceBaseSQL("up") + ") + ROUND(" + f + " * " + sinceBaseSQL("down") + ") >= client_traffics.total)"
+	}
 	var all, above []string
 	for _, t := range tiers {
 		all = append(all, t.guids...)
@@ -144,12 +159,13 @@ func withBilledQuota(db *gorm.DB, cond string, args []any) (string, []any) {
 	var b strings.Builder
 	var out []any
 	b.WriteString("(CASE")
+	// ×1 sits between the tiers below and above it: the lowest multiplier of a client wins.
 	one := func() {
 		b.WriteString(" WHEN (" + has("NOT IN") + ")")
-		out = append(out, all)
+		out = append(out, since, all)
 		if len(above) > 0 {
 			b.WriteString(" OR NOT " + has("IN"))
-			out = append(out, above)
+			out = append(out, since, above)
 		} else {
 			b.WriteString(" OR 1 = 1")
 		}
@@ -161,9 +177,8 @@ func withBilledQuota(db *gorm.DB, cond string, args []any) (string, []any) {
 			one()
 			oneDone = true
 		}
-		f := sqlFactor(t.m)
-		b.WriteString(" WHEN " + has("IN") + " THEN (" + noFresh + " AND ROUND(up * " + f + ") + ROUND(down * " + f + ") >= total)")
-		out = append(out, t.guids, freshSince)
+		b.WriteString(" WHEN " + has("IN") + " THEN " + billed(sqlFactor(t.m)))
+		out = append(out, since, t.guids, since, t.guids)
 	}
 	if !oneDone {
 		one()
@@ -172,8 +187,19 @@ func withBilledQuota(db *gorm.DB, cond string, args []any) (string, []any) {
 	return strings.Replace(cond, own, b.String(), 1), append(out, args...)
 }
 
-// billedUsage rewrites rows' own counters as the quota check sees them, in place: a client
-// billed at m≠1 carries its master's fresh push, or without one its counters × m.
+// sinceBase is the own counter's growth since a push, as sinceBaseSQL.
+func sinceBase(raw int64, base *int64) int64 {
+	switch {
+	case base == nil:
+		return 0
+	case raw >= *base:
+		return raw - *base
+	default:
+		return raw
+	}
+}
+
+// billedUsage rewrites rows' own counters (as read, unbilled) in place to what withBilledQuota judges.
 func billedUsage(db *gorm.DB, rows []xray.ClientTraffic) {
 	live := liveMasterMultipliers(db)
 	billed := false
@@ -187,48 +213,44 @@ func billedUsage(db *gorm.DB, rows []xray.ClientTraffic) {
 	for i := range rows {
 		emails = append(emails, rows[i].Email)
 	}
-	freshSince := globalTrafficFreshSince(db.NowFunc())
-	type usage struct {
-		m        float64
-		fresh    bool
-		up, down int64
-		anyRows  bool
+	since := billingRowsSince(db)
+	type tier struct {
+		m    float64
+		rows []model.ClientGlobalTraffic
 	}
-	by := map[string]*usage{}
+	by := map[string]*tier{}
 	for _, batch := range chunkStrings(uniqueNonEmptyStrings(emails), sqlInChunk) {
 		var globals []model.ClientGlobalTraffic
-		if err := db.Where("email IN ?", batch).Find(&globals).Error; err != nil {
+		if err := db.Where("email IN ? AND updated_at >= ?", batch, since).Find(&globals).Error; err != nil {
 			return
 		}
 		for _, g := range globals {
-			key := strings.ToLower(g.Email)
-			u := by[key]
-			if u == nil {
-				u = &usage{m: 1}
-				by[key] = u
-			}
 			m, ok := live[g.MasterGuid]
 			if !ok {
 				m = 1
 			}
-			if !u.anyRows || m < u.m {
-				u.m = m
-			}
-			u.anyRows = true
-			if g.UpdatedAt >= freshSince {
-				u.fresh = true
-				u.up, u.down = max(u.up, g.Up), max(u.down, g.Down)
+			key := strings.ToLower(g.Email)
+			switch u := by[key]; {
+			case u == nil || m < u.m:
+				by[key] = &tier{m: m, rows: []model.ClientGlobalTraffic{g}}
+			case m == u.m:
+				u.rows = append(u.rows, g)
 			}
 		}
 	}
 	for i := range rows {
 		u := by[strings.ToLower(rows[i].Email)]
-		switch {
-		case u == nil || u.m == 1:
-		case u.fresh:
-			rows[i].Up, rows[i].Down = u.up, u.down
-		default:
-			rows[i].Up, rows[i].Down = scaleNodeTraffic(rows[i].Up, u.m), scaleNodeTraffic(rows[i].Down, u.m)
+		if u == nil || u.m == 1 {
+			continue
 		}
+		var up, down int64
+		for _, g := range u.rows {
+			gu := clampedTrafficAdd(g.Up, scaleNodeTraffic(sinceBase(rows[i].Up, g.BaseUp), u.m))
+			gd := clampedTrafficAdd(g.Down, scaleNodeTraffic(sinceBase(rows[i].Down, g.BaseDown), u.m))
+			if clampedTrafficAdd(gu, gd) >= clampedTrafficAdd(up, down) {
+				up, down = gu, gd
+			}
+		}
+		rows[i].Up, rows[i].Down = up, down
 	}
 }

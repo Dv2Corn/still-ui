@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -72,7 +73,8 @@ func goOffline(t *testing.T, db *gorm.DB) {
 	clock.Store(time.Now().Add(25 * time.Hour).UnixMilli())
 }
 
-// Without a fresh push the node bills its own counters at that client's master's multiplier.
+// After a push the node bills its own traffic since then at that client's master's multiplier,
+// also while the master is silent.
 func TestNodeBillingFallbackCutsAtBilledQuota(t *testing.T) {
 	cases := []struct {
 		name               string
@@ -107,8 +109,8 @@ func TestNodeBillingFallbackCutsAtBilledQuota(t *testing.T) {
 	}
 }
 
-// With a fresh push a billed client is judged by its master's count, which bills each delta at
-// the rate of its time: raising ×1 to ×2 mid-period does not re-bill the traffic before it.
+// A billed client is judged by its master's count, which bills each delta at the rate of its
+// time: own traffic from before the push is not billed again.
 func TestNodeBillingFreshPushIsTheMastersCount(t *testing.T) {
 	for i, tc := range []struct {
 		m       float64
@@ -375,5 +377,163 @@ func TestMasterIgnoresANodeCutThatRebillsHistory(t *testing.T) {
 	assertUpDown(t, ct, 40, 40, "60 at ×1 plus 10 at ×2")
 	if !ct.Enable {
 		t.Fatal("the master latched a cut its own count (80 of 100) contradicts")
+	}
+}
+
+// ×1 → ×2 mid-period: traffic the master counted before the push is not re-billed, and a master
+// that then goes silent still has the node cut at its count plus ×2 of the later traffic.
+func TestNodeBillingChangeMidwayDoesNotRebill(t *testing.T) {
+	db := initTrafficTestDB(t)
+	nodeClient(t, db, "midway", 42080, 100)
+	setNodeCounters(t, db, "midway", 30, 30)
+	setBilling(t, "master-a", 2)
+	pushFrom(t, "master-a", "midway", 30, 30) // the first 60 were billed at ×1
+	setNodeCounters(t, db, "midway", 39, 39)  // +18 raw at ×2: 96 of 100
+	if !runNodeQuotaLoop(t, db, "midway") {
+		t.Fatal("the node re-billed traffic from before the change")
+	}
+	goOffline(t, db)
+	setNodeCounters(t, db, "midway", 40, 40) // 100 of 100
+	if runNodeQuotaLoop(t, db, "midway") {
+		t.Fatal("a silent master stopped the node's enforcement")
+	}
+}
+
+// Own counters under the push's base mean a reset: all of them count. A row from before bases
+// were stored bills the master's count alone, and the next push stores a base.
+func TestNodeBillingBaseResetAndOldRows(t *testing.T) {
+	db := initTrafficTestDB(t)
+	setBilling(t, "master-a", 2)
+	nodeClient(t, db, "base", 42081, 1000)
+	setNodeCounters(t, db, "base", 400, 400)
+	pushFrom(t, "master-a", "base", 100, 100)
+	setNodeCounters(t, db, "base", 199, 200) // after a reset: 100+398 + 100+400
+	if !runNodeQuotaLoop(t, db, "base") {
+		t.Fatal("cut at 998 of 1000 after a reset")
+	}
+	setNodeCounters(t, db, "base", 200, 200)
+	if runNodeQuotaLoop(t, db, "base") {
+		t.Fatal("kept on at 1000 of 1000 after a reset")
+	}
+
+	nodeClient(t, db, "old", 42082, 1000)
+	pushFrom(t, "master-a", "old", 300, 300)
+	if err := db.Model(&model.ClientGlobalTraffic{}).Where("email = ?", "old").
+		UpdateColumns(map[string]any{"base_up": nil, "base_down": nil}).Error; err != nil {
+		t.Fatal(err)
+	}
+	setNodeCounters(t, db, "old", 400, 400)
+	if !runNodeQuotaLoop(t, db, "old") {
+		t.Fatal("a row without a base re-billed the whole counter")
+	}
+	pushFrom(t, "master-a", "old", 300, 300) // same count: written anyway to store the base
+	var row model.ClientGlobalTraffic
+	if err := db.Where("email = ?", "old").First(&row).Error; err != nil || row.BaseUp == nil || *row.BaseUp != 400 {
+		t.Fatalf("the base was not stored: %+v %v", row, err)
+	}
+	setNodeCounters(t, db, "old", 500, 500) // 300+200 each
+	if runNodeQuotaLoop(t, db, "old") {
+		t.Fatal("kept on at 1000 of 1000 once the base was stored")
+	}
+}
+
+// A client pushed by ×0.5 and ×2 masters is billed at ×0.5; once that master stops pushing the
+// email for the TTL (still pushing others), the ×2 master's count and rate take over.
+func TestNodeBillingTwoTiersForOneClient(t *testing.T) {
+	db := initTrafficTestDB(t)
+	setBilling(t, "half", 0.5)
+	setBilling(t, "double", 2)
+	nodeClient(t, db, "shared", 42083, 1000)
+	pushFrom(t, "half", "shared", 0, 0)
+	pushFrom(t, "double", "shared", 0, 0)
+	setNodeCounters(t, db, "shared", 600, 600)
+	if !runNodeQuotaLoop(t, db, "shared") {
+		t.Fatal("cut at ×0.5: 600 of 1000")
+	}
+	agePushes(t, db, "half", "shared")
+	if runNodeQuotaLoop(t, db, "shared") {
+		t.Fatal("a master that stopped pushing the email still set its multiplier")
+	}
+}
+
+func agePushes(t *testing.T, db *gorm.DB, guid, email string) {
+	t.Helper()
+	old := time.Now().Add(-nodeBillingTTL - time.Hour).UnixMilli()
+	if err := db.Model(&model.ClientGlobalTraffic{}).Where("master_guid = ? AND email = ?", guid, email).
+		UpdateColumn("updated_at", old).Error; err != nil {
+		t.Fatal(err)
+	}
+}
+
+// The SQL predicate and billedUsage agree on mixed input, with tiers below and above ×1
+// (the ×1 branch in between), unknown masters, resets, rows without a base and aged rows.
+func TestNodeBillingSQLAndGoAgree(t *testing.T) {
+	db := initTrafficTestDB(t)
+	for g, m := range map[string]float64{"half": 0.5, "one": 1, "double": 2, "triple": 3} {
+		setBilling(t, g, m)
+	}
+	type push struct {
+		guid                 string
+		up, down, rawU, rawD int64
+	}
+	cases := []struct {
+		name           string
+		pushes         []push
+		noBase, aged   string // a master whose row loses its base / ages past the TTL
+		rawUp, rawDown int64
+		total          int64
+		want           bool
+	}{
+		{"none under", nil, "", "", 499, 500, 1000, false},
+		{"none at", nil, "", "", 500, 500, 1000, true},
+		{"half under", []push{{"half", 0, 0, 0, 0}}, "", "", 998, 1000, 1000, false},
+		{"half at", []push{{"half", 0, 0, 0, 0}}, "", "", 1000, 1000, 1000, true},
+		{"double under", []push{{"double", 100, 100, 50, 50}}, "", "", 249, 250, 1000, false},
+		{"double at", []push{{"double", 100, 100, 50, 50}}, "", "", 250, 250, 1000, true},
+		{"one and double is one", []push{{"one", 0, 0, 0, 0}, {"double", 0, 0, 0, 0}}, "", "", 300, 300, 1000, false},
+		{"half and one is half", []push{{"half", 0, 0, 0, 0}, {"one", 0, 0, 0, 0}}, "", "", 600, 600, 1000, false},
+		{"half and double is half", []push{{"half", 0, 0, 0, 0}, {"double", 0, 0, 0, 0}}, "", "", 998, 1000, 1000, false},
+		{"double and triple is double", []push{{"double", 0, 0, 0, 0}, {"triple", 0, 0, 0, 0}}, "", "", 200, 200, 1000, false},
+		{"unknown master is one", []push{{"stranger", 0, 0, 0, 0}}, "", "", 300, 300, 1000, false},
+		{"unknown master at", []push{{"stranger", 0, 0, 0, 0}}, "", "", 500, 500, 1000, true},
+		{"reset under", []push{{"double", 100, 100, 400, 400}}, "", "", 199, 200, 1000, false},
+		{"reset at", []push{{"double", 100, 100, 400, 400}}, "", "", 200, 200, 1000, true},
+		{"no base", []push{{"double", 300, 300, 0, 0}}, "double", "", 500, 500, 1000, false},
+		{"aged half", []push{{"half", 0, 0, 0, 0}, {"double", 0, 0, 0, 0}}, "", "half", 300, 300, 1000, true},
+		{"two rows one tier", []push{{"double", 100, 100, 0, 0}, {"triple", 0, 0, 0, 0}, {"double-b", 0, 0, 0, 0}}, "", "", 200, 200, 1000, true},
+		{"unlimited", []push{{"double", 0, 0, 0, 0}}, "", "", 5000, 5000, 0, false},
+	}
+	setBilling(t, "double-b", 2)
+	for i, tc := range cases {
+		email := fmt.Sprintf("agree-%d", i)
+		seedClientRow(t, email, 1, 0, 0, tc.total)
+		for _, p := range tc.pushes {
+			setNodeCounters(t, db, email, p.rawU, p.rawD)
+			pushFrom(t, p.guid, email, p.up, p.down)
+		}
+		if tc.noBase != "" {
+			if err := db.Model(&model.ClientGlobalTraffic{}).Where("email = ? AND master_guid = ?", email, tc.noBase).
+				UpdateColumns(map[string]any{"base_up": nil, "base_down": nil}).Error; err != nil {
+				t.Fatal(err)
+			}
+		}
+		if tc.aged != "" {
+			agePushes(t, db, tc.aged, email)
+		}
+		setNodeCounters(t, db, email, tc.rawUp, tc.rawDown)
+	}
+	cond, args := withBilledQuota(db, "(total > 0 AND up + down >= total)", nil)
+	var sqlDepleted []string
+	if err := db.Model(xray.ClientTraffic{}).Where(cond, args...).Pluck("email", &sqlDepleted).Error; err != nil {
+		t.Fatal(err)
+	}
+	for i, tc := range cases {
+		email := fmt.Sprintf("agree-%d", i)
+		rows := []xray.ClientTraffic{readTraffic(t, db, email)}
+		billedUsage(db, rows)
+		goDepleted := rows[0].Total > 0 && clampedTrafficAdd(rows[0].Up, rows[0].Down) >= rows[0].Total
+		if got := slices.Contains(sqlDepleted, email); got != goDepleted || got != tc.want {
+			t.Errorf("%s: SQL depleted=%v, Go depleted=%v (billed %d+%d), want %v", tc.name, got, goDepleted, rows[0].Up, rows[0].Down, tc.want)
+		}
 	}
 }

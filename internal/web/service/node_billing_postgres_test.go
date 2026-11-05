@@ -16,14 +16,18 @@ func TestNodeBillingPostgres(t *testing.T) {
 		name string
 		run  func(*testing.T)
 	}{
-		{"fallback at the billed quota", TestNodeBillingFallbackCutsAtBilledQuota},
-		{"fresh push is the master's count", TestNodeBillingFreshPushIsTheMastersCount},
+		{"billed quota after a push", TestNodeBillingFallbackCutsAtBilledQuota},
+		{"push is the master's count", TestNodeBillingFreshPushIsTheMastersCount},
 		{"per-client master", TestNodeBillingPerClientMaster},
 		{"multiplier 1 unchanged", TestNodeBillingOneIsByteIdentical},
 		{"reset re-enables", TestNodeBillingResetReenables},
 		{"renewal re-enables", TestNodeBillingRenewalReenables},
 		{"periodic reset", TestNodeBillingPeriodicResetSeesBilledUsage},
 		{"master ignores re-billed history", TestMasterIgnoresANodeCutThatRebillsHistory},
+		{"change midway", TestNodeBillingChangeMidwayDoesNotRebill},
+		{"base reset and old rows", TestNodeBillingBaseResetAndOldRows},
+		{"two tiers for one client", TestNodeBillingTwoTiersForOneClient},
+		{"SQL and Go agree", TestNodeBillingSQLAndGoAgree},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			cleanup, err := testpg.IsolatePackage("node_billing")

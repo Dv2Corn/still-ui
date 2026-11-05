@@ -9,4 +9,7 @@ type ClientGlobalTraffic struct {
 	Up         int64  `json:"up"`
 	Down       int64  `json:"down"`
 	UpdatedAt  int64  `json:"updatedAt" gorm:"autoUpdateTime:milli"`
+	// BaseUp/BaseDown are this panel's own counters when Up/Down were written (nil on older rows).
+	BaseUp   *int64 `json:"-"`
+	BaseDown *int64 `json:"-"`
 }
