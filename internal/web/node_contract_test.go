@@ -272,9 +272,17 @@ func TestMasterNodeContract(t *testing.T) {
 					_, err := master.FetchTrafficSnapshot(ctx)
 					return err
 				}, nil},
-				{"PushGlobalClientTraffics is accepted", []string{"PushGlobalClientTraffics"}, func() error {
-					return master.PushGlobalClientTraffics(ctx, "master-guid", []*xray.ClientTraffic{{Email: "c0", Up: 1, Down: 2}})
-				}, nil},
+				{"PushGlobalClientTraffics is accepted with the master's billing multiplier", []string{"PushGlobalClientTraffics"}, func() error {
+					return master.PushGlobalClientTraffics(ctx, "master-guid", []*xray.ClientTraffic{{Email: "c0", Up: 1, Down: 2}}, 0.5)
+				}, func(t *testing.T) {
+					var row model.Setting
+					if err := database.GetDB().Where("key = ?", "nodeTrafficMultipliers").First(&row).Error; err != nil || !strings.HasPrefix(row.Value, `{"master-guid":{"m":0.5,"at":`) {
+						t.Fatalf("node billing multipliers = %q (%v), want the master's 0.5", row.Value, err)
+					}
+					if err := (&service.InboundService{}).SetMasterBillingMultiplier("master-guid", 1); err != nil {
+						t.Fatal(err)
+					}
+				}},
 				{"client IP sync is accepted both ways", []string{"FetchAllClientIps", "PushAllClientIps", "FetchClientIpsByGuid"}, func() error {
 					ips, err := master.FetchAllClientIps(ctx)
 					if err != nil {

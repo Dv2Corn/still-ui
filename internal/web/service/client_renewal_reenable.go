@@ -47,7 +47,8 @@ func (s *ClientService) renewalReenables(email string, newTotal, newExpiry int64
 	// projected row values, then the cross-panel branch the loop would apply
 	// to the projected total.
 	now := time.Now().UnixMilli()
-	used := traffic.Up + traffic.Down
+	billing := localBillingMultiplier(db)
+	used := scaleNodeTraffic(traffic.Up, billing) + scaleNodeTraffic(traffic.Down, billing)
 	if newTotal > 0 && used >= newTotal {
 		return false // still over quota
 	}

@@ -150,11 +150,18 @@ func clientResetCycles(tx *gorm.DB) *gorm.DB {
 // period, independent of the cycle configured on the inbounds they belong to.
 func (s *ClientService) GetClientsByTrafficReset(period string) ([]ClientResetCycle, error) {
 	var cycles []ClientResetCycle
-	err := clientResetCycles(database.GetDB()).
+	db := database.GetDB()
+	err := clientResetCycles(db).
 		Where("c.traffic_reset = ?", period).
 		Scan(&cycles).Error
 	if err != nil {
 		return nil, err
+	}
+	// Depleted judges billed bytes, as the quota loop does.
+	if billing := localBillingMultiplier(db); billing != 1 {
+		for i := range cycles {
+			cycles[i].Up, cycles[i].Down = scaleNodeTraffic(cycles[i].Up, billing), scaleNodeTraffic(cycles[i].Down, billing)
+		}
 	}
 	return cycles, nil
 }
@@ -167,10 +174,11 @@ func quotaDisabledEmails(tx *gorm.DB, within []string) ([]string, error) {
 	if err := clientResetCycles(tx).Where("c.enable = ?", false).Scan(&cycles).Error; err != nil {
 		return nil, err
 	}
-	// Cross-panel usage depletes too: a client cut off on pushed usage was the quota's doing.
+	// Own counters in billed bytes; cross-panel usage depletes too (a cut on pushed usage counts).
+	billing := localBillingMultiplier(tx)
 	rows := make([]xray.ClientTraffic, len(cycles))
 	for i, c := range cycles {
-		rows[i] = xray.ClientTraffic{Email: c.Email, Up: c.Up, Down: c.Down, Total: c.Total}
+		rows[i] = xray.ClientTraffic{Email: c.Email, Up: scaleNodeTraffic(c.Up, billing), Down: scaleNodeTraffic(c.Down, billing), Total: c.Total}
 	}
 	overlayGlobalTrafficValues(tx, rows)
 	for i := range cycles {

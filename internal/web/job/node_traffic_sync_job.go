@@ -351,7 +351,7 @@ func (j *NodeTrafficSyncJob) maybePushGlobals(mgr *runtime.Manager, nodes []*mod
 			defer func() { <-sem }()
 			ctx, cancel := context.WithTimeout(context.Background(), nodeTrafficSyncRequestTimeout)
 			defer cancel()
-			if err := remote.PushGlobalClientTraffics(ctx, masterGuid, traffics); err != nil {
+			if err := remote.PushGlobalClientTraffics(ctx, masterGuid, traffics, service.NodeBillingMultiplier(n)); err != nil {
 				// An old-build node without the endpoint answers 404 — not worth a
 				// warning every cycle.
 				if strings.Contains(err.Error(), "HTTP 404") {

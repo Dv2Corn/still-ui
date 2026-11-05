@@ -893,10 +893,11 @@ func (r *Remote) FetchTrafficSnapshot(ctx context.Context) (*TrafficSnapshot, er
 // pushing master. Display/enforcement input on the node only — the node never
 // folds these into the counters it reports back, so this panel's (and any
 // other master's) delta accounting over the node snapshot stays intact.
-func (r *Remote) PushGlobalClientTraffics(ctx context.Context, masterGuid string, traffics []*xray.ClientTraffic) error {
+func (r *Remote) PushGlobalClientTraffics(ctx context.Context, masterGuid string, traffics []*xray.ClientTraffic, multiplier float64) error {
 	payload := map[string]any{
-		"masterGuid": masterGuid,
-		"traffics":   traffics,
+		"masterGuid":        masterGuid,
+		"traffics":          traffics,
+		"trafficMultiplier": multiplier,
 	}
 	_, err := r.do(ctx, http.MethodPost, "panel/api/inbounds/pushClientTraffics", payload)
 	return err

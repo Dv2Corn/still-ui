@@ -1524,7 +1524,7 @@ func (s *ClientService) bulkCreate(inboundSvc *InboundService, payloads []Client
 func (s *ClientService) DelDepleted(inboundSvc *InboundService) (int, bool, error) {
 	db := database.GetDB()
 	now := time.Now().UnixMilli()
-	depletedClause := depletedClientsClause
+	depletedClause := billedLocalUsage(depletedClientsClause, localBillingMultiplier(db))
 
 	var rows []xray.ClientTraffic
 	if err := db.Where(depletedClause, now).Find(&rows).Error; err != nil {

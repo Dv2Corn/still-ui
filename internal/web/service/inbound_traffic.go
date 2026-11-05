@@ -970,7 +970,7 @@ func (s *InboundService) DelDepletedClients(id int) (err error) {
 		// Collect depleted emails globally — a shared-email row owned by one
 		// inbound depletes every sibling that lists the email.
 		now := time.Now().Unix() * 1000
-		depletedClause := depletedClientsClause
+		depletedClause := billedLocalUsage(depletedClientsClause, localBillingMultiplier(tx))
 		var depletedRows []xray.ClientTraffic
 		if err := tx.Model(xray.ClientTraffic{}).
 			Where(depletedClause, now).
