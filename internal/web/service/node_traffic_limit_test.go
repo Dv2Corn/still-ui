@@ -452,9 +452,8 @@ func TestSetTrafficLimitKeepsNodeClean(t *testing.T) {
 	}
 }
 
-// A node enforces client quotas on its raw counters. On a 0.5 node a client that used
-// 1200 raw bytes of a 1000-byte quota is billed 600: the node's own disable latch is
-// stale and must not cut the client at half its quota.
+// On a 0.5 node a client at 1200 raw bytes of a 1000-byte quota is billed 600: a disable the node
+// reports on raw counters (an older node) is stale and must not cut it at half its quota.
 func TestNodeTrafficMultiplierStaleDisableUsesBilledUsage(t *testing.T) {
 	db := initTrafficTestDB(t)
 	seedNodeRow(t, db, &model.Node{Id: 1, Name: "n1", Address: "127.0.0.1", Port: 2096, ApiToken: "tok", Enable: true})

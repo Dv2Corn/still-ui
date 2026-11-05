@@ -1,11 +1,7 @@
 package sub
 
-// The full remark template (email, traffic left, days left, expiry…) goes to the first link of
-// each subscription identity, and every later link gets the name-only part. Remarks are written
-// while links are rendered, before the probe ordering moves or hides the links that are down; so
-// a render pass records which templated remark each served entry carries, and when the entry in
-// front after the ordering is not the one that got the full template, the subscription is
-// rendered once more with the full template assigned to that entry.
+// The full remark template goes to each identity's first served link; if probe ordering moves another
+// entry to the front, the subscription is rendered again with the full template on that entry.
 
 // remarkSpan is the range of templated remarks (indices into SubService.remarkCalls) one
 // rendered entry carries.

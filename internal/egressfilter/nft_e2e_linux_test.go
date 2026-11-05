@@ -10,9 +10,8 @@ import (
 	"testing"
 )
 
-// The e2e test rebuilds a small network inside the current (throwaway) host: netns
-// "sueg-out" plays the internet and a private LAN, "sueg-cli"/"sueg-cli2" are
-// AmneziaWG kernel clients behind xui-awg7/xui-awg6, the host is the VPN server.
+// A throwaway host plays the VPN server: netns "sueg-out" is the internet and a private LAN,
+// "sueg-cli"/"sueg-cli2" are AmneziaWG kernel clients behind xui-awg7/xui-awg6.
 const (
 	egOutNS  = "sueg-out"
 	egCliNS  = "sueg-cli"

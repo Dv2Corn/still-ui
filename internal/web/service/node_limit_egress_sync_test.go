@@ -10,9 +10,8 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/egressfilter"
 )
 
-// The per-node traffic limit and the egress filter both reach the same node: the
-// limit by turning its inbounds off (pushed with the node's config), the filter by
-// its own managed-filter call. Neither may undo or block the other.
+// The traffic limit (inbounds off, pushed with the config) and the egress filter (its own call)
+// reach the same node; neither may undo or block the other.
 func TestNodeTrafficLimitAndEgressFilterSyncCoexist(t *testing.T) {
 	db := initTrafficTestDB(t)
 	collectNodeTrafficEvents(t)
@@ -84,9 +83,8 @@ func TestNodeTrafficLimitAndEgressFilterSyncCoexist(t *testing.T) {
 	}
 }
 
-// A node added by one-command enrollment is a node like any other: it starts with
-// the traffic-limit defaults (no limit, x1, warn at 80%, notify) and the egress
-// filter handed to all nodes reaches it once it is online.
+// An enrolled node starts with the traffic-limit defaults (no limit, x1, warn 80%, notify) and
+// gets the all-nodes egress filter once online.
 func TestEnrolledNodeGetsTrafficDefaultsAndEgressFilter(t *testing.T) {
 	f := newEnrollFixture(t)
 	useFakeEgress(t)

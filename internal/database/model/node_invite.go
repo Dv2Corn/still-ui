@@ -1,9 +1,7 @@
 package model
 
-// NodeInvite is a one-time invitation that lets a new server add itself as a
-// node (Nodes → Add with a command). Only the SHA-256 of its token is stored;
-// the invitation string is shown once. Rows stay as the audit trail of who
-// joined, when and from where, until they are pruned a month after use.
+// NodeInvite is a one-time invitation for a new server to add itself as a node; only its token's
+// SHA-256 is stored. Rows stay as the audit trail of who joined until pruned a month after use.
 type NodeInvite struct {
 	Id        int    `json:"id" gorm:"primaryKey;autoIncrement"`
 	TokenHash string `json:"-" gorm:"column:token_hash;uniqueIndex;not null"`

@@ -479,9 +479,8 @@ func TestEgressFilterService_SyncNodes(t *testing.T) {
 	}
 }
 
-// Routing matches "ip" only against the address a client named, so a domain that
-// resolves to a private, loopback or listed address is caught only by freedom's final
-// rules, which see the resolved address. They come first, ahead of the template's allow.
+// A domain resolving to a blocked address is caught only by freedom's final rules, which see the
+// resolved address; they come ahead of the template's allow.
 func TestInjectEgressFilter_FreedomBlocksResolvedAddresses(t *testing.T) {
 	freedomFinal := func(t *testing.T, template string, f egressfilter.Filter, own egressOwnTargets) []any {
 		t.Helper()

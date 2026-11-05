@@ -98,9 +98,8 @@ type SubService struct {
 	// probe is the probes' verdict on the endpoints, read lazily by probeVerdicts.
 	probe       *service.ReachSubVerdicts
 	probeLoaded bool
-	// remarkCalls is the identity of every templated body remark of this render pass, in order;
-	// remarkFullAt, set for a second pass, names the remark that carries the full template per
-	// identity (probe_remarks.go).
+	// remarkCalls: identity of each templated remark this pass, in order; remarkFullAt (second pass)
+	// names the remark carrying the full template per identity (probe_remarks.go).
 	remarkCalls  []string
 	remarkFullAt map[string]int
 }

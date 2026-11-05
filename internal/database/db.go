@@ -419,9 +419,8 @@ func migrateSyncOrphanColumns() error {
 	return db.Exec("UPDATE clients SET sync_orphaned_by = 0 WHERE sync_orphaned_by IS NULL").Error
 }
 
-// AutoMigrate adds the node traffic quota columns with their defaults; this only backfills
-// NULLs an older SQLite ALTER TABLE may leave, so a NULL multiplier never reads as 0 and a
-// NULL action never reads as an unknown one (still-ui).
+// Backfills the NULLs an older SQLite ALTER TABLE may leave in the node quota columns, so a
+// NULL multiplier never reads as 0 nor a NULL action as an unknown one (still-ui).
 func migrateNodeTrafficLimitColumns() error {
 	defaults := []struct {
 		column string
@@ -1560,10 +1559,8 @@ func seedRandomSubscriptionPaths() error {
 	})
 }
 
-// FreshEgressFilter is the egress filter a new install starts with: outgoing SMTP
-// (port 25) blocked. No client device sends mail to port 25 itself (mail apps submit on
-// 465/587, which stay open), while spam from VPN clients on it gets servers suspended.
-// Existing installs keep the filter off until the operator turns it on.
+// FreshEgressFilter blocks outgoing SMTP (port 25) on new installs: mail apps submit on 465/587,
+// while client spam on 25 gets servers suspended. Existing installs keep the filter off.
 const FreshEgressFilter = `{"smtp":true}`
 
 func seedFreshEgressFilter() error {

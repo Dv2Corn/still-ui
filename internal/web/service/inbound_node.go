@@ -1111,9 +1111,8 @@ func (s *InboundService) setRemoteTrafficLocked(nodeID int, snap *runtime.Traffi
 					deltaDown = 0
 				}
 			}
-			// Billed share. The node enforces quotas on its raw counters, so its disable
-			// latch is judged against its usage in billed bytes too: a 0.5 node must not cut
-			// a client at half the quota, nor a 2.0 node let one run past it.
+			// Billed share; the node's disable latch is judged in billed bytes too (the node
+			// bills its own counters at the multiplier this master pushes).
 			deltaUp, deltaDown = scaleNodeTraffic(deltaUp, billing), scaleNodeTraffic(deltaDown, billing)
 			billedCanon := nodeTrafficCounter{Up: scaleNodeTraffic(canon.Up, billing), Down: scaleNodeTraffic(canon.Down, billing)}
 

@@ -221,11 +221,8 @@ const (
 	reachDirectFailing
 )
 
-// reachOwnNetworkBroken decides, for a probe that fails on every endpoint it checks, whether the
-// cause is more likely its own network or test URL than a block. A passing direct check means the
-// probe's network works, so a censor blocking a whole server is believed. A failing one means it
-// does not. Without a direct check, failures spread over two or more hosts point at the probe;
-// every endpoint of one host failing is what a blocked server address looks like.
+// reachOwnNetworkBroken blames the probe, not a block, for all-failing checks: by its direct check
+// when there is one, otherwise when the failures span two or more hosts.
 func reachOwnNetworkBroken(down []string, direct int) bool {
 	switch direct {
 	case reachDirectOk:
@@ -243,9 +240,8 @@ func reachOwnNetworkBroken(down []string, direct int) bool {
 	return len(hosts) >= 2
 }
 
-// freshReachFailures returns the normalized keys of the probe's targets that are down, the
-// number of its targets checked since the cut-off (the direct check and dropped inbounds are
-// skipped) and what its direct check said in that time.
+// freshReachFailures returns the probe's down targets, how many it checked since the cut-off
+// (direct check and dropped inbounds skipped) and what its direct check said then.
 func freshReachFailures(probe *model.ReachProbe, since int64) ([]string, int, int, error) {
 	db := database.GetDB()
 	var lastChecks []struct {

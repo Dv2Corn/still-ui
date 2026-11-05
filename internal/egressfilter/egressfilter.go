@@ -1,8 +1,5 @@
-// Package egressfilter keeps clients from using the server for mail spam, for reaching
-// private networks and for reaching the server's own management ports. Xray traffic is
-// filtered by routing rules the panel adds to the generated config; this package also
-// owns one nftables table for AmneziaWG kernel-mode clients, whose packets the kernel
-// forwards without Xray seeing them.
+// Package egressfilter keeps clients off mail spam, private networks and the server's own ports:
+// Xray by generated routing rules, AmneziaWG kernel-mode clients by one nftables table.
 package egressfilter
 
 import (
@@ -48,9 +45,8 @@ var SMTPPorts = []PortRange{{25, 25}}
 // SubmissionPorts is authenticated mail submission (SMTPS, submission).
 var SubmissionPorts = []PortRange{{465, 465}, {587, 587}}
 
-// PrivateV4 and PrivateV6 are the destinations no client needs: RFC 1918, carrier-grade
-// NAT, loopback, link-local, benchmarking, multicast, reserved, unique-local. NAT64
-// prefixes are left out on purpose: a NAT64 host reaches the IPv4 internet through them.
+// PrivateV4 and PrivateV6 are the private, loopback, link-local, multicast and reserved ranges no
+// client needs. NAT64 prefixes are left out: a NAT64 host reaches the IPv4 internet through them.
 var (
 	PrivateV4 = []string{
 		"0.0.0.0/8", "10.0.0.0/8", "100.64.0.0/10", "127.0.0.0/8", "169.254.0.0/16",
@@ -320,9 +316,8 @@ func prefixElements(prefixes []netip.Prefix) string {
 
 var counterNames = []string{"mail", "private", "server", "custom"}
 
-// Ruleset returns one nft transaction that replaces the table. Only connections an
-// AmneziaWG kernel client opens are judged: the server's own traffic, SSH, DNS replies
-// and every other interface are never matched. An unparsable custom list is an error.
+// Ruleset returns one nft transaction replacing the table; it judges only connections AmneziaWG
+// kernel clients open, never the server's own traffic. An unparsable custom list is an error.
 func Ruleset(spec Spec) (string, error) {
 	custom, err := ParseCustom(spec.Filter.Custom)
 	if err != nil {

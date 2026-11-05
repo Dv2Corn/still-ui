@@ -101,9 +101,8 @@ type Status struct {
 		State    ProcessState `json:"state"`
 		ErrorMsg string       `json:"errorMsg"`
 		Version  string       `json:"version"`
-		// StillBuild is true when the local core is still-ui's own Xray build
-		// (scripts/xray-build); the version dialog warns before replacing it
-		// with an official release.
+		// StillBuild marks still-ui's own Xray build (scripts/xray-build); the version
+		// dialog warns before replacing it with an official release.
 		StillBuild bool `json:"stillBuild"`
 		// Certificates is what each TLS/Hysteria inbound actually answers with, against its file.
 		Certificates []certwatch.Status `json:"certificates,omitempty"`

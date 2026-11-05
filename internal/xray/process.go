@@ -699,13 +699,11 @@ func CheckConfig(binaryPath string, cfg *Config) error {
 	return nil
 }
 
-// StillBuildName is the build name scripts/xray-build/build.sh links into
-// still-ui's Xray (XRAY_BUILD_NAME, linked as core.build). It is part
-// of the pinned binary sums, so it cannot change without a new build.
+// StillBuildName is the core.build name scripts/xray-build/build.sh links in; it is part of
+// the pinned binary sums, so it cannot change without a new build.
 const StillBuildName = "sp-ios"
 
-// parseXrayVersion reads `xray -version` output: "Xray 26.10.31 (Xray,
-// Penetrates Everything.) sp-ios (go1.27.3 linux/amd64)". It returns the
+// parseXrayVersion reads "Xray 26.10.31 (Xray, Penetrates Everything.) sp-ios (go…)" into the
 // version and whether the build name after the codename is StillBuildName.
 func parseXrayVersion(data []byte) (version string, stillBuild bool) {
 	version = "Unknown"

@@ -171,9 +171,8 @@ func (s *NodeService) trafficLocation() *time.Location {
 	return loc
 }
 
-// EvaluateTrafficLimits rolls finished periods over, applies the limit action and
-// announces level changes. Alert level and disabled inbounds are stored, so a panel
-// restart neither repeats an alert nor forgets what to turn back on.
+// EvaluateTrafficLimits rolls periods over, applies the limit action and announces level changes;
+// both are stored, so a restart neither repeats an alert nor forgets what to turn back on.
 func (s *NodeService) EvaluateTrafficLimits(now time.Time) {
 	var nodes []model.Node
 	if err := database.GetDB().Model(model.Node{}).Find(&nodes).Error; err != nil {

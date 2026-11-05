@@ -1,13 +1,5 @@
-// Package nodeenroll is the wire contract of one-command node enrollment: the
-// invitation string the master shows, and the client a new node uses to
-// register itself with the master that made it.
-//
-// The invitation is "still-node1.<token>.<key pin>.<master URL>": a one-time
-// token, the SHA-256 of the master's TLS public key (SubjectPublicKeyInfo,
-// unpadded base64url) and the master's panel URL (unpadded base64url). The
-// node checks the key pin on every connection, so it reaches the right master
-// even when the master's certificate is self-signed. The fields are separated
-// by dots so install.sh can read them without a JSON parser.
+// Package nodeenroll is the one-command enrollment contract: "still-node1.<token>.<SPKI SHA-256>.<URL>"
+// (base64url fields, dot-separated for install.sh); the node pins the key on every connection.
 package nodeenroll
 
 import (

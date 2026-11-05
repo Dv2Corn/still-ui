@@ -136,10 +136,8 @@ func (s *EgressFilterService) save(v EgressFilterSettings) error {
 	return s.settingService.setString(egressFilterSettingKey, string(raw))
 }
 
-// ServerPorts are this server's own TCP management ports: the panel and SSH. The
-// subscription port stays open, since client apps refresh their subscription through
-// the tunnel they are connected to; a port that also serves an inbound is left out
-// too: it is public on purpose.
+// ServerPorts are the panel and SSH ports. The subscription port (refreshed through the tunnel)
+// and any port that also serves an inbound stay open.
 func (s *EgressFilterService) ServerPorts() []uint16 {
 	var ports []uint16
 	add := func(p int) {
@@ -257,9 +255,8 @@ func (s *EgressFilterService) templatePrivateBlocked() bool {
 	return routingBlocksPrivate(tmpl.Routing, tmpl.Outbounds, map[string]bool{"api": true})
 }
 
-// SetLocal stores the operator's own filter (a managed one becomes local), converges
-// the host table and hands the filter to the chosen nodes. The Xray half follows from
-// the next config build, so the caller restarts Xray.
+// SetLocal stores the operator's filter, converges the host table and hands it to the chosen nodes;
+// the Xray half follows from the next config build, so the caller restarts Xray.
 func (s *EgressFilterService) SetLocal(in EgressFilterSettings) (EgressFilterStatus, error) {
 	f, err := in.Normalize()
 	if err != nil {
@@ -335,9 +332,8 @@ func (s *EgressFilterService) applyHost(f egressfilter.Filter) {
 	}
 }
 
-// EnsureHostFilter reloads the table after a reboot or a foreign ruleset flush, and
-// keeps it in step with the panel's ports. With nothing to block it does nothing, so a
-// panel that never used the filter never runs nft.
+// EnsureHostFilter reloads the table after a reboot or foreign flush and follows the panel's ports;
+// with nothing to block it never runs nft.
 func (s *EgressFilterService) EnsureHostFilter() {
 	settings := s.Settings()
 	spec := s.spec(settings.Filter)
@@ -418,9 +414,8 @@ func pushEgressFilterToNode(ctx context.Context, n *model.Node, req ManagedEgres
 	return remote.ApplyManagedEgressFilter(ctx, req)
 }
 
-// SyncNodes hands this panel's filter to every node in scope and releases the rest.
-// Each node is contacted once per change (and once after a panel restart); a node that
-// is offline, disabled or refused is retried later. force retries refused nodes now.
+// SyncNodes hands the filter to nodes in scope and releases the rest, once per change or restart;
+// unreachable or refusing nodes are retried later (force retries refused ones now).
 func (s *EgressFilterService) SyncNodes(force bool) {
 	nodes, err := s.nodeService.GetAll()
 	if err != nil || len(nodes) == 0 {
@@ -513,10 +508,8 @@ func (s *EgressFilterService) SyncNodes(force bool) {
 
 // Xray config ---------------------------------------------------------------
 
-// egressClientTags are the generated inbounds that carry client traffic: every local
-// inbound of the panel, including the relays AmneziaWG (userspace), TUIC and MTProto
-// dial Xray through, which keep their inbound's tag. The API inbound and the panel's
-// own bridges (panel egress, node egress) are never filtered.
+// egressClientTags are the inbounds carrying client traffic, relays (AmneziaWG userspace, TUIC,
+// MTProto) included; the API inbound and the panel's own egress bridges are never filtered.
 func egressClientTags(cfg *xray.Config, inbounds []*model.Inbound) []string {
 	local := map[string]bool{}
 	for _, in := range inbounds {
@@ -604,10 +597,8 @@ type egressOwnTargets struct {
 
 var egressLoopback = []string{"127.0.0.0/8", "::1/128"}
 
-// injectEgressFilter puts the filter's blackhole rules ahead of every other rule for
-// client inbounds only. For the address blocks (this server's ports, private and loopback
-// ranges, listed addresses) it also adds block finalRules to each freedom outbound, since
-// a client that names such an address by domain is only resolved there.
+// injectEgressFilter puts blackhole rules first for client inbounds; address blocks also become
+// freedom finalRules, since a destination named by domain is only resolved there.
 func injectEgressFilter(cfg *xray.Config, clientTags []string, f egressfilter.Filter, own egressOwnTargets) {
 	if len(clientTags) == 0 || !f.Any() {
 		return
@@ -737,9 +728,8 @@ func ensureBlackholeOutbound(outbounds []map[string]any, tag string) (string, []
 	return name, append(outbounds, map[string]any{"tag": name, "protocol": "blackhole"})
 }
 
-// freedomBlocks is what freedom has to refuse after it resolves a domain: routing matches
-// "ip" only against the address the client named, so a domain that resolves to a private,
-// loopback or listed address (or to this server) would otherwise be dialled.
+// freedomBlocks is what freedom refuses after resolving a domain: routing matches "ip" only against
+// the address the client named, so a domain resolving to a blocked address would be dialled.
 type freedomBlocks struct {
 	serverIPs   []string
 	serverPorts string // empty: no server block
@@ -751,10 +741,8 @@ type freedomBlocks struct {
 // egressFreedomPorts is every port but DNS, which the filter never blocks.
 const egressFreedomPorts = "1-52,54-65535"
 
-// addFreedomBlocks prepends block finalRules to every freedom outbound that dials for itself
-// (a dialerProxy chain ignores finalRules), ahead of the outbound's own rules, so a later
-// "allow" cannot let the destination through. Final rules see every connection the outbound
-// dials, after the domain is resolved.
+// addFreedomBlocks prepends block finalRules (checked after resolution) to every freedom outbound that
+// dials itself (dialerProxy ignores them), so no later "allow" lets the destination through.
 func addFreedomBlocks(outbounds []map[string]any, b freedomBlocks) {
 	for _, o := range outbounds {
 		if p, _ := o["protocol"].(string); !strings.EqualFold(p, "freedom") {
