@@ -796,7 +796,6 @@ def filter_text(text: str, policy: Policy | None = None) -> tuple[str, int, int]
 _GATE_ATTRS = _URL_ATTRS | {"data-canonical-src"}
 _CAMO = re.compile(r"^https?://camo\.githubusercontent\.com/", re.I)
 _USER_MENTION = re.compile(r"^https://github\.com/[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})/?$")
-_TEAM_MENTION = re.compile(r"^https://github\.com/orgs/[A-Za-z0-9-]+/teams/[A-Za-z0-9._-]+/?$")
 
 
 class _LinkCollector(HTMLParser):
@@ -828,7 +827,8 @@ def rendered_link_failures(rendered: str, policy: Policy | None = None) -> int:
     """How many URLs in GitHub's rendering of the reply fail the policy. A
     camo (image proxy) URL passes only as the src of an image whose
     data-canonical-src passes, and then also as the href of the link GitHub
-    wraps around it; a mention passes as a link to a profile or team page."""
+    wraps around it; a mention passes only as a link to the profile of the
+    repository owner or the --author, never to a team."""
     policy = policy or _DEFAULT_POLICY
     collector = _LinkCollector()
     collector.feed(rendered)
@@ -846,9 +846,10 @@ def rendered_link_failures(rendered: str, policy: Policy | None = None) -> int:
         if _CAMO.match(url):
             ok = url in camo_ok
         elif tag == "a" and name == "href" and "user-mention" in classes:
-            ok = bool(_USER_MENTION.match(url))
+            # Only the accounts the text pass lets through: the owner and the author.
+            ok = bool(_USER_MENTION.match(url)) and url.rstrip("/").rsplit("/", 1)[-1].lower() in policy.mentionable
         elif tag == "a" and name == "href" and "team-mention" in classes:
-            ok = bool(_TEAM_MENTION.match(url))
+            ok = False  # a team mention notifies every member; the text pass never allows one
         else:
             ok = target_allowed(url, policy)
         failures += not ok

