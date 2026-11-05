@@ -46,6 +46,15 @@ func validateClientEmail(email string) error {
 	return nil
 }
 
+func validateClientsEmail(clients []model.Client) error {
+	for _, client := range clients {
+		if err := validateClientEmail(client.Email); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func validateClientSubID(subID string) error {
 	if hasForbiddenClientChar(subID) {
 		return common.NewError("client subId contains an invalid character:", subID)
