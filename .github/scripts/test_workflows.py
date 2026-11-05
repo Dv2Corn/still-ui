@@ -41,5 +41,36 @@ class ModelJobTest(unittest.TestCase):
                 self.assertIn("bwrap --ro-bind / / --unshare-all true", step, where)
 
 
+class PostJobTest(unittest.TestCase):
+    """The jobs that hold the write token run no model and no pull-request code."""
+
+    POST_STEPS = {
+        "claude-issue-analyst.yml": ("- name: Post the reply and apply its labels, title and state", "gh issue comment"),
+        "claude-pr-review.yml": ("- name: Post the review", "gh pr comment"),
+    }
+
+    def test_post_jobs_check_out_only_the_scripts_and_filter_links_before_posting(self):
+        for name, (step_name, comment) in self.POST_STEPS.items():
+            job = jobs((WORKFLOWS / name).read_text())["post"]
+            self.assertNotIn(ACTION, job, name)
+            self.assertNotIn("secrets.CLAUDE", job, name)
+            self.assertNotIn("secrets.ANTHROPIC", job, name)
+            # One checkout: the workflow's own commit (no ref:, so never the
+            # pull request head), .github/scripts only, no stored token.
+            checkouts = [m.start() for m in re.finditer(r"uses: actions/checkout@", job)]
+            self.assertEqual(len(checkouts), 1, name)
+            with_block = job[checkouts[0] : job.index("\n      - ", checkouts[0] + 1)]
+            self.assertIn("persist-credentials: false", with_block, name)
+            self.assertIn("sparse-checkout: .github/scripts", with_block, name)
+            self.assertNotIn("ref:", with_block, name)
+            self.assertNotIn("path:", with_block, name)
+            self.assertNotIn("allow-unsafe-pr-checkout", with_block, name)
+            # Nothing else from the checkout runs but the link filter.
+            self.assertEqual(re.findall(r"\.github/scripts/[\w.-]+", job.replace("sparse-checkout: .github/scripts", "")),
+                             [".github/scripts/link_filter.py"], name)
+            step = job[job.index(step_name) :]
+            self.assertLess(step.index("python3 -I .github/scripts/link_filter.py"), step.index(comment), name)
+
+
 if __name__ == "__main__":
     unittest.main()

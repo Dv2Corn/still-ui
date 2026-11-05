@@ -358,14 +358,17 @@ jobs:
           if-no-files-found: ignore
           retention-days: 1
 
-  # Runs no model, checks out nothing and holds no Claude secret: it reads the
-  # reply the analyze job left and applies it to this issue alone.
+  # Runs no model and holds no Claude secret: it reads the reply the analyze
+  # job left and applies it to this issue alone. The only code it checks out
+  # is .github/scripts of the commit this workflow file came from (the
+  # default branch), for the link filter.
   post:
     needs: analyze
     if: ${{ !cancelled() && needs.analyze.outputs.ran == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
+      contents: read
       issues: write
     env:
       GH_TOKEN: ${{ github.token }}
@@ -373,6 +376,10 @@ jobs:
       ISSUE: ${{ github.event.issue.number }}
       TRIGGER: ${{ (github.event_name == 'issue_comment' && startsWith(github.event.comment.body, '@claude analyze')) && 'maintainer_request' || github.event_name }}
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         continue-on-error: true
         with:
@@ -410,10 +417,12 @@ jobs:
           fi
           # The run marker is the workflow's, never the model's: drop any copy
           # the reply carries, then put this run's id above the closing marker.
+          # Links to hosts outside the allowlist go first: an issue may have
+          # steered the model into citing an attacker's site.
           reply="$RUNNER_TEMP/reply.md"
-          { grep -vE '^[[:space:]]*<!-- claude-issue:run [0-9]+ -->[[:space:]]*$' "$body" | sed '$d'
-            printf '<!-- claude-issue:run %s -->\n<!-- claude-issue:analyst -->\n' "$GITHUB_RUN_ID"
-          } > "$reply"
+          grep -vE '^[[:space:]]*<!-- claude-issue:run [0-9]+ -->[[:space:]]*$' "$body" | sed '$d' > "$RUNNER_TEMP/prose.md"
+          python3 -I .github/scripts/link_filter.py "$RUNNER_TEMP/prose.md" "$reply"
+          printf '<!-- claude-issue:run %s -->\n<!-- claude-issue:analyst -->\n' "$GITHUB_RUN_ID" >> "$reply"
           gh issue comment "$ISSUE" -R "$REPO" --body-file "$reply"
 
           actions="$DIR/actions.json"
