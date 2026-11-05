@@ -288,6 +288,25 @@
           "subClashAutoDetect": {
             "type": "boolean"
           },
+          "subClashAutoGroup": {
+            "type": "boolean"
+          },
+          "subClashAutoGroupInterval": {
+            "maximum": 86400,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "subClashAutoGroupTolerance": {
+            "maximum": 10000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "subClashAutoGroupType": {
+            "type": "string"
+          },
+          "subClashAutoGroupUrl": {
+            "type": "string"
+          },
           "subClashEnable": {
             "type": "boolean"
           },
@@ -733,6 +752,11 @@
           "subCalendarExpireInclusive",
           "subCertFile",
           "subClashAutoDetect",
+          "subClashAutoGroup",
+          "subClashAutoGroupInterval",
+          "subClashAutoGroupTolerance",
+          "subClashAutoGroupType",
+          "subClashAutoGroupUrl",
           "subClashEnable",
           "subClashEnableRouting",
           "subClashPath",
@@ -1139,6 +1163,25 @@
           },
           "subClashAutoDetect": {
             "type": "boolean"
+          },
+          "subClashAutoGroup": {
+            "type": "boolean"
+          },
+          "subClashAutoGroupInterval": {
+            "maximum": 86400,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "subClashAutoGroupTolerance": {
+            "maximum": 10000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "subClashAutoGroupType": {
+            "type": "string"
+          },
+          "subClashAutoGroupUrl": {
+            "type": "string"
           },
           "subClashEnable": {
             "type": "boolean"
@@ -1593,6 +1636,11 @@
           "subCalendarExpireInclusive",
           "subCertFile",
           "subClashAutoDetect",
+          "subClashAutoGroup",
+          "subClashAutoGroupInterval",
+          "subClashAutoGroupTolerance",
+          "subClashAutoGroupType",
+          "subClashAutoGroupUrl",
           "subClashEnable",
           "subClashEnableRouting",
           "subClashPath",

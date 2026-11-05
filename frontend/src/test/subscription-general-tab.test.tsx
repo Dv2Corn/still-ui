@@ -231,4 +231,60 @@ describe('SubscriptionGeneralTab', () => {
     ).toBe('false');
     expect(updateSetting).not.toHaveBeenCalled();
   });
+
+  it.each([false, true])('toggles the Clash Auto group stored as %s', (enabled) => {
+    const updateSetting = vi.fn();
+
+    renderWithProviders(
+      <MemoryRouter initialEntries={['/settings#subscription']}>
+        <SubscriptionGeneralTab
+          allSetting={new AllSetting({ subClashAutoGroup: enabled })}
+          updateSetting={updateSetting}
+        />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: /Clash/ }));
+    const autoSwitch = screen.getByRole('switch', { name: 'Auto group' });
+    expect(autoSwitch.getAttribute('aria-checked')).toBe(String(enabled));
+    fireEvent.click(autoSwitch);
+
+    expect(updateSetting).toHaveBeenCalledExactlyOnceWith({ subClashAutoGroup: !enabled });
+  });
+
+  it('switches the Clash Auto group to fallback and locks the url-test tolerance', () => {
+    function Harness() {
+      const [allSetting, setAllSetting] = useState(() => new AllSetting());
+      return (
+        <SubscriptionGeneralTab
+          allSetting={allSetting}
+          updateSetting={(patch) =>
+            setAllSetting((current) => new AllSetting({ ...current, ...patch }))
+          }
+        />
+      );
+    }
+
+    renderWithProviders(
+      <MemoryRouter initialEntries={['/settings#subscription']}>
+        <Harness />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: /Clash/ }));
+    const tolerance = screen.getByRole('spinbutton', { name: 'Tolerance (ms)' });
+    expect(tolerance).toHaveProperty('disabled', false);
+    expect(tolerance).toHaveProperty('value', '50');
+    expect(screen.getByRole('spinbutton', { name: 'Check interval (seconds)' })).toHaveProperty(
+      'value',
+      '300',
+    );
+
+    chooseSelectOption('sub-clash-auto-group-type', 'First working (fallback)');
+
+    expect(screen.getByRole('spinbutton', { name: 'Tolerance (ms)' })).toHaveProperty(
+      'disabled',
+      true,
+    );
+  });
 });

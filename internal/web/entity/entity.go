@@ -144,6 +144,11 @@ type AllSetting struct {
 	SubClashEnableRouting       bool   `json:"subClashEnableRouting" form:"subClashEnableRouting"`
 	SubClashRules               string `json:"subClashRules" form:"subClashRules"`
 	SubClashRemoteDNS           bool   `json:"subClashRemoteDNS" form:"subClashRemoteDNS"`
+	SubClashAutoGroup           bool   `json:"subClashAutoGroup" form:"subClashAutoGroup"`
+	SubClashAutoGroupType       string `json:"subClashAutoGroupType" form:"subClashAutoGroupType"`
+	SubClashAutoGroupUrl        string `json:"subClashAutoGroupUrl" form:"subClashAutoGroupUrl"`
+	SubClashAutoGroupInterval   int    `json:"subClashAutoGroupInterval" form:"subClashAutoGroupInterval" validate:"gte=0,lte=86400"`
+	SubClashAutoGroupTolerance  int    `json:"subClashAutoGroupTolerance" form:"subClashAutoGroupTolerance" validate:"gte=0,lte=10000"`
 	SubJsonMux                  string `json:"subJsonMux" form:"subJsonMux"`
 	SubJsonRules                string `json:"subJsonRules" form:"subJsonRules"`
 	SubJsonRoutingRules         string `json:"subJsonRoutingRules" form:"subJsonRoutingRules"`

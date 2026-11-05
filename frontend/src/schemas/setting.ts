@@ -10,6 +10,9 @@ export type SubProfileMode = z.infer<typeof SubProfileModeSchema>;
 export const SubHostSortModeSchema = z.enum(['inbound-first', 'hosts-first']);
 export type SubHostSortMode = z.infer<typeof SubHostSortModeSchema>;
 
+export const SubClashAutoGroupTypeSchema = z.enum(['url-test', 'fallback']);
+export type SubClashAutoGroupType = z.infer<typeof SubClashAutoGroupTypeSchema>;
+
 export const AllSettingSchema = z
   .object({
     webListen: z.string().optional(),
@@ -86,6 +89,11 @@ export const AllSettingSchema = z
     subClashEnableRouting: z.boolean().optional(),
     subClashRules: z.string().optional(),
     subClashRemoteDNS: z.boolean().optional(),
+    subClashAutoGroup: z.boolean().optional(),
+    subClashAutoGroupType: SubClashAutoGroupTypeSchema.optional(),
+    subClashAutoGroupUrl: z.string().max(2048).optional(),
+    subClashAutoGroupInterval: z.number().int().min(10).max(86400).optional(),
+    subClashAutoGroupTolerance: z.number().int().min(0).max(10000).optional(),
     subJsonMux: z.string().optional(),
     subJsonRules: z.string().optional(),
     subJsonRoutingRules: z.string().optional(),

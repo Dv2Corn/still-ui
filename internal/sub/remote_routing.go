@@ -469,8 +469,8 @@ func normalizeClashRouting(body []byte) (string, map[string]any, error) {
 	base := map[string]any{
 		"proxies": []map[string]any{{"name": "validation-node", "type": "vless"}},
 		"proxy-groups": []map[string]any{{
-			"name": "PROXY", "type": "select", "proxies": []string{"validation-node", "DIRECT"},
-		}},
+			"name": "PROXY", "type": "select", "proxies": []string{clashAutoGroupName, "validation-node", "DIRECT"},
+		}, defaultClashAutoGroup().proxyGroup([]string{"validation-node"})},
 		"rules": []string{"MATCH,PROXY"},
 	}
 	if err := mergeRemoteClashRules(base, document, false); err != nil {

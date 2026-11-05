@@ -367,6 +367,7 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 		WithSUBClashEnableRouting(SubClashEnableRouting),
 		WithSUBClashRules(SubClashRules),
 		WithSUBClashRemoteDNS(SubClashRemoteDNS),
+		WithSUBClashAutoGroup(loadClashAutoGroup(&s.settingService)),
 		WithSUBTitle(SubTitle),
 		WithSUBSupportURL(SubSupportUrl),
 		WithSUBProfileURL(SubProfileUrl),
