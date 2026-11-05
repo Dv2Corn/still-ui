@@ -25,6 +25,7 @@ function renderSubNode(fields: Partial<NodeRecord>) {
       selectedIds={[]}
       onSelectionChange={noop}
       onAdd={noop}
+      onInvite={noop}
       onMtls={noop}
       onEdit={noop}
       onDelete={noop}

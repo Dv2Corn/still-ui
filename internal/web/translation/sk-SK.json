@@ -1320,7 +1320,9 @@
         "updateResult": "Aktualizácia spustená na serveroch: {ok}, neúspešné: {failed}",
         "updateNoneEligible": "Vyberte aspoň jeden dostupný a zapnutý server",
         "saveMtls": "Uložiť mTLS servera",
-        "reloadMtls": "Znova načítať prihlasovací údaj mTLS hlavného panelu"
+        "reloadMtls": "Znova načítať prihlasovací údaj mTLS hlavného panelu",
+        "inviteCreate": "Vytvorenie pozvánky uzla",
+        "inviteRevoke": "Zrušenie pozvánky uzla"
       },
       "tlsVerifyMode": "Overovanie TLS",
       "tlsVerifyModeHint": "Spôsob overenia certifikátu HTTPS vzdialeného servera. Pri certifikáte podpísanom sebou samým použite pevný odtlačok alebo vynechanie overenia (iba servery HTTPS).",
@@ -1348,7 +1350,34 @@
       "pinnedCertPlaceholder": "SHA-256 vo formáte base64 alebo hex",
       "fetchPin": "Získať",
       "pinFetched": "Aktuálny certifikát servera bol načítaný",
-      "pinFetchFailed": "Nepodarilo sa získať certifikát"
+      "pinFetchFailed": "Nepodarilo sa získať certifikát",
+      "invite": {
+        "button": "Pridať príkazom",
+        "title": "Pridať uzol jedným príkazom",
+        "intro": "Vytvorte jednorazovú pozvánku a spustite príkaz ako root na novom serveri. Nainštaluje tam still-ui, nastaví ho ako uzol tohto panela a pridá ho do tohto zoznamu.",
+        "addressHint": "Nechajte prázdne, ak sa má použiť adresa, z ktorej sa server pripojí.",
+        "addressPlaceholder": "Adresa, z ktorej sa server pripojí",
+        "masterUrl": "URL tohto panela pre uzly",
+        "masterUrlHint": "Nový server otvorí túto adresu HTTPS. Príkaz overuje kľúč TLS tohto panela, takže funguje aj certifikát s vlastným podpisom.",
+        "validMinutes": "Platí, minút",
+        "nodeAdmin": "Povoliť aktualizáciu panela",
+        "nodeAdminHint": "Uzol dá tomuto panelu token, ktorým môže aj aktualizovať jeho still-ui. Inak token iba synchronizuje vstupy a klientov.",
+        "create": "Vytvoriť pozvánku",
+        "once": "Skopírujte príkaz teraz: zobrazí sa iba raz. Funguje jedenkrát, do {time}.",
+        "command": "Spustite ako root na novom serveri",
+        "another": "Vytvoriť ďalšiu",
+        "list": "Pozvánky",
+        "details": "Podrobnosti",
+        "usedFrom": "Použitá {time} z {ip}, uzol #{id}",
+        "validUntil": "Platí do {time}",
+        "revoke": "Zrušiť",
+        "status": {
+          "pending": "Čaká",
+          "used": "Použitá",
+          "expired": "Vypršala",
+          "revoked": "Zrušená"
+        }
+      }
     },
     "settings": {
       "defaultTag": "Predvolené",

@@ -1199,7 +1199,9 @@
         "updateResult": "تم بدء التحديث على {ok} عقدة، فشل {failed}",
         "updateNoneEligible": "اختر عقدة واحدة على الأقل متصلة ومفعّلة",
         "saveMtls": "حفظ mTLS النود",
-        "reloadMtls": "Reload master mTLS credential"
+        "reloadMtls": "Reload master mTLS credential",
+        "inviteCreate": "إنشاء دعوة عقدة",
+        "inviteRevoke": "إلغاء دعوة عقدة"
       },
       "tlsVerifyMode": "التحقق من TLS",
       "tlsVerifyModeHint": "كيف يتحقق اللوحة من شهادة HTTPS الخاصة بالعقدة. التثبيت أو التخطّي مخصّصان للشهادات الموقّعة ذاتيًا (عُقد https فقط).",
@@ -1227,7 +1229,34 @@
       "pinnedCertPlaceholder": "SHA-256 بصيغة base64 أو hex",
       "fetchPin": "جلب",
       "pinFetched": "تم جلب شهادة العقدة الحالية",
-      "pinFetchFailed": "تعذّر جلب الشهادة"
+      "pinFetchFailed": "تعذّر جلب الشهادة",
+      "invite": {
+        "button": "إضافة بأمر",
+        "title": "إضافة عقدة بأمر واحد",
+        "intro": "أنشئ دعوة لمرة واحدة ثم شغّل الأمر بصلاحية root على الخادم الجديد. سيثبّت still-ui هناك ويجعله عقدة لهذه اللوحة ويضيفه إلى هذه القائمة.",
+        "addressHint": "اتركه فارغًا لاستخدام العنوان الذي يتصل منه الخادم.",
+        "addressPlaceholder": "العنوان الذي يتصل منه الخادم",
+        "masterUrl": "عنوان هذه اللوحة للعُقد",
+        "masterUrlHint": "سيفتح الخادم الجديد عنوان HTTPS هذا. يتحقق الأمر من مفتاح TLS لهذه اللوحة، لذا تعمل الشهادة الموقّعة ذاتيًا أيضًا.",
+        "validMinutes": "الصلاحية بالدقائق",
+        "nodeAdmin": "السماح بتحديث اللوحة",
+        "nodeAdminHint": "تعطي العقدة هذه اللوحة رمزًا يمكنه أيضًا تحديث still-ui الخاص بها. وإلا فالرمز يزامن الواردات والعملاء فقط.",
+        "create": "إنشاء دعوة",
+        "once": "انسخ الأمر الآن: يظهر مرة واحدة فقط. يعمل مرة واحدة حتى {time}.",
+        "command": "شغّله بصلاحية root على الخادم الجديد",
+        "another": "إنشاء أخرى",
+        "list": "الدعوات",
+        "details": "التفاصيل",
+        "usedFrom": "استُخدمت {time} من {ip}، العقدة #{id}",
+        "validUntil": "صالحة حتى {time}",
+        "revoke": "إلغاء",
+        "status": {
+          "pending": "بانتظار الاستخدام",
+          "used": "مستخدمة",
+          "expired": "منتهية",
+          "revoked": "ملغاة"
+        }
+      }
     },
     "settings": {
       "defaultTag": "افتراضي",

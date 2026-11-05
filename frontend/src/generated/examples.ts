@@ -988,6 +988,51 @@ export const EXAMPLES: Record<string, unknown> = {
     "xrayState": "",
     "xrayVersion": "25.10.31"
   },
+  "NodeInviteCreated": {
+    "invite": {
+      "address": "",
+      "allowPrivateAddress": false,
+      "attempts": 0,
+      "createdAt": 1736000000,
+      "expiresAt": 1736001800,
+      "id": 3,
+      "lastError": "",
+      "masterUrl": "https://panel.example.com:2053/path/",
+      "name": "de-fra-1",
+      "nodeAdmin": false,
+      "nodeId": 0,
+      "revokedAt": 0,
+      "status": "pending",
+      "usedAt": 0,
+      "usedFromIp": ""
+    },
+    "secret": "still-node1.\u003ctoken\u003e.\u003cpin\u003e.\u003curl\u003e"
+  },
+  "NodeInviteInput": {
+    "address": "",
+    "allowPrivateAddress": false,
+    "masterUrl": "https://panel.example.com:2053/path/",
+    "name": "de-fra-1",
+    "nodeAdmin": false,
+    "validMinutes": 30
+  },
+  "NodeInviteView": {
+    "address": "",
+    "allowPrivateAddress": false,
+    "attempts": 0,
+    "createdAt": 1736000000,
+    "expiresAt": 1736001800,
+    "id": 3,
+    "lastError": "",
+    "masterUrl": "https://panel.example.com:2053/path/",
+    "name": "de-fra-1",
+    "nodeAdmin": false,
+    "nodeId": 0,
+    "revokedAt": 0,
+    "status": "pending",
+    "usedAt": 0,
+    "usedFromIp": ""
+  },
   "NodeMutationRequest": {
     "address": "",
     "allowPrivateAddress": false,

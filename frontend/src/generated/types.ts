@@ -898,6 +898,38 @@ export interface Node {
   xrayVersion: string;
 }
 
+export interface NodeInviteCreated {
+  invite: NodeInviteView;
+  secret: string;
+}
+
+export interface NodeInviteInput {
+  address: string;
+  allowPrivateAddress: boolean;
+  masterUrl: string;
+  name: string;
+  nodeAdmin: boolean;
+  validMinutes: number;
+}
+
+export interface NodeInviteView {
+  address: string;
+  allowPrivateAddress: boolean;
+  attempts: number;
+  createdAt: number;
+  expiresAt: number;
+  id: number;
+  lastError: string;
+  masterUrl: string;
+  name: string;
+  nodeAdmin: boolean;
+  nodeId: number;
+  revokedAt: number;
+  status: string;
+  usedAt: number;
+  usedFromIp: string;
+}
+
 export interface NodeMutationRequest {
   address: string;
   allowPrivateAddress: boolean;

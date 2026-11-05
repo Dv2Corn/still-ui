@@ -1199,7 +1199,9 @@
         "updateResult": "Actualización iniciada en {ok} nodo(s), {failed} fallaron",
         "updateNoneEligible": "Selecciona al menos un nodo en línea y habilitado",
         "saveMtls": "Guardar mTLS del nodo",
-        "reloadMtls": "Reload master mTLS credential"
+        "reloadMtls": "Reload master mTLS credential",
+        "inviteCreate": "Crear invitación de nodo",
+        "inviteRevoke": "Revocar invitación de nodo"
       },
       "tlsVerifyMode": "Verificación TLS",
       "tlsVerifyModeHint": "Cómo valida el panel el certificado HTTPS del nodo. Fijar u Omitir son para certificados autofirmados (solo nodos https).",
@@ -1227,7 +1229,34 @@
       "pinnedCertPlaceholder": "SHA-256 en base64 o hex",
       "fetchPin": "Obtener",
       "pinFetched": "Se obtuvo el certificado actual del nodo",
-      "pinFetchFailed": "No se pudo obtener el certificado"
+      "pinFetchFailed": "No se pudo obtener el certificado",
+      "invite": {
+        "button": "Añadir con un comando",
+        "title": "Añadir un nodo con un comando",
+        "intro": "Crea una invitación de un solo uso y ejecuta el comando como root en el servidor nuevo. Instala still-ui, lo configura como nodo de este panel y lo añade a esta lista.",
+        "addressHint": "Déjalo vacío para usar la dirección desde la que se conecta el servidor.",
+        "addressPlaceholder": "Dirección desde la que se conecta el servidor",
+        "masterUrl": "URL de este panel para los nodos",
+        "masterUrlHint": "El servidor nuevo abre esta dirección HTTPS. El comando comprueba la clave TLS de este panel, así que también sirve un certificado autofirmado.",
+        "validMinutes": "Válida durante, minutos",
+        "nodeAdmin": "Permitir actualizar el panel",
+        "nodeAdminHint": "El nodo da a este panel un token que también puede actualizar su still-ui. Si no, el token solo sincroniza entradas y clientes.",
+        "create": "Crear invitación",
+        "once": "Copia el comando ahora: solo se muestra una vez. Funciona una sola vez, hasta {time}.",
+        "command": "Ejecútalo como root en el servidor nuevo",
+        "another": "Crear otra",
+        "list": "Invitaciones",
+        "details": "Detalles",
+        "usedFrom": "Usada {time} desde {ip}, nodo #{id}",
+        "validUntil": "Válida hasta {time}",
+        "revoke": "Revocar",
+        "status": {
+          "pending": "En espera",
+          "used": "Usada",
+          "expired": "Caducada",
+          "revoked": "Revocada"
+        }
+      }
     },
     "settings": {
       "defaultTag": "Predeterminado",

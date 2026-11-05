@@ -1199,7 +1199,9 @@
         "updateResult": "Pembaruan dipicu pada {ok} node, {failed} gagal",
         "updateNoneEligible": "Pilih minimal satu node online dan aktif",
         "saveMtls": "Simpan mTLS node",
-        "reloadMtls": "Reload master mTLS credential"
+        "reloadMtls": "Reload master mTLS credential",
+        "inviteCreate": "Buat undangan node",
+        "inviteRevoke": "Cabut undangan node"
       },
       "tlsVerifyMode": "Verifikasi TLS",
       "tlsVerifyModeHint": "Cara panel memvalidasi sertifikat HTTPS node. Pin atau Lewati untuk sertifikat self-signed (hanya node https).",
@@ -1227,7 +1229,34 @@
       "pinnedCertPlaceholder": "SHA-256 base64 atau hex",
       "fetchPin": "Ambil",
       "pinFetched": "Berhasil mengambil sertifikat node saat ini",
-      "pinFetchFailed": "Tidak dapat mengambil sertifikat"
+      "pinFetchFailed": "Tidak dapat mengambil sertifikat",
+      "invite": {
+        "button": "Tambah dengan perintah",
+        "title": "Tambah node dengan satu perintah",
+        "intro": "Buat undangan sekali pakai lalu jalankan perintah sebagai root di server baru. Perintah itu memasang still-ui, menjadikannya node panel ini, dan menambahkannya ke daftar ini.",
+        "addressHint": "Kosongkan untuk memakai alamat asal koneksi server.",
+        "addressPlaceholder": "Alamat asal koneksi server",
+        "masterUrl": "URL panel ini untuk node",
+        "masterUrlHint": "Server baru membuka alamat HTTPS ini. Perintah memeriksa kunci TLS panel ini, jadi sertifikat self-signed juga bisa.",
+        "validMinutes": "Berlaku, menit",
+        "nodeAdmin": "Izinkan pembaruan panel",
+        "nodeAdminHint": "Node memberi panel ini token yang juga dapat memperbarui still-ui-nya. Jika tidak, token hanya menyinkronkan inbound dan klien.",
+        "create": "Buat undangan",
+        "once": "Salin perintahnya sekarang: hanya ditampilkan sekali. Berlaku satu kali, sampai {time}.",
+        "command": "Jalankan sebagai root di server baru",
+        "another": "Buat lagi",
+        "list": "Undangan",
+        "details": "Detail",
+        "usedFrom": "Dipakai {time} dari {ip}, node #{id}",
+        "validUntil": "Berlaku sampai {time}",
+        "revoke": "Cabut",
+        "status": {
+          "pending": "Menunggu",
+          "used": "Dipakai",
+          "expired": "Kedaluwarsa",
+          "revoked": "Dicabut"
+        }
+      }
     },
     "settings": {
       "defaultTag": "Bawaan",

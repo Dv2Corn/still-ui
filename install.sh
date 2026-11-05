@@ -2502,8 +2502,107 @@ _still_migrate() {
     [[ -n "${work}" ]] && rm -rf "${work}"
     exit "$rc"
 }
+# still-ui: "install.sh node-enroll" installs still-ui and adds this server as a
+# node of the master that made the invitation (Nodes → Add with a command on
+# the master). The invitation is a credential: it comes from STILL_NODE_INVITE
+# or standard input, never the command line. STILL_NODE_NAME and
+# STILL_NODE_ADDRESS override the node name and the address the master uses;
+# STILL_UI_VERSION and STILL_UI_ARCHIVE pick the release as for an install.
+_still_node_invite_read() {
+    local line=""
+    node_invite="${STILL_NODE_INVITE:-}"
+    unset STILL_NODE_INVITE
+    if [[ -z "${node_invite}" ]]; then
+        if [[ -t 0 ]]; then
+            IFS= read -rs -p "Node invitation (from the master's Nodes page): " line || true
+            echo >&2
+        else
+            IFS= read -r line || true
+        fi
+        node_invite="${line}"
+    fi
+    node_invite="${node_invite//[[:space:]]/}"
+}
+
+# _still_node_invite_parse splits node_invite ("still-node1.<token>.<key
+# pin>.<master URL>", base64url parts) into node_token, node_pin (padded
+# base64, as curl --pinnedpubkey takes it) and node_master.
+_still_node_invite_parse() {
+    local prefix url_b64 rest padded url_re='^https://[]A-Za-z0-9.:[-]+(/[A-Za-z0-9._~/%+-]*)?/$'
+    IFS=. read -r prefix node_token node_pin url_b64 rest <<< "${node_invite}"
+    if [[ "${prefix}" != "still-node1" || -n "${rest}" || ! "${node_token}" =~ ^[A-Za-z0-9]{48}$ ||
+        ! "${node_pin}" =~ ^[A-Za-z0-9_-]{43}$ || ! "${url_b64}" =~ ^[A-Za-z0-9_-]+$ ]]; then
+        echo -e "${red}That is not a still-ui node invitation (it starts with still-node1.). Copy it again from the master's Nodes page.${plain}" >&2
+        return 1
+    fi
+    node_pin="${node_pin//-/+}"
+    node_pin="${node_pin//_//}="
+    padded="${url_b64//-/+}"
+    padded="${padded//_//}"
+    while ((${#padded} % 4)); do padded+="="; done
+    node_master=$(printf '%s' "${padded}" | base64 -d 2> /dev/null)
+    if [[ ! "${node_master}" =~ ${url_re} ]]; then
+        echo -e "${red}The invitation holds no valid master URL. Copy it again from the master's Nodes page.${plain}" >&2
+        return 1
+    fi
+}
+
+# _still_node_preflight asks the master whether the invitation is valid before
+# anything is installed. The key pin is checked even for a self-signed master
+# (curl -k skips only the chain); the token goes to curl on stdin, not argv.
+_still_node_preflight() {
+    local out rc
+    command -v curl > /dev/null 2>&1 || return 0
+    out=$(curl -sS -k --pinnedpubkey "sha256//${node_pin}" --connect-timeout 15 --max-time 30 \
+        -o /dev/null -w '%{http_code}' -H @- "${node_master}enroll/v1/node" 2>&1 <<< "Authorization: Bearer ${node_token}")
+    rc=$?
+    if [[ $rc -eq 90 ]]; then
+        echo -e "${red}The server at ${node_master} is not the master that made this invitation: its TLS key does not match. Nothing was changed.${plain}" >&2
+        return 1
+    fi
+    if [[ $rc -ne 0 ]]; then
+        echo -e "${red}Cannot reach the master at ${node_master}: ${out}${plain}" >&2
+        return 1
+    fi
+    case "${out}" in
+        200) return 0 ;;
+        401) echo -e "${red}The master does not accept this invitation: it is unknown, already used, revoked or expired. Make a new one on the master's Nodes page.${plain}" >&2 ;;
+        429) echo -e "${red}The master refuses for now: too many attempts. Try again in 10 minutes.${plain}" >&2 ;;
+        404) echo -e "${red}The master at ${node_master} has no node enrollment (HTTP 404): check the URL, or update the master to a still-ui release that has it.${plain}" >&2 ;;
+        *) echo -e "${red}The master answered HTTP ${out}.${plain}" >&2 ;;
+    esac
+    return 1
+}
+
+_still_node_enroll() {
+    local node_invite="" node_token="" node_pin="" node_master="" enroll_args=()
+    _still_node_invite_read
+    _still_node_invite_parse || exit 1
+    echo -e "Checking the invitation with the master ${node_master} ..."
+    _still_node_preflight || exit 1
+    echo -e "${green}The master accepts the invitation; installing still-ui.${plain}"
+    NONINTERACTIVE=1
+    export NONINTERACTIVE
+    export XUI_SSL_MODE="${XUI_SSL_MODE:-none}"
+    install_base
+    _still_swap_check
+    if [[ -n "${STILL_UI_VERSION:-}" && -z "${STILL_UI_ARCHIVE:-}" ]]; then
+        install_x-ui "${STILL_UI_VERSION}"
+    else
+        install_x-ui
+    fi
+    [[ -n "${STILL_NODE_NAME:-}" ]] && enroll_args+=(-name "${STILL_NODE_NAME}")
+    [[ -n "${STILL_NODE_ADDRESS:-}" ]] && enroll_args+=(-address "${STILL_NODE_ADDRESS}")
+    echo -e "Adding this server to the master ..."
+    printf '%s\n' "${node_invite}" | "${xui_folder}/x-ui" node-enroll "${enroll_args[@]}" || exit $?
+    if [[ -f /etc/still-ui/install-result.env ]]; then
+        echo -e "The login of this node's own panel is in /etc/still-ui/install-result.env (readable by root only)."
+    fi
+    exit 0
+}
 case "${1:-}" in
     migrate | migrate-rollback) _still_migrate "$@" ;;
+    node-enroll) _still_node_enroll ;;
 esac
 
 echo -e "${green}Running...${plain}"

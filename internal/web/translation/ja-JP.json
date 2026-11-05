@@ -1199,7 +1199,9 @@
         "updateResult": "{ok} 個のノードで更新を開始、{failed} 個失敗",
         "updateNoneEligible": "オンラインで有効なノードを少なくとも1つ選択してください",
         "saveMtls": "ノード mTLS を保存",
-        "reloadMtls": "Reload master mTLS credential"
+        "reloadMtls": "Reload master mTLS credential",
+        "inviteCreate": "ノード招待の作成",
+        "inviteRevoke": "ノード招待の取り消し"
       },
       "tlsVerifyMode": "TLS 検証",
       "tlsVerifyModeHint": "パネルがノードの HTTPS 証明書を検証する方法。ピン留めやスキップは自己署名証明書向け（https ノードのみ）。",
@@ -1227,7 +1229,34 @@
       "pinnedCertPlaceholder": "base64 または hex の SHA-256",
       "fetchPin": "取得",
       "pinFetched": "ノードの現在の証明書を取得しました",
-      "pinFetchFailed": "証明書を取得できませんでした"
+      "pinFetchFailed": "証明書を取得できませんでした",
+      "invite": {
+        "button": "コマンドで追加",
+        "title": "1つのコマンドでノードを追加",
+        "intro": "1回限りの招待を作成し、新しいサーバーで root としてコマンドを実行します。still-ui をインストールし、このパネルのノードとして設定して、この一覧に追加します。",
+        "addressHint": "空欄にすると、サーバーが接続してきたアドレスを使います。",
+        "addressPlaceholder": "サーバーが接続してきたアドレス",
+        "masterUrl": "ノード向けのこのパネルの URL",
+        "masterUrlHint": "新しいサーバーはこの HTTPS アドレスを開きます。コマンドはこのパネルの TLS 鍵を確認するので、自己署名証明書でも使えます。",
+        "validMinutes": "有効期間（分）",
+        "nodeAdmin": "パネルの更新を許可",
+        "nodeAdminHint": "ノードは、自身の still-ui も更新できるトークンをこのパネルに渡します。許可しない場合、トークンはインバウンドとクライアントの同期だけに使えます。",
+        "create": "招待を作成",
+        "once": "今すぐコマンドをコピーしてください。表示は1回だけで、{time} まで1回だけ使えます。",
+        "command": "新しいサーバーで root として実行",
+        "another": "もう1つ作成",
+        "list": "招待",
+        "details": "詳細",
+        "usedFrom": "{time} に {ip} から使用、ノード #{id}",
+        "validUntil": "{time} まで有効",
+        "revoke": "取り消す",
+        "status": {
+          "pending": "待機中",
+          "used": "使用済み",
+          "expired": "期限切れ",
+          "revoked": "取り消し済み"
+        }
+      }
     },
     "settings": {
       "defaultTag": "デフォルト",

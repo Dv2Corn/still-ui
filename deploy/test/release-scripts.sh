@@ -10,7 +10,9 @@
 #   - scripts/still-release.sh refuses a third-party download whose sum is not
 #     the pinned one;
 #   - scripts/still-probe-install.sh takes the token from the environment, a
-#     file or standard input, and warns about --token.
+#     file or standard input, and warns about --token;
+#   - install.sh node-enroll reads the invitation from the environment or
+#     standard input, checks its form and the master's key pin before installing.
 # Variables assigned below are read by the functions under test.
 # shellcheck disable=SC2034
 set -uo pipefail
@@ -247,6 +249,60 @@ out=$(bash -c "$read_token_cmd" test "$probe_sh" --token "$tok" < /dev/null 2>&1
 check "probe installer still takes --token, with a warning" 0 "warning: --token puts the token on the command line.*token=$tok" "$?" "$out"
 out=$(bash -c "$read_token_cmd" test "$probe_sh" --token-file "$work/none" < /dev/null 2>&1)
 check "probe installer refuses an unreadable --token-file" 1 "cannot read --token-file" "$?" "$out"
+
+# --- install.sh node-enroll: the invitation ---------------------------------
+load_function "$repo_root/install.sh" _still_node_invite_read
+load_function "$repo_root/install.sh" _still_node_invite_parse
+load_function "$repo_root/install.sh" _still_node_preflight
+b64url() { base64 -w0 | tr '+/' '-_' | tr -d '='; }
+node_tok=abcdefghijABCDEFGHIJ0123456789abcdefghijABCDEFGH
+node_pin_raw=$(head -c 32 /dev/zero | tr '\0' '\373' | b64url)
+master_url='https://203.0.113.5:2053/secret path/'
+master_ok='https://203.0.113.5:2053/secret/'
+invite="still-node1.${node_tok}.${node_pin_raw}.$(printf '%s' "$master_ok" | b64url)"
+
+out=$(STILL_NODE_INVITE=" $invite " bash -c "$(declare -f _still_node_invite_read)"'; _still_node_invite_read; echo "invite=$node_invite env=${STILL_NODE_INVITE-unset}"' < /dev/null 2>&1)
+check "node-enroll reads STILL_NODE_INVITE and unsets it" 0 "^invite=${invite} env=unset$" "$?" "$out"
+out=$(printf '%s\n' "$invite" | bash -c "$(declare -f _still_node_invite_read)"'; _still_node_invite_read; echo "invite=$node_invite"' 2>&1)
+check "node-enroll reads the invitation from standard input" 0 "^invite=${invite}$" "$?" "$out"
+
+node_invite=$invite node_token="" node_pin="" node_master=""
+out=$(_still_node_invite_parse 2>&1 && echo "token=$node_token pin=$node_pin master=$node_master")
+check "node-enroll splits an invitation" 0 "token=${node_tok} pin=\+/v7\+/v7.*= master=${master_ok}$" "$?" "$out"
+for bad in "still-node2.${invite#still-node1.}" "${invite}.extra" "still-node1.short.${node_pin_raw}.aGk"; do
+    node_invite=$bad
+    out=$(_still_node_invite_parse 2>&1)
+    check "node-enroll refuses a malformed invitation (${bad:0:14}...)" 1 "not a still-ui node invitation" "$?" "$out"
+done
+node_invite="still-node1.${node_tok}.${node_pin_raw}.$(printf '%s' "$master_url" | b64url)"
+out=$(_still_node_invite_parse 2>&1)
+check "node-enroll refuses a master URL with characters an invitation cannot carry" 1 "no valid master URL" "$?" "$out"
+
+# Stub for curl in the preflight: CURL_RC is its exit status, CURL_CODE the
+# HTTP status it prints; the arguments go to $work/curl-args, stdin to curl-stdin.
+# shellcheck disable=SC2317,SC2329
+curl() {
+    printf '%s\n' "$@" > "$work/curl-args"
+    cat > "$work/curl-stdin"
+    [[ "${CURL_RC:-0}" -eq 0 ]] && printf '%s' "${CURL_CODE:-200}"
+    return "${CURL_RC:-0}"
+}
+node_invite=$invite
+_still_node_invite_parse
+out=$(_still_node_preflight 2>&1)
+check "node-enroll preflight accepts a valid invitation" 0 "" "$?" "$out"
+if grep -q "$node_tok" "$work/curl-args"; then
+    fail "node-enroll keeps the token off curl's command line" "$(cat "$work/curl-args")"
+elif ! grep -qx "Authorization: Bearer $node_tok" "$work/curl-stdin" || ! grep -qx "sha256//${node_pin}" "$work/curl-args"; then
+    fail "node-enroll sends the token on stdin and pins the master key" "args: $(cat "$work/curl-args") stdin: $(cat "$work/curl-stdin")"
+else
+    pass "node-enroll sends the token on stdin and pins the master key"
+fi
+out=$(CURL_RC=90 _still_node_preflight 2>&1)
+check "node-enroll refuses a master whose TLS key does not match" 1 "is not the master that made this invitation" "$?" "$out"
+out=$(CURL_CODE=401 _still_node_preflight 2>&1)
+check "node-enroll explains a spent invitation" 1 "already used, revoked or expired" "$?" "$out"
+unset -f curl
 
 if [[ $failures -gt 0 ]]; then
     echo "$failures release-script test(s) failed"

@@ -265,6 +265,7 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 	s.panel = controller.NewXUIController(g)
 	s.api = controller.NewAPIController(g)
 	controller.NewReachProbeAgentController(g.Group("/probe/v1"))
+	controller.NewNodeEnrollAgentController(g.Group("/enroll/v1"))
 
 	// Initialize WebSocket hub
 	s.wsHub = websocket.NewHub()

@@ -119,6 +119,9 @@ func run(root, outDir string) error {
 				"ReachProbeView",
 				"ReachProbeCreated",
 				"ReachHistoryPoint",
+				"NodeInviteInput",
+				"NodeInviteView",
+				"NodeInviteCreated",
 			),
 		},
 		{
