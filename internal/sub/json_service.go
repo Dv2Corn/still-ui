@@ -209,6 +209,7 @@ func (s *SubJsonService) GetJson(subId string, host string, alwaysReturnArray bo
 			}
 		}
 	}
+	entries = arrangeJSONEntries(subReq.probeVerdicts(), entries)
 	entries = s.appendBalancerEntries(entries)
 
 	// Inbounds arrive sorted by (sub_sort_index, id); balancers interleave by
@@ -240,8 +241,15 @@ func (s *SubJsonService) GetJson(subId string, host string, alwaysReturnArray bo
 			}
 		}
 	}
+	var probeDemoted []json_util.RawMessage
 	for _, entry := range entries {
-		configArray = append(configArray, entry.configs...)
+		for i, config := range entry.configs {
+			if i < len(entry.probeDemoted) && entry.probeDemoted[i] {
+				probeDemoted = append(probeDemoted, config)
+			} else {
+				configArray = append(configArray, config)
+			}
+		}
 	}
 	for _, ext := range externalLinks {
 		if ext.Enable {
@@ -272,6 +280,8 @@ func (s *SubJsonService) GetJson(subId string, host string, alwaysReturnArray bo
 			configArray = append(configArray, newConfig)
 		}
 	}
+
+	configArray = append(configArray, probeDemoted...)
 
 	if len(configArray) == 0 && !hasInactiveExternal && !hasBoundClosed {
 		return "", "", nil
@@ -317,6 +327,8 @@ type subConfigEntry struct {
 	kind      int
 	id        int
 	configs   []json_util.RawMessage
+	// probeDemoted marks configs the probes report down; they go to the end of the subscription.
+	probeDemoted []bool
 }
 
 const (

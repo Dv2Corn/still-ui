@@ -170,6 +170,9 @@ export interface AllSetting {
   subListen: string;
   subPath: string;
   subPort: number;
+  subProbeMinAgents: number;
+  subProbeOrder: string;
+  subProbeStaleMinutes: number;
   subProfileMode: string;
   subProfileUrl: string;
   subRoutingRules: string;
@@ -372,6 +375,9 @@ export interface AllSettingView {
   subListen: string;
   subPath: string;
   subPort: number;
+  subProbeMinAgents: number;
+  subProbeOrder: string;
+  subProbeStaleMinutes: number;
   subProfileMode: string;
   subProfileUrl: string;
   subRoutingRules: string;
@@ -1038,6 +1044,7 @@ export interface ReachProbeView {
   lastSeenAt: number;
   name: string;
   stale: boolean;
+  subIgnored: string;
   targets: ReachTargetView[];
   testUrl: string;
 }
@@ -1056,6 +1063,9 @@ export interface ReachTargetView {
   lastTotalMs: number;
   lastTtfbMs: number;
   status: string;
+  subFailAgents: number;
+  subNeedAgents: number;
+  subState: string;
   uptime7d: number;
 }
 

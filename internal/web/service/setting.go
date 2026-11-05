@@ -87,6 +87,9 @@ var defaultValueMap = map[string]string{
 	"subCalendarExpireInclusive":  "false",
 	"subExpiredTemplate":          DefaultSubExpiredTemplate,
 	"subTrafficDepletedTemplate":  DefaultSubTrafficDepletedTemplate,
+	"subProbeOrder":               SubProbeOrderOff,
+	"subProbeMinAgents":           "0",
+	"subProbeStaleMinutes":        strconv.Itoa(SubProbeStaleMinutesDefault),
 	"timeLocation":                "Local",
 	"tgBotEnable":                 "false",
 	"tgBotToken":                  "",
@@ -1738,6 +1741,9 @@ func (s *SettingService) UpdateAllSetting(allSetting *entity.AllSetting, clears 
 	case "inbound-first", "hosts-first":
 	default:
 		return errors.New("subscription host sort mode must be inbound-first or hosts-first")
+	}
+	if err := normalizeSubProbeSettings(allSetting); err != nil {
+		return err
 	}
 	switch allSetting.SubProfileMode {
 	case "", SubProfileModeNone, SubProfileModeBuiltin, SubProfileModeCustom:

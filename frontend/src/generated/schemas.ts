@@ -522,6 +522,22 @@ export const SCHEMAS: Record<string, unknown> = {
         "minimum": 1,
         "type": "integer"
       },
+      "subProbeMinAgents": {
+        "example": 0,
+        "maximum": 10,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "subProbeOrder": {
+        "example": "off",
+        "type": "string"
+      },
+      "subProbeStaleMinutes": {
+        "example": 30,
+        "maximum": 1440,
+        "minimum": 5,
+        "type": "integer"
+      },
       "subProfileMode": {
         "type": "string"
       },
@@ -792,6 +808,9 @@ export const SCHEMAS: Record<string, unknown> = {
       "subListen",
       "subPath",
       "subPort",
+      "subProbeMinAgents",
+      "subProbeOrder",
+      "subProbeStaleMinutes",
       "subProfileMode",
       "subProfileUrl",
       "subRoutingRules",
@@ -1374,6 +1393,22 @@ export const SCHEMAS: Record<string, unknown> = {
         "minimum": 1,
         "type": "integer"
       },
+      "subProbeMinAgents": {
+        "example": 0,
+        "maximum": 10,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "subProbeOrder": {
+        "example": "off",
+        "type": "string"
+      },
+      "subProbeStaleMinutes": {
+        "example": 30,
+        "maximum": 1440,
+        "minimum": 5,
+        "type": "integer"
+      },
       "subProfileMode": {
         "type": "string"
       },
@@ -1652,6 +1687,9 @@ export const SCHEMAS: Record<string, unknown> = {
       "subListen",
       "subPath",
       "subPort",
+      "subProbeMinAgents",
+      "subProbeOrder",
+      "subProbeStaleMinutes",
       "subProfileMode",
       "subProfileUrl",
       "subRoutingRules",
@@ -4597,6 +4635,10 @@ export const SCHEMAS: Record<string, unknown> = {
         "example": false,
         "type": "boolean"
       },
+      "subIgnored": {
+        "description": "SubIgnored says why subscriptions do not use this probe now: silent, allFailing or \"\".",
+        "type": "string"
+      },
       "targets": {
         "items": {
           "$ref": "#/components/schemas/ReachTargetView"
@@ -4620,6 +4662,7 @@ export const SCHEMAS: Record<string, unknown> = {
       "lastSeenAt",
       "name",
       "stale",
+      "subIgnored",
       "targets",
       "testUrl"
     ],
@@ -4681,6 +4724,19 @@ export const SCHEMAS: Record<string, unknown> = {
         "example": "ok",
         "type": "string"
       },
+      "subFailAgents": {
+        "example": 2,
+        "type": "integer"
+      },
+      "subNeedAgents": {
+        "example": 2,
+        "type": "integer"
+      },
+      "subState": {
+        "description": "SubState is what subscriptions do with this endpoint: demoted, hidden, unconfirmed or \"\".",
+        "example": "demoted",
+        "type": "string"
+      },
       "uptime7d": {
         "example": 99.4,
         "type": "number"
@@ -4700,6 +4756,9 @@ export const SCHEMAS: Record<string, unknown> = {
       "lastTotalMs",
       "lastTtfbMs",
       "status",
+      "subFailAgents",
+      "subNeedAgents",
+      "subState",
       "uptime7d"
     ],
     "type": "object"

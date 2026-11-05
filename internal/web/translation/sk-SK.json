@@ -2019,6 +2019,15 @@
       "subHostSortInbound": "Poradie inboundov (predvolené)",
       "subHostSortHosts": "Poradie hostiteľov",
       "subHostSortModeDesc": "Poradie hostiteľov sa riadi stránkou Hostitelia naprieč inboundmi. Určuje poradie, ktoré odosiela server; klientske aplikácie môžu použiť vlastné triedenie.",
+      "subProbeOrder": "Používať výsledky sond",
+      "subProbeOrderDesc": "Odkazy, ktoré sondy dostupnosti hlásia ako nedostupné (2 zlyhania za sebou), sa presunú na koniec predplatného alebo sa skryjú, vo všetkých formátoch: odkazy, JSON aj Clash. Používateľovi vždy ostane aspoň jeden odkaz a bez čerstvých výsledkov sond sa nič nemení. Stránka sond ukazuje, čo sa deje s každým koncovým bodom.",
+      "subProbeOrderOff": "Vypnuté (predvolené)",
+      "subProbeOrderReorder": "Presunúť na koniec",
+      "subProbeOrderHide": "Skryť",
+      "subProbeMinAgents": "Počet sond na potvrdenie",
+      "subProbeMinAgentsDesc": "Koľko sond musí hlásiť koncový bod ako nedostupný. 0 = automaticky: 1, ak inbound kontroluje iba jedna sonda, inak 2.",
+      "subProbeStaleMinutes": "Ignorovať výsledky staršie ako, min",
+      "subProbeStaleMinutesDesc": "Sonda, ktorá sa tak dlho neozvala, sa ignoruje: jej staré výsledky sa nikdy nepočítajú ako zlyhanie.",
       "eventGroupProbe": "Sondy dostupnosti",
       "eventProbeDown": "Vstup nedostupný",
       "eventProbeUp": "Vstup opäť dostupný",
@@ -2598,7 +2607,8 @@
         "target": "Prístupový bod",
         "lastCheck": "Posledná kontrola",
         "latency": "Prvý bajt / spolu",
-        "uptime": "Dostupnosť za 7 dní"
+        "uptime": "Dostupnosť za 7 dní",
+        "subscription": "Predplatné"
       },
       "hints": {
         "name": "Kde sonda beží, napríklad home-mobile",
@@ -2621,6 +2631,20 @@
       "toasts": {
         "saved": "Sonda uložená",
         "deleted": "Sonda odstránená"
+      },
+      "sub": {
+        "demoted": "Na konci",
+        "demotedHint": "Nedostupný pre {fail} sond (treba {need}). Predplatné uvádza tento odkaz ako posledný.",
+        "hidden": "Skrytý",
+        "hiddenHint": "Nedostupný pre {fail} sond (treba {need}). Predplatné tento odkaz vynecháva, kým má používateľ iné.",
+        "unconfirmed": "Nepotvrdené {fail}/{need}",
+        "unconfirmedHint": "Nedostupný pre {fail} sond, treba {need}. Predplatné sa zatiaľ nemení.",
+        "ignored": {
+          "silent": "Predplatné ju nepoužíva",
+          "silentHint": "Sonda sa v poslednom čase neozvala, preto predplatné ignoruje jej výsledky.",
+          "allFailing": "Predplatné ju nepoužíva",
+          "allFailingHint": "Na tejto sonde zlyhávajú naraz všetky koncové body. Zvyčajne to znamená chybu jej vlastnej siete alebo testovacej URL, preto ju predplatné ignoruje."
+        }
       }
     }
   },

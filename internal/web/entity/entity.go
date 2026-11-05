@@ -44,6 +44,9 @@ type AllSetting struct {
 	SubCalendarExpireInclusive bool   `json:"subCalendarExpireInclusive" form:"subCalendarExpireInclusive"`
 	SubExpiredTemplate         string `json:"subExpiredTemplate" form:"subExpiredTemplate"`
 	SubTrafficDepletedTemplate string `json:"subTrafficDepletedTemplate" form:"subTrafficDepletedTemplate"`
+	SubProbeOrder              string `json:"subProbeOrder" form:"subProbeOrder" example:"off"`
+	SubProbeMinAgents          int    `json:"subProbeMinAgents" form:"subProbeMinAgents" validate:"gte=0,lte=10" example:"0"`
+	SubProbeStaleMinutes       int    `json:"subProbeStaleMinutes" form:"subProbeStaleMinutes" validate:"gte=5,lte=1440" example:"30"`
 	Datepicker                 string `json:"datepicker" form:"datepicker"`
 
 	TgBotEnable     bool   `json:"tgBotEnable" form:"tgBotEnable"`

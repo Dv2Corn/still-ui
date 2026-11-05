@@ -159,6 +159,9 @@ export const EXAMPLES: Record<string, unknown> = {
     "subListen": "",
     "subPath": "",
     "subPort": 1,
+    "subProbeMinAgents": 0,
+    "subProbeOrder": "off",
+    "subProbeStaleMinutes": 30,
     "subProfileMode": "",
     "subProfileUrl": "",
     "subRoutingRules": "",
@@ -360,6 +363,9 @@ export const EXAMPLES: Record<string, unknown> = {
     "subListen": "",
     "subPath": "",
     "subPort": 1,
+    "subProbeMinAgents": 0,
+    "subProbeOrder": "off",
+    "subProbeStaleMinutes": 30,
     "subProfileMode": "",
     "subProfileUrl": "",
     "subRoutingRules": "",
@@ -1119,6 +1125,7 @@ export const EXAMPLES: Record<string, unknown> = {
       "lastSeenAt": 1736000000000,
       "name": "home-mobile",
       "stale": false,
+      "subIgnored": "",
       "targets": [
         {
           "changedAt": 1736000000000,
@@ -1134,6 +1141,9 @@ export const EXAMPLES: Record<string, unknown> = {
           "lastTotalMs": 950,
           "lastTtfbMs": 180,
           "status": "ok",
+          "subFailAgents": 2,
+          "subNeedAgents": 2,
+          "subState": "demoted",
           "uptime7d": 99.4
         }
       ],
@@ -1167,6 +1177,7 @@ export const EXAMPLES: Record<string, unknown> = {
     "lastSeenAt": 1736000000000,
     "name": "home-mobile",
     "stale": false,
+    "subIgnored": "",
     "targets": [
       {
         "changedAt": 1736000000000,
@@ -1182,6 +1193,9 @@ export const EXAMPLES: Record<string, unknown> = {
         "lastTotalMs": 950,
         "lastTtfbMs": 180,
         "status": "ok",
+        "subFailAgents": 2,
+        "subNeedAgents": 2,
+        "subState": "demoted",
         "uptime7d": 99.4
       }
     ],
@@ -1201,6 +1215,9 @@ export const EXAMPLES: Record<string, unknown> = {
     "lastTotalMs": 950,
     "lastTtfbMs": 180,
     "status": "ok",
+    "subFailAgents": 2,
+    "subNeedAgents": 2,
+    "subState": "demoted",
     "uptime7d": 99.4
   },
   "Readiness": {

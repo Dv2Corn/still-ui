@@ -1898,6 +1898,15 @@
       "subHostSortInbound": "入站順序（預設）",
       "subHostSortHosts": "主機順序",
       "subHostSortModeDesc": "跨入站使用主機頁面中的排序。此設定決定伺服器輸出順序；用戶端應用程式仍可能自行排序。",
+      "subProbeOrder": "使用探針結果",
+      "subProbeOrderDesc": "可達性探針回報不通的連結（連續 2 次失敗）會移到訂閱末尾或被隱藏，適用於所有格式：連結、JSON 和 Clash。使用者始終至少保留一個連結；沒有新的探針結果時不做任何變動。探針頁面會顯示每個端點的處理情況。",
+      "subProbeOrderOff": "關閉（預設）",
+      "subProbeOrderReorder": "移到末尾",
+      "subProbeOrderHide": "隱藏",
+      "subProbeMinAgents": "確認所需探針數",
+      "subProbeMinAgentsDesc": "需要多少個探針回報端點不通。0 = 自動：只有一個探針檢查該入站時為 1，否則為 2。",
+      "subProbeStaleMinutes": "忽略早於此時間的結果（分鐘）",
+      "subProbeStaleMinutesDesc": "超過此時間未回報的探針會被忽略：它的舊結果永遠不會算作失敗。",
       "eventGroupProbe": "可達性探針",
       "eventProbeDown": "入站無法連線",
       "eventProbeUp": "入站已恢復",
@@ -2598,7 +2607,8 @@
         "target": "接入點",
         "lastCheck": "最近檢查",
         "latency": "首位元組 / 總計",
-        "uptime": "7 天可用率"
+        "uptime": "7 天可用率",
+        "subscription": "訂閱"
       },
       "hints": {
         "name": "探針所在位置，例如 home-mobile",
@@ -2621,6 +2631,20 @@
       "toasts": {
         "saved": "探針已儲存",
         "deleted": "探針已刪除"
+      },
+      "sub": {
+        "demoted": "已移到末尾",
+        "demotedHint": "{fail} 個探針回報不通（需要 {need} 個）。訂閱會把此連結放在最後。",
+        "hidden": "已隱藏",
+        "hiddenHint": "{fail} 個探針回報不通（需要 {need} 個）。只要使用者還有其他連結，訂閱就不包含此連結。",
+        "unconfirmed": "未確認 {fail}/{need}",
+        "unconfirmedHint": "{fail} 個探針回報不通，需要 {need} 個。訂閱暫不變更。",
+        "ignored": {
+          "silent": "訂閱不使用",
+          "silentHint": "此探針最近沒有回報，訂閱會忽略它的結果。",
+          "allFailing": "訂閱不使用",
+          "allFailingHint": "此探針上所有端點同時失敗，通常是它自身的網路或測試 URL 出了問題，因此訂閱會忽略它。"
+        }
       }
     }
   },

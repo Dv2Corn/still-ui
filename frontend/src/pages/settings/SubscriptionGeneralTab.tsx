@@ -11,7 +11,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router';
 import type { AllSetting } from '@/models/setting';
-import type { SubProfileMode, SubHostSortMode } from '@/schemas/setting';
+import type { SubProfileMode, SubHostSortMode, SubProbeOrder } from '@/schemas/setting';
 import { onNumber } from '@/utils/onNumber';
 import { DefaultSettingTag, SettingListItem } from '@/components/ui';
 import { RemarkTemplateField } from '@/components/form';
@@ -111,6 +111,55 @@ export default function SubscriptionGeneralTab({
                   ]}
                 />
               </SettingListItem>
+              <SettingListItem
+                paddings="small"
+                title={t('pages.settings.subProbeOrder')}
+                description={t('pages.settings.subProbeOrderDesc')}
+              >
+                <Select
+                  id="sub-probe-order"
+                  aria-label={t('pages.settings.subProbeOrder')}
+                  value={allSetting.subProbeOrder}
+                  onChange={(value: SubProbeOrder) => updateSetting({ subProbeOrder: value })}
+                  options={[
+                    { value: 'off', label: t('pages.settings.subProbeOrderOff') },
+                    { value: 'reorder', label: t('pages.settings.subProbeOrderReorder') },
+                    { value: 'hide', label: t('pages.settings.subProbeOrderHide') },
+                  ]}
+                />
+              </SettingListItem>
+              {allSetting.subProbeOrder !== 'off' && (
+                <>
+                  <SettingListItem
+                    paddings="small"
+                    title={t('pages.settings.subProbeMinAgents')}
+                    description={t('pages.settings.subProbeMinAgentsDesc')}
+                  >
+                    <InputNumber
+                      aria-label={t('pages.settings.subProbeMinAgents')}
+                      value={allSetting.subProbeMinAgents}
+                      min={0}
+                      max={10}
+                      style={{ width: '100%' }}
+                      onChange={onNumber((v) => updateSetting({ subProbeMinAgents: v }))}
+                    />
+                  </SettingListItem>
+                  <SettingListItem
+                    paddings="small"
+                    title={t('pages.settings.subProbeStaleMinutes')}
+                    description={t('pages.settings.subProbeStaleMinutesDesc')}
+                  >
+                    <InputNumber
+                      aria-label={t('pages.settings.subProbeStaleMinutes')}
+                      value={allSetting.subProbeStaleMinutes}
+                      min={5}
+                      max={1440}
+                      style={{ width: '100%' }}
+                      onChange={onNumber((v) => updateSetting({ subProbeStaleMinutes: v }))}
+                    />
+                  </SettingListItem>
+                </>
+              )}
               <SettingListItem
                 paddings="small"
                 title={t('pages.settings.subListen')}

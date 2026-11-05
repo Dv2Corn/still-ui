@@ -1898,6 +1898,15 @@
       "subHostSortInbound": "Orden de entradas (predeterminado)",
       "subHostSortHosts": "Orden de hosts",
       "subHostSortModeDesc": "Sigue el orden de la página de hosts entre distintas entradas. Determina el orden emitido por el servidor; las aplicaciones cliente pueden aplicar su propio orden.",
+      "subProbeOrder": "Usar los resultados de las sondas",
+      "subProbeOrderDesc": "Los enlaces que las sondas de accesibilidad marcan como caídos (2 fallos seguidos) pasan al final de la suscripción o se ocultan, en todos los formatos: enlaces, JSON y Clash. El usuario conserva siempre al menos un enlace y, sin resultados recientes de las sondas, nada cambia. La página de sondas muestra qué pasa con cada punto de acceso.",
+      "subProbeOrderOff": "Desactivado (predeterminado)",
+      "subProbeOrderReorder": "Mover al final",
+      "subProbeOrderHide": "Ocultar",
+      "subProbeMinAgents": "Sondas para confirmar",
+      "subProbeMinAgentsDesc": "Cuántas sondas deben marcar un punto de acceso como caído. 0 = automático: 1 si solo una sonda comprueba el inbound, si no 2.",
+      "subProbeStaleMinutes": "Ignorar resultados de más de, min",
+      "subProbeStaleMinutesDesc": "Una sonda que no informa durante este tiempo se ignora: sus resultados antiguos nunca cuentan como fallo.",
       "eventGroupProbe": "Sondas de accesibilidad",
       "eventProbeDown": "Entrada inaccesible",
       "eventProbeUp": "Entrada accesible de nuevo",
@@ -2598,7 +2607,8 @@
         "target": "Punto de acceso",
         "lastCheck": "Última comprobación",
         "latency": "TTFB / total",
-        "uptime": "Disponibilidad, 7 días"
+        "uptime": "Disponibilidad, 7 días",
+        "subscription": "Suscripción"
       },
       "hints": {
         "name": "Dónde se ejecuta la sonda, por ejemplo home-mobile",
@@ -2621,6 +2631,20 @@
       "toasts": {
         "saved": "Sonda guardada",
         "deleted": "Sonda eliminada"
+      },
+      "sub": {
+        "demoted": "Al final",
+        "demotedHint": "Caído para {fail} sondas (se necesitan {need}). Las suscripciones ponen este enlace al final.",
+        "hidden": "Oculto",
+        "hiddenHint": "Caído para {fail} sondas (se necesitan {need}). Las suscripciones omiten este enlace mientras el usuario tenga otros.",
+        "unconfirmed": "Sin confirmar {fail}/{need}",
+        "unconfirmedHint": "Caído para {fail} sondas, se necesitan {need}. Las suscripciones aún no cambian.",
+        "ignored": {
+          "silent": "No lo usan las suscripciones",
+          "silentHint": "Esta sonda no ha informado recientemente, así que las suscripciones ignoran sus resultados.",
+          "allFailing": "No lo usan las suscripciones",
+          "allFailingHint": "En esta sonda fallan todos los puntos de acceso a la vez. Suele indicar que falla su propia red o su URL de prueba, así que las suscripciones la ignoran."
+        }
       }
     }
   },

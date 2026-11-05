@@ -1898,6 +1898,15 @@
       "subHostSortInbound": "インバウンド順（既定）",
       "subHostSortHosts": "ホスト順",
       "subHostSortModeDesc": "異なるインバウンド間でもホストページの順序に従います。サーバーが出力する順序を指定しますが、クライアントアプリが独自に並べ替える場合があります。",
+      "subProbeOrder": "プローブの結果を使う",
+      "subProbeOrderDesc": "到達性プローブが不通と報告したリンク（2回連続の失敗）は、サブスクリプションの末尾に移すか非表示にします。リンク、JSON、Clash のすべての形式に適用されます。ユーザーには常に少なくとも1つのリンクが残り、新しいプローブ結果がなければ何も変わりません。各エンドポイントの扱いはプローブのページで確認できます。",
+      "subProbeOrderOff": "オフ（既定）",
+      "subProbeOrderReorder": "末尾に移す",
+      "subProbeOrderHide": "非表示にする",
+      "subProbeMinAgents": "確認に必要なプローブ数",
+      "subProbeMinAgentsDesc": "エンドポイントを不通と判断するのに必要なプローブの数。0 = 自動：インバウンドを確認するプローブが1つだけなら1、それ以外は2。",
+      "subProbeStaleMinutes": "これより古い結果を無視（分）",
+      "subProbeStaleMinutesDesc": "この時間報告のないプローブは無視されます。古い結果が失敗として数えられることはありません。",
       "eventGroupProbe": "到達性プローブ",
       "eventProbeDown": "インバウンド到達不可",
       "eventProbeUp": "インバウンド復旧",
@@ -2598,7 +2607,8 @@
         "target": "接続先",
         "lastCheck": "最終チェック",
         "latency": "最初のバイト / 合計",
-        "uptime": "稼働率（7 日間）"
+        "uptime": "稼働率（7 日間）",
+        "subscription": "サブスクリプション"
       },
       "hints": {
         "name": "プローブの設置場所。例: home-mobile",
@@ -2621,6 +2631,20 @@
       "toasts": {
         "saved": "プローブを保存しました",
         "deleted": "プローブを削除しました"
+      },
+      "sub": {
+        "demoted": "末尾へ移動",
+        "demotedHint": "{fail} 個のプローブで不通（必要数：{need}）。サブスクリプションではこのリンクを最後に置きます。",
+        "hidden": "非表示",
+        "hiddenHint": "{fail} 個のプローブで不通（必要数：{need}）。ユーザーに他のリンクがある間、サブスクリプションはこのリンクを含めません。",
+        "unconfirmed": "未確認 {fail}/{need}",
+        "unconfirmedHint": "{fail} 個のプローブで不通、必要数は {need}。サブスクリプションはまだ変わりません。",
+        "ignored": {
+          "silent": "サブスクリプションでは不使用",
+          "silentHint": "このプローブは最近報告していないため、サブスクリプションはその結果を無視します。",
+          "allFailing": "サブスクリプションでは不使用",
+          "allFailingHint": "このプローブではすべてのエンドポイントが同時に失敗しています。通常はプローブ自身のネットワークかテスト URL の問題なので、サブスクリプションはこれを無視します。"
+        }
       }
     }
   },

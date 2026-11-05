@@ -58,6 +58,38 @@ describe('SubscriptionGeneralTab', () => {
     );
     expect(screen.getByText('Hosts order')).toBeTruthy();
   });
+  it('shows the probe confirmation fields only when probes drive the subscription', () => {
+    const updateSetting = vi.fn();
+    const { unmount } = renderWithProviders(
+      <MemoryRouter>
+        <SubscriptionGeneralTab allSetting={new AllSetting()} updateSetting={updateSetting} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('Off (default)')).toBeTruthy();
+    expect(screen.queryByRole('spinbutton', { name: 'Probes to confirm' })).toBeNull();
+    chooseSelectOption('sub-probe-order', 'Hide');
+    expect(updateSetting).toHaveBeenCalledWith({ subProbeOrder: 'hide' });
+    unmount();
+    renderWithProviders(
+      <MemoryRouter>
+        <SubscriptionGeneralTab
+          allSetting={new AllSetting({ subProbeOrder: 'reorder', subProbeMinAgents: 2 })}
+          updateSetting={updateSetting}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('Move to the end')).toBeTruthy();
+    const agents = screen.getByRole('spinbutton', { name: 'Probes to confirm' });
+    expect((agents as HTMLInputElement).value).toBe('2');
+    fireEvent.change(agents, { target: { value: '3' } });
+    expect(updateSetting).toHaveBeenCalledWith({ subProbeMinAgents: 3 });
+    expect(
+      screen.getByRole('spinbutton', {
+        name: 'Ignore probe results older than, min',
+      }),
+    ).toBeTruthy();
+  });
+
   it('switches profile modes without losing the custom URL and warns only for the built-in page', () => {
     const storedUrl = 'https://example.com/profile/{{SUB_ID}}';
     const editedUrl = 'https://example.com/account/{{SUB_ID}}';

@@ -1898,6 +1898,15 @@
       "subHostSortInbound": "Ordem das entradas (padrão)",
       "subHostSortHosts": "Ordem dos hosts",
       "subHostSortModeDesc": "Segue a ordem da página de hosts entre diferentes entradas. Define a ordem emitida pelo servidor; os aplicativos clientes podem aplicar sua própria ordenação.",
+      "subProbeOrder": "Usar os resultados das sondas",
+      "subProbeOrderDesc": "Links que as sondas de acessibilidade indicam como fora do ar (2 falhas seguidas) vão para o fim da assinatura ou são ocultados, em todos os formatos: links, JSON e Clash. O usuário sempre mantém pelo menos um link e, sem resultados recentes das sondas, nada muda. A página de sondas mostra o que acontece com cada endpoint.",
+      "subProbeOrderOff": "Desligado (padrão)",
+      "subProbeOrderReorder": "Mover para o fim",
+      "subProbeOrderHide": "Ocultar",
+      "subProbeMinAgents": "Sondas para confirmar",
+      "subProbeMinAgentsDesc": "Quantas sondas precisam indicar um endpoint como fora do ar. 0 = automático: 1 se só uma sonda verifica o inbound, senão 2.",
+      "subProbeStaleMinutes": "Ignorar resultados com mais de, min",
+      "subProbeStaleMinutesDesc": "Uma sonda sem relatório por esse tempo é ignorada: seus resultados antigos nunca contam como falha.",
       "eventGroupProbe": "Sondas de acessibilidade",
       "eventProbeDown": "Entrada inacessível",
       "eventProbeUp": "Entrada acessível de novo",
@@ -2598,7 +2607,8 @@
         "target": "Ponto de acesso",
         "lastCheck": "Última verificação",
         "latency": "TTFB / total",
-        "uptime": "Disponibilidade, 7 dias"
+        "uptime": "Disponibilidade, 7 dias",
+        "subscription": "Assinatura"
       },
       "hints": {
         "name": "Onde a sonda roda, por exemplo home-mobile",
@@ -2621,6 +2631,20 @@
       "toasts": {
         "saved": "Sonda salva",
         "deleted": "Sonda excluída"
+      },
+      "sub": {
+        "demoted": "No fim",
+        "demotedHint": "Fora do ar para {fail} sondas (necessário: {need}). As assinaturas listam este link por último.",
+        "hidden": "Oculto",
+        "hiddenHint": "Fora do ar para {fail} sondas (necessário: {need}). As assinaturas omitem este link enquanto o usuário tiver outros.",
+        "unconfirmed": "Não confirmado {fail}/{need}",
+        "unconfirmedHint": "Fora do ar para {fail} sondas, são necessárias {need}. As assinaturas ainda não mudam.",
+        "ignored": {
+          "silent": "Não usada pelas assinaturas",
+          "silentHint": "Esta sonda não enviou relatórios recentemente, então as assinaturas ignoram seus resultados.",
+          "allFailing": "Não usada pelas assinaturas",
+          "allFailingHint": "Nesta sonda todos os endpoints falham ao mesmo tempo. Isso costuma indicar problema na rede dela ou na URL de teste, então as assinaturas a ignoram."
+        }
       }
     }
   },

@@ -1898,6 +1898,15 @@
       "subHostSortInbound": "入站顺序（默认）",
       "subHostSortHosts": "主机顺序",
       "subHostSortModeDesc": "跨入站使用主机页面中的排序。此设置决定服务器输出顺序；客户端应用仍可能自行排序。",
+      "subProbeOrder": "使用探针结果",
+      "subProbeOrderDesc": "可达性探针报告不通的链接（连续 2 次失败）会移到订阅末尾或被隐藏，适用于所有格式：链接、JSON 和 Clash。用户始终至少保留一个链接；没有新的探针结果时不做任何改动。探针页面会显示每个端点的处理情况。",
+      "subProbeOrderOff": "关闭（默认）",
+      "subProbeOrderReorder": "移到末尾",
+      "subProbeOrderHide": "隐藏",
+      "subProbeMinAgents": "确认所需探针数",
+      "subProbeMinAgentsDesc": "需要多少个探针报告端点不通。0 = 自动：只有一个探针检查该入站时为 1，否则为 2。",
+      "subProbeStaleMinutes": "忽略早于此时间的结果（分钟）",
+      "subProbeStaleMinutesDesc": "超过此时间未上报的探针会被忽略：它的旧结果永远不会算作失败。",
       "eventGroupProbe": "可达性探针",
       "eventProbeDown": "入站不可达",
       "eventProbeUp": "入站已恢复",
@@ -2598,7 +2607,8 @@
         "target": "接入点",
         "lastCheck": "最近检查",
         "latency": "首字节 / 总计",
-        "uptime": "7 天可用率"
+        "uptime": "7 天可用率",
+        "subscription": "订阅"
       },
       "hints": {
         "name": "探针所在位置，例如 home-mobile",
@@ -2621,6 +2631,20 @@
       "toasts": {
         "saved": "探针已保存",
         "deleted": "探针已删除"
+      },
+      "sub": {
+        "demoted": "已移到末尾",
+        "demotedHint": "{fail} 个探针报告不通（需要 {need} 个）。订阅会把此链接放在最后。",
+        "hidden": "已隐藏",
+        "hiddenHint": "{fail} 个探针报告不通（需要 {need} 个）。只要用户还有其他链接，订阅就不包含此链接。",
+        "unconfirmed": "未确认 {fail}/{need}",
+        "unconfirmedHint": "{fail} 个探针报告不通，需要 {need} 个。订阅暂不改变。",
+        "ignored": {
+          "silent": "订阅不使用",
+          "silentHint": "此探针最近没有上报，订阅会忽略它的结果。",
+          "allFailing": "订阅不使用",
+          "allFailingHint": "此探针上所有端点同时失败，通常是它自身的网络或测试 URL 出了问题，因此订阅会忽略它。"
+        }
       }
     }
   },

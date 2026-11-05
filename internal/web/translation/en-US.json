@@ -2019,6 +2019,15 @@
       "subHostSortInbound": "Inbound order (default)",
       "subHostSortHosts": "Hosts order",
       "subHostSortModeDesc": "Hosts order follows the Hosts page across inbounds. This controls the order emitted by the server; client apps may apply their own sorting.",
+      "subProbeOrder": "Use probe results",
+      "subProbeOrderDesc": "Links that the reachability probes report down (2 failed checks in a row) move to the end of the subscription or are hidden, in every format: links, JSON and Clash. A user always keeps at least one link, and without fresh probe results nothing changes. The Probes page shows what happens to each endpoint.",
+      "subProbeOrderOff": "Off (default)",
+      "subProbeOrderReorder": "Move to the end",
+      "subProbeOrderHide": "Hide",
+      "subProbeMinAgents": "Probes to confirm",
+      "subProbeMinAgentsDesc": "How many probes must report an endpoint down. 0 = automatic: 1 when only one probe checks the inbound, otherwise 2.",
+      "subProbeStaleMinutes": "Ignore probe results older than, min",
+      "subProbeStaleMinutesDesc": "A probe that has not reported for this long is ignored: its old results never count as a failure.",
       "eventGroupProbe": "Reachability probes",
       "eventProbeDown": "Inbound unreachable",
       "eventProbeUp": "Inbound reachable again",
@@ -2598,7 +2607,8 @@
         "target": "Endpoint",
         "lastCheck": "Last check",
         "latency": "TTFB / total",
-        "uptime": "Uptime, 7 days"
+        "uptime": "Uptime, 7 days",
+        "subscription": "Subscription"
       },
       "hints": {
         "name": "Where the probe runs, for example home-mobile",
@@ -2621,6 +2631,20 @@
       "toasts": {
         "saved": "Probe saved",
         "deleted": "Probe deleted"
+      },
+      "sub": {
+        "demoted": "Moved down",
+        "demotedHint": "Down for {fail} probes (needed: {need}). Subscriptions list this link last.",
+        "hidden": "Hidden",
+        "hiddenHint": "Down for {fail} probes (needed: {need}). Subscriptions leave this link out while the user has other links.",
+        "unconfirmed": "Unconfirmed {fail}/{need}",
+        "unconfirmedHint": "Down for {fail} probes, {need} needed. Subscriptions do not change yet.",
+        "ignored": {
+          "silent": "Not used by subscriptions",
+          "silentHint": "This probe has not reported recently, so subscriptions ignore its results.",
+          "allFailing": "Not used by subscriptions",
+          "allFailingHint": "Every endpoint fails at once on this probe. That usually means its own network or test URL is broken, so subscriptions ignore it."
+        }
       }
     }
   },
