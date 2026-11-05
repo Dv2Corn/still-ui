@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
@@ -47,6 +48,8 @@ type EgressFilterSettings struct {
 	// when the filter is this panel's own.
 	ManagedBy string `json:"managedBy,omitempty"`
 	ManagedAt int64  `json:"managedAt,omitempty"`
+	// MasterAddress is the address a central panel reaches this node at (it may be a NAT address).
+	MasterAddress string `json:"masterAddress,omitempty"`
 }
 
 // EgressFilterNodeState is how far a node is with this panel's filter.
@@ -78,6 +81,8 @@ type ManagedEgressFilterRequest struct {
 	Filter    *egressfilter.Filter `json:"filter,omitempty"`
 	Release   bool                 `json:"release,omitempty"`
 	ManagedBy string               `json:"managedBy"`
+	// ServerAddress is the address the central panel reaches the node at.
+	ServerAddress string `json:"serverAddress,omitempty"`
 }
 
 // egressHost is the nftables side; swapped out in tests.
@@ -95,6 +100,8 @@ var (
 
 	// egressLocalAddrs lists this host's own addresses; swapped out in tests.
 	egressLocalAddrs = interfaceAddrs
+	// egressResolve looks up a public name of the panel; swapped out in tests.
+	egressResolve = resolveEgressHost
 	// sshdConfigPath is read for the SSH ports; swapped out in tests.
 	sshdConfigPath = "/etc/ssh/sshd_config"
 	// egressFilterPush delivers a request to one node; swapped out in tests.
@@ -219,6 +226,80 @@ func (s *EgressFilterService) spec(f egressfilter.Filter) egressfilter.Spec {
 	return spec
 }
 
+// hostSpec is spec plus the panel's public addresses, which the nftables table matches too.
+func (s *EgressFilterService) hostSpec(f egressfilter.Filter) egressfilter.Spec {
+	spec := s.spec(f)
+	if f.Server && len(spec.ServerPorts) > 0 {
+		spec.ServerAddrs = s.PublicAddrs()
+	}
+	return spec
+}
+
+// PublicAddrs are the addresses clients may reach this server at but that need not be on an
+// interface (NAT, floating IPs): web and subscription domains, and the address a master uses.
+func (s *EgressFilterService) PublicAddrs() []string {
+	var hosts []string
+	for _, get := range []func() (string, error){s.settingService.GetWebDomain, s.settingService.GetSubDomain} {
+		if v, err := get(); err == nil {
+			hosts = append(hosts, v)
+		}
+	}
+	for _, get := range []func() (string, error){s.settingService.GetSubURI, s.settingService.GetSubJsonURI} {
+		if v, err := get(); err == nil && strings.TrimSpace(v) != "" {
+			if u, err := url.Parse(strings.TrimSpace(v)); err == nil {
+				hosts = append(hosts, u.Hostname())
+			}
+		}
+	}
+	hosts = append(hosts, s.Settings().MasterAddress)
+	var out []string
+	seen := map[string]bool{}
+	for _, h := range hosts {
+		h = cleanEgressHost(h)
+		if h == "" || seen[h] {
+			continue
+		}
+		seen[h] = true
+		if ip := net.ParseIP(h); ip != nil {
+			if ip.IsGlobalUnicast() {
+				out = append(out, ip.String())
+			}
+			continue
+		}
+		for _, a := range egressResolve(h) {
+			if ip := net.ParseIP(a); ip != nil && ip.IsGlobalUnicast() {
+				out = append(out, ip.String())
+			}
+		}
+	}
+	slices.Sort(out)
+	return slices.Compact(out)
+}
+
+// cleanEgressHost strips a port, brackets and a trailing dot from a configured host.
+func cleanEgressHost(h string) string {
+	h = strings.TrimSpace(h)
+	if host, _, err := net.SplitHostPort(h); err == nil {
+		h = host
+	}
+	h = strings.TrimSuffix(strings.Trim(h, "[]"), ".")
+	if len(h) > 253 || strings.ContainsAny(h, " /\\") {
+		return ""
+	}
+	return strings.ToLower(h)
+}
+
+// resolveEgressHost resolves a name within a short deadline; a failure yields nothing.
+func resolveEgressHost(host string) []string {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	addrs, err := net.DefaultResolver.LookupHost(ctx, host)
+	if err != nil {
+		return nil
+	}
+	return addrs
+}
+
 // Status is safe to poll: it never changes the host or the nodes.
 func (s *EgressFilterService) Status() EgressFilterStatus {
 	settings := s.Settings()
@@ -273,7 +354,9 @@ func (s *EgressFilterService) SetLocal(in EgressFilterSettings) (EgressFilterSta
 	}
 	in.Filter = f
 	in.ManagedBy, in.ManagedAt = "", 0
-	in.NodeScopeUsed = in.NodeScope != EgressNodeScopeNone || s.Settings().NodeScopeUsed
+	cur := s.Settings()
+	in.NodeScopeUsed = in.NodeScope != EgressNodeScopeNone || cur.NodeScopeUsed
+	in.MasterAddress = cur.MasterAddress
 	if err := s.save(in); err != nil {
 		return EgressFilterStatus{}, err
 	}
@@ -289,12 +372,25 @@ func (s *EgressFilterService) ApplyManaged(req ManagedEgressFilterRequest) (chan
 		return false, errors.New("managedBy is required")
 	}
 	cur := s.Settings()
+	addr := cleanEgressHost(req.ServerAddress)
+	moved := addr != "" && addr != cur.MasterAddress
+	if moved {
+		cur.MasterAddress = addr
+	}
 	if req.Release {
-		if cur.ManagedBy != req.ManagedBy {
+		if cur.ManagedBy != req.ManagedBy && !moved {
 			return false, nil
 		}
-		cur.ManagedBy, cur.ManagedAt = "", 0
-		return false, s.save(cur)
+		if cur.ManagedBy == req.ManagedBy {
+			cur.ManagedBy, cur.ManagedAt = "", 0
+		}
+		if err := s.save(cur); err != nil {
+			return false, err
+		}
+		if moved && cur.Server {
+			s.applyHost(cur.Filter)
+		}
+		return moved && cur.Server, nil
 	}
 	if req.Filter == nil {
 		return false, errors.New("filter is required")
@@ -303,10 +399,10 @@ func (s *EgressFilterService) ApplyManaged(req ManagedEgressFilterRequest) (chan
 	if err != nil {
 		return false, err
 	}
-	if cur.ManagedBy == req.ManagedBy && cur.Fingerprint() == f.Fingerprint() {
+	if cur.ManagedBy == req.ManagedBy && cur.Fingerprint() == f.Fingerprint() && !moved {
 		return false, nil
 	}
-	changed = cur.Fingerprint() != f.Fingerprint()
+	changed = cur.Fingerprint() != f.Fingerprint() || (moved && f.Server)
 	cur.Filter = f
 	cur.ManagedBy = req.ManagedBy
 	cur.ManagedAt = time.Now().Unix()
@@ -322,7 +418,7 @@ func (s *EgressFilterService) ApplyManaged(req ManagedEgressFilterRequest) (chan
 }
 
 func (s *EgressFilterService) applyHost(f egressfilter.Filter) {
-	spec := s.spec(f)
+	spec := s.hostSpec(f)
 	egressFilterMu.Lock()
 	defer egressFilterMu.Unlock()
 	if spec.Needed() {
@@ -340,6 +436,7 @@ func (s *EgressFilterService) EnsureHostFilter() {
 	if !spec.Needed() {
 		return
 	}
+	spec = s.hostSpec(settings.Filter)
 	egressFilterMu.Lock()
 	defer egressFilterMu.Unlock()
 	recordEgressFilterErr(egressFilterHost.Ensure(spec))
@@ -447,6 +544,8 @@ func (s *EgressFilterService) SyncNodes(force bool) {
 			f := settings.Filter
 			want, req = "apply:"+fp, ManagedEgressFilterRequest{Filter: &f, ManagedBy: guid}
 		}
+		req.ServerAddress = n.Address
+		want += "@" + n.Address
 		st := egressNodeSync.m[n.Id]
 		if st == nil {
 			st = &egressNodeSyncState{}
@@ -807,7 +906,9 @@ func (s *EgressFilterService) xrayInputs() (egressfilter.Filter, egressOwnTarget
 	f := s.Settings().Filter
 	var own egressOwnTargets
 	if f.Server {
-		own = egressOwnTargets{Addrs: egressLocalAddrs(), Ports: s.ServerPorts()}
+		addrs := append(egressLocalAddrs(), s.PublicAddrs()...)
+		slices.Sort(addrs)
+		own = egressOwnTargets{Addrs: slices.Compact(addrs), Ports: s.ServerPorts()}
 	}
 	return f, own
 }

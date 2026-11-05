@@ -48,9 +48,10 @@ func (f *fakeEgressHost) Status() egressfilter.Status {
 func useFakeEgress(t *testing.T) *fakeEgressHost {
 	t.Helper()
 	fake := &fakeEgressHost{}
-	prevHost, prevAddrs, prevSshd, prevPush := egressFilterHost, egressLocalAddrs, sshdConfigPath, egressFilterPush
+	prevHost, prevAddrs, prevSshd, prevPush, prevResolve := egressFilterHost, egressLocalAddrs, sshdConfigPath, egressFilterPush, egressResolve
 	egressFilterHost = fake
 	egressLocalAddrs = func() []string { return []string{"192.0.2.1", "2001:db8::1"} }
+	egressResolve = func(string) []string { return nil }
 	dir := t.TempDir()
 	sshdConfigPath = filepath.Join(dir, "sshd_config")
 	if err := os.WriteFile(sshdConfigPath, []byte("# test\nPort 2222\n"), 0o600); err != nil {
@@ -62,6 +63,7 @@ func useFakeEgress(t *testing.T) *fakeEgressHost {
 	resetEgressNodeSync()
 	t.Cleanup(func() {
 		egressFilterHost, egressLocalAddrs, sshdConfigPath, egressFilterPush = prevHost, prevAddrs, prevSshd, prevPush
+		egressResolve = prevResolve
 		egressFilterErr = ""
 		resetEgressNodeSync()
 	})
@@ -443,7 +445,7 @@ func TestEgressFilterService_SyncNodes(t *testing.T) {
 	}
 	got := pushes()
 	if len(got) != 2 || got[0].node != a || got[0].req.Filter == nil || !got[0].req.Filter.SMTP ||
-		got[1].node != b || !got[1].req.Release || got[0].req.ManagedBy == "" {
+		got[1].node != b || !got[1].req.Release || got[0].req.ManagedBy == "" || got[0].req.ServerAddress != "203.0.113.9" {
 		t.Fatalf("pushes = %+v, want the filter to a and a release to b, none to the offline node", got)
 	}
 	svc.SyncNodes(false)
@@ -550,4 +552,62 @@ func TestInjectEgressFilter_FreedomBlocksResolvedAddresses(t *testing.T) {
 			t.Fatalf("finalRules = %v, want the template's own", final)
 		}
 	})
+}
+
+// Behind NAT the server's public address is on no interface: the server block must cover it too.
+func TestEgressFilterService_PublicAddressesAreBlocked(t *testing.T) {
+	setupConflictDB(t)
+	fake := useFakeEgress(t)
+	addTorrentBlockInbound(t, "in-client", 30101, `{"enabled":false}`)
+	egressResolve = func(h string) []string {
+		if h == "panel.example.com" {
+			return []string{"198.51.100.7", "2001:db8::7"}
+		}
+		return nil // unresolvable names are skipped
+	}
+	svc := &EgressFilterService{}
+	if _, err := svc.SetLocal(EgressFilterSettings{Filter: egressfilter.Filter{Server: true}}); err != nil {
+		t.Fatal(err)
+	}
+	if got := fake.spec.ServerAddrs; len(got) != 0 {
+		t.Fatalf("no public address known, nft spec has %v", got)
+	}
+	settings := &SettingService{}
+	for k, v := range map[string]string{"webDomain": "panel.example.com", "subDomain": "gone.example.com", "subURI": "https://203.0.113.50:2096/sub/"} {
+		if err := settings.setString(k, v); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// On a node, the address its master reaches it at (a floating IP, say).
+	if _, err := svc.ApplyManaged(ManagedEgressFilterRequest{Filter: &egressfilter.Filter{Server: true}, ManagedBy: "central", ServerAddress: "198.51.100.8:2053"}); err != nil {
+		t.Fatal(err)
+	}
+	public := []string{"198.51.100.7", "198.51.100.8", "2001:db8::7", "203.0.113.50"}
+	if got := svc.PublicAddrs(); !reflect.DeepEqual(got, public) {
+		t.Fatalf("PublicAddrs = %v, want %v", got, public)
+	}
+	if !reflect.DeepEqual(fake.spec.ServerAddrs, public) {
+		t.Fatalf("nft spec addresses = %v, want %v", fake.spec.ServerAddrs, public)
+	}
+	cfg, err := (&XrayService{}).GetXrayConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var server map[string]any
+	for _, r := range routingRules(t, cfg) {
+		if r["ruleTag"] == "egress-filter-server" {
+			server = r
+		}
+	}
+	want := []string{"192.0.2.1", "198.51.100.7", "198.51.100.8", "2001:db8::1", "2001:db8::7", "203.0.113.50"}
+	if server == nil || !reflect.DeepEqual(stringList(server["ip"]), want) {
+		t.Fatalf("server rule = %v, want the interface and public addresses %v", server, want)
+	}
+	// A local save on the node keeps the address its master uses.
+	if _, err := svc.SetLocal(EgressFilterSettings{Filter: egressfilter.Filter{Server: true}}); err != nil {
+		t.Fatal(err)
+	}
+	if svc.Settings().MasterAddress != "198.51.100.8" {
+		t.Fatalf("a local save dropped the master's address: %+v", svc.Settings())
+	}
 }

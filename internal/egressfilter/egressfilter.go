@@ -283,6 +283,25 @@ type Spec struct {
 	Filter Filter
 	// ServerPorts are this server's own TCP management ports (panel, SSH).
 	ServerPorts []uint16
+	// ServerAddrs are public addresses of this server that need not be on an interface (NAT).
+	ServerAddrs []string
+}
+
+// serverAddrs splits ServerAddrs into valid, deduplicated IPv4 and IPv6 lists.
+func (s Spec) serverAddrs() (v4, v6 []string) {
+	for _, a := range s.ServerAddrs {
+		ip, err := netip.ParseAddr(strings.TrimSpace(a))
+		switch {
+		case err != nil || ip.Zone() != "":
+		case ip.Unmap().Is4():
+			v4 = append(v4, ip.Unmap().String())
+		default:
+			v6 = append(v6, ip.String())
+		}
+	}
+	slices.Sort(v4)
+	slices.Sort(v6)
+	return slices.Compact(v4), slices.Compact(v6)
 }
 
 func (s Spec) serverPorts() []uint16 {
@@ -347,6 +366,16 @@ func Ruleset(spec Spec) (string, error) {
 		}
 		w("\tset server_ports { type inet_service; elements = { %s }; }", strings.Join(parts, ", "))
 	}
+	addr4, addr6 := spec.serverAddrs()
+	if !f.Server || len(server) == 0 {
+		addr4, addr6 = nil, nil
+	}
+	if len(addr4) > 0 {
+		w("\tset server4 { type ipv4_addr; elements = { %s }; }", strings.Join(addr4, ", "))
+	}
+	if len(addr6) > 0 {
+		w("\tset server6 { type ipv6_addr; elements = { %s }; }", strings.Join(addr6, ", "))
+	}
 	if len(custom.V4) > 0 {
 		w("\tset custom4 { type ipv4_addr; flags interval; elements = { %s }; }", prefixElements(custom.V4))
 	}
@@ -368,6 +397,13 @@ func Ruleset(spec Spec) (string, error) {
 	w("\t\tmeta l4proto { tcp, udp } th dport %d return", DNSPort)
 	if len(mail) > 0 {
 		w("\t\tmeta l4proto tcp tcp dport @mail_ports counter name mail goto deny")
+	}
+	// This server's public address behind NAT is routed out and back in, not delivered locally.
+	if len(addr4) > 0 {
+		w("\t\tip daddr @server4 tcp dport @server_ports counter name server goto deny")
+	}
+	if len(addr6) > 0 {
+		w("\t\tip6 daddr @server6 tcp dport @server_ports counter name server goto deny")
 	}
 	if f.Private {
 		// Peer-to-peer inside the tunnel is the tunnel's own business, not egress.

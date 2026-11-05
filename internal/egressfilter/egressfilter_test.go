@@ -130,11 +130,38 @@ func TestRulesetOnlyJudgesTunnelClients(t *testing.T) {
 		if strings.Contains(line, "hook") {
 			continue
 		}
-		if strings.Contains(line, "jump client") || strings.Contains(line, "@server_ports counter") {
+		if strings.Contains(line, "jump client") || (strings.Contains(line, "@server_ports counter") && !strings.Contains(line, "daddr @server")) {
 			if !strings.Contains(line, `iifname "xui-awg*" ct direction original`) {
 				t.Errorf("entry rule not limited to tunnel clients: %q", line)
 			}
 		}
+	}
+}
+
+func TestRulesetBlocksPublicServerAddresses(t *testing.T) {
+	spec := Spec{Filter: Filter{Server: true}, ServerPorts: []uint16{2053}, ServerAddrs: []string{"198.51.100.7", "bad", "2001:db8::7", "198.51.100.7", "::ffff:203.0.113.5"}}
+	tx, err := Ruleset(spec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := tx[strings.Index(tx, "chain client {"):]
+	client = client[:strings.Index(client, "\n\t}")]
+	for _, want := range []string{
+		"set server4 { type ipv4_addr; elements = { 198.51.100.7, 203.0.113.5 }; }",
+		"set server6 { type ipv6_addr; elements = { 2001:db8::7 }; }",
+	} {
+		if !strings.Contains(tx, want) {
+			t.Errorf("ruleset lacks %q:\n%s", want, tx)
+		}
+	}
+	for _, want := range []string{"ip daddr @server4 tcp dport @server_ports counter name server goto deny", "ip6 daddr @server6 tcp dport @server_ports counter name server goto deny"} {
+		if !strings.Contains(client, want) {
+			t.Errorf("forwarded-client chain lacks %q:\n%s", want, tx)
+		}
+	}
+	spec.ServerPorts = nil
+	if tx, _ := Ruleset(spec); strings.Contains(tx, "server4") {
+		t.Fatalf("addresses without ports rendered a rule:\n%s", tx)
 	}
 }
 
