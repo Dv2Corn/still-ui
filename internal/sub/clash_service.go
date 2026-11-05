@@ -1673,13 +1673,76 @@ func mergeClashProxyGroups(baseValue any, remoteGroups []any) []any {
 		seen[name] = struct{}{}
 		merged = append(merged, group)
 	}
+	members := make(map[string][]string, len(merged)+len(baseOrder))
+	for _, group := range append(slices.Clone(merged), baseGroups...) {
+		if name := clashProxyGroupName(group); name != "" {
+			if _, known := members[name]; !known {
+				members[name] = clashGroupMembers(group)
+			}
+		}
+	}
 	for _, name := range baseOrder {
 		if _, replaced := seen[name]; replaced {
 			continue
 		}
-		merged = append(merged, baseByName[name])
+		merged = append(merged, withoutMembersLeadingBack(baseByName[name], name, seen, members))
 	}
 	return merged
+}
+
+func clashGroupMembers(value any) []string {
+	group, _ := value.(map[string]any)
+	refs, _ := asAnySlice(group["proxies"])
+	out := make([]string, 0, len(refs))
+	for _, ref := range refs {
+		if s, ok := ref.(string); ok {
+			out = append(out, strings.TrimSpace(s))
+		}
+	}
+	return out
+}
+
+// withoutMembersLeadingBack drops from a generated group the template groups that lead back to
+// it (PROXY → the template's own Auto → … → PROXY): Mihomo refuses a profile with a group loop.
+func withoutMembersLeadingBack(value any, name string, template map[string]struct{}, members map[string][]string) any {
+	group, ok := value.(map[string]any)
+	if !ok {
+		return value
+	}
+	refs, _ := asAnySlice(group["proxies"])
+	kept := make([]any, 0, len(refs))
+	for _, ref := range refs {
+		s, _ := ref.(string)
+		if _, fromTemplate := template[strings.TrimSpace(s)]; fromTemplate && clashGroupReaches(strings.TrimSpace(s), name, members) {
+			continue
+		}
+		kept = append(kept, ref)
+	}
+	if len(kept) == len(refs) {
+		return value
+	}
+	out := cloneMap(group)
+	out["proxies"] = kept
+	return out
+}
+
+func clashGroupReaches(from, to string, members map[string][]string) bool {
+	seen := map[string]bool{from: true}
+	queue := []string{from}
+	for len(queue) > 0 {
+		cur := queue[0]
+		queue = queue[1:]
+		for _, next := range members[cur] {
+			if next == to {
+				return true
+			}
+			if !seen[next] {
+				seen[next] = true
+				queue = append(queue, next)
+			}
+		}
+	}
+	return false
 }
 
 func clashProxyGroupName(value any) string {
