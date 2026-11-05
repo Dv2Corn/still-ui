@@ -85,6 +85,11 @@ export interface AllSetting {
   subCalendarExpireInclusive: boolean;
   subCertFile: string;
   subClashAutoDetect: boolean;
+  subClashAutoGroup: boolean;
+  subClashAutoGroupInterval: number;
+  subClashAutoGroupTolerance: number;
+  subClashAutoGroupType: string;
+  subClashAutoGroupUrl: string;
   subClashEnable: boolean;
   subClashEnableRouting: boolean;
   subClashPath: string;
@@ -287,6 +292,11 @@ export interface AllSettingView {
   subCalendarExpireInclusive: boolean;
   subCertFile: string;
   subClashAutoDetect: boolean;
+  subClashAutoGroup: boolean;
+  subClashAutoGroupInterval: number;
+  subClashAutoGroupTolerance: number;
+  subClashAutoGroupType: string;
+  subClashAutoGroupUrl: string;
   subClashEnable: boolean;
   subClashEnableRouting: boolean;
   subClashPath: string;

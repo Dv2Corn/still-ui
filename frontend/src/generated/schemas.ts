@@ -262,6 +262,25 @@ export const SCHEMAS: Record<string, unknown> = {
       "subClashAutoDetect": {
         "type": "boolean"
       },
+      "subClashAutoGroup": {
+        "type": "boolean"
+      },
+      "subClashAutoGroupInterval": {
+        "maximum": 86400,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "subClashAutoGroupTolerance": {
+        "maximum": 10000,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "subClashAutoGroupType": {
+        "type": "string"
+      },
+      "subClashAutoGroupUrl": {
+        "type": "string"
+      },
       "subClashEnable": {
         "type": "boolean"
       },
@@ -707,6 +726,11 @@ export const SCHEMAS: Record<string, unknown> = {
       "subCalendarExpireInclusive",
       "subCertFile",
       "subClashAutoDetect",
+      "subClashAutoGroup",
+      "subClashAutoGroupInterval",
+      "subClashAutoGroupTolerance",
+      "subClashAutoGroupType",
+      "subClashAutoGroupUrl",
       "subClashEnable",
       "subClashEnableRouting",
       "subClashPath",
@@ -1113,6 +1137,25 @@ export const SCHEMAS: Record<string, unknown> = {
       },
       "subClashAutoDetect": {
         "type": "boolean"
+      },
+      "subClashAutoGroup": {
+        "type": "boolean"
+      },
+      "subClashAutoGroupInterval": {
+        "maximum": 86400,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "subClashAutoGroupTolerance": {
+        "maximum": 10000,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "subClashAutoGroupType": {
+        "type": "string"
+      },
+      "subClashAutoGroupUrl": {
+        "type": "string"
       },
       "subClashEnable": {
         "type": "boolean"
@@ -1567,6 +1610,11 @@ export const SCHEMAS: Record<string, unknown> = {
       "subCalendarExpireInclusive",
       "subCertFile",
       "subClashAutoDetect",
+      "subClashAutoGroup",
+      "subClashAutoGroupInterval",
+      "subClashAutoGroupTolerance",
+      "subClashAutoGroupType",
+      "subClashAutoGroupUrl",
       "subClashEnable",
       "subClashEnableRouting",
       "subClashPath",

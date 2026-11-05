@@ -62,8 +62,8 @@ and Shadowsocks nodes and excludes VLESS, Hysteria2, Reality, XHTTP,
 HTTPUpgrade, and Shadowsocks 2022. If no compatible node exists, it returns an
 explicit `422` response instead of a YAML profile the client cannot import.
 To avoid Mihomo-only syntax entering the legacy profile, this endpoint always
-uses its minimal `PROXY` group and `MATCH,PROXY` rule and ignores custom Clash
-routing settings.
+uses its minimal `PROXY` group (plus the `Auto` group below, a classic Clash
+group type) and `MATCH,PROXY` rule and ignores custom Clash routing settings.
 
 If an administrator has already assigned `/mihomo/` or `/clash-legacy/` to a
 different configurable subscription path, that existing path is preserved and
@@ -73,6 +73,48 @@ Automatic Clash format detection keeps the existing `(?i)(clash|mihomo)`
 default matcher so existing subscription URLs continue returning YAML.
 It does not distinguish legacy clients from Mihomo-based clients; Clash for
 Windows users must use `/clash-legacy/<sub-id>` for a compatible profile.
+
+### Clash/Mihomo Auto group
+
+With **Settings → Subscription → Auto group** (`subClashAutoGroup`) on, Clash and
+Mihomo profiles get an `Auto` group with every server of the subscription. The
+app tests each server through the tunnel and moves to a working one by itself,
+so a blocked or down server costs the user a minute, not a support request.
+`Auto` is the first, default entry of the `PROXY` select group; the user can
+still pick a server by hand there.
+
+```yaml
+proxy-groups:
+  - name: PROXY
+    type: select
+    proxies: [Auto, Server A, Server B, DIRECT]
+  - name: Auto
+    type: url-test
+    proxies: [Server A, Server B]
+    url: http://www.gstatic.com/generate_204
+    interval: 300
+    tolerance: 50
+    lazy: true
+```
+
+| Setting | Key | Default |
+| --- | --- | --- |
+| Mode: **Fastest** (`url-test`) or **First working** (`fallback`, subscription order) | `subClashAutoGroupType` | `url-test` |
+| Check URL (must answer 204/200 through the tunnel) | `subClashAutoGroupUrl` | `http://www.gstatic.com/generate_204` |
+| Check interval, seconds (10–86400) | `subClashAutoGroupInterval` | `300` |
+| Tolerance, ms (`url-test` only; stops hopping on jitter) | `subClashAutoGroupTolerance` | `50` |
+
+`Auto` appears only when a subscription has two or more servers; the
+subscription info node is never a member. A proxy whose remark is `Auto` is
+renamed so the profile stays valid. Custom Clash routing rules and remote
+templates may route to `Auto` (for example `MATCH,Auto`): the group is then
+emitted even for a single server or with the switch off, and a template that
+defines its own `Auto` group replaces the generated one.
+
+The switch is on for new installs. A panel upgraded from a release without the
+group keeps it off until an administrator turns it on, so existing subscribers
+do not find a new default in their app after a refresh. Xray JSON subscriptions
+already have their own balancer; still-ui does not emit sing-box profiles.
 
 ### Subscription node ordering
 

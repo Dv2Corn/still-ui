@@ -11,7 +11,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router';
 import type { AllSetting } from '@/models/setting';
-import type { SubProfileMode, SubHostSortMode } from '@/schemas/setting';
+import type { SubProfileMode, SubHostSortMode, SubClashAutoGroupType } from '@/schemas/setting';
 import { onNumber } from '@/utils/onNumber';
 import { DefaultSettingTag, SettingListItem } from '@/components/ui';
 import { RemarkTemplateField } from '@/components/form';
@@ -483,6 +483,73 @@ export default function SubscriptionGeneralTab({
                 <Switch
                   checked={allSetting.subClashRemoteDNS}
                   onChange={(v) => updateSetting({ subClashRemoteDNS: v })}
+                />
+              </SettingListItem>
+              <SettingListItem
+                paddings="small"
+                title={t('pages.settings.subClashAutoGroup')}
+                description={t('pages.settings.subClashAutoGroupDesc')}
+              >
+                <Switch
+                  checked={allSetting.subClashAutoGroup}
+                  onChange={(v) => updateSetting({ subClashAutoGroup: v })}
+                />
+              </SettingListItem>
+              <SettingListItem
+                paddings="small"
+                title={t('pages.settings.subClashAutoGroupType')}
+                description={t('pages.settings.subClashAutoGroupTypeDesc')}
+              >
+                <Select<SubClashAutoGroupType>
+                  id="sub-clash-auto-group-type"
+                  aria-label={t('pages.settings.subClashAutoGroupType')}
+                  value={allSetting.subClashAutoGroupType}
+                  onChange={(value) => updateSetting({ subClashAutoGroupType: value })}
+                  options={[
+                    { value: 'url-test', label: t('pages.settings.subClashAutoGroupUrlTest') },
+                    { value: 'fallback', label: t('pages.settings.subClashAutoGroupFallback') },
+                  ]}
+                />
+              </SettingListItem>
+              <SettingListItem
+                paddings="small"
+                title={t('pages.settings.subClashAutoGroupUrl')}
+                description={t('pages.settings.subClashAutoGroupUrlDesc')}
+              >
+                <Input
+                  aria-label={t('pages.settings.subClashAutoGroupUrl')}
+                  value={allSetting.subClashAutoGroupUrl}
+                  placeholder="http://www.gstatic.com/generate_204"
+                  onChange={(e) => updateSetting({ subClashAutoGroupUrl: e.target.value })}
+                />
+              </SettingListItem>
+              <SettingListItem
+                paddings="small"
+                title={t('pages.settings.subClashAutoGroupInterval')}
+                description={t('pages.settings.subClashAutoGroupIntervalDesc')}
+              >
+                <InputNumber
+                  aria-label={t('pages.settings.subClashAutoGroupInterval')}
+                  value={allSetting.subClashAutoGroupInterval}
+                  min={10}
+                  max={86400}
+                  style={{ width: '100%' }}
+                  onChange={onNumber((v) => updateSetting({ subClashAutoGroupInterval: v }))}
+                />
+              </SettingListItem>
+              <SettingListItem
+                paddings="small"
+                title={t('pages.settings.subClashAutoGroupTolerance')}
+                description={t('pages.settings.subClashAutoGroupToleranceDesc')}
+              >
+                <InputNumber
+                  aria-label={t('pages.settings.subClashAutoGroupTolerance')}
+                  value={allSetting.subClashAutoGroupTolerance}
+                  min={0}
+                  max={10000}
+                  disabled={allSetting.subClashAutoGroupType === 'fallback'}
+                  style={{ width: '100%' }}
+                  onChange={onNumber((v) => updateSetting({ subClashAutoGroupTolerance: v }))}
                 />
               </SettingListItem>
             </>

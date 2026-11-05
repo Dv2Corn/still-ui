@@ -118,6 +118,7 @@ type subControllerConfig struct {
 	subClashEnableRouting bool
 	subClashRules         string
 	subClashRemoteDNS     bool
+	subClashAutoGroup     ClashAutoGroup
 
 	subTitle         string
 	subSupportURL    string
@@ -222,6 +223,10 @@ func WithSUBClashRules(value string) SUBControllerOption {
 
 func WithSUBClashRemoteDNS(value bool) SUBControllerOption {
 	return func(config *subControllerConfig) { config.subClashRemoteDNS = value }
+}
+
+func WithSUBClashAutoGroup(value ClashAutoGroup) SUBControllerOption {
+	return func(config *subControllerConfig) { config.subClashAutoGroup = value }
 }
 
 func WithSUBTitle(value string) SUBControllerOption {
@@ -337,6 +342,7 @@ func NewSUBController(g *gin.RouterGroup, options ...SUBControllerOption) *SUBCo
 		subTemplateCache:     map[string]*cachedSubTemplate{},
 		releaseSettingsCache: releaseSettingsCache,
 	}
+	a.subClashService.autoGroup = config.subClashAutoGroup.normalized()
 	a.initRouter(g)
 	return a
 }

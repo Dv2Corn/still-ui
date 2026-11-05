@@ -22,6 +22,7 @@ type SubClashService struct {
 	enableRouting  bool
 	clashRules     string
 	clashRemoteDNS bool
+	autoGroup      ClashAutoGroup
 	SubService     *SubService
 }
 
@@ -174,41 +175,52 @@ func (s *SubClashService) getClash(subId string, host string, legacy bool) (stri
 		return "", header, nil
 	}
 
-	ensureUniqueProxyNames(proxies)
+	// Custom Clash routing can inject Mihomo-only groups, rules, providers or a
+	// top-level proxies key — exactly what the legacy filter just removed.
+	var resolved string
+	var remoteDocument map[string]any
+	var remote, applyRouting bool
+	if s.enableRouting && !legacy {
+		var resolveErr error
+		resolved, remoteDocument, remote, resolveErr = resolveClashRoutingSource(s.clashRules)
+		applyRouting = resolveErr == nil && strings.TrimSpace(resolved) != ""
+	}
+	templateMentionsAuto := applyRouting && clashTemplateMentionsAuto(resolved)
+
+	if s.autoGroup.clashAutoGroupMayAppear(templateMentionsAuto) {
+		ensureUniqueProxyNames(proxies, clashAutoGroupName)
+	} else {
+		ensureUniqueProxyNames(proxies)
+	}
 
 	proxyNames := make([]string, 0, len(proxies)+1)
+	autoMembers := make([]string, 0, len(proxies))
 	for _, proxy := range proxies {
-		if isDummyProxy(proxy) && len(proxies) > 1 {
+		dummy := isDummyProxy(proxy)
+		if dummy && len(proxies) > 1 {
 			continue
 		}
 		if name, ok := proxy["name"].(string); ok && name != "" {
 			proxyNames = append(proxyNames, name)
+			if !dummy {
+				autoMembers = append(autoMembers, name)
+			}
 		}
 	}
-	proxyNames = append(proxyNames, "DIRECT")
 
 	config := map[string]any{
-		"proxies": proxies,
-		"proxy-groups": []map[string]any{{
-			"name":    "PROXY",
-			"type":    "select",
-			"proxies": proxyNames,
-		}},
-		"rules": []string{"MATCH,PROXY"},
+		"proxies":      proxies,
+		"proxy-groups": s.autoGroup.clashProxyGroups(proxyNames, autoMembers, templateMentionsAuto),
+		"rules":        []string{"MATCH,PROXY"},
 	}
 
-	// Custom Clash routing can inject Mihomo-only groups, rules, providers or a
-	// top-level proxies key — exactly what the legacy filter just removed.
-	if s.enableRouting && !legacy {
-		resolved, remoteDocument, remote, resolveErr := resolveClashRoutingSource(s.clashRules)
-		if resolveErr == nil && strings.TrimSpace(resolved) != "" {
-			if remote {
-				if err := mergeRemoteClashRules(config, remoteDocument, s.clashRemoteDNS); err != nil {
-					return "", "", err
-				}
-			} else if err := mergeClashRulesYAML(config, resolved); err != nil {
+	if applyRouting {
+		if remote {
+			if err := mergeRemoteClashRules(config, remoteDocument, s.clashRemoteDNS); err != nil {
 				return "", "", err
 			}
+		} else if err := mergeClashRulesYAML(config, resolved); err != nil {
+			return "", "", err
 		}
 	}
 
@@ -324,8 +336,14 @@ func legacyShadowsocksCipher(value any) string {
 // mihomo rejects the whole config on a duplicate name (the empty string
 // genRemark returns for a remark-less inbound counts), vanishing the Clash
 // profile on refresh. See issue #4641.
-func ensureUniqueProxyNames(proxies []map[string]any) {
-	seen := make(map[string]struct{}, len(proxies))
+//
+// reserved names (proxy groups the output defines) are taken up front, so a
+// proxy called like a group is renamed instead of the config being rejected.
+func ensureUniqueProxyNames(proxies []map[string]any, reserved ...string) {
+	seen := make(map[string]struct{}, len(proxies)+len(reserved))
+	for _, name := range reserved {
+		seen[name] = struct{}{}
+	}
 	for i, proxy := range proxies {
 		base, _ := proxy["name"].(string)
 		if base == "" {

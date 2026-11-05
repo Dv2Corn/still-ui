@@ -188,6 +188,11 @@ var defaultValueMap = map[string]string{
 	"subClashEnableRouting":       "false",
 	"subClashRules":               "",
 	"subClashRemoteDNS":           "false",
+	"subClashAutoGroup":           "true",
+	"subClashAutoGroupType":       DefaultSubClashAutoGroupType,
+	"subClashAutoGroupUrl":        DefaultSubClashAutoGroupURL,
+	"subClashAutoGroupInterval":   "300",
+	"subClashAutoGroupTolerance":  "50",
 	"subJsonMux":                  "",
 	"subJsonRules":                "",
 	"subJsonRoutingRules":         "",
@@ -1758,6 +1763,9 @@ func (s *SettingService) UpdateAllSetting(allSetting *entity.AllSetting, clears 
 		return err
 	}
 	if err := validateSubJsonDnsSetting(allSetting); err != nil {
+		return err
+	}
+	if err := validateSubClashAutoGroup(allSetting); err != nil {
 		return err
 	}
 	if err := validateFinalMaskJSONSalamander(allSetting.SubJsonFinalMask); err != nil {

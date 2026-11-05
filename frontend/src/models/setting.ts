@@ -1,5 +1,5 @@
 import { ObjectUtil } from '@/utils';
-import type { SubProfileMode, SubHostSortMode } from '@/schemas/setting';
+import type { SubProfileMode, SubHostSortMode, SubClashAutoGroupType } from '@/schemas/setting';
 
 export class AllSetting {
   webListen = '';
@@ -76,6 +76,11 @@ export class AllSetting {
   subClashEnableRouting = false;
   subClashRules = '';
   subClashRemoteDNS = false;
+  subClashAutoGroup = true;
+  subClashAutoGroupType: SubClashAutoGroupType = 'url-test';
+  subClashAutoGroupUrl = 'http://www.gstatic.com/generate_204';
+  subClashAutoGroupInterval = 300;
+  subClashAutoGroupTolerance = 50;
   subJsonMux = '';
   subJsonRules = '';
   subJsonRoutingRules = '';
