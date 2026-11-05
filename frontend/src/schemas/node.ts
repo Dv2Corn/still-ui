@@ -45,6 +45,16 @@ export const NodeRecordSchema = z
     guid: z.string().optional(),
     parentGuid: z.string().optional(),
     transitive: z.boolean().optional(),
+    // Per-node traffic quota (still-ui): trafficUsed is raw bytes this period,
+    // trafficNextReset unix ms; trafficLimitBytes 0 means no limit.
+    trafficLimitBytes: z.number().optional(),
+    trafficResetDay: z.number().optional(),
+    trafficWarnPercent: z.number().optional(),
+    trafficLimitAction: z.string().optional(),
+    trafficMultiplier: z.number().optional(),
+    trafficUsed: z.number().optional(),
+    trafficNextReset: z.number().optional(),
+    trafficLimited: z.boolean().optional(),
   })
   .loose();
 

@@ -35,6 +35,7 @@ func (a *NodeController) initRouter(g *gin.RouterGroup) {
 	g.POST("/update/:id", a.update)
 	g.POST("/del/:id", a.del)
 	g.POST("/setEnable/:id", a.setEnable)
+	g.POST("/trafficLimit/:id", a.setTrafficLimit)
 
 	g.POST("/test", a.test)
 	g.POST("/certFingerprint", a.certFingerprint)
@@ -245,6 +246,24 @@ func (a *NodeController) setEnable(c *gin.Context) {
 		}
 	}
 	jsonMsg(c, I18nWeb(c, "pages.nodes.toasts.update"), nil)
+}
+
+func (a *NodeController) setTrafficLimit(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		jsonMsg(c, I18nWeb(c, "get"), err)
+		return
+	}
+	var req service.NodeTrafficLimitRequest
+	if err := c.ShouldBind(&req); err != nil {
+		jsonMsg(c, I18nWeb(c, "pages.nodes.toasts.trafficLimit"), err)
+		return
+	}
+	if err := a.nodeService.SetTrafficLimit(id, &req); err != nil {
+		jsonMsg(c, I18nWeb(c, "pages.nodes.toasts.trafficLimit"), err)
+		return
+	}
+	jsonMsg(c, I18nWeb(c, "pages.nodes.toasts.trafficLimit"), nil)
 }
 
 func (a *NodeController) inbounds(c *gin.Context) {
