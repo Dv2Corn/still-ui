@@ -5,6 +5,9 @@
 <p>
   <a href="https://www.gnu.org/licenses/gpl-3.0.en.html"><img src="https://img.shields.io/badge/license-GPL%20V3-blue.svg?longCache=true" alt="Лицензия: GPL-3.0"></a>
   <a href="https://github.com/MHSanaei/3x-ui"><img src="https://img.shields.io/badge/based%20on-3x--ui%20v3.11.0-555" alt="Основан на 3x-ui v3.11.0"></a>
+  <a href="https://github.com/Dv2Corn/still-ui/releases/latest"><img src="https://img.shields.io/github/v/release/Dv2Corn/still-ui?label=release" alt="Последний выпуск"></a>
+  <a href="https://github.com/Dv2Corn/still-ui/actions/workflows/ci.yml?query=branch%3Amain"><img src="https://github.com/Dv2Corn/still-ui/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://github.com/Dv2Corn/still-ui/attestations"><img src="https://img.shields.io/badge/builds-attested-2ea44f" alt="Сборки выпусков подписаны GitHub Actions"></a>
 </p>
 
 **still-ui** — форк панели [3x-ui](https://github.com/MHSanaei/3x-ui) (автор — MHSanaei) для [Xray-core](https://github.com/XTLS/Xray-core). За основу взята 3x-ui **v3.11.0**, и всё, что умеет она, умеет и still-ui: те же протоколы, тот же интерфейс, та же база.

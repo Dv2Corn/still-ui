@@ -5,6 +5,9 @@
 <p>
   <a href="https://www.gnu.org/licenses/gpl-3.0.en.html"><img src="https://img.shields.io/badge/license-GPL%20V3-blue.svg?longCache=true" alt="许可证：GPL-3.0"></a>
   <a href="https://github.com/MHSanaei/3x-ui"><img src="https://img.shields.io/badge/based%20on-3x--ui%20v3.11.0-555" alt="基于 3x-ui v3.11.0"></a>
+  <a href="https://github.com/Dv2Corn/still-ui/releases/latest"><img src="https://img.shields.io/github/v/release/Dv2Corn/still-ui?label=release" alt="最新版本"></a>
+  <a href="https://github.com/Dv2Corn/still-ui/actions/workflows/ci.yml?query=branch%3Amain"><img src="https://github.com/Dv2Corn/still-ui/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://github.com/Dv2Corn/still-ui/attestations"><img src="https://img.shields.io/badge/builds-attested-2ea44f" alt="发布构建由 GitHub Actions 证明"></a>
 </p>
 
 **still-ui** 是 MHSanaei 开发的 [3x-ui](https://github.com/MHSanaei/3x-ui) 面板的一个分支（fork），用于管理 [Xray-core](https://github.com/XTLS/Xray-core)。它以 3x-ui **v3.11.0** 为基础，保留了原面板的全部能力：相同的协议、相同的界面、相同的数据库。
