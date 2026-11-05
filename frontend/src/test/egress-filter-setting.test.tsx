@@ -65,7 +65,7 @@ describe('EgressFilterSetting', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: /^Private and local networks/ }));
     await screen.findByText(/already blocks these with the template's geoip:private rule/);
     fireEvent.click(screen.getByRole('checkbox', { name: "This server's panel and SSH ports" }));
-    await screen.findByText(/Ports now: 22, 2053\. The subscription port stays open/);
+    await screen.findByText(/Ports now: 22, 2053\. The subscription port stays open.*names are not resolved.*under custom addresses/);
 
     const custom = screen.getByRole('combobox', { name: 'Custom addresses and ports' });
     fireEvent.change(custom, { target: { value: '203.0.113.0/24, 6667' } });

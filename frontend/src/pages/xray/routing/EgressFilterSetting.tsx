@@ -137,7 +137,8 @@ export default function EgressFilterSetting() {
         </Checkbox>
         {form?.server && (
           <Typography.Text type="secondary">
-            {t('pages.xray.egressFilter.serverPorts', { ports })}
+            {t('pages.xray.egressFilter.serverPorts', { ports })}{' '}
+            {t('pages.xray.egressFilter.serverAddrs')}
           </Typography.Text>
         )}
         <Select

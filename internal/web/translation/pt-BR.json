@@ -2041,6 +2041,7 @@
         "privateInTemplate": "O Xray já bloqueia essas redes com a regra geoip:private do modelo; o filtro adiciona só a parte do AmneziaWG em modo kernel.",
         "server": "Portas do painel e SSH deste servidor",
         "serverPorts": "Portas agora: {ports}. A porta de assinatura continua aberta para os apps atualizarem pela VPN.",
+        "serverAddrs": "Cobertos: os endereços das interfaces deste servidor e os IPs escritos nos campos de escuta e domínio do painel (nomes não são resolvidos). Adicione em endereços personalizados um IP público que não esteja em nenhuma interface (NAT, IP flutuante).",
         "custom": "Endereços e portas próprios",
         "customHint": "Um endereço ou CIDR é bloqueado em todas as portas; uma porta ou faixa (6667, 1000-2000), em todos os endereços.",
         "nodes": "Nós",

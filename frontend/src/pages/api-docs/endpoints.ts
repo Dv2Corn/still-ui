@@ -751,7 +751,7 @@ export const sections: readonly Section[] = [
         method: 'POST',
         path: '/panel/api/server/applyManagedEgressFilter',
         summary:
-          "Node side of the egress filter: a central panel sets this node's filter (stored as managed by its panelGuid) or, with release=true, gives up ownership and leaves the current filter in place as the node's own. Allowed for node-sync tokens. serverAddress is the address the central panel reaches the node at; the server block covers it too (it may be a NAT address on no interface). Xray is reconciled when the filter or that address changed. Returns the same object as GET /egressFilter.",
+          "Node side of the egress filter: a central panel sets this node's filter (stored as managed by its panelGuid) or, with release=true, gives up ownership and leaves the current filter in place as the node's own. Allowed for node-sync tokens. serverAddress is the address the central panel reaches the node at; if it is an IP literal and this panel owns the filter, the server block covers it too (it may be a NAT address on no interface). A release or push from a panel that does not own the filter changes nothing. Xray is reconciled when the filter or that address changed. Returns the same object as GET /egressFilter.",
         body: '{\n  "filter": { "smtp": true, "private": true, "custom": [] },\n  "managedBy": "4b1c0f6e-2f6d-4c55-9a1e-0f3d7c2a9b10",\n  "serverAddress": "203.0.113.9"\n}',
       },
       {

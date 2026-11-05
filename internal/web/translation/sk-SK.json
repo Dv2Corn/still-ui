@@ -2154,6 +2154,7 @@
         "privateInTemplate": "Xray ich už blokuje pravidlom geoip:private zo šablóny; filter pridáva len časť pre AmneziaWG v režime jadra.",
         "server": "Porty panelu a SSH tohto servera",
         "serverPorts": "Aktuálne porty: {ports}. Port odberu zostáva otvorený, aby sa aplikácie mohli aktualizovať cez VPN.",
+        "serverAddrs": "Pokryté sú adresy rozhraní tohto servera a IP adresy zapísané v poliach adresy počúvania a domény panela (mená sa neprekladajú). Verejnú IP, ktorá nie je na žiadnom rozhraní (NAT, plávajúca IP), pridajte do vlastných adries.",
         "custom": "Vlastné adresy a porty",
         "customHint": "Adresa alebo CIDR sa blokuje na všetkých portoch, port alebo rozsah (6667, 1000-2000) na všetkých adresách.",
         "nodes": "Uzly",

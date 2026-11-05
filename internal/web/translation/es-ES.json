@@ -2033,6 +2033,7 @@
         "privateInTemplate": "Xray ya las bloquea con la regla geoip:private de la plantilla; el filtro solo añade la parte de AmneziaWG en modo kernel.",
         "server": "Puertos del panel y SSH de este servidor",
         "serverPorts": "Puertos ahora: {ports}. El puerto de suscripción sigue abierto para que las apps se actualicen a través de la VPN.",
+        "serverAddrs": "Se cubren las direcciones de las interfaces de este servidor y las IP escritas en los campos de escucha y dominio del panel (los nombres no se resuelven). Añade en direcciones personalizadas una IP pública que no esté en ninguna interfaz (NAT, IP flotante).",
         "custom": "Direcciones y puertos propios",
         "customHint": "Una dirección o CIDR se bloquea en todos los puertos; un puerto o rango (6667, 1000-2000), en todas las direcciones.",
         "nodes": "Nodos",

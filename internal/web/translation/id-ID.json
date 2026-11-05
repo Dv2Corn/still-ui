@@ -2033,6 +2033,7 @@
         "privateInTemplate": "Xray sudah memblokirnya dengan aturan geoip:private dari template; filter hanya menambahkan bagian AmneziaWG mode kernel.",
         "server": "Port panel dan SSH server ini",
         "serverPorts": "Port saat ini: {ports}. Port langganan tetap terbuka agar aplikasi bisa memperbarui lewat VPN.",
+        "serverAddrs": "Yang dicakup: alamat antarmuka server ini dan alamat IP yang ditulis di kolom listen dan domain panel (nama tidak di-resolve). Tambahkan IP publik yang tidak ada di antarmuka mana pun (NAT, IP mengambang) di alamat kustom.",
         "custom": "Alamat dan port khusus",
         "customHint": "Alamat atau CIDR diblokir di semua port, port atau rentang (6667, 1000-2000) di semua alamat.",
         "nodes": "Node",

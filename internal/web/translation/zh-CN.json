@@ -2041,6 +2041,7 @@
         "privateInTemplate": "Xray 已通过模板中的 geoip:private 规则屏蔽这些网络；过滤器只补充内核模式 AmneziaWG 的部分。",
         "server": "本服务器的面板和 SSH 端口",
         "serverPorts": "当前端口：{ports}。订阅端口保持开放，以便应用通过 VPN 更新订阅。",
+        "serverAddrs": "覆盖范围:本服务器网卡上的地址,以及面板监听地址和域名字段中直接填写的 IP 地址(不解析域名)。不在任何网卡上的公网 IP(NAT、浮动 IP)请添加到自定义地址中。",
         "custom": "自定义地址和端口",
         "customHint": "地址或 CIDR 在所有端口上屏蔽，端口或端口范围（6667、1000-2000）在所有地址上屏蔽。",
         "nodes": "节点",

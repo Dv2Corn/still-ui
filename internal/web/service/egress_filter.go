@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
@@ -48,7 +47,7 @@ type EgressFilterSettings struct {
 	// when the filter is this panel's own.
 	ManagedBy string `json:"managedBy,omitempty"`
 	ManagedAt int64  `json:"managedAt,omitempty"`
-	// MasterAddress is the address a central panel reaches this node at (it may be a NAT address).
+	// MasterAddress is the owning central panel's address for this node, kept only as an IP literal.
 	MasterAddress string `json:"masterAddress,omitempty"`
 }
 
@@ -100,8 +99,6 @@ var (
 
 	// egressLocalAddrs lists this host's own addresses; swapped out in tests.
 	egressLocalAddrs = interfaceAddrs
-	// egressResolve looks up a public name of the panel; swapped out in tests.
-	egressResolve = resolveEgressHost
 	// sshdConfigPath is read for the SSH ports; swapped out in tests.
 	sshdConfigPath = "/etc/ssh/sshd_config"
 	// egressFilterPush delivers a request to one node; swapped out in tests.
@@ -235,69 +232,37 @@ func (s *EgressFilterService) hostSpec(f egressfilter.Filter) egressfilter.Spec 
 	return spec
 }
 
-// PublicAddrs are the addresses clients may reach this server at but that need not be on an
-// interface (NAT, floating IPs): web and subscription domains, and the address a master uses.
+// PublicAddrs are the addresses this server may be reached at that need not be on an interface:
+// IP literals in the panel's listen and domain settings and the owning master's address. No DNS.
 func (s *EgressFilterService) PublicAddrs() []string {
 	var hosts []string
-	for _, get := range []func() (string, error){s.settingService.GetWebDomain, s.settingService.GetSubDomain} {
+	for _, get := range []func() (string, error){s.settingService.GetListen, s.settingService.GetWebDomain} {
 		if v, err := get(); err == nil {
 			hosts = append(hosts, v)
 		}
 	}
-	for _, get := range []func() (string, error){s.settingService.GetSubURI, s.settingService.GetSubJsonURI} {
-		if v, err := get(); err == nil && strings.TrimSpace(v) != "" {
-			if u, err := url.Parse(strings.TrimSpace(v)); err == nil {
-				hosts = append(hosts, u.Hostname())
-			}
-		}
-	}
 	hosts = append(hosts, s.Settings().MasterAddress)
 	var out []string
-	seen := map[string]bool{}
 	for _, h := range hosts {
-		h = cleanEgressHost(h)
-		if h == "" || seen[h] {
-			continue
-		}
-		seen[h] = true
-		if ip := net.ParseIP(h); ip != nil {
-			if ip.IsGlobalUnicast() {
-				out = append(out, ip.String())
-			}
-			continue
-		}
-		for _, a := range egressResolve(h) {
-			if ip := net.ParseIP(a); ip != nil && ip.IsGlobalUnicast() {
-				out = append(out, ip.String())
-			}
+		if ip := egressIPLiteral(h); ip != "" {
+			out = append(out, ip)
 		}
 	}
 	slices.Sort(out)
 	return slices.Compact(out)
 }
 
-// cleanEgressHost strips a port, brackets and a trailing dot from a configured host.
-func cleanEgressHost(h string) string {
+// egressIPLiteral returns a configured host as a public IP, or "" for a name or anything else.
+func egressIPLiteral(h string) string {
 	h = strings.TrimSpace(h)
 	if host, _, err := net.SplitHostPort(h); err == nil {
 		h = host
 	}
-	h = strings.TrimSuffix(strings.Trim(h, "[]"), ".")
-	if len(h) > 253 || strings.ContainsAny(h, " /\\") {
+	ip := net.ParseIP(strings.Trim(h, "[]"))
+	if ip == nil || !ip.IsGlobalUnicast() {
 		return ""
 	}
-	return strings.ToLower(h)
-}
-
-// resolveEgressHost resolves a name within a short deadline; a failure yields nothing.
-func resolveEgressHost(host string) []string {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	addrs, err := net.DefaultResolver.LookupHost(ctx, host)
-	if err != nil {
-		return nil
-	}
-	return addrs
+	return ip.String()
 }
 
 // Status is safe to poll: it never changes the host or the nodes.
@@ -372,18 +337,15 @@ func (s *EgressFilterService) ApplyManaged(req ManagedEgressFilterRequest) (chan
 		return false, errors.New("managedBy is required")
 	}
 	cur := s.Settings()
-	addr := cleanEgressHost(req.ServerAddress)
-	moved := addr != "" && addr != cur.MasterAddress
-	if moved {
-		cur.MasterAddress = addr
-	}
+	// Only the master that owns the filter (or takes it over now) says where it reaches this node.
+	addr := egressIPLiteral(req.ServerAddress)
+	owner := cur.ManagedBy == req.ManagedBy || !req.Release
+	moved := owner && addr != cur.MasterAddress
 	if req.Release {
-		if cur.ManagedBy != req.ManagedBy && !moved {
+		if cur.ManagedBy != req.ManagedBy {
 			return false, nil
 		}
-		if cur.ManagedBy == req.ManagedBy {
-			cur.ManagedBy, cur.ManagedAt = "", 0
-		}
+		cur.ManagedBy, cur.ManagedAt, cur.MasterAddress = "", 0, addr
 		if err := s.save(cur); err != nil {
 			return false, err
 		}
@@ -404,6 +366,7 @@ func (s *EgressFilterService) ApplyManaged(req ManagedEgressFilterRequest) (chan
 	}
 	changed = cur.Fingerprint() != f.Fingerprint() || (moved && f.Server)
 	cur.Filter = f
+	cur.MasterAddress = addr
 	cur.ManagedBy = req.ManagedBy
 	cur.ManagedAt = time.Now().Unix()
 	if err := s.save(cur); err != nil {

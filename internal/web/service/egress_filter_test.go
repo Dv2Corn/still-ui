@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -48,10 +49,9 @@ func (f *fakeEgressHost) Status() egressfilter.Status {
 func useFakeEgress(t *testing.T) *fakeEgressHost {
 	t.Helper()
 	fake := &fakeEgressHost{}
-	prevHost, prevAddrs, prevSshd, prevPush, prevResolve := egressFilterHost, egressLocalAddrs, sshdConfigPath, egressFilterPush, egressResolve
+	prevHost, prevAddrs, prevSshd, prevPush := egressFilterHost, egressLocalAddrs, sshdConfigPath, egressFilterPush
 	egressFilterHost = fake
 	egressLocalAddrs = func() []string { return []string{"192.0.2.1", "2001:db8::1"} }
-	egressResolve = func(string) []string { return nil }
 	dir := t.TempDir()
 	sshdConfigPath = filepath.Join(dir, "sshd_config")
 	if err := os.WriteFile(sshdConfigPath, []byte("# test\nPort 2222\n"), 0o600); err != nil {
@@ -63,7 +63,6 @@ func useFakeEgress(t *testing.T) *fakeEgressHost {
 	resetEgressNodeSync()
 	t.Cleanup(func() {
 		egressFilterHost, egressLocalAddrs, sshdConfigPath, egressFilterPush = prevHost, prevAddrs, prevSshd, prevPush
-		egressResolve = prevResolve
 		egressFilterErr = ""
 		resetEgressNodeSync()
 	})
@@ -554,35 +553,48 @@ func TestInjectEgressFilter_FreedomBlocksResolvedAddresses(t *testing.T) {
 	})
 }
 
-// Behind NAT the server's public address is on no interface: the server block must cover it too.
+// failOnDNS fails the test if anything resolves a name through the Go or system resolver.
+func failOnDNS(t *testing.T) {
+	t.Helper()
+	prev := net.DefaultResolver
+	net.DefaultResolver = &net.Resolver{PreferGo: true, Dial: func(_ context.Context, _, addr string) (net.Conn, error) {
+		t.Errorf("a DNS lookup went to %s while the egress filter was rendered", addr)
+		return nil, errors.New("no DNS in this test")
+	}}
+	t.Cleanup(func() { net.DefaultResolver = prev })
+}
+
+// Behind NAT the server's public address is on no interface: the server block covers IP
+// literals the panel is configured with, never what a name resolves to (a CDN, a shared host).
 func TestEgressFilterService_PublicAddressesAreBlocked(t *testing.T) {
 	setupConflictDB(t)
 	fake := useFakeEgress(t)
+	failOnDNS(t)
 	addTorrentBlockInbound(t, "in-client", 30101, `{"enabled":false}`)
-	egressResolve = func(h string) []string {
-		if h == "panel.example.com" {
-			return []string{"198.51.100.7", "2001:db8::7"}
-		}
-		return nil // unresolvable names are skipped
-	}
 	svc := &EgressFilterService{}
-	if _, err := svc.SetLocal(EgressFilterSettings{Filter: egressfilter.Filter{Server: true}}); err != nil {
-		t.Fatal(err)
-	}
-	if got := fake.spec.ServerAddrs; len(got) != 0 {
-		t.Fatalf("no public address known, nft spec has %v", got)
-	}
 	settings := &SettingService{}
-	for k, v := range map[string]string{"webDomain": "panel.example.com", "subDomain": "gone.example.com", "subURI": "https://203.0.113.50:2096/sub/"} {
+	// A name behind a CDN, plus subscription hosts on another server: none of them are blocked.
+	for k, v := range map[string]string{"webDomain": "panel.example.com", "subDomain": "sub.example.com", "subURI": "https://203.0.113.50:2096/sub/"} {
 		if err := settings.setString(k, v); err != nil {
 			t.Fatal(err)
 		}
 	}
-	// On a node, the address its master reaches it at (a floating IP, say).
+	if _, err := svc.SetLocal(EgressFilterSettings{Filter: egressfilter.Filter{Server: true}}); err != nil {
+		t.Fatal(err)
+	}
+	if got := svc.PublicAddrs(); len(got) != 0 || len(fake.spec.ServerAddrs) != 0 {
+		t.Fatalf("names and subscription hosts gave %v (nft %v), want nothing", got, fake.spec.ServerAddrs)
+	}
+	for k, v := range map[string]string{"webListen": "10.0.0.5", "webDomain": "[2001:db8::7]"} {
+		if err := settings.setString(k, v); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// On a node, the owning master's address for it (a floating IP, say).
 	if _, err := svc.ApplyManaged(ManagedEgressFilterRequest{Filter: &egressfilter.Filter{Server: true}, ManagedBy: "central", ServerAddress: "198.51.100.8:2053"}); err != nil {
 		t.Fatal(err)
 	}
-	public := []string{"198.51.100.7", "198.51.100.8", "2001:db8::7", "203.0.113.50"}
+	public := []string{"10.0.0.5", "198.51.100.8", "2001:db8::7"}
 	if got := svc.PublicAddrs(); !reflect.DeepEqual(got, public) {
 		t.Fatalf("PublicAddrs = %v, want %v", got, public)
 	}
@@ -599,9 +611,26 @@ func TestEgressFilterService_PublicAddressesAreBlocked(t *testing.T) {
 			server = r
 		}
 	}
-	want := []string{"192.0.2.1", "198.51.100.7", "198.51.100.8", "2001:db8::1", "2001:db8::7", "203.0.113.50"}
+	want := []string{"10.0.0.5", "192.0.2.1", "198.51.100.8", "2001:db8::1", "2001:db8::7"}
 	if server == nil || !reflect.DeepEqual(stringList(server["ip"]), want) {
 		t.Fatalf("server rule = %v, want the interface and public addresses %v", server, want)
+	}
+	// A master that does not own the filter cannot move the address.
+	if _, err := svc.ApplyManaged(ManagedEgressFilterRequest{Release: true, ManagedBy: "other", ServerAddress: "198.51.100.66"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := svc.Settings(); got.MasterAddress != "198.51.100.8" || got.ManagedBy != "central" {
+		t.Fatalf("a non-owner's release changed the node: %+v", got)
+	}
+	// A master address that is a name is not resolved and not kept.
+	if _, err := svc.ApplyManaged(ManagedEgressFilterRequest{Filter: &egressfilter.Filter{Server: true}, ManagedBy: "central", ServerAddress: "node.example.com:2053"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := svc.PublicAddrs(); !reflect.DeepEqual(got, []string{"10.0.0.5", "2001:db8::7"}) {
+		t.Fatalf("PublicAddrs with a named master address = %v", got)
+	}
+	if _, err := svc.ApplyManaged(ManagedEgressFilterRequest{Filter: &egressfilter.Filter{Server: true}, ManagedBy: "central", ServerAddress: "198.51.100.8"}); err != nil {
+		t.Fatal(err)
 	}
 	// A local save on the node keeps the address its master uses.
 	if _, err := svc.SetLocal(EgressFilterSettings{Filter: egressfilter.Filter{Server: true}}); err != nil {

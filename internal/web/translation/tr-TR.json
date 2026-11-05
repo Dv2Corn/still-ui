@@ -2041,6 +2041,7 @@
         "privateInTemplate": "Xray bunları şablondaki geoip:private kuralıyla zaten engelliyor; filtre yalnızca çekirdek modundaki AmneziaWG kısmını ekler.",
         "server": "Bu sunucunun panel ve SSH portları",
         "serverPorts": "Şu anki portlar: {ports}. Uygulamalar VPN üzerinden güncellenebilsin diye abonelik portu açık kalır.",
+        "serverAddrs": "Kapsanan: bu sunucunun arayüz adresleri ve panelin dinleme ve alan adı alanlarına yazılmış IP adresleri (adlar çözümlenmez). Hiçbir arayüzde olmayan genel bir IP'yi (NAT, kayan IP) özel adreslere ekleyin.",
         "custom": "Özel adresler ve portlar",
         "customHint": "Bir adres veya CIDR tüm portlarda, bir port veya aralık (6667, 1000-2000) tüm adreslerde engellenir.",
         "nodes": "Düğümler",

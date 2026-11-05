@@ -2154,6 +2154,7 @@
         "privateInTemplate": "Xray already blocks these with the template's geoip:private rule; the filter adds only the AmneziaWG kernel-mode part.",
         "server": "This server's panel and SSH ports",
         "serverPorts": "Ports now: {ports}. The subscription port stays open so apps can refresh through the VPN.",
+        "serverAddrs": "Covered: this server's interface addresses and IP addresses set in the panel's listen and domain fields (names are not resolved). Add a public IP that is on no interface (NAT, floating IP) under custom addresses.",
         "custom": "Custom addresses and ports",
         "customHint": "An address or CIDR is blocked on every port, a port or range (6667, 1000-2000) on every address.",
         "nodes": "Nodes",

@@ -2041,6 +2041,7 @@
         "privateInTemplate": "Xray đã chặn chúng bằng quy tắc geoip:private trong mẫu; bộ lọc chỉ thêm phần cho AmneziaWG chế độ kernel.",
         "server": "Cổng bảng điều khiển và SSH của máy chủ này",
         "serverPorts": "Cổng hiện tại: {ports}. Cổng đăng ký vẫn mở để ứng dụng cập nhật qua VPN.",
+        "serverAddrs": "Được chặn: địa chỉ các giao diện của máy chủ này và địa chỉ IP ghi trong ô địa chỉ lắng nghe và tên miền của bảng điều khiển (không phân giải tên). Thêm IP công khai không nằm trên giao diện nào (NAT, IP nổi) vào địa chỉ tùy chỉnh.",
         "custom": "Địa chỉ và cổng tùy chỉnh",
         "customHint": "Địa chỉ hoặc CIDR bị chặn trên mọi cổng, cổng hoặc dải cổng (6667, 1000-2000) bị chặn trên mọi địa chỉ.",
         "nodes": "Node",
