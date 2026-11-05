@@ -18,6 +18,7 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/database"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/dbtest"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
+	"github.com/mhsanaei/3x-ui/v3/internal/egressfilter"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/crypto"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/global"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/runtime"
@@ -308,6 +309,15 @@ func TestMasterNodeContract(t *testing.T) {
 					}
 					return nil
 				}, nil},
+				{"ApplyManagedEgressFilter hands the node the master's filter", []string{"ApplyManagedEgressFilter"}, func() error {
+					// An empty filter: the node drops its own, so no host table is loaded.
+					return master.ApplyManagedEgressFilter(ctx, service.ManagedEgressFilterRequest{Filter: &egressfilter.Filter{}, ManagedBy: "master-guid"})
+				}, func(t *testing.T) {
+					got := (&service.EgressFilterService{}).Settings()
+					if got.ManagedBy != "master-guid" || got.Any() {
+						t.Fatalf("node egress filter = %+v, want the master's empty filter", got)
+					}
+				}},
 				{"DeleteUser detaches the client from the inbound", []string{"DeleteUser"}, func() error {
 					return master.DeleteUser(ctx, masterInbound("updated", false), "c3")
 				}, func(t *testing.T) {

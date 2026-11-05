@@ -32,6 +32,7 @@ type ServerController struct {
 	panelService       panel.PanelService
 	xrayMetricsService service.XrayMetricsService
 	torrentBlock       service.TorrentBlockService
+	egressFilter       service.EgressFilterService
 	xrayService        service.XrayService
 }
 
@@ -70,6 +71,7 @@ func (a *ServerController) initRouter(g *gin.RouterGroup) {
 	g.GET("/clientIps", a.getClientIps)
 	g.GET("/fail2banStatus", a.getFail2banStatus)
 	g.GET("/torrentBlock", a.getTorrentBlock)
+	g.GET("/egressFilter", a.getEgressFilter)
 
 	g.POST("/stopXrayService", a.stopXrayService)
 	g.POST("/restartXrayService", a.restartXrayService)
@@ -77,6 +79,8 @@ func (a *ServerController) initRouter(g *gin.RouterGroup) {
 	g.POST("/updatePanel", a.updatePanel)
 	g.POST("/setUpdateChannel", a.setUpdateChannel)
 	g.POST("/setTorrentBlock", a.setTorrentBlock)
+	g.POST("/setEgressFilter", a.setEgressFilter)
+	g.POST("/applyManagedEgressFilter", a.applyManagedEgressFilter)
 	g.POST("/updateGeofile", a.updateGeofile)
 	g.POST("/updateGeofile/:fileName", a.updateGeofile)
 	g.POST("/logs/:count", a.getLogs)
@@ -145,6 +149,49 @@ func (a *ServerController) setTorrentBlock(c *gin.Context) {
 		logger.Warning("apply torrent block change failed:", restartErr)
 	}
 	jsonObj(c, status, nil)
+}
+
+func (a *ServerController) getEgressFilter(c *gin.Context) {
+	jsonObj(c, a.egressFilter.Status(), nil)
+}
+
+// setEgressFilter stores this panel's own egress filter, hands it to the chosen nodes
+// and reconciles the running core, whose routing carries the Xray half.
+func (a *ServerController) setEgressFilter(c *gin.Context) {
+	form := service.EgressFilterSettings{}
+	if err := c.ShouldBindJSON(&form); err != nil {
+		jsonMsg(c, "invalid data", err)
+		return
+	}
+	status, err := a.egressFilter.SetLocal(form)
+	if err != nil {
+		jsonMsg(c, I18nWeb(c, "pages.settings.toasts.modifySettings"), err)
+		return
+	}
+	if restartErr := a.xrayService.RestartXray(false); restartErr != nil {
+		logger.Warning("apply egress filter change failed:", restartErr)
+	}
+	jsonObj(c, status, nil)
+}
+
+// applyManagedEgressFilter is how a central panel sets (or releases) this node's filter.
+func (a *ServerController) applyManagedEgressFilter(c *gin.Context) {
+	req := service.ManagedEgressFilterRequest{}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		jsonMsg(c, "invalid data", err)
+		return
+	}
+	changed, err := a.egressFilter.ApplyManaged(req)
+	if err != nil {
+		jsonMsg(c, I18nWeb(c, "pages.settings.toasts.modifySettings"), err)
+		return
+	}
+	if changed {
+		if restartErr := a.xrayService.RestartXray(false); restartErr != nil {
+			logger.Warning("apply managed egress filter failed:", restartErr)
+		}
+	}
+	jsonObj(c, a.egressFilter.Status(), nil)
 }
 
 func parseHistoryBucket(c *gin.Context) (int, bool) {

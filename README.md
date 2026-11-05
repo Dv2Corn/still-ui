@@ -186,6 +186,18 @@ Russian mobile operators inspect traffic (DPI), and in "whitelist" mode they cut
 
 BitTorrent encrypted inside a client's own extra tunnel cannot be seen. Traffic that Xray passes on to another proxy is covered by the Xray rule only. With nodes, turn the option on in each node's own panel.
 
+**Egress filter for clients.** **Xray Configs → Routing → Basic Routing → Egress filter for clients.** It keeps clients from using the server for mail spam, from reaching networks behind it and from reaching its management ports; hosters suspend servers over complaints about exactly these. Tick what to refuse and press **Apply**:
+
+- **Mail to mail servers (port 25)** — on by default on new installs, off on existing ones. Spam from VPN clients goes out on port 25, while mail apps send on 465/587.
+- **Mail submission (ports 465 and 587)**.
+- **Private and local networks**: 10/8, 172.16/12, 192.168/16, 100.64/10 (carrier-grade NAT), 169.254/16, loopback, multicast, reserved, fc00::/7, fe80::/10. The stock template already sends `geoip:private` to a blackhole; the panel sees that rule and adds no second one.
+- **This server's panel and SSH ports**, read from the panel settings and `sshd_config`, and the server's loopback services. The subscription port stays open, because client apps refresh their subscription through the tunnel they are connected to; a port that also serves an inbound stays open too.
+- **Custom addresses and ports**: an address or CIDR is refused on every port, a port or range (`6667`, `1000-2000`) on every address. Port 53 cannot be listed: DNS always works.
+
+Refused TCP connections are closed at once instead of hanging. Every generated Xray config gets these rules ahead of all others, for client inbounds only (including AmneziaWG, TUIC and MTProto relayed through Xray), plus a block final rule in each freedom outbound for the server's own ports, since a client that names the server by domain is only resolved there. On Linux with `nft`, the table `inet still_egress_filter` refuses the same for AmneziaWG kernel-mode clients (`xui-awg*`): it judges only connections a tunnel client opens, never the server's own traffic, SSH sessions, DNS or replies, and traffic between two clients of the same tunnel. It is loaded on start and reloaded if it disappears.
+
+With nodes, choose **All nodes** or **Selected nodes**: the panel hands the filter to those nodes and keeps retrying the ones that are offline; nodes taken out of the list keep their last filter as their own. A node shows that its filter was set by the central panel; saving it on the node makes it the node's own until the central panel sends it again.
+
 ## Verify a release
 
 Release archives are built by GitHub Actions from the tagged commit ([release workflow](.github/workflows/release.yml)), not on a developer's machine, and every archive comes with a signed [build provenance attestation](https://docs.github.com/actions/security-for-github-actions/using-artifact-attestations). Releases up to and including 1.4.0 were built by hand with `scripts/still-release.sh` and have only the `.sha256` files.

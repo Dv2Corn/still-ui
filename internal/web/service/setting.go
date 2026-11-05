@@ -206,6 +206,7 @@ var defaultValueMap = map[string]string{
 	"xrayOutboundTestUrl":         "https://www.google.com/generate_204",
 	"panelOutbound":               "",
 	"torrentBlock":                "false",
+	"egressFilter":                "",
 	"devChannelEnable":            "false",
 
 	// LDAP defaults

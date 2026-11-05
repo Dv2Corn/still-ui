@@ -469,6 +469,14 @@ export const sections: readonly Section[] = [
       },
       {
         method: 'GET',
+        path: '/panel/api/server/egressFilter',
+        summary:
+          'State of the egress filter: the stored settings (managedBy is set when a central panel owns them), the TCP ports "server" blocks (panel and SSH), whether the template already blackholes geoip:private, whether this host can run the nftables half and has it loaded, its packet counters, the last apply error, and how far each node is with this panel\'s filter.',
+        response:
+          '{\n  "success": true,\n  "obj": {\n    "settings": {\n      "smtp": true,\n      "mailSubmission": false,\n      "private": true,\n      "server": true,\n      "custom": ["203.0.113.0/24", "6667"],\n      "nodeScope": "all",\n      "nodeIds": null\n    },\n    "host": {\n      "supported": true,\n      "nftInstalled": true,\n      "active": true,\n      "counters": { "mail": 12, "private": 0, "server": 3, "custom": 0 }\n    },\n    "hostNeeded": true,\n    "serverPorts": [22, 2053],\n    "templatePrivateBlocked": true,\n    "nodes": [{ "id": 1, "name": "de-1", "wanted": "apply", "synced": true, "at": 1793750400 }]\n  }\n}',
+      },
+      {
+        method: 'GET',
         path: '/panel/api/server/cpuHistory/:bucket',
         summary:
           'Legacy: aggregated CPU history. Use /history/cpu/:bucket instead — same data with a uniform {t, v} shape.',
@@ -721,6 +729,22 @@ export const sections: readonly Section[] = [
           },
         ],
         body: 'enable=true',
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/server/setEgressFilter',
+        summary:
+          'Store this panel\'s egress filter and apply it. Every generated Xray config gets blackhole rules ahead of all others for client inbounds (mail ports, geoip:private unless the template already blocks it, loopback and the panel/SSH ports of this server, custom addresses and ports), and on Linux the nftables table inet still_egress_filter refuses the same for AmneziaWG kernel-mode clients. DNS (port 53) is never blocked. nodeScope "all" or "selected" (with nodeIds) hands the filter to those nodes; nodes leaving the scope get theirs released. Xray is reconciled immediately. Returns the same object as GET /egressFilter; an invalid custom entry is refused.',
+        body: '{\n  "smtp": true,\n  "mailSubmission": false,\n  "private": true,\n  "server": true,\n  "custom": ["203.0.113.0/24", "6667", "1000-2000"],\n  "nodeScope": "selected",\n  "nodeIds": [1, 3]\n}',
+        response:
+          '{\n  "success": true,\n  "obj": {\n    "settings": {\n      "smtp": true,\n      "mailSubmission": false,\n      "private": true,\n      "server": true,\n      "custom": ["203.0.113.0/24", "6667"],\n      "nodeScope": "all",\n      "nodeIds": null\n    },\n    "host": {\n      "supported": true,\n      "nftInstalled": true,\n      "active": true,\n      "counters": { "mail": 12, "private": 0, "server": 3, "custom": 0 }\n    },\n    "hostNeeded": true,\n    "serverPorts": [22, 2053],\n    "templatePrivateBlocked": true,\n    "nodes": [{ "id": 1, "name": "de-1", "wanted": "apply", "synced": true, "at": 1793750400 }]\n  }\n}',
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/server/applyManagedEgressFilter',
+        summary:
+          "Node side of the egress filter: a central panel sets this node's filter (stored as managed by its panelGuid) or, with release=true, gives up ownership and leaves the current filter in place as the node's own. Allowed for node-sync tokens. Xray is reconciled when the filter changed. Returns the same object as GET /egressFilter.",
+        body: '{\n  "filter": { "smtp": true, "private": true, "custom": [] },\n  "managedBy": "4b1c0f6e-2f6d-4c55-9a1e-0f3d7c2a9b10"\n}',
       },
       {
         method: 'POST',
