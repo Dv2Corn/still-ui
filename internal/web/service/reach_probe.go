@@ -757,16 +757,8 @@ func reachJobTarget(ib *model.Inbound, shareLink string, manyEndpoints bool) (Re
 		return ReachJobTarget{}, false
 	}
 	ob := parsed.Outbound
-	settings, _ := ob["settings"].(map[string]any)
-	address, _ := settings["address"].(string)
-	port := 0
-	switch p := settings["port"].(type) {
-	case int:
-		port = p
-	case float64:
-		port = int(p)
-	}
-	if address == "" || port <= 0 {
+	address, port, ok := link.Endpoint(ob)
+	if !ok {
 		return ReachJobTarget{}, false
 	}
 	endpoint := net.JoinHostPort(address, strconv.Itoa(port))
