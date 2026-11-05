@@ -104,7 +104,9 @@ func (m *OutboundManager) ensureLocked(d OutboundDesired) error {
 		opts.Logger = verboseLoggerIfEnabled(0)
 	}
 
-	fp := outboundFingerprint(inst)
+	// I1-I5 rebuild too: a client-mode Device initiates every handshake, and
+	// re-sending them in place races with that (signaturePacketsFingerprint).
+	fp := outboundFingerprint(inst) + "|" + signaturePacketsFingerprint(inst.Obfuscation)
 	conf, err := buildClientUAPIConfig(inst, opts)
 	if err != nil {
 		return fmt.Errorf("render UAPI config: %w", err)
@@ -116,7 +118,7 @@ func (m *OutboundManager) ensureLocked(d OutboundDesired) error {
 			GetEgressServer().SetStack(inst.Tag, cur.dev, inst.DNS)
 			return nil
 		}
-		if err := cur.dev.IpcSet(conf); err != nil {
+		if err := cur.dev.IpcSet(withoutSignaturePackets(conf)); err != nil {
 			return fmt.Errorf("reconfigure outbound %q: %w", inst.Tag, err)
 		}
 		cur.uapiConfig = conf
