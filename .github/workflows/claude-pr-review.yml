@@ -517,8 +517,9 @@ jobs:
             `Reviewed head: ${{ needs.prepare.outputs.sha }}`, gives each
             finding in full with its `file:line`, and ends with the coverage list
             `REVIEW.md` asks for, whether or not you found anything. Link only to
-            github.com, raw.githubusercontent.com or xtls.github.io: any other
-            link is replaced by "(link removed)" before posting. When there is
+            this repository, MHSanaei/3x-ui or XTLS/* on GitHub, docs.github.com
+            or xtls.github.io: any other link is replaced by "(link removed)"
+            before posting. When there is
             a blocking finding - CRITICAL or HIGH that this pull request
             introduced or made worse - or a pre-existing live security hole on an
             exposed surface, the comment's first line tags

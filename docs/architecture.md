@@ -629,9 +629,10 @@ PR) pass a quota gate first (`.github/scripts/claude_gate.py`): 2 model runs per
 15 in all per 24 h across both workflows, at most 2 at once, with fewer turns; runs that spent
 nothing do not count. A run over a limit is skipped quietly; maintainer requests are never
 limited. The gate reads earlier runs by their `run-name:` title, so keep that format in sync.
-Before posting, both `post` jobs replace every link to a host other than github.com (and its
-subdomains), raw.githubusercontent.com and xtls.github.io with "(link removed)"
-(`.github/scripts/link_filter.py`), so a hostile issue or PR cannot get its link posted by the bot.
+Before posting, both `post` jobs replace every link outside an allowlist with "(link removed)"
+(`.github/scripts/link_filter.py`): github.com and raw.githubusercontent.com only under
+Dv2Corn/still-ui, MHSanaei/3x-ui and XTLS/*, plus docs.github.com and xtls.github.io; e-mail
+addresses go too. So a hostile issue or PR cannot get its link posted by the bot.
 
 ---
 
