@@ -72,6 +72,16 @@ _openapi:
       title: Pause or resume traffic sync with this node.
       url: '#pause-or-resume-traffic-sync-with-this-node'
     - depth: 2
+      title: Set a node's monthly traffic limit and accounting multiplier.
+        trafficLimitBytes 0 means no limit; usage counts the node's own inbound
+        traffic and resets at midnight on trafficResetDay (1-31, clamped to the
+        month's last day). trafficWarnPercent (0 = off) sends a Telegram alert
+        once per period. trafficLimitAction is notify or disable (turns the
+        node's inbounds off until the reset). trafficMultiplier (0.1-100) scales
+        the node's traffic added to client totals; the node's own counter stays
+        raw.
+      url: '#set-a-nodes-monthly-traffic-limit-and-accounting-multiplier-trafficlimitbytes-0-means-no-limit-usage-counts-the-nodes-own-inbound-traffic-and-resets-at-midnight-on-trafficresetday-1-31-clamped-to-the-months-last-day-trafficwarnpercent-0--off-sends-a-telegram-alert-once-per-period-trafficlimitaction-is-notify-or-disable-turns-the-nodes-inbounds-off-until-the-reset-trafficmultiplier-01-100-scales-the-nodes-traffic-added-to-client-totals-the-nodes-own-counter-stays-raw'
+    - depth: 2
       title: Probe a node without saving it. Uses the body as connection details and
         returns the same heartbeat snapshot a registered node would have.
       url: '#probe-a-node-without-saving-it-uses-the-body-as-connection-details-and-returns-the-same-heartbeat-snapshot-a-registered-node-would-have'
@@ -152,6 +162,15 @@ _openapi:
         id: delete-a-node-inbounds-bound-to-it-are-not-auto-migrated
       - content: Pause or resume traffic sync with this node.
         id: pause-or-resume-traffic-sync-with-this-node
+      - content: Set a node's monthly traffic limit and accounting multiplier.
+          trafficLimitBytes 0 means no limit; usage counts the node's own
+          inbound traffic and resets at midnight on trafficResetDay (1-31,
+          clamped to the month's last day). trafficWarnPercent (0 = off) sends a
+          Telegram alert once per period. trafficLimitAction is notify or
+          disable (turns the node's inbounds off until the reset).
+          trafficMultiplier (0.1-100) scales the node's traffic added to client
+          totals; the node's own counter stays raw.
+        id: set-a-nodes-monthly-traffic-limit-and-accounting-multiplier-trafficlimitbytes-0-means-no-limit-usage-counts-the-nodes-own-inbound-traffic-and-resets-at-midnight-on-trafficresetday-1-31-clamped-to-the-months-last-day-trafficwarnpercent-0--off-sends-a-telegram-alert-once-per-period-trafficlimitaction-is-notify-or-disable-turns-the-nodes-inbounds-off-until-the-reset-trafficmultiplier-01-100-scales-the-nodes-traffic-added-to-client-totals-the-nodes-own-counter-stays-raw
       - content: Probe a node without saving it. Uses the body as connection details and
           returns the same heartbeat snapshot a registered node would have.
         id: probe-a-node-without-saving-it-uses-the-body-as-connection-details-and-returns-the-same-heartbeat-snapshot-a-registered-node-would-have
@@ -184,7 +203,7 @@ export default function Layout(props) {
   return (
     <>
       {props.children}
-      <OpenAPIPage document="./public/openapi.json" webhooks={[]} operations={[{"path":"/panel/api/nodes/list","method":"get"},{"path":"/panel/api/nodes/mtls/ca","method":"post"},{"path":"/panel/api/nodes/mtls/trustCA","method":"post"},{"path":"/panel/api/nodes/mtls/reloadClient","method":"post"},{"path":"/panel/api/nodes/invites","method":"get"},{"path":"/panel/api/nodes/invites/create","method":"post"},{"path":"/panel/api/nodes/invites/revoke/{id}","method":"post"},{"path":"/panel/api/nodes/get/{id}","method":"get"},{"path":"/panel/api/nodes/webCert/{id}","method":"get"},{"path":"/panel/api/nodes/add","method":"post"},{"path":"/panel/api/nodes/update/{id}","method":"post"},{"path":"/panel/api/nodes/del/{id}","method":"post"},{"path":"/panel/api/nodes/setEnable/{id}","method":"post"},{"path":"/panel/api/nodes/test","method":"post"},{"path":"/panel/api/nodes/certFingerprint","method":"post"},{"path":"/panel/api/nodes/inbounds","method":"post"},{"path":"/panel/api/nodes/probe/{id}","method":"post"},{"path":"/panel/api/nodes/updatePanel","method":"post"},{"path":"/panel/api/nodes/history/{id}/{metric}/{bucket}","method":"get"}]} showTitle />
+      <OpenAPIPage document="./public/openapi.json" webhooks={[]} operations={[{"path":"/panel/api/nodes/list","method":"get"},{"path":"/panel/api/nodes/mtls/ca","method":"post"},{"path":"/panel/api/nodes/mtls/trustCA","method":"post"},{"path":"/panel/api/nodes/mtls/reloadClient","method":"post"},{"path":"/panel/api/nodes/invites","method":"get"},{"path":"/panel/api/nodes/invites/create","method":"post"},{"path":"/panel/api/nodes/invites/revoke/{id}","method":"post"},{"path":"/panel/api/nodes/get/{id}","method":"get"},{"path":"/panel/api/nodes/webCert/{id}","method":"get"},{"path":"/panel/api/nodes/add","method":"post"},{"path":"/panel/api/nodes/update/{id}","method":"post"},{"path":"/panel/api/nodes/del/{id}","method":"post"},{"path":"/panel/api/nodes/setEnable/{id}","method":"post"},{"path":"/panel/api/nodes/trafficLimit/{id}","method":"post"},{"path":"/panel/api/nodes/test","method":"post"},{"path":"/panel/api/nodes/certFingerprint","method":"post"},{"path":"/panel/api/nodes/inbounds","method":"post"},{"path":"/panel/api/nodes/probe/{id}","method":"post"},{"path":"/panel/api/nodes/updatePanel","method":"post"},{"path":"/panel/api/nodes/history/{id}/{metric}/{bucket}","method":"get"}]} showTitle />
     </>
   );
 }
