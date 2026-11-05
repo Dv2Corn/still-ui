@@ -63,6 +63,8 @@ export interface XrayInfo {
   state: 'running' | 'stop' | 'error' | string;
   errorMsg: string;
   version: string;
+  /** The local core is still-ui's own Xray build, not an official release. */
+  stillBuild: boolean;
   color: string;
   certificates: XrayCertificate[];
 }
@@ -117,7 +119,14 @@ export class Status {
   uptime = 0;
   appUptime = 0;
   appStats: AppStats = { threads: 0, mem: 0, uptime: 0 };
-  xray: XrayInfo = { state: 'stop', errorMsg: '', version: '', color: '', certificates: [] };
+  xray: XrayInfo = {
+    state: 'stop',
+    errorMsg: '',
+    version: '',
+    stillBuild: false,
+    color: '',
+    certificates: [],
+  };
   amneziawg: AmneziaWGInfo = { configured: false, running: false };
 
   constructor(data?: StatusInput | null) {

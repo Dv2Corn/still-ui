@@ -207,7 +207,7 @@ export function buildWebSocketEvents(
           disk: { current: 53687091200, total: 107374182400 },
           diskIO: { read: 1048576, write: 2097152 },
           diskTraffic: { read: 4096, write: 8192 },
-          xray: { state: 'running', errorMsg: '', version: '25.10.31' },
+          xray: { state: 'running', errorMsg: '', version: '26.10.31', stillBuild: true },
           amneziawg: { configured: false, running: false },
           panelVersion: 'v3.x.x',
           panelGuid: 'panel-guid',
