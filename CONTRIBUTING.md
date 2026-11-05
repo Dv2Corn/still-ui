@@ -266,6 +266,18 @@ Tests live next to the code (`foo.go` ↔ `foo_test.go`); frontend specs and gol
 
 Frontend: `cd frontend && npm run test` (vitest), or `npm run test -- --coverage`.
 
+### Installer and lifecycle scripts
+
+`install.sh`, `update.sh`, `x-ui.sh` (the `still-ui` menu), `migrate.sh` and the systemd units have three layers of tests:
+
+| Goal | Command |
+|------|---------|
+| Unit tests, function by function in a scratch root (no root, no network; CI) | `bash deploy/test/installer-unit.sh`, also `installer-panel-port.sh`, `release-scripts.sh`, `migrate-unit.sh` |
+| Check the checks: break each guarded behaviour in a copy, the unit tests must fail (CI) | `bash deploy/test/installer-mutations.sh -v` |
+| End to end on real systemd in throwaway Incus containers, from a locally built archive served by a fake github.com (Linux host with Incus, ~20 min) | `scripts/still-release.sh out amd64 && deploy/test/installer-e2e.sh --archive out/still-ui-linux-amd64.tar.gz [--migrate] [images...]` |
+
+A change to one of these scripts comes with a unit test, and with a line in `installer-mutations.sh` when it adds a refusal or a computed value.
+
 ### Property and fuzz tests
 
 Input-heavy or pure logic (link builders, parsers, decoders) is also covered by **property tests** (`pgregory.net/rapid`) and **native fuzz targets** (`go test -fuzz`). A fuzz target's **seed corpus** (its inline `f.Add` cases plus any `testdata/fuzz` entries) runs as ordinary subtests under a plain `go test` — no `-fuzz` flag needed — so CI's normal test job exercises the seeds; the time-boxed *fuzzing* exploration (`-fuzz=...`) runs separately as the `fuzz-smoke` job.
