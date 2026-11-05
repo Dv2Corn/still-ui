@@ -629,6 +629,17 @@ PR) pass a quota gate first (`.github/scripts/claude_gate.py`): 2 model runs per
 15 in all per 24 h across both workflows, at most 2 at once, with fewer turns; runs that spent
 nothing do not count. A run over a limit is skipped quietly; maintainer requests are never
 limited. The gate reads earlier runs by their `run-name:` title, so keep that format in sync.
+Before posting, both `post` jobs replace every link outside an allowlist with "(link removed)"
+(`.github/scripts/link_filter.py`): github.com and raw.githubusercontent.com only under this
+repository, MHSanaei/3x-ui and XTLS/*, and there a commit only by the default branch, a tag, a
+full SHA the default branch contains (checked with `gh api`, failing closed) or the reviewed
+head; plus docs.github.com and xtls.github.io. Relative links are resolved against the issue or
+PR page; e-mail addresses go too. That text pass is cosmetic; the boundary is the gate after
+it: GitHub renders the finished reply (`gh api markdown`), every URL in that HTML is checked
+against the same rules, and if one fails (or the render fails) the reply is posted as plain
+text in a fence. References GitHub links only at view time (`owner/repo#N`, SHAs, `@user`)
+are put in inline code unless they point at an allowed repository, and only the owner and the
+issue/PR author may be @mentioned. So a hostile issue or PR cannot get its link posted by the bot.
 
 ---
 

