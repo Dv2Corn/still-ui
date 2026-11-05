@@ -336,6 +336,37 @@ func TestEgressFilterService_ServerPorts(t *testing.T) {
 	}
 }
 
+// The panel listens on XUI_PORT when it is set (docker-compose.yml documents it), not on the stored port.
+func TestEgressFilterService_ServerPortsFollowXUIPort(t *testing.T) {
+	setupConflictDB(t)
+	useFakeEgress(t)
+	t.Setenv("XUI_PORT", "8080")
+	if got, want := (&EgressFilterService{}).ServerPorts(), []uint16{2222, 8080}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("server ports = %v, want %v (the port the panel listens on, not the stored 2053)", got, want)
+	}
+}
+
+// sshd listens on a ListenAddress port instead of Port for that address; Port (22 by default)
+// applies only to addresses given without one.
+func TestSshdPortsReadListenAddress(t *testing.T) {
+	tests := map[string][]int{
+		"ListenAddress 0.0.0.0:2222\n":                                      {2222},
+		"ListenAddress [::]:2200\nListenAddress 0.0.0.0\n":                  {22, 2200},
+		"Port 2022\nListenAddress 10.0.0.1:2222\nListenAddress 10.0.0.2\n": {2022, 2222},
+		"ListenAddress ::\n":                                                {22},
+		"Port 2022\nListenAddress 10.0.0.1:2222\n":                          {2222},
+	}
+	for config, want := range tests {
+		path := filepath.Join(t.TempDir(), "sshd_config")
+		if err := os.WriteFile(path, []byte(config), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if got := sshdPorts(path); !reflect.DeepEqual(got, want) {
+			t.Errorf("sshd_config %q: ports %v, want %v", config, got, want)
+		}
+	}
+}
+
 func TestEgressFilterService_ApplyManaged(t *testing.T) {
 	setupConflictDB(t)
 	fake := useFakeEgress(t)

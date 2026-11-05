@@ -149,7 +149,7 @@ func (s *EgressFilterService) ServerPorts() []uint16 {
 			ports = append(ports, uint16(p))
 		}
 	}
-	if p, err := s.settingService.GetPort(); err == nil {
+	if p, err := s.settingService.GetListenPort(); err == nil {
 		add(p)
 	}
 	for _, p := range sshdPorts(sshdConfigPath) {
@@ -168,13 +168,15 @@ func (s *EgressFilterService) ServerPorts() []uint16 {
 	return slices.Compact(ports)
 }
 
-// sshdPorts reads "Port" lines from sshd_config and its drop-in directory; 22 when none.
+// sshdPorts reads sshd_config and its drop-ins: a ListenAddress with a port listens there, one
+// without listens on the Port values (22 when there are none).
 func sshdPorts(path string) []int {
 	files := []string{path}
 	if more, err := filepath.Glob(filepath.Join(filepath.Dir(path), "sshd_config.d", "*.conf")); err == nil {
 		files = append(files, more...)
 	}
-	var ports []int
+	var ports, listenPorts []int
+	portlessListen, anyListen := false, false
 	for _, file := range files {
 		f, err := os.Open(file)
 		if err != nil {
@@ -183,19 +185,43 @@ func sshdPorts(path string) []int {
 		sc := bufio.NewScanner(f)
 		for sc.Scan() {
 			fields := strings.Fields(sc.Text())
-			if len(fields) < 2 || !strings.EqualFold(fields[0], "port") {
+			if len(fields) < 2 {
 				continue
 			}
-			if p, err := strconv.Atoi(fields[1]); err == nil && p > 0 && p <= 65535 {
-				ports = append(ports, p)
+			switch {
+			case strings.EqualFold(fields[0], "port"):
+				if p, err := strconv.Atoi(fields[1]); err == nil && p > 0 && p <= 65535 {
+					ports = append(ports, p)
+				}
+			case strings.EqualFold(fields[0], "listenaddress"):
+				anyListen = true
+				if p, ok := listenAddressPort(fields[1]); ok {
+					listenPorts = append(listenPorts, p)
+				} else {
+					portlessListen = true
+				}
 			}
 		}
 		_ = f.Close()
 	}
 	if len(ports) == 0 {
-		return []int{22}
+		ports = []int{22}
 	}
-	return ports
+	out := listenPorts
+	if !anyListen || portlessListen {
+		out = append(out, ports...)
+	}
+	slices.Sort(out)
+	return slices.Compact(out)
+}
+
+func listenAddressPort(addr string) (int, bool) {
+	_, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return 0, false
+	}
+	p, err := strconv.Atoi(port)
+	return p, err == nil && p > 0 && p <= 65535
 }
 
 func interfaceAddrs() []string {
