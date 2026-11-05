@@ -516,7 +516,11 @@ jobs:
             status line with the full tally - carries the line
             `Reviewed head: ${{ needs.prepare.outputs.sha }}`, gives each
             finding in full with its `file:line`, and ends with the coverage list
-            `REVIEW.md` asks for, whether or not you found anything. When there is
+            `REVIEW.md` asks for, whether or not you found anything. Link only to
+            this repository, MHSanaei/3x-ui or XTLS/* on GitHub, docs.github.com
+            or xtls.github.io, and to code at the reviewed head, the default
+            branch, a tag or a full SHA on the default branch: any other link
+            is replaced by "(link removed)" before posting. When there is
             a blocking finding - CRITICAL or HIGH that this pull request
             introduced or made worse - or a pre-existing live security hole on an
             exposed surface, the comment's first line tags
@@ -583,14 +587,17 @@ jobs:
           if-no-files-found: ignore
           retention-days: 1
 
-  # Runs no model and checks out nothing: it only reads the two artifacts the
-  # review job left, so its write token never sits beside pull-request code.
+  # Runs no model and checks out no pull-request code: it reads the two
+  # artifacts the review job left, plus .github/scripts of the base commit (the
+  # one this workflow file came from) for the link filter, so its write token
+  # never sits beside pull-request code.
   post:
     needs: [prepare, review]
     if: ${{ !cancelled() && needs.prepare.result == 'success' && needs.prepare.outputs.done != 'true' && needs.review.result != 'cancelled' && needs.review.outputs.ran == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
+      contents: read
       pull-requests: write
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -602,6 +609,12 @@ jobs:
         with:
           name: claude-review-body-${{ env.PR }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/review
+      # The base commit's .github/scripts for the link filter, never the pull
+      # request: nothing from the head runs here.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
       # An exhausted usage window or an overloaded API is not a broken workflow.
       # Say so where the maintainer will see it, and leave the job green.
       - name: Report a review the API refused to run
@@ -632,6 +645,8 @@ jobs:
         env:
           HEAD_SHA: ${{ needs.prepare.outputs.sha }}
           BODY: ${{ runner.temp }}/review/review.md
+          # Besides the repository owner, the only account the review may @mention.
+          AUTHOR: ${{ github.event.pull_request.user.login || github.event.issue.user.login }}
         run: |
           set -euo pipefail
           if [ ! -s "$BODY" ]; then
@@ -642,10 +657,23 @@ jobs:
             echo "::error::The review of ${HEAD_SHA} for #${PR} is unfinished: its body lacks the Reviewed head line, so nothing was posted. Read the uploaded transcript before re-running."
             exit 1
           fi
+          # Links outside the allowlist go first: the pull request may have
+          # steered the model into citing an attacker's site. Relative links
+          # resolve against this pull request's page; refs are checked with
+          # the API, and the reviewed head may be linked.
+          linked=$(mktemp)
+          python3 -I .github/scripts/link_filter.py --repo "$REPO" --base "https://github.com/${REPO}/pull/${PR}" \
+            --head-sha "$HEAD_SHA" --author "$AUTHOR" "$BODY" "$linked"
           out=$(mktemp)
           awk '/^[ \t]*(```|~~~)/ { if (!open) print "_[Code removed: this review does not propose code.]_"; open = !open; next } !open' \
-            "$BODY" > "$out"
-          gh pr comment "$PR" --repo "$REPO" --body-file "$out"
+            "$linked" > "$out"
+          # The security boundary: GitHub renders the finished body and every
+          # link in that HTML is checked; if one fails, the review is posted
+          # as plain text. After the awk, so the awk cannot strip that fence.
+          checked=$(mktemp)
+          python3 -I .github/scripts/link_filter.py --no-filter --gate --repo "$REPO" --base "https://github.com/${REPO}/pull/${PR}" \
+            --head-sha "$HEAD_SHA" "$out" "$checked"
+          gh pr comment "$PR" --repo "$REPO" --body-file "$checked"
           if grep -qE '^[[:space:]]*(```|~~~)' "$BODY"; then
             echo "::error::Removed fenced code from the review of #${PR} before posting it: the review must not propose code."
             exit 1

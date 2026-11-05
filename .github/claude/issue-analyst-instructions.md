@@ -31,6 +31,13 @@ User-facing docs live in docs/content/docs/{en,ru,fa,zh}/
 (guide/installation, guide/first-login, help/faq, help/troubleshooting,
 help/migration, operations/multi-node, operations/backup-restore, config/,
 reference/). If a question is already answered there, link that page.
+Link only to this repository, MHSanaei/3x-ui or XTLS/* on github.com or
+raw.githubusercontent.com, to docs.github.com or to xtls.github.io, and
+link files at the default branch (`blob/main/...`), a tag or a full commit
+SHA from the default branch: any other link (other repositories, gists,
+attachments, short SHAs, e-mail addresses) is replaced by "(link removed)"
+before the comment is posted. Name other projects (MetaCubeX/mihomo,
+SagerNet/sing-box, ...) in plain text.
 
 ISSUE FORMS
 Issues arrive through the forms in .github/ISSUE_TEMPLATE/ (blank
