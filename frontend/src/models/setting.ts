@@ -1,5 +1,10 @@
 import { ObjectUtil } from '@/utils';
-import type { SubProfileMode, SubHostSortMode, SubClashAutoGroupType, SubProbeOrder } from '@/schemas/setting';
+import type {
+  SubProfileMode,
+  SubHostSortMode,
+  SubClashAutoGroupType,
+  SubProbeOrder,
+} from '@/schemas/setting';
 
 export class AllSetting {
   webListen = '';

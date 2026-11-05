@@ -11,7 +11,12 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router';
 import type { AllSetting } from '@/models/setting';
-import type { SubProfileMode, SubHostSortMode, SubClashAutoGroupType, SubProbeOrder } from '@/schemas/setting';
+import type {
+  SubProfileMode,
+  SubHostSortMode,
+  SubClashAutoGroupType,
+  SubProbeOrder,
+} from '@/schemas/setting';
 import { onNumber } from '@/utils/onNumber';
 import { DefaultSettingTag, SettingListItem } from '@/components/ui';
 import { RemarkTemplateField } from '@/components/form';

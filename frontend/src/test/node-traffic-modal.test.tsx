@@ -35,6 +35,7 @@ describe('node traffic limit UI', () => {
         selectedIds={[]}
         onSelectionChange={noop}
         onAdd={noop}
+        onInvite={noop}
         onMtls={noop}
         onEdit={noop}
         onDelete={noop}
