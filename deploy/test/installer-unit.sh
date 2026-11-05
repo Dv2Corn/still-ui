@@ -887,25 +887,34 @@ t "update.sh: a read-only install folder stops the update before anything change
 
 xui_setup() {
     fresh_root
-    for f in uninstall delete_script xui_env_file_path confirm postgresql_installed; do load "$XUI_SH" "$f" || return 1; done
+    for f in uninstall delete_script xui_env_file_path confirm postgresql_installed _still_stdin_is_tty; do load "$XUI_SH" "$f" || return 1; done
     purge_postgresql() { log_call purge_postgresql; }
     show_menu() { log_call show_menu; }
-    mkdir -p "$R/etc/still-ui" "$xui_service/still-ui.service.d" "$xui_service/still-xray.service.d" "$R/etc/still-xray" "$R/var/log/still-xray"
+    LOGE() { echo "[ERR] $*"; }
+    mkdir -p "$R/etc/still-ui/backups" "$xui_service/still-ui.service.d" "$xui_service/still-xray.service.d" "$R/etc/still-xray" "$R/var/log/still-xray"
     echo db > "$R/etc/still-ui/x-ui.db"
+    echo creds > "$R/etc/still-ui/install-result.env"
+    echo dump > "$R/etc/still-ui/backups/still-ui-1.tar.gz"
     touch "$xui_service/still-ui.service" "$xui_service/still-xray.service" "$xui_service/still-ui.service.d/10-xui-sandbox.conf"
     touch "$R/user-still-xray"
     echo 'XUI_XRAY_UNIT=still-xray' > "$R/etc/default/still-ui"
     # uninstall ends in delete_script, which deletes "$0" (the installed menu):
-    # here that would be this test, so it deletes the scratch copy instead.
+    # here that would be this test, so it deletes the scratch copy instead
+    # (delete_script itself is tested on its own below).
     grep -qx '    rm "\$0" # Remove the script file itself' "$XUI_SH" || { echo "delete_script no longer removes \$0"; return 1; }
     cp "$XUI_SH" "$R/usr/bin/still-ui"
-    delete_script() { rm -f "$R/usr/bin/still-ui"; exit 1; }
+    delete_script() { rm -f "$R/usr/bin/still-ui"; exit "${1:-0}"; }
+    TTY=yes
+    _still_stdin_is_tty() { [[ $TTY == yes ]]; }
 }
-uninstall_yes() {
-    xui_setup || return 1
-    postgresql_installed() { return 0; } # installed for something else
-    (uninstall 0 <<< "y") > "$R/out" 2>&1
-    has "$R/out" "Uninstalled Successfully"
+# un STDIN ARGS...: runs the uninstall, sets st to its exit status.
+un() {
+    local input="$1"
+    shift
+    (uninstall "$@" <<< "$input") > "$R/out" 2>&1
+    st=$?
+}
+program_gone() {
     called "systemctl stop still-ui"
     called "systemctl disable still-ui"
     called "systemctl disable --now still-xray"
@@ -914,31 +923,149 @@ uninstall_yes() {
     local p
     for p in "$xui_service/still-ui.service" "$xui_service/still-ui.service.d" "$xui_service/still-xray.service" \
         "$xui_service/still-xray.service.d" "$R/etc/still-xray" "$R/var/log/still-xray" "$xui_folder" "$R/usr/bin/still-ui"; do
-        [[ ! -e "$p" ]] || { echo "left behind: $p"; return 1; }
+        [[ ! -e "$p" ]] || afail "left behind: $p"
     done
-    # Documented (README): like 3x-ui, uninstall also deletes the database.
-    [[ ! -e "$R/etc/still-ui" ]] || { echo "database kept"; return 1; }
-    [[ ! -e "$R/etc/default/still-ui" ]] || { echo "env file kept"; return 1; }
+}
+data_kept() {
+    eq "$(cat "$R/etc/still-ui/x-ui.db" 2> /dev/null)" db "(database)"
+    eq "$(cat "$R/etc/still-ui/install-result.env" 2> /dev/null)" creds "(install-result.env)"
+    eq "$(cat "$R/etc/still-ui/backups/still-ui-1.tar.gz" 2> /dev/null)" dump "(backups)"
+    has "$R/etc/default/still-ui" XUI_XRAY_UNIT=still-xray
+    has "$R/out" "The data is kept"
+    has "$R/out" "rm -rf $R/etc/still-ui $R/etc/default/still-ui"
+}
+data_gone() {
+    [[ ! -e "$R/etc/still-ui" ]] || afail "data kept: $(find "$R/etc/still-ui")"
+    [[ ! -e "$R/etc/default/still-ui" ]] || afail "env file kept"
+    has "$R/out" "the data is deleted too"
+}
+uninstall_default_keeps() {
+    xui_setup || return 1
+    un $'y\n' 0 # yes to the uninstall, Enter at the data question
+    eq "$st" 0 "(exit status)"
+    program_gone
+    data_kept
+    # read -p shows the question only on a terminal; the text is the agreed one.
+    has "$XUI_SH" 'confirm "Also delete all data (database /etc/still-ui, clients, settings)?" "n"'
     not_called purge_postgresql
 }
-t "x-ui.sh: uninstall removes both units, their drop-ins, the still-xray user and config, the panel and its database" uninstall_yes
+t "x-ui.sh: uninstall removes the program and, by default, keeps the data (exit 0)" uninstall_default_keeps
+uninstall_answer_no_keeps() {
+    xui_setup || return 1
+    un $'y\nn\n' 0
+    eq "$st" 0 "(exit status)"
+    program_gone
+    data_kept
+}
+t "x-ui.sh: 'n' at the data question keeps the data" uninstall_answer_no_keeps
+uninstall_answer_yes_purges() {
+    xui_setup || return 1
+    un $'y\ny\n' 0
+    eq "$st" 0 "(exit status)"
+    program_gone
+    data_gone
+}
+t "x-ui.sh: 'y' at the data question deletes the data too (exit 0)" uninstall_answer_yes_purges
+uninstall_no_tty_keeps() {
+    xui_setup || return 1
+    TTY=no
+    un $'y\ny\ny\n' 0 # e.g. `yes | still-ui uninstall`
+    eq "$st" 0 "(exit status)"
+    program_gone
+    data_kept
+}
+t "x-ui.sh: without a terminal and without a flag uninstall never deletes the data" uninstall_no_tty_keeps
+uninstall_flags() {
+    xui_setup || return 1
+    TTY=no
+    un '' 0 --keep-data
+    eq "$st" 0 "(--keep-data exit status)"
+    program_gone
+    data_kept
+    hasnt "$R/out" "Are you sure"
+    xui_setup || return 1
+    TTY=no
+    un '' 0 --purge
+    eq "$st" 0 "(--purge exit status)"
+    program_gone
+    data_gone
+    hasnt "$R/out" "Are you sure"
+}
+t "x-ui.sh: 'uninstall --keep-data' and '--purge' run without questions" uninstall_flags
+uninstall_bad_flag() {
+    xui_setup || return 1
+    un $'y\ny\n' 0 --all
+    eq "$st" 2 "(exit status)"
+    has "$R/out" "Unknown option --all"
+    not_called systemctl
+    [[ -e "$R/etc/still-ui/x-ui.db" && -e "$xui_folder" && -e "$R/usr/bin/still-ui" ]] || afail "removed with an unknown option"
+}
+t "x-ui.sh: an unknown uninstall option changes nothing (exit 2)" uninstall_bad_flag
 uninstall_no() {
     xui_setup || return 1
-    (uninstall 0 <<< "n") > "$R/out" 2>&1 || return 1
+    un 'n' 0
+    eq "$st" 0
     not_called systemctl
     [[ -e "$R/etc/still-ui/x-ui.db" && -e "$xui_service/still-ui.service" && -e "$R/usr/bin/still-ui" ]] || { echo "removed after no"; return 1; }
     (uninstall 0 < /dev/null) > /dev/null 2>&1 || return 1
-    [[ -e "$R/etc/still-ui/x-ui.db" ]] || { echo "removed on EOF"; return 1; }
+    [[ -e "$R/etc/still-ui/x-ui.db" && -e "$xui_folder" ]] || { echo "removed on EOF"; return 1; }
+    (uninstall <<< "n") > /dev/null 2>&1
+    called show_menu
 }
 t "x-ui.sh: uninstall defaults to no (answer n or no input) and then changes nothing" uninstall_no
 uninstall_pg() {
     xui_setup || return 1
     printf 'XUI_DB_TYPE=postgres\nXUI_DB_DSN=postgres://u:p@127.0.0.1/db\n' > "$R/etc/default/still-ui"
     postgresql_installed() { return 0; }
-    (uninstall 0 <<< "y") > /dev/null 2>&1
+    un '' 0 --keep-data
+    not_called purge_postgresql
+    has "$R/etc/default/still-ui" XUI_DB_DSN=
+    has "$R/out" "PostgreSQL connection"
+    xui_setup || return 1
+    printf 'XUI_DB_TYPE=postgres\nXUI_DB_DSN=postgres://u:p@127.0.0.1/db\n' > "$R/etc/default/still-ui"
+    postgresql_installed() { return 0; }
+    un '' 0 --purge
     called purge_postgresql
+    xui_setup || return 1
+    postgresql_installed() { return 0; } # installed for something else
+    un '' 0 --purge
+    not_called purge_postgresql
 }
-t "x-ui.sh: uninstall offers the PostgreSQL purge only for a PostgreSQL panel" uninstall_pg
+t "x-ui.sh: the PostgreSQL purge is offered only when deleting the data of a PostgreSQL panel" uninstall_pg
+uninstall_xui_wrapper() {
+    xui_setup || return 1
+    printf "#!/bin/sh\n# Installed by still-ui's migrate.sh: this host now runs still-ui.\nexec /usr/bin/still-ui \"\$@\"\n" > "$R/usr/bin/x-ui"
+    un '' 0 --keep-data
+    [[ ! -e "$R/usr/bin/x-ui" ]] || afail "the x-ui wrapper of migrate.sh was left pointing at nothing"
+    xui_setup || return 1
+    echo "3x-ui's own menu" > "$R/usr/bin/x-ui"
+    un '' 0 --keep-data
+    eq "$(cat "$R/usr/bin/x-ui")" "3x-ui's own menu" "(another x-ui command was removed)"
+}
+t "x-ui.sh: uninstall removes migrate.sh's x-ui wrapper and nothing else named x-ui" uninstall_xui_wrapper
+uninstall_failure() {
+    [[ $(command id -u) != 0 ]] || return 0 # root removes it anyway
+    xui_setup || return 1
+    chmod 555 "$R/usr/local"
+    un '' 0 --purge
+    chmod 755 "$R/usr/local"
+    eq "$st" 1 "(exit status when the panel folder stays)"
+    has "$R/out" "Could not remove $xui_folder"
+    hasnt "$R/out" "Uninstalled Successfully"
+}
+t "x-ui.sh: uninstall exits 1 when something could not be removed" uninstall_failure
+delete_script_status() {
+    fresh_root
+    load "$XUI_SH" delete_script || return 1
+    echo menu > "$R/menu"
+    bash -c "$(declare -f delete_script); delete_script" "$R/menu"
+    eq "$?" 0 "(default status)"
+    [[ ! -e "$R/menu" ]] || afail "menu not removed"
+    echo menu > "$R/menu"
+    bash -c "$(declare -f delete_script); delete_script 1" "$R/menu"
+    eq "$?" 1 "(status passed on)"
+}
+t "x-ui.sh: delete_script removes the menu and exits with the uninstall's status" delete_script_status
 
 legacy_tags() {
     fresh_root
@@ -997,9 +1124,20 @@ settings_offline() {
     curl() { log_call "curl $*"; return 7; } # no internet
     printf '#!/bin/sh\ncase "$2" in\n    -show) printf "hasDefaultCredential: false\\nport: 2053\\nwebBasePath: /base/\\n" ;;\n    -getCert) echo "cert: " ;;\nesac\n' > "$xui_folder/x-ui"
     chmod +x "$xui_folder/x-ui"
-    timeout 20 bash -c "$(declare -f check_config xui_env_file_path LOGI LOGE show_menu curl log_call); R='$R' xui_folder='$xui_folder' release=debian; check_config" < /dev/null > "$R/out" 2>&1
-    eq "$?" 0 "(still-ui settings without a terminal and without internet; 124 = it hung)" || { tail -n 5 "$R/out"; return 1; }
+    # settings_run INPUT: still-ui settings with INPUT as its standard input.
+    settings_run() {
+        printf '%s' "$1" | timeout 20 bash -c "$(declare -f check_config xui_env_file_path LOGI LOGE show_menu curl log_call); R='$R' xui_folder='$xui_folder' release=debian; check_config" > "$R/out" 2>&1
+        eq "$?" 0 "(still-ui settings without a terminal and without internet; 124 = it hung)" || { tail -n 5 "$R/out"; return 1; }
+    }
+    settings_run '' || return 1
     has "$R/out" "port: 2053"
+    has "$R/out" "http://SERVER_IP:2053/base/"
+    # An address on a last line without a newline is used, not dropped.
+    settings_run '192.0.2.7' || return 1
+    has "$R/out" "http://192.0.2.7:2053/base/"
+    # An invalid one is refused, then the end of input gives the placeholder.
+    settings_run 'not-an-ip' || return 1
+    has "$R/out" "Invalid IPv4 address"
     has "$R/out" "http://SERVER_IP:2053/base/"
 }
 t "x-ui.sh: 'still-ui settings' without internet and without a terminal finishes" settings_offline

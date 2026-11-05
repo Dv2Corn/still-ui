@@ -167,8 +167,7 @@ Remove the panel:
 still-ui uninstall
 ```
 
-> [!WARNING]
-> `still-ui uninstall` also deletes the database in `/etc/still-ui`, just like 3x-ui does. Copy `/etc/still-ui/x-ui.db` somewhere safe first if you might need your inbounds and clients again.
+This removes the program, both services, the `still-xray` user and the menu, and keeps the data: the database, backups and `install-result.env` in `/etc/still-ui` and the env file (`/etc/default/still-ui`). Installing still-ui again picks them up, with the same login, inbounds and clients. The menu asks "Also delete all data?" (default No); without a terminal the data is always kept. For scripts: `still-ui uninstall --keep-data` keeps it, `still-ui uninstall --purge` deletes it too (and offers to purge a local PostgreSQL). Unlike 3x-ui, nothing is deleted unless you ask.
 
 ## Mobile networks in Russia
 
