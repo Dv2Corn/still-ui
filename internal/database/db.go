@@ -216,6 +216,9 @@ func initModels() error {
 	if err := migrateSyncOrphanColumns(); err != nil {
 		return err
 	}
+	if err := migrateNodeTrafficLimitColumns(); err != nil {
+		return err
+	}
 	if err := migrateClientEmailLowerIndex(); err != nil {
 		return err
 	}
@@ -413,6 +416,36 @@ func migrateSyncOrphanColumns() error {
 		return err
 	}
 	return db.Exec("UPDATE clients SET sync_orphaned_by = 0 WHERE sync_orphaned_by IS NULL").Error
+}
+
+// AutoMigrate adds the node traffic quota columns with their defaults; this only backfills
+// NULLs an older SQLite ALTER TABLE may leave, so a NULL multiplier never reads as 0 and a
+// NULL action never reads as an unknown one (still-ui).
+func migrateNodeTrafficLimitColumns() error {
+	defaults := []struct {
+		column string
+		value  any
+	}{
+		{"traffic_limit_bytes", 0},
+		{"traffic_reset_day", 1},
+		{"traffic_warn_percent", 80},
+		{"traffic_limit_action", "notify"},
+		{"traffic_multiplier", 1},
+		{"traffic_used", 0},
+		{"traffic_period_start", 0},
+		{"traffic_limited", false},
+		{"traffic_alert_level", 0},
+		{"traffic_disabled_inbounds", "[]"},
+	}
+	for _, d := range defaults {
+		if !db.Migrator().HasColumn(&model.Node{}, d.column) {
+			continue
+		}
+		if err := db.Table("nodes").Where(d.column+" IS NULL").UpdateColumn(d.column, d.value).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // The client identity checks match emails case-insensitively; without an

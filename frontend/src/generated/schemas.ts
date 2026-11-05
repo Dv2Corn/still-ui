@@ -3958,6 +3958,41 @@ export const SCHEMAS: Record<string, unknown> = {
         ],
         "type": "string"
       },
+      "trafficLimitAction": {
+        "example": "notify",
+        "type": "string"
+      },
+      "trafficLimitBytes": {
+        "description": "Per-node traffic quota (master-local billing policy, never pushed to the node).\nTrafficUsed is raw bytes through the node's own inbounds since TrafficPeriodStart.",
+        "example": 0,
+        "format": "int64",
+        "type": "integer"
+      },
+      "trafficLimited": {
+        "type": "boolean"
+      },
+      "trafficMultiplier": {
+        "example": 1,
+        "type": "number"
+      },
+      "trafficPeriodStart": {
+        "example": 0,
+        "format": "int64",
+        "type": "integer"
+      },
+      "trafficResetDay": {
+        "example": 1,
+        "type": "integer"
+      },
+      "trafficUsed": {
+        "example": 0,
+        "format": "int64",
+        "type": "integer"
+      },
+      "trafficWarnPercent": {
+        "example": 80,
+        "type": "integer"
+      },
       "transitive": {
         "type": "boolean"
       },
@@ -4029,6 +4064,14 @@ export const SCHEMAS: Record<string, unknown> = {
       "scheme",
       "status",
       "tlsVerifyMode",
+      "trafficLimitAction",
+      "trafficLimitBytes",
+      "trafficLimited",
+      "trafficMultiplier",
+      "trafficPeriodStart",
+      "trafficResetDay",
+      "trafficUsed",
+      "trafficWarnPercent",
       "updatedAt",
       "uptimeSecs",
       "xrayError",
@@ -4277,6 +4320,42 @@ export const SCHEMAS: Record<string, unknown> = {
         "example": "verify",
         "type": "string"
       },
+      "trafficLimitAction": {
+        "example": "notify",
+        "type": "string"
+      },
+      "trafficLimitBytes": {
+        "description": "Traffic quota: TrafficUsed is raw bytes this period; TrafficNextReset is unix ms.",
+        "example": 1099511627776,
+        "format": "int64",
+        "type": "integer"
+      },
+      "trafficLimited": {
+        "example": false,
+        "type": "boolean"
+      },
+      "trafficMultiplier": {
+        "example": 1,
+        "type": "number"
+      },
+      "trafficNextReset": {
+        "example": 1700000000000,
+        "format": "int64",
+        "type": "integer"
+      },
+      "trafficResetDay": {
+        "example": 1,
+        "type": "integer"
+      },
+      "trafficUsed": {
+        "example": 53687091200,
+        "format": "int64",
+        "type": "integer"
+      },
+      "trafficWarnPercent": {
+        "example": 80,
+        "type": "integer"
+      },
       "transitive": {
         "example": false,
         "type": "boolean"
@@ -4344,6 +4423,14 @@ export const SCHEMAS: Record<string, unknown> = {
       "scheme",
       "status",
       "tlsVerifyMode",
+      "trafficLimitAction",
+      "trafficLimitBytes",
+      "trafficLimited",
+      "trafficMultiplier",
+      "trafficNextReset",
+      "trafficResetDay",
+      "trafficUsed",
+      "trafficWarnPercent",
       "updatedAt",
       "uptimeSecs",
       "xrayError",

@@ -1831,6 +1831,14 @@ export const sections: readonly Section[] = [
       },
       {
         method: 'POST',
+        path: '/panel/api/nodes/trafficLimit/:id',
+        summary:
+          "Set a node's monthly traffic limit and accounting multiplier. trafficLimitBytes 0 means no limit; usage counts the node's own inbound traffic and resets at midnight on trafficResetDay (1-31, clamped to the month's last day). trafficWarnPercent (0 = off) sends a Telegram alert once per period. trafficLimitAction is notify or disable (turns the node's inbounds off until the reset). trafficMultiplier (0.1-100) scales the node's traffic added to client totals; the node's own counter stays raw.",
+        params: [{ name: 'id', in: 'path', type: 'number', desc: 'Node ID.' }],
+        body: '{\n  "trafficLimitBytes": 1099511627776,\n  "trafficResetDay": 1,\n  "trafficWarnPercent": 80,\n  "trafficLimitAction": "notify",\n  "trafficMultiplier": 1\n}',
+      },
+      {
+        method: 'POST',
         path: '/panel/api/nodes/test',
         summary:
           'Probe a node without saving it. Uses the body as connection details and returns the same heartbeat snapshot a registered node would have.',

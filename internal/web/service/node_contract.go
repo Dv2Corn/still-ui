@@ -2,6 +2,7 @@ package service
 
 import (
 	"strings"
+	"time"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/common"
@@ -50,11 +51,24 @@ type NodeView struct {
 	DepletedCount       int      `json:"depletedCount" example:"1"`
 	ParentGuid          string   `json:"parentGuid,omitempty" example:""`
 	Transitive          bool     `json:"transitive,omitempty" example:"false"`
-	CreatedAt           int64    `json:"createdAt" example:"1700000000"`
-	UpdatedAt           int64    `json:"updatedAt" example:"1700003600"`
+	// Traffic quota: TrafficUsed is raw bytes this period; TrafficNextReset is unix ms.
+	TrafficLimitBytes  int64   `json:"trafficLimitBytes" example:"1099511627776"`
+	TrafficResetDay    int     `json:"trafficResetDay" example:"1"`
+	TrafficWarnPercent int     `json:"trafficWarnPercent" example:"80"`
+	TrafficLimitAction string  `json:"trafficLimitAction" example:"notify"`
+	TrafficMultiplier  float64 `json:"trafficMultiplier" example:"1"`
+	TrafficUsed        int64   `json:"trafficUsed" example:"53687091200"`
+	TrafficNextReset   int64   `json:"trafficNextReset" example:"1700000000000"`
+	TrafficLimited     bool    `json:"trafficLimited" example:"false"`
+	CreatedAt          int64   `json:"createdAt" example:"1700000000"`
+	UpdatedAt          int64   `json:"updatedAt" example:"1700003600"`
 }
 
 func toNodeView(n *model.Node) *NodeView {
+	return toNodeViewIn(n, (&NodeService{}).trafficLocation())
+}
+
+func toNodeViewIn(n *model.Node, loc *time.Location) *NodeView {
 	if n == nil {
 		return nil
 	}
@@ -99,6 +113,14 @@ func toNodeView(n *model.Node) *NodeView {
 		DepletedCount:       n.DepletedCount,
 		ParentGuid:          n.ParentGuid,
 		Transitive:          n.Transitive,
+		TrafficLimitBytes:   n.TrafficLimitBytes,
+		TrafficResetDay:     n.TrafficResetDay,
+		TrafficWarnPercent:  n.TrafficWarnPercent,
+		TrafficLimitAction:  n.TrafficLimitAction,
+		TrafficMultiplier:   effectiveTrafficMultiplier(n.TrafficMultiplier),
+		TrafficUsed:         n.TrafficUsed,
+		TrafficNextReset:    nodeTrafficNextReset(n, loc),
+		TrafficLimited:      n.TrafficLimited,
 		CreatedAt:           n.CreatedAt,
 		UpdatedAt:           n.UpdatedAt,
 	}
@@ -106,8 +128,9 @@ func toNodeView(n *model.Node) *NodeView {
 
 func toNodeViews(nodes []*model.Node) []*NodeView {
 	views := make([]*NodeView, 0, len(nodes))
+	loc := (&NodeService{}).trafficLocation()
 	for _, node := range nodes {
-		views = append(views, toNodeView(node))
+		views = append(views, toNodeViewIn(node, loc))
 	}
 	return views
 }

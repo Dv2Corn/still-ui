@@ -134,6 +134,9 @@ func (j *NodeTrafficSyncJob) Run() {
 	}
 	wg.Wait()
 
+	// After the merges, so a crossing is acted on in the tick that counted it.
+	j.nodeService.EvaluateTrafficLimits(time.Now())
+
 	needRestart, clientsDisabled, err := j.inboundService.AddTraffic(nil, nil)
 	if err != nil {
 		logger.Warning("node traffic sync: depletion check failed:", err)

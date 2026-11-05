@@ -31,6 +31,7 @@ import { useNodeMutations } from '@/api/queries/useNodeMutations';
 import AppSidebar from '@/layouts/AppSidebar';
 import NodeList from './NodeList';
 import NodeFormModal from './NodeFormModal';
+import NodeTrafficModal from './NodeTrafficModal';
 import { setMessageInstance } from '@/utils/messageBus';
 import { HttpUtil } from '@/utils';
 import type { PanelUpdateInfo } from '../index/PanelUpdateModal';
@@ -51,6 +52,7 @@ export default function NodesPage() {
     update,
     remove,
     setEnable,
+    setTrafficLimit,
     testConnection,
     fetchFingerprint,
     fetchInbounds,
@@ -166,6 +168,9 @@ export default function NodesPage() {
     },
     [probe, t, messageApi, refetch],
   );
+
+  // HttpUtil already toasts the result of the save.
+  const [trafficNode, setTrafficNode] = useState<NodeRecord | null>(null);
 
   const onToggleEnable = useCallback(
     async (node: NodeRecord, next: boolean) => {
@@ -324,6 +329,7 @@ export default function NodesPage() {
                       onDelete={onDelete}
                       onProbe={onProbe}
                       onToggleEnable={onToggleEnable}
+                      onTrafficLimit={setTrafficNode}
                       onUpdateNode={onUpdateNode}
                       onUpdateSelected={onUpdateSelected}
                     />
@@ -343,6 +349,13 @@ export default function NodesPage() {
           fetchInbounds={fetchInbounds}
           save={onSave}
           onOpenChange={setFormOpen}
+        />
+
+        <NodeTrafficModal
+          key={trafficNode?.id ?? 0}
+          node={trafficNode}
+          save={setTrafficLimit}
+          onClose={() => setTrafficNode(null)}
         />
 
         <Modal

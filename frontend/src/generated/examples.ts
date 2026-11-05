@@ -993,6 +993,14 @@ export const EXAMPLES: Record<string, unknown> = {
     "scheme": "https",
     "status": "online",
     "tlsVerifyMode": "verify",
+    "trafficLimitAction": "notify",
+    "trafficLimitBytes": 0,
+    "trafficLimited": false,
+    "trafficMultiplier": 1,
+    "trafficPeriodStart": 0,
+    "trafficResetDay": 1,
+    "trafficUsed": 0,
+    "trafficWarnPercent": 80,
     "transitive": false,
     "unavailableMetrics": [
       ""
@@ -1062,6 +1070,14 @@ export const EXAMPLES: Record<string, unknown> = {
     "scheme": "https",
     "status": "online",
     "tlsVerifyMode": "verify",
+    "trafficLimitAction": "notify",
+    "trafficLimitBytes": 1099511627776,
+    "trafficLimited": false,
+    "trafficMultiplier": 1,
+    "trafficNextReset": 1700000000000,
+    "trafficResetDay": 1,
+    "trafficUsed": 53687091200,
+    "trafficWarnPercent": 80,
     "transitive": false,
     "unavailableMetrics": [
       ""

@@ -3984,6 +3984,41 @@
             ],
             "type": "string"
           },
+          "trafficLimitAction": {
+            "example": "notify",
+            "type": "string"
+          },
+          "trafficLimitBytes": {
+            "description": "Per-node traffic quota (master-local billing policy, never pushed to the node).\nTrafficUsed is raw bytes through the node's own inbounds since TrafficPeriodStart.",
+            "example": 0,
+            "format": "int64",
+            "type": "integer"
+          },
+          "trafficLimited": {
+            "type": "boolean"
+          },
+          "trafficMultiplier": {
+            "example": 1,
+            "type": "number"
+          },
+          "trafficPeriodStart": {
+            "example": 0,
+            "format": "int64",
+            "type": "integer"
+          },
+          "trafficResetDay": {
+            "example": 1,
+            "type": "integer"
+          },
+          "trafficUsed": {
+            "example": 0,
+            "format": "int64",
+            "type": "integer"
+          },
+          "trafficWarnPercent": {
+            "example": 80,
+            "type": "integer"
+          },
           "transitive": {
             "type": "boolean"
           },
@@ -4055,6 +4090,14 @@
           "scheme",
           "status",
           "tlsVerifyMode",
+          "trafficLimitAction",
+          "trafficLimitBytes",
+          "trafficLimited",
+          "trafficMultiplier",
+          "trafficPeriodStart",
+          "trafficResetDay",
+          "trafficUsed",
+          "trafficWarnPercent",
           "updatedAt",
           "uptimeSecs",
           "xrayError",
@@ -4303,6 +4346,42 @@
             "example": "verify",
             "type": "string"
           },
+          "trafficLimitAction": {
+            "example": "notify",
+            "type": "string"
+          },
+          "trafficLimitBytes": {
+            "description": "Traffic quota: TrafficUsed is raw bytes this period; TrafficNextReset is unix ms.",
+            "example": 1099511627776,
+            "format": "int64",
+            "type": "integer"
+          },
+          "trafficLimited": {
+            "example": false,
+            "type": "boolean"
+          },
+          "trafficMultiplier": {
+            "example": 1,
+            "type": "number"
+          },
+          "trafficNextReset": {
+            "example": 1700000000000,
+            "format": "int64",
+            "type": "integer"
+          },
+          "trafficResetDay": {
+            "example": 1,
+            "type": "integer"
+          },
+          "trafficUsed": {
+            "example": 53687091200,
+            "format": "int64",
+            "type": "integer"
+          },
+          "trafficWarnPercent": {
+            "example": 80,
+            "type": "integer"
+          },
           "transitive": {
             "example": false,
             "type": "boolean"
@@ -4370,6 +4449,14 @@
           "scheme",
           "status",
           "tlsVerifyMode",
+          "trafficLimitAction",
+          "trafficLimitBytes",
+          "trafficLimited",
+          "trafficMultiplier",
+          "trafficNextReset",
+          "trafficResetDay",
+          "trafficUsed",
+          "trafficWarnPercent",
           "updatedAt",
           "uptimeSecs",
           "xrayError",
@@ -12059,6 +12146,14 @@
                       "scheme": "https",
                       "status": "online",
                       "tlsVerifyMode": "verify",
+                      "trafficLimitAction": "notify",
+                      "trafficLimitBytes": 1099511627776,
+                      "trafficLimited": false,
+                      "trafficMultiplier": 1,
+                      "trafficNextReset": 1700000000000,
+                      "trafficResetDay": 1,
+                      "trafficUsed": 53687091200,
+                      "trafficWarnPercent": 80,
                       "transitive": false,
                       "unavailableMetrics": [
                         ""
@@ -12263,6 +12358,14 @@
                     "scheme": "https",
                     "status": "online",
                     "tlsVerifyMode": "verify",
+                    "trafficLimitAction": "notify",
+                    "trafficLimitBytes": 1099511627776,
+                    "trafficLimited": false,
+                    "trafficMultiplier": 1,
+                    "trafficNextReset": 1700000000000,
+                    "trafficResetDay": 1,
+                    "trafficUsed": 53687091200,
+                    "trafficWarnPercent": 80,
                     "transitive": false,
                     "unavailableMetrics": [
                       ""
@@ -12416,6 +12519,14 @@
                     "scheme": "https",
                     "status": "online",
                     "tlsVerifyMode": "verify",
+                    "trafficLimitAction": "notify",
+                    "trafficLimitBytes": 1099511627776,
+                    "trafficLimited": false,
+                    "trafficMultiplier": 1,
+                    "trafficNextReset": 1700000000000,
+                    "trafficResetDay": 1,
+                    "trafficUsed": 53687091200,
+                    "trafficWarnPercent": 80,
                     "transitive": false,
                     "unavailableMetrics": [
                       ""
@@ -12564,6 +12675,64 @@
               },
               "example": {
                 "enable": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/nodes/trafficLimit/{id}": {
+      "post": {
+        "tags": [
+          "Nodes"
+        ],
+        "summary": "Set a node's monthly traffic limit and accounting multiplier. trafficLimitBytes 0 means no limit; usage counts the node's own inbound traffic and resets at midnight on trafficResetDay (1-31, clamped to the month's last day). trafficWarnPercent (0 = off) sends a Telegram alert once per period. trafficLimitAction is notify or disable (turns the node's inbounds off until the reset). trafficMultiplier (0.1-100) scales the node's traffic added to client totals; the node's own counter stays raw.",
+        "operationId": "post_panel_api_nodes_trafficLimit_id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Node ID.",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "trafficLimitBytes": 1099511627776,
+                "trafficResetDay": 1,
+                "trafficWarnPercent": 80,
+                "trafficLimitAction": "notify",
+                "trafficMultiplier": 1
               }
             }
           }
@@ -18029,6 +18198,14 @@
                   "scheme": "https",
                   "status": "online",
                   "tlsVerifyMode": "verify",
+                  "trafficLimitAction": "notify",
+                  "trafficLimitBytes": 1099511627776,
+                  "trafficLimited": false,
+                  "trafficMultiplier": 1,
+                  "trafficNextReset": 1700000000000,
+                  "trafficResetDay": 1,
+                  "trafficUsed": 53687091200,
+                  "trafficWarnPercent": 80,
                   "transitive": false,
                   "unavailableMetrics": [
                     ""

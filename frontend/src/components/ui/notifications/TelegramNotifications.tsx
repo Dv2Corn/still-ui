@@ -67,6 +67,12 @@ const GROUPS: NotificationGroupConfig[] = [
         ),
       },
       { key: 'node.up', label: 'eventNodeUp', settingKey: '' },
+      {
+        key: 'node.traffic',
+        label: 'eventNodeTraffic',
+        settingKey: '',
+        hint: 'eventNodeTrafficHint',
+      },
     ],
   },
   {
