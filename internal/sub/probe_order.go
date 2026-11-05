@@ -205,6 +205,12 @@ func restoreReferencedHidden(config map[string]any, visible, hidden []map[string
 		}
 	}
 	taken := map[string]bool{}
+	// A reference to a group's name (PROXY, Auto, a template's own) means that group.
+	for _, value := range groups {
+		if name := clashProxyGroupName(value); name != "" {
+			taken[name] = true
+		}
+	}
 	for _, proxy := range visible {
 		name, _ := proxy["name"].(string)
 		taken[name] = true
