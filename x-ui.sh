@@ -408,6 +408,8 @@ uninstall() {
         systemctl daemon-reload
         systemctl reset-failed
     fi
+    # The egress filter's nftables table (AmneziaWG kernel clients) goes with the panel.
+    if command -v nft > /dev/null 2>&1; then nft delete table inet still_egress_filter > /dev/null 2>&1; fi
 
     local panel_used_postgres="false"
     local db_env_file
