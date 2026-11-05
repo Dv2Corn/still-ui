@@ -555,3 +555,22 @@ func TestReachProbePruneHistoryDropsOldRowsAndOrphanTargets(t *testing.T) {
 		t.Fatalf("after cleanup: %d results (%d old), %d targets (live %d); want 1, 0, 1, 1", results, oldLeft, targets, live)
 	}
 }
+
+// Xray keeps the VMess endpoint in settings.vnext and the Trojan/Shadowsocks one in
+// settings.servers; reading only the flat form gave those inbounds no probe target at all.
+func TestReachProbeJobTargetsEveryProtocolShape(t *testing.T) {
+	cases := []struct{ name, link, key string }{
+		{"vmess", "vmess://eyJ2IjoiMiIsInBzIjoiYSIsImFkZCI6InZtLmV4YW1wbGUuY29tIiwicG9ydCI6IjgwODAiLCJpZCI6IjExMTExMTExLTIyMjItNDMzMy04NDQ0LTU1NTU1NTU1NTU1NSIsIm5ldCI6InRjcCJ9", "vm.example.com:8080"},
+		{"trojan", "trojan://secret@tr.example.com:8443?security=tls#a", "tr.example.com:8443"},
+		{"shadowsocks", "ss://YWVzLTI1Ni1nY206c2VjcmV0@ss.example.com:8388#a", "ss.example.com:8388"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ib := &model.Inbound{Id: 7, Remark: "X", Protocol: model.Trojan}
+			target, ok := reachJobTarget(ib, tc.link, false)
+			if !ok || target.Key != "7@"+tc.key {
+				t.Fatalf("target %+v ok=%v, want key 7@%s", target, ok, tc.key)
+			}
+		})
+	}
+}

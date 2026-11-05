@@ -61,8 +61,42 @@ export default function ProbeCard({ probe, onEdit, onDelete, onRotate }: Props) 
     return <Tag>{t('pages.probes.status.unknown')}</Tag>;
   };
 
+  const subscriptionTag = (target: ReachTargetView) => {
+    const counts = { fail: target.subFailAgents, need: target.subNeedAgents };
+    if (target.subState === 'hidden')
+      return (
+        <Tooltip title={t('pages.probes.sub.hiddenHint', counts)}>
+          <Tag color="error">{t('pages.probes.sub.hidden')}</Tag>
+        </Tooltip>
+      );
+    if (target.subState === 'demoted')
+      return (
+        <Tooltip title={t('pages.probes.sub.demotedHint', counts)}>
+          <Tag color="warning">{t('pages.probes.sub.demoted')}</Tag>
+        </Tooltip>
+      );
+    if (target.subState === 'unconfirmed')
+      return (
+        <Tooltip title={t('pages.probes.sub.unconfirmedHint', counts)}>
+          <Tag>{t('pages.probes.sub.unconfirmed', counts)}</Tag>
+        </Tooltip>
+      );
+    return null;
+  };
+  const showSubscription = probe.targets.some((target) => target.subState);
+
   const columns: ColumnsType<ReachTargetView> = [
     { title: t('status'), key: 'status', width: 110, render: (_, r) => statusTag(r) },
+    ...(showSubscription
+      ? [
+          {
+            title: t('pages.probes.fields.subscription'),
+            key: 'subscription',
+            width: 130,
+            render: (_: unknown, r: ReachTargetView) => subscriptionTag(r),
+          },
+        ]
+      : []),
     {
       title: t('pages.probes.fields.target'),
       key: 'label',
@@ -125,6 +159,11 @@ export default function ProbeCard({ probe, onEdit, onDelete, onRotate }: Props) 
             <Tag icon={<WarningOutlined aria-hidden />} color="warning">
               {t('pages.probes.stale')}
             </Tag>
+          )}
+          {probe.subIgnored && (
+            <Tooltip title={t(`pages.probes.sub.ignored.${probe.subIgnored}Hint`)}>
+              <Tag>{t(`pages.probes.sub.ignored.${probe.subIgnored}`)}</Tag>
+            </Tooltip>
           )}
           <Typography.Text type="secondary">{seen}</Typography.Text>
           {probe.agentVersion && (

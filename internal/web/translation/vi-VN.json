@@ -1910,6 +1910,15 @@
       "subHostSortInbound": "Thứ tự kết nối vào (mặc định)",
       "subHostSortHosts": "Thứ tự máy chủ",
       "subHostSortModeDesc": "Theo thứ tự trên trang Máy chủ giữa các kết nối vào. Thiết lập này quyết định thứ tự do máy chủ xuất ra; ứng dụng khách có thể tự sắp xếp lại.",
+      "subProbeOrder": "Dùng kết quả thăm dò",
+      "subProbeOrderDesc": "Các liên kết mà bộ thăm dò báo là không truy cập được (thất bại 2 lần liên tiếp) sẽ được chuyển xuống cuối gói đăng ký hoặc bị ẩn, ở mọi định dạng: liên kết, JSON và Clash. Người dùng luôn còn ít nhất một liên kết, và nếu không có kết quả thăm dò mới thì không có gì thay đổi. Trang Thăm dò cho biết điều gì xảy ra với từng điểm kết nối.",
+      "subProbeOrderOff": "Tắt (mặc định)",
+      "subProbeOrderReorder": "Chuyển xuống cuối",
+      "subProbeOrderHide": "Ẩn",
+      "subProbeMinAgents": "Số bộ thăm dò để xác nhận",
+      "subProbeMinAgentsDesc": "Cần bao nhiêu bộ thăm dò báo một điểm kết nối không truy cập được. 0 = tự động: 1 nếu chỉ một bộ thăm dò kiểm tra inbound, ngược lại là 2.",
+      "subProbeStaleMinutes": "Bỏ qua kết quả cũ hơn, phút",
+      "subProbeStaleMinutesDesc": "Bộ thăm dò không gửi báo cáo trong khoảng thời gian này sẽ bị bỏ qua: kết quả cũ của nó không bao giờ bị tính là thất bại.",
       "eventGroupProbe": "Thăm dò khả năng truy cập",
       "eventProbeDown": "Inbound không truy cập được",
       "eventProbeUp": "Inbound truy cập lại được",
@@ -2610,7 +2619,8 @@
         "target": "Điểm truy cập",
         "lastCheck": "Lần kiểm tra cuối",
         "latency": "Byte đầu / tổng",
-        "uptime": "Khả dụng 7 ngày"
+        "uptime": "Khả dụng 7 ngày",
+        "subscription": "Gói đăng ký"
       },
       "hints": {
         "name": "Nơi thăm dò chạy, ví dụ home-mobile",
@@ -2633,6 +2643,20 @@
       "toasts": {
         "saved": "Đã lưu thăm dò",
         "deleted": "Đã xóa thăm dò"
+      },
+      "sub": {
+        "demoted": "Đã chuyển xuống",
+        "demotedHint": "{fail} bộ thăm dò báo lỗi (cần: {need}). Gói đăng ký đặt liên kết này ở cuối.",
+        "hidden": "Đã ẩn",
+        "hiddenHint": "{fail} bộ thăm dò báo lỗi (cần: {need}). Gói đăng ký bỏ liên kết này khi người dùng còn liên kết khác.",
+        "unconfirmed": "Chưa xác nhận {fail}/{need}",
+        "unconfirmedHint": "{fail} bộ thăm dò báo lỗi, cần {need}. Gói đăng ký chưa thay đổi.",
+        "ignored": {
+          "silent": "Gói đăng ký không dùng",
+          "silentHint": "Bộ thăm dò này gần đây không gửi báo cáo nên gói đăng ký bỏ qua kết quả của nó.",
+          "allFailing": "Gói đăng ký không dùng",
+          "allFailingHint": "Mọi điểm kết nối đều lỗi cùng lúc trên bộ thăm dò này. Thường là do mạng của chính nó hoặc URL thử nghiệm bị hỏng, nên gói đăng ký bỏ qua nó."
+        }
       }
     }
   },

@@ -1910,6 +1910,15 @@
       "subHostSortInbound": "Gelen bağlantı sırası (varsayılan)",
       "subHostSortHosts": "Ana bilgisayar sırası",
       "subHostSortModeDesc": "Farklı gelen bağlantılarda Ana Bilgisayarlar sayfasının sırasını izler. Sunucunun çıktı sırasını belirler; istemci uygulamaları kendi sıralamalarını uygulayabilir.",
+      "subProbeOrder": "Yoklayıcı sonuçlarını kullan",
+      "subProbeOrderDesc": "Erişilebilirlik yoklayıcılarının erişilemez bildirdiği bağlantılar (art arda 2 başarısız kontrol) aboneliğin sonuna taşınır veya gizlenir; tüm biçimlerde: bağlantılar, JSON ve Clash. Kullanıcıda her zaman en az bir bağlantı kalır ve güncel yoklayıcı sonucu yoksa hiçbir şey değişmez. Yoklayıcılar sayfası her uç noktaya ne olduğunu gösterir.",
+      "subProbeOrderOff": "Kapalı (varsayılan)",
+      "subProbeOrderReorder": "Sona taşı",
+      "subProbeOrderHide": "Gizle",
+      "subProbeMinAgents": "Onay için yoklayıcı sayısı",
+      "subProbeMinAgentsDesc": "Bir uç noktayı erişilemez saymak için kaç yoklayıcının bildirmesi gerekir. 0 = otomatik: inbound'u yalnızca bir yoklayıcı kontrol ediyorsa 1, aksi halde 2.",
+      "subProbeStaleMinutes": "Şundan eski sonuçları yok say, dk",
+      "subProbeStaleMinutesDesc": "Bu süre boyunca rapor göndermeyen yoklayıcı yok sayılır: eski sonuçları asla başarısızlık sayılmaz.",
       "eventGroupProbe": "Erişilebilirlik yoklayıcıları",
       "eventProbeDown": "Gelen bağlantıya erişilemiyor",
       "eventProbeUp": "Gelen bağlantı yeniden erişilebilir",
@@ -2610,7 +2619,8 @@
         "target": "Uç nokta",
         "lastCheck": "Son kontrol",
         "latency": "İlk bayt / toplam",
-        "uptime": "Erişilebilirlik, 7 gün"
+        "uptime": "Erişilebilirlik, 7 gün",
+        "subscription": "Abonelik"
       },
       "hints": {
         "name": "Yoklayıcının çalıştığı yer, örneğin home-mobile",
@@ -2633,6 +2643,20 @@
       "toasts": {
         "saved": "Yoklayıcı kaydedildi",
         "deleted": "Yoklayıcı silindi"
+      },
+      "sub": {
+        "demoted": "Sona taşındı",
+        "demotedHint": "{fail} yoklayıcıda erişilemez (gereken: {need}). Abonelikler bu bağlantıyı en sona koyar.",
+        "hidden": "Gizlendi",
+        "hiddenHint": "{fail} yoklayıcıda erişilemez (gereken: {need}). Kullanıcının başka bağlantıları olduğu sürece abonelikler bu bağlantıyı vermez.",
+        "unconfirmed": "Onaylanmadı {fail}/{need}",
+        "unconfirmedHint": "{fail} yoklayıcıda erişilemez, {need} gerekiyor. Abonelikler henüz değişmez.",
+        "ignored": {
+          "silent": "Abonelikler kullanmıyor",
+          "silentHint": "Bu yoklayıcı son zamanlarda rapor göndermedi, bu yüzden abonelikler sonuçlarını yok sayar.",
+          "allFailing": "Abonelikler kullanmıyor",
+          "allFailingHint": "Bu yoklayıcıda tüm uç noktalar aynı anda başarısız. Genelde yoklayıcının kendi ağı veya test URL'si bozuktur, bu yüzden abonelikler onu yok sayar."
+        }
       }
     }
   },

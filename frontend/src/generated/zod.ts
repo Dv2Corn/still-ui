@@ -197,6 +197,9 @@ export const AllSettingSchema = z.object({
   subListen: z.string(),
   subPath: z.string(),
   subPort: z.number().int().min(1).max(65535),
+  subProbeMinAgents: z.number().int().min(0).max(10),
+  subProbeOrder: z.string(),
+  subProbeStaleMinutes: z.number().int().min(5).max(1440),
   subProfileMode: z.string(),
   subProfileUrl: z.string(),
   subRoutingRules: z.string(),
@@ -405,6 +408,9 @@ export const AllSettingViewSchema = z.object({
   subListen: z.string(),
   subPath: z.string(),
   subPort: z.number().int().min(1).max(65535),
+  subProbeMinAgents: z.number().int().min(0).max(10),
+  subProbeOrder: z.string(),
+  subProbeStaleMinutes: z.number().int().min(5).max(1440),
   subProfileMode: z.string(),
   subProfileUrl: z.string(),
   subRoutingRules: z.string(),
@@ -1118,6 +1124,7 @@ export const ReachProbeViewSchema = z.object({
   lastSeenAt: z.number().int(),
   name: z.string(),
   stale: z.boolean(),
+  subIgnored: z.string(),
   targets: z.array(z.lazy(() => ReachTargetViewSchema)),
   testUrl: z.string(),
 });
@@ -1137,6 +1144,9 @@ export const ReachTargetViewSchema = z.object({
   lastTotalMs: z.number().int(),
   lastTtfbMs: z.number().int(),
   status: z.string(),
+  subFailAgents: z.number().int(),
+  subNeedAgents: z.number().int(),
+  subState: z.string(),
   uptime7d: z.number(),
 });
 export type ReachTargetView = z.infer<typeof ReachTargetViewSchema>;

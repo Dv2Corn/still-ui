@@ -1910,6 +1910,15 @@
       "subHostSortInbound": "Urutan inbound (bawaan)",
       "subHostSortHosts": "Urutan host",
       "subHostSortModeDesc": "Mengikuti urutan di halaman Host untuk semua inbound. Ini menentukan urutan keluaran server; aplikasi klien dapat menerapkan urutan sendiri.",
+      "subProbeOrder": "Gunakan hasil probe",
+      "subProbeOrderDesc": "Tautan yang dilaporkan mati oleh probe keterjangkauan (2 kali gagal berturut-turut) dipindah ke akhir langganan atau disembunyikan, di semua format: tautan, JSON, dan Clash. Pengguna selalu menyisakan setidaknya satu tautan, dan tanpa hasil probe terbaru tidak ada yang berubah. Halaman Probe menampilkan apa yang terjadi pada setiap endpoint.",
+      "subProbeOrderOff": "Mati (bawaan)",
+      "subProbeOrderReorder": "Pindah ke akhir",
+      "subProbeOrderHide": "Sembunyikan",
+      "subProbeMinAgents": "Probe untuk konfirmasi",
+      "subProbeMinAgentsDesc": "Berapa probe yang harus melaporkan endpoint mati. 0 = otomatis: 1 jika hanya satu probe yang memeriksa inbound, selain itu 2.",
+      "subProbeStaleMinutes": "Abaikan hasil probe lebih lama dari, menit",
+      "subProbeStaleMinutesDesc": "Probe yang tidak melapor selama ini diabaikan: hasil lamanya tidak pernah dihitung sebagai kegagalan.",
       "eventGroupProbe": "Probe keterjangkauan",
       "eventProbeDown": "Inbound tidak terjangkau",
       "eventProbeUp": "Inbound terjangkau lagi",
@@ -2610,7 +2619,8 @@
         "target": "Titik akses",
         "lastCheck": "Cek terakhir",
         "latency": "Byte pertama / total",
-        "uptime": "Ketersediaan, 7 hari"
+        "uptime": "Ketersediaan, 7 hari",
+        "subscription": "Langganan"
       },
       "hints": {
         "name": "Lokasi probe, misalnya home-mobile",
@@ -2633,6 +2643,20 @@
       "toasts": {
         "saved": "Probe disimpan",
         "deleted": "Probe dihapus"
+      },
+      "sub": {
+        "demoted": "Dipindah ke akhir",
+        "demotedHint": "Mati menurut {fail} probe (dibutuhkan: {need}). Langganan menaruh tautan ini paling akhir.",
+        "hidden": "Disembunyikan",
+        "hiddenHint": "Mati menurut {fail} probe (dibutuhkan: {need}). Langganan tidak menyertakan tautan ini selama pengguna punya tautan lain.",
+        "unconfirmed": "Belum dikonfirmasi {fail}/{need}",
+        "unconfirmedHint": "Mati menurut {fail} probe, dibutuhkan {need}. Langganan belum berubah.",
+        "ignored": {
+          "silent": "Tidak dipakai langganan",
+          "silentHint": "Probe ini belum melapor akhir-akhir ini, jadi langganan mengabaikan hasilnya.",
+          "allFailing": "Tidak dipakai langganan",
+          "allFailingHint": "Semua endpoint gagal sekaligus pada probe ini. Biasanya jaringan probe itu sendiri atau URL ujinya bermasalah, jadi langganan mengabaikannya."
+        }
       }
     }
   },

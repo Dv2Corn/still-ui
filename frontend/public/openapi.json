@@ -567,6 +567,22 @@
             "minimum": 1,
             "type": "integer"
           },
+          "subProbeMinAgents": {
+            "example": 0,
+            "maximum": 10,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "subProbeOrder": {
+            "example": "off",
+            "type": "string"
+          },
+          "subProbeStaleMinutes": {
+            "example": 30,
+            "maximum": 1440,
+            "minimum": 5,
+            "type": "integer"
+          },
           "subProfileMode": {
             "type": "string"
           },
@@ -842,6 +858,9 @@
           "subListen",
           "subPath",
           "subPort",
+          "subProbeMinAgents",
+          "subProbeOrder",
+          "subProbeStaleMinutes",
           "subProfileMode",
           "subProfileUrl",
           "subRoutingRules",
@@ -1443,6 +1462,22 @@
             "minimum": 1,
             "type": "integer"
           },
+          "subProbeMinAgents": {
+            "example": 0,
+            "maximum": 10,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "subProbeOrder": {
+            "example": "off",
+            "type": "string"
+          },
+          "subProbeStaleMinutes": {
+            "example": 30,
+            "maximum": 1440,
+            "minimum": 5,
+            "type": "integer"
+          },
           "subProfileMode": {
             "type": "string"
           },
@@ -1726,6 +1761,9 @@
           "subListen",
           "subPath",
           "subPort",
+          "subProbeMinAgents",
+          "subProbeOrder",
+          "subProbeStaleMinutes",
           "subProfileMode",
           "subProfileUrl",
           "subRoutingRules",
@@ -4671,6 +4709,10 @@
             "example": false,
             "type": "boolean"
           },
+          "subIgnored": {
+            "description": "SubIgnored says why subscriptions do not use this probe now: silent, allFailing or \"\".",
+            "type": "string"
+          },
           "targets": {
             "items": {
               "$ref": "#/components/schemas/ReachTargetView"
@@ -4694,6 +4736,7 @@
           "lastSeenAt",
           "name",
           "stale",
+          "subIgnored",
           "targets",
           "testUrl"
         ],
@@ -4755,6 +4798,19 @@
             "example": "ok",
             "type": "string"
           },
+          "subFailAgents": {
+            "example": 2,
+            "type": "integer"
+          },
+          "subNeedAgents": {
+            "example": 2,
+            "type": "integer"
+          },
+          "subState": {
+            "description": "SubState is what subscriptions do with this endpoint: demoted, hidden, unconfirmed or \"\".",
+            "example": "demoted",
+            "type": "string"
+          },
           "uptime7d": {
             "example": 99.4,
             "type": "number"
@@ -4774,6 +4830,9 @@
           "lastTotalMs",
           "lastTtfbMs",
           "status",
+          "subFailAgents",
+          "subNeedAgents",
+          "subState",
           "uptime7d"
         ],
         "type": "object"
@@ -13718,6 +13777,7 @@
                       "lastSeenAt": 1736000000000,
                       "name": "home-mobile",
                       "stale": false,
+                      "subIgnored": "",
                       "targets": [
                         {
                           "changedAt": 1736000000000,
@@ -13733,6 +13793,9 @@
                           "lastTotalMs": 950,
                           "lastTtfbMs": 180,
                           "status": "ok",
+                          "subFailAgents": 2,
+                          "subNeedAgents": 2,
+                          "subState": "demoted",
                           "uptime7d": 99.4
                         }
                       ],
@@ -13867,6 +13930,7 @@
                       "lastSeenAt": 1736000000000,
                       "name": "home-mobile",
                       "stale": false,
+                      "subIgnored": "",
                       "targets": [
                         {
                           "changedAt": 1736000000000,
@@ -13882,6 +13946,9 @@
                           "lastTotalMs": 950,
                           "lastTtfbMs": 180,
                           "status": "ok",
+                          "subFailAgents": 2,
+                          "subNeedAgents": 2,
+                          "subState": "demoted",
                           "uptime7d": 99.4
                         }
                       ],
