@@ -170,8 +170,7 @@ bash <(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/ins
 still-ui uninstall
 ```
 
-> [!WARNING]
-> `still-ui uninstall` удаляет и базу в `/etc/still-ui` — так же, как в 3x-ui. Если входы и клиенты могут ещё понадобиться, сначала сохраните `/etc/still-ui/x-ui.db` в надёжное место.
+Удаляются программа, обе службы, пользователь `still-xray` и меню, а данные остаются: база, резервные копии и `install-result.env` в `/etc/still-ui` и файл настроек (`/etc/default/still-ui`). Если поставить still-ui снова, он их подхватит — тот же вход, те же входы и клиенты. Меню спрашивает «Also delete all data?» (по умолчанию «нет»); без терминала данные не удаляются никогда. Для скриптов: `still-ui uninstall --keep-data` — оставить, `still-ui uninstall --purge` — удалить и данные (и предложить снести локальный PostgreSQL). В отличие от 3x-ui, без вашего явного ответа ничего не удаляется.
 
 ## Мобильные сети России
 

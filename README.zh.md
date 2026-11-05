@@ -160,8 +160,7 @@ bash <(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/ins
 still-ui uninstall
 ```
 
-> [!WARNING]
-> `still-ui uninstall` 会同时删除 `/etc/still-ui` 中的数据库，与 3x-ui 的行为一致。如果以后还可能用到入站和客户端，请先把 `/etc/still-ui/x-ui.db` 复制到安全的地方。
+该命令会删除程序、两个服务、`still-xray` 用户和管理菜单，但保留数据：`/etc/still-ui` 中的数据库、备份和 `install-result.env`，以及配置文件（`/etc/default/still-ui`）。再次安装 still-ui 时会沿用这些数据，登录信息、入站和客户端都保持不变。菜单会询问 “Also delete all data?”（默认否）；没有终端时永远不会删除数据。在脚本中：`still-ui uninstall --keep-data` 保留数据，`still-ui uninstall --purge` 连同数据一起删除（并提示是否清除本地 PostgreSQL）。与 3x-ui 不同，除非你明确要求，否则不会删除任何数据。
 
 ## 移动网络
 

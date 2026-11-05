@@ -88,11 +88,24 @@ x-ui
 
 ## 卸载
 
-菜单选项 **6** 或 `x-ui uninstall`。它会停止并禁用服务、移除服务单元，
-并删除 `/etc/x-ui/` 和安装目录。如果面板使用的是本地安装的 PostgreSQL，
-它还会询问是否一并清除（这是一次单独的、不可逆的确认）。
+菜单选项 **6** 或 `still-ui uninstall`。它会停止并禁用面板和 `still-xray` 服务，
+移除它们的单元和附加配置、`still-xray` 用户、安装目录和管理菜单，但**保留数据**：
+`/etc/still-ui/` 中的数据库、备份和 `install-result.env`，以及配置文件
+（`/etc/default/still-ui`，RHEL 上为 `/etc/sysconfig/still-ui`）。再次安装 still-ui
+时会沿用这些数据，登录信息、入站和客户端都保持不变。
 
-<Callout type="warn">
-  卸载会删除数据库（`/etc/x-ui/x-ui.db`）和你的配置。
-  如果以后可能还需要，请先[备份](/docs/operations/backup-restore)。
+随后菜单会询问 **Also delete all data (database /etc/still-ui, clients,
+settings)?**，默认否。没有终端时（脚本、管道）永远不会删除数据。在脚本中：
+
+| 命令                             | 数据                     |
+| -------------------------------- | ------------------------ |
+| `still-ui uninstall --keep-data` | 保留，不提问             |
+| `still-ui uninstall --purge`     | 一并删除，不提问         |
+
+删除使用本地 PostgreSQL 的面板数据时，还会询问是否清除 PostgreSQL（这是一次
+单独的、不可逆的确认）。全部删除成功时退出码为 0，有内容无法删除时为 1。
+
+<Callout type="info">
+  与 3x-ui 不同，除非你明确要求，否则不会删除任何数据。之后要删除保留的数据：
+  `rm -rf /etc/still-ui /etc/default/still-ui`。
 </Callout>

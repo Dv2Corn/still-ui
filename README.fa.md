@@ -160,8 +160,7 @@ bash <(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/ins
 still-ui uninstall
 ```
 
-> [!WARNING]
-> دستور `still-ui uninstall` پایگاه داده در `/etc/still-ui` را هم پاک می‌کند، درست مثل 3x-ui. اگر ممکن است دوباره به اینباندها و کلاینت‌ها نیاز داشته باشید، اول فایل `/etc/still-ui/x-ui.db` را جای امنی کپی کنید.
+این دستور برنامه، هر دو سرویس، کاربر `still-xray` و منو را حذف می‌کند، اما داده‌ها می‌مانند: پایگاه داده، نسخه‌های پشتیبان و `install-result.env` در `/etc/still-ui` و فایل تنظیمات (`/etc/default/still-ui`). اگر still-ui را دوباره نصب کنید، همین داده‌ها را برمی‌دارد و ورود، اینباندها و کلاینت‌ها همان می‌مانند. منو می‌پرسد «Also delete all data?» (پیش‌فرض: خیر)؛ بدون ترمینال داده‌ها هرگز پاک نمی‌شوند. برای اسکریپت‌ها: `still-ui uninstall --keep-data` داده‌ها را نگه می‌دارد و `still-ui uninstall --purge` آن‌ها را هم پاک می‌کند (و پیشنهاد پاک کردن PostgreSQL محلی را می‌دهد). برخلاف 3x-ui، تا خودتان نخواهید چیزی پاک نمی‌شود.
 
 ## شبکه‌های موبایل
 

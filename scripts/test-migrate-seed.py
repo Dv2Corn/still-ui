@@ -140,11 +140,12 @@ def inbounds():
         "settings": {"clients": [client(1, "pm", id=str(uuid.uuid4()), security="auto")]},
         "streamSettings": {"network": "tcp", "security": "none", "tcpSettings": {"header": {"type": "none"}}},
     }
-    # Only on request (--only mixed): a SOCKS/HTTP inbound without auth on
-    # 127.0.0.1, which deploy/test/installer-e2e.sh downloads through while
-    # the panel restarts.
+    # Only on request (--only mixed): a SOCKS/HTTP inbound without auth, which
+    # deploy/test/installer-e2e.sh downloads through while the panel restarts.
+    # It listens on 127.0.0.1 only: an open proxy must not be reachable from
+    # the container bridge.
     yield "mixed", {
-        "port": 24441, "protocol": "mixed",
+        "port": 24441, "protocol": "mixed", "listen": "127.0.0.1",
         "settings": {"auth": "noauth", "accounts": [], "udp": False, "ip": "127.0.0.1"},
         "streamSettings": {},
     }
@@ -198,7 +199,7 @@ def main():
     for name, ib in inbounds():
         if ib["port"] in taken or (ONLY and name not in ONLY) or (name in ("post-migration", "mixed") and name not in ONLY):
             continue
-        body = {"up": 0, "down": 0, "total": 0, "remark": name, "enable": True, "expiryTime": 0, "listen": "",
+        body = {"up": 0, "down": 0, "total": 0, "remark": name, "enable": True, "expiryTime": 0, "listen": ib.get("listen", ""),
                 "port": ib["port"], "protocol": ib["protocol"], "settings": json.dumps(ib["settings"]),
                 "streamSettings": json.dumps(ib["streamSettings"]), "sniffing": sniffing()}
         try:
