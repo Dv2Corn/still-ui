@@ -630,9 +630,11 @@ PR) pass a quota gate first (`.github/scripts/claude_gate.py`): 2 model runs per
 nothing do not count. A run over a limit is skipped quietly; maintainer requests are never
 limited. The gate reads earlier runs by their `run-name:` title, so keep that format in sync.
 Before posting, both `post` jobs replace every link outside an allowlist with "(link removed)"
-(`.github/scripts/link_filter.py`): github.com and raw.githubusercontent.com only under
-Dv2Corn/still-ui, MHSanaei/3x-ui and XTLS/*, plus docs.github.com and xtls.github.io; e-mail
-addresses go too. So a hostile issue or PR cannot get its link posted by the bot.
+(`.github/scripts/link_filter.py`): github.com and raw.githubusercontent.com only under this
+repository, MHSanaei/3x-ui and XTLS/*, and there a commit only by the default branch, a tag, a
+full SHA the default branch contains (checked with `gh api`, failing closed) or the reviewed
+head; plus docs.github.com and xtls.github.io. Relative links are resolved against the issue or
+PR page; e-mail addresses go too. So a hostile issue or PR cannot get its link posted by the bot.
 
 ---
 

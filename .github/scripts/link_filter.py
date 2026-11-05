@@ -9,16 +9,23 @@ comment`: every link that is not on the allowlist is replaced by
 
 Allowed, over http(s), with no userinfo and no port:
 - github.com and raw.githubusercontent.com, only under this repository
-  (Dv2Corn/still-ui), upstream 3x-ui (MHSanaei/3x-ui) and the XTLS
-  organisation (XTLS/*);
+  (--repo), upstream 3x-ui (MHSanaei/3x-ui) and the XTLS organisation;
 - docs.github.com and xtls.github.io, any path.
-Everything else on GitHub (other owners, gist., user-attachments, other
-*.githubusercontent.com) is removed, and so are e-mail addresses and
-mailto:/xmpp:/tel:/sms: links. Relative links (`../docs/x.md`, `#anchor`,
-`/owner/repo/issues/1`) stay. Anything that does not clearly pass is removed,
-so the filter errs towards removing.
+Under an allowed repository, GitHub also serves commits of every fork, so a
+path that names a commit (blob, tree, raw, blame, commit, commits, compare,
+archive, raw.githubusercontent.com) passes only for the default branch, a tag,
+a full SHA that the default branch contains (asked of the GitHub API, `gh
+api`, failing closed) or the head under review (--head-sha). Issue, pull
+request, discussion and release pages pass; release downloads only for this
+repository; issue attachments (/files/, /assets/) never.
 
-Usage: python3 -I link_filter.py IN OUT
+Relative links are resolved against the page the reply is posted on (--base,
+e.g. https://github.com/OWNER/REPO/issues/7) and pass the same rules; `#anchor`
+links stay. E-mail addresses and mailto:/xmpp:/tel:/sms: links go. Anything
+that does not clearly pass is removed, so the filter errs towards removing.
+
+Usage: python3 -I link_filter.py [--repo OWNER/REPO] [--base URL]
+                                  [--head-sha SHA] IN OUT
 Writes the filtered text to OUT. When it removed anything, prints one GitHub
 `::warning::` with the count; the links themselves are never printed, since
 they are attacker text. Stdlib only: the post job installs nothing.
@@ -26,19 +33,36 @@ they are attacker text. Stdlib only: the post job installs nothing.
 
 from __future__ import annotations
 
+import argparse
 import html
 import re
+import subprocess
 import sys
-from urllib.parse import unquote
+from dataclasses import dataclass, field
+from urllib.parse import quote, unquote, urljoin
 
 REMOVED = "(link removed)"
+DEFAULT_REPO = "Dv2Corn/still-ui"
 
 # Hosts any path of which may be linked.
 OPEN_HOSTS = frozenset({"docs.github.com", "xtls.github.io"})
 # Hosts that serve every user's content: only these owners and repositories.
 REPO_HOSTS = frozenset({"github.com", "raw.githubusercontent.com"})
 ALLOWED_OWNERS = frozenset({"xtls"})
-ALLOWED_REPOS = frozenset({("dv2corn", "still-ui"), ("mhsanaei", "3x-ui")})
+UPSTREAM_REPOS = frozenset({("mhsanaei", "3x-ui")})
+
+# Repository pages that show no code of a chosen commit.
+PAGE_SECTIONS = frozenset(
+    {"issues", "pull", "pulls", "discussions", "tags", "labels", "milestones", "milestone", "actions", "security"}
+)
+# Sections whose next segment is a ref: GitHub resolves a SHA there across
+# the whole fork network.
+REF_SECTIONS = frozenset({"blob", "tree", "raw", "blame", "commit", "commits"})
+
+_NAME = re.compile(r"^[A-Za-z0-9_.-]+$")
+_FULL_SHA = re.compile(r"^[0-9a-f]{40}$", re.I)
+_SHORT_HEX = re.compile(r"^[0-9a-f]{4,39}$", re.I)
+_REF_NAME = re.compile(r"^[A-Za-z0-9._-]{1,200}$")
 
 # Absolute http(s) URL with a bare host: no userinfo, no port, no backslash.
 _ALLOWED_SHAPE = re.compile(r"^https?://([a-z0-9.-]+)([/?#].*)?$", re.I | re.S)
@@ -54,6 +78,174 @@ _ENTITY = re.compile(r"&(?:#[0-9]{1,7}|#[xX][0-9a-fA-F]{1,6}|[A-Za-z][A-Za-z0-9]
 # markup, never create a link the later passes would not see.
 _SAFE_DECODED = re.compile(r"^[A-Za-z0-9:/\\]$")
 
+# Stand-ins for spans already checked and kept (a link, a tag, an autolink),
+# so the last pass reads the text around them the way GitHub does.
+_P_OPEN, _P_CLOSE = "\ue000", "\ue001"
+_PLACEHOLDER = re.compile(f"{_P_OPEN}([0-9]+){_P_CLOSE}")
+
+
+class RefChecker:
+    """Answers whether a ref of a repository may be linked. This base knows
+    nothing, so every ref is refused (fail closed)."""
+
+    def default_branch(self, owner: str, repo: str) -> str | None:
+        return None
+
+    def is_tag(self, owner: str, repo: str, name: str) -> bool:
+        return False
+
+    def sha_on_default(self, owner: str, repo: str, sha: str) -> bool:
+        return False
+
+
+class StaticChecker(RefChecker):
+    """Fixed answers, for tests. Keys are `owner/repo`, any case."""
+
+    def __init__(self, default_branches=None, tags=None, shas=None):
+        self.branches = {k.lower(): v for k, v in (default_branches or {}).items()}
+        self.tags = {k.lower(): set(v) for k, v in (tags or {}).items()}
+        self.shas = {k.lower(): {s.lower() for s in v} for k, v in (shas or {}).items()}
+
+    def default_branch(self, owner, repo):
+        return self.branches.get(f"{owner}/{repo}".lower())
+
+    def is_tag(self, owner, repo, name):
+        return name in self.tags.get(f"{owner}/{repo}".lower(), ())
+
+    def sha_on_default(self, owner, repo, sha):
+        return sha.lower() in self.shas.get(f"{owner}/{repo}".lower(), ())
+
+
+class GhChecker(RefChecker):
+    """Asks the GitHub API through `gh api` (GH_TOKEN from the job). Every
+    error, timeout or unexpected answer counts as no; answers are cached and
+    the number of calls is capped."""
+
+    MAX_CALLS = 40
+
+    def __init__(self) -> None:
+        self.cache: dict[tuple[str, str], str | None] = {}
+        self.calls = 0
+
+    def _api(self, path: str, jq: str) -> str | None:
+        key = (path, jq)
+        if key not in self.cache:
+            out = None
+            if self.calls < self.MAX_CALLS:
+                self.calls += 1
+                try:
+                    proc = subprocess.run(["gh", "api", path, "--jq", jq], capture_output=True, text=True, timeout=30)
+                    if proc.returncode == 0:
+                        out = proc.stdout.strip()
+                except (OSError, subprocess.SubprocessError):
+                    out = None
+            self.cache[key] = out
+        return self.cache[key]
+
+    def default_branch(self, owner, repo):
+        name = self._api(f"repos/{owner}/{repo}", ".default_branch")
+        return name if name and _REF_NAME.match(name) else None
+
+    def is_tag(self, owner, repo, name):
+        if not _REF_NAME.match(name):
+            return False
+        return self._api(f"repos/{owner}/{repo}/git/ref/tags/{quote(name, safe='')}", ".ref") == f"refs/tags/{name}"
+
+    def sha_on_default(self, owner, repo, sha):
+        branch = self.default_branch(owner, repo)
+        if not branch or not _FULL_SHA.match(sha):
+            return False
+        # `behind`/`identical`: the commit is an ancestor of the default branch.
+        status = self._api(f"repos/{owner}/{repo}/compare/{quote(branch, safe='')}...{sha.lower()}", ".status")
+        return status in ("behind", "identical")
+
+
+@dataclass
+class Policy:
+    repo: str = DEFAULT_REPO
+    # The page the reply is posted on; relative links resolve against it.
+    base: str = ""
+    # The commit under review: the PR reviewer links its code.
+    head_sha: str = ""
+    checker: RefChecker = field(default_factory=RefChecker)
+
+    def __post_init__(self) -> None:
+        owner, _, name = self.repo.partition("/")
+        if not (_NAME.match(owner) and _NAME.match(name)):
+            raise ValueError("--repo must be OWNER/REPO")
+        self.own = (owner.lower(), name.lower())
+        if not self.base:
+            self.base = f"https://github.com/{self.repo}/issues/1"
+
+    def repo_allowed(self, owner: str, repo: str) -> bool:
+        owner, repo = owner.lower(), repo.lower()
+        return bool(repo) and (owner in ALLOWED_OWNERS or (owner, repo) in UPSTREAM_REPOS or (owner, repo) == self.own)
+
+    def ref_ok(self, owner: str, repo: str, ref: str) -> bool:
+        if _FULL_SHA.match(ref):
+            if self.head_sha and ref.lower() == self.head_sha.lower() and (owner.lower(), repo.lower()) == self.own:
+                return True
+            return self.checker.sha_on_default(owner, repo, ref)
+        # A short SHA may name any commit of the fork network.
+        if _SHORT_HEX.match(ref) or not _REF_NAME.match(ref):
+            return False
+        if ref == self.checker.default_branch(owner, repo):
+            return True
+        return self.checker.is_tag(owner, repo, ref)
+
+
+_DEFAULT_POLICY = Policy()
+
+
+def _ref_path_allowed(owner: str, repo: str, parts: list[str], policy: Policy, *, need_file: bool = False) -> bool:
+    """`parts` starts at a ref: `<ref>/...`, `refs/heads/<b>/...` or `refs/tags/<t>/...`."""
+    if not parts:
+        return False
+    if parts[0] == "refs":
+        if len(parts) < 3:
+            return False
+        if parts[1] == "tags":
+            # Resolved only among this repository's own tags.
+            ok = bool(_REF_NAME.match(parts[2]))
+        elif parts[1] == "heads":
+            ok = parts[2] == policy.checker.default_branch(owner, repo)
+        else:  # refs/pull/* and anything else
+            return False
+        rest = parts[3:]
+    else:
+        ok = policy.ref_ok(owner, repo, parts[0])
+        rest = parts[1:]
+    return ok and (bool(rest) or not need_file)
+
+
+def _section_allowed(owner: str, repo: str, rest: list[str], policy: Policy) -> bool:
+    if not rest:
+        return True
+    section, sub = rest[0].lower(), rest[1:]
+    if section in PAGE_SECTIONS:
+        return True
+    if section == "commits" and not sub:
+        return True
+    if section in REF_SECTIONS:
+        return _ref_path_allowed(owner, repo, sub, policy)
+    if section == "archive" and sub:
+        last = sub[-1]
+        for ext in (".tar.gz", ".zip"):
+            if last.endswith(ext) and len(last) > len(ext):
+                return _ref_path_allowed(owner, repo, sub[:-1] + [last[: -len(ext)]], policy)
+        return False
+    if section == "compare":
+        if not sub:
+            return True
+        sides = re.split(r"\.{2,3}", "/".join(sub), maxsplit=1)
+        return all(side and policy.ref_ok(owner, repo, side) for side in sides)
+    if section == "releases":
+        if not sub or sub == ["latest"] or (sub[0] == "tag" and len(sub) >= 2):
+            return True
+        download = sub[:1] == ["download"] or sub[:2] == ["latest", "download"]
+        return download and (owner.lower(), repo.lower()) == policy.own
+    return False
+
 
 def host_allowed(host: str) -> bool:
     """Whether some path on this host may be linked."""
@@ -61,25 +253,37 @@ def host_allowed(host: str) -> bool:
     return host in OPEN_HOSTS or host in REPO_HOSTS
 
 
-def path_allowed(host: str, rest: str) -> bool:
+def path_allowed(host: str, rest: str, policy: Policy | None = None) -> bool:
     """Whether `rest` (path, query, fragment) on `host` may be linked."""
+    policy = policy or _DEFAULT_POLICY
     host = host.lower()
     if host in OPEN_HOSTS:
         return True
     if host not in REPO_HOSTS:
         return False
     path = re.split(r"[?#]", rest, maxsplit=1)[0]
-    # No encoded separators, no backslash, no dot or empty segments: the owner
-    # and repository read here are the ones the browser goes to.
+    # No encoded separators, no backslash, no dot or empty segments: the owner,
+    # repository and ref read here are the ones the browser goes to.
     if "\\" in path or _ENCODED_SEPARATOR.search(path):
         return False
     segments = unquote(path).split("/")
     if segments[0] != "" or any(s in (".", "..") for s in segments[1:]) or "" in segments[1:-1]:
         return False
-    owner = segments[1].lower() if len(segments) > 1 else ""
-    repo = segments[2].lower() if len(segments) > 2 else ""
-    repo = repo.removesuffix(".git")
-    return owner in ALLOWED_OWNERS or (owner, repo) in ALLOWED_REPOS
+    segs = segments[1:]
+    if segs and segs[-1] == "":
+        segs = segs[:-1]
+    if not segs or not all(_NAME.match(s) for s in segs[:2]):
+        return False
+    if len(segs) == 1:
+        return host == "github.com" and segs[0].lower() in ALLOWED_OWNERS
+    owner, repo = segs[0], segs[1]
+    if repo.lower().endswith(".git") and len(segs) == 2:
+        repo = repo[:-4]
+    if not policy.repo_allowed(owner, repo):
+        return False
+    if host == "raw.githubusercontent.com":
+        return _ref_path_allowed(owner, repo, segs[2:], policy, need_file=True)
+    return _section_allowed(owner, repo, segs[2:], policy)
 
 
 def _variants(target: str) -> list[str]:
@@ -97,21 +301,30 @@ def _variants(target: str) -> list[str]:
     return out
 
 
-def _absolute_allowed(url: str) -> bool:
+def _absolute_allowed(url: str, policy: Policy) -> bool:
     m = _ALLOWED_SHAPE.match(url)
-    return bool(m) and path_allowed(m.group(1), m.group(2) or "")
+    return bool(m) and path_allowed(m.group(1), m.group(2) or "", policy)
 
 
-def target_allowed(target: str, *, relative_ok: bool = True) -> bool:
-    """Whether a link target may stay. Every reading of it must pass."""
+def target_allowed(target: str, policy: Policy | None = None, *, relative_ok: bool = True) -> bool:
+    """Whether a link target may stay. Every reading of it must pass; a
+    relative one is resolved against the page the reply is posted on."""
+    policy = policy or _DEFAULT_POLICY
     for v in _variants(target):
         if _PROTOCOL_RELATIVE.match(v):
-            if not _absolute_allowed("https:" + v):
-                return False
+            url = "https:" + v
         elif _SCHEME.match(v):
-            if not _absolute_allowed(v):
-                return False
+            url = v
         elif not relative_ok:
+            return False
+        elif v == "" or v.startswith("#"):
+            continue
+        else:
+            try:
+                url = urljoin(policy.base, v)
+            except ValueError:
+                return False
+        if not _absolute_allowed(url, policy):
             return False
     return True
 
@@ -122,6 +335,33 @@ def _decode_safe_entities(text: str) -> str:
         return ch if _SAFE_DECODED.match(ch) else m.group(0)
 
     return _ENTITY.sub(repl, text)
+
+
+def gfm_trim(url: str) -> str:
+    """What GitHub's autolink extension keeps of `url`: trailing ?!.,:*_~,
+    an unbalanced trailing `)` and a trailing entity-like `&name;` go."""
+    while url:
+        if url[-1] in "?!.,:*_~":
+            url = url[:-1]
+        elif url[-1] == ")" and url.count(")") > url.count("("):
+            url = url[:-1]
+        elif re.search(r"&[A-Za-z0-9]+;$", url):
+            url = re.sub(r"&[A-Za-z0-9]+;$", "", url)
+        else:
+            break
+    return url
+
+
+# A URL in code or in a quote ends at these too; whatever of them GitHub's
+# autolink keeps can only lengthen the last path segment of the URL that
+# passed, never lead to another repository or ref.
+_QUOTE_TAIL = "`'\"]>)?!.,:*_~"
+
+
+def _strip_quote_tail(url: str) -> str:
+    while url and url[-1] in _QUOTE_TAIL:
+        url = url[:-1]
+    return url
 
 
 # Attributes whose value a browser follows or loads.
@@ -177,12 +417,26 @@ def scan_start_tag(text: str, i: int) -> tuple[int, list[tuple[str, str]]] | Non
 
 
 class _Filter:
-    def __init__(self) -> None:
+    def __init__(self, policy: Policy) -> None:
+        self.policy = policy
         self.removed = 0
+        self.kept: list[str] = []
+
+    def allowed(self, target: str, *, relative_ok: bool = True) -> bool:
+        return target_allowed(target, self.policy, relative_ok=relative_ok)
 
     def drop(self, keep: str = "") -> str:
         self.removed += 1
         return f"{keep} {REMOVED}" if keep.strip() else REMOVED
+
+    def protect(self, span: str) -> str:
+        self.kept.append(span)
+        return f"{_P_OPEN}{len(self.kept) - 1}{_P_CLOSE}"
+
+    def restore(self, text: str) -> str:
+        while _PLACEHOLDER.search(text):
+            text = _PLACEHOLDER.sub(lambda m: self.kept[int(m.group(1))], text)
+        return text
 
     # <https://host/...> and <user@host>: CommonMark autolinks. No e-mail
     # domain is allowed.
@@ -194,15 +448,14 @@ class _Filter:
 
     def autolinks(self, text: str) -> str:
         return self._AUTOLINK.sub(
-            lambda m: m.group(0) if m.group(1) and target_allowed(m.group(1)) else self.drop(), text
+            lambda m: self.protect(m.group(0)) if m.group(1) and self.allowed(m.group(1)) else self.drop(), text
         )
 
     def tags(self, text: str) -> str:
         """A foreign target in a URL attribute removes the whole start tag (a
         closing </a> left behind renders as nothing). A tag that never closes
-        loses its `<`, so no tag can start there (fail closed). A URL in any
-        other attribute (title=...) is not a link; the last pass still
-        replaces it if it has a scheme."""
+        loses its `<`, so no tag can start there (fail closed). A kept tag
+        still loses any foreign URL in its other attributes (title=...)."""
         out = []
         pos = 0
         for m in re.finditer(r"<[A-Za-z]", text):
@@ -211,26 +464,33 @@ class _Filter:
                 continue
             scanned = scan_start_tag(text, i)
             if scanned is None:
-                rest = text[i:]
-                if "=" in rest.split("\n\n", 1)[0]:
+                if "=" in text[i:].split("\n\n", 1)[0]:
                     out.append(text[pos:i] + self.drop() + " ")
                     pos = i + 1
                 continue
             end, attrs = scanned
             bad = any(
                 name in _URL_ATTRS
-                and any(not target_allowed(t) for t in (re.split(r"[\s,]+", html.unescape(value)) or [""]))
+                and any(not self.allowed(t) for t in (re.split(r"[\s,]+", html.unescape(value)) or [""]))
                 for name, value in attrs
             )
             if bad:
                 out.append(text[pos:i] + self.drop())
-                pos = end
+            elif re.match(r"<[A-Za-z][A-Za-z0-9-]*[\s/>]", text[i:end]):
+                # A real tag stays as it is; its quoted values are read only here.
+                out.append(text[pos:i] + self.protect(self.scan(text[i:end], quoted=True)))
+            else:
+                # Not a tag GitHub renders (`<https://...>` with a space): the
+                # passes below read it.
+                continue
+            pos = end
         out.append(text[pos:])
         return "".join(out)
 
     # [text](target "title") and ![alt](target): text stays, the link goes.
+    # An escaped `\[` opens no link.
     _INLINE = re.compile(
-        r"(!?)\[((?:[^\[\]\\]|\\.|\[(?:[^\[\]\\]|\\.)*\])*)\]\(\s*(<[^<>\n]*>|(?:[^\s()\\]|\\.|\([^\s()]*\))*)"
+        r"(?<!\\)(!?)\[((?:[^\[\]\\]|\\.|\[(?:[^\[\]\\]|\\.)*\])*)\]\(\s*(<[^<>\n]*>|(?:[^\s()\\]|\\.|\([^\s()]*\))*)"
         r"(?:\s+(?:\"[^\"]*\"|'[^']*'|\([^()]*\)))?\s*\)",
         re.S,
     )
@@ -243,11 +503,16 @@ class _Filter:
             target = m.group(3)
             if target.startswith("<") and target.endswith(">"):
                 target = target[1:-1]
-            return m.group(0) if target_allowed(target) else self.drop(m.group(2))
+            if not self.allowed(target):
+                return self.drop(m.group(2))
+            # The link stays; URLs in its text are checked on their own.
+            s, a, b = m.start(), m.start(2), m.end(2)
+            whole = m.group(0)
+            return self.protect(whole[: a - s] + self.scan(m.group(2)) + whole[b - s :])
 
         text = self._INLINE.sub(repl, text)
         return self._LEFTOVER.sub(
-            lambda m: m.group(0) if target_allowed(m.group(1).strip("<>")) else f"] {self.drop()} (", text
+            lambda m: m.group(0) if self.allowed(m.group(1).strip("<>")) else f"] {self.drop()} (", text
         )
 
     # `]: target` anywhere - a reference definition, also inside a block quote
@@ -258,86 +523,88 @@ class _Filter:
     def reference_definitions(self, text: str) -> str:
         def repl(m: re.Match[str]) -> str:
             target = m.group(1)
+            if target.startswith(_P_OPEN):
+                return m.group(0)
             if target.startswith("<") and target.endswith(">"):
                 target = target[1:-1]
-            if target_allowed(target):
+            if self.allowed(target):
                 return m.group(0)
             return "]: " + self.drop()
 
         return self._REFDEF.sub(repl, text)
 
-    # Whatever is left, in prose or code: a URL with any scheme; the bare
-    # `www.` names GitHub turns into links; `//host.tld/...` or `\\host.tld`
-    # (a dotted host, so `//go:embed` and `// comment` stay); mailto:, xmpp:,
-    # tel: and sms: links; and e-mail addresses, which GitHub links too (the
-    # domain must end in letters, so `pkg@v1.2.3` stays, and `icon@2x.png`
-    # is a file name, not an address). A URL ends at a
-    # bracket, so `[https://a](https://b)` is read as two.
+    # Whatever is left, in prose or code. A URL with any scheme and a `www.`
+    # name run, as in GitHub's autolinks, to whitespace or `<` (or a span kept
+    # above); `//host.tld/...` or `\\host.tld` (a dotted host, so `//go:embed`
+    # and `// comment` stay); mailto:, xmpp:, tel: and sms: links; and e-mail
+    # addresses, which GitHub links too (the domain must end in letters, so
+    # `pkg@v1.2.3` stays, and `icon@2x.png` is a file name, not an address).
+    _END = r"[^\s<" + _P_OPEN + r"]"
     _URL = re.compile(
-        r"(?<![A-Za-z0-9+.-])[A-Za-z][A-Za-z0-9+.-]*:(?:\\?[/\\]){2}[^\s<>\"'`\[\]]*"
-        r"|(?<![A-Za-z0-9.@/:_\\-])www\.[^\s<>\"'`\[\]]+"
-        r"|(?<![A-Za-z0-9.@/:_\\-])[/\\]{2}[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+(?=[/\\:?#\s)\]]|$)[^\s<>\"'`\[\]]*"
-        r"|(?<![A-Za-z0-9+.-])(?:mailto|xmpp|tel|sms):[^\s<>\"'`\[\]]+"
-        r"|(?<![A-Za-z0-9._+/-])[A-Za-z0-9._+-]+@(?!\d+(?:\.\d+)?x\.)[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}(?![A-Za-z0-9-])",
+        r"(?<![A-Za-z0-9+.-])[A-Za-z][A-Za-z0-9+.-]*:(?:\\?[/\\]){2}" + _END + "*"
+        r"|(?<![A-Za-z0-9.@/:_\\-])www\." + _END + "+"
+        r"|(?<![A-Za-z0-9.@/:_\\-])[/\\]{2}[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+(?=[/\\:?#\s)\]]|$)[^\s<>\"'`\[\]"
+        + _P_OPEN + r"]*"
+        r"|(?<![A-Za-z0-9+.-])(?:mailto|xmpp|tel|sms):[^\s<>\"'`\[\]" + _P_OPEN + r"]+"
+        r"|(?<![A-Za-z0-9._+/-])[A-Za-z0-9._+-]+@(?!\d+(?:\.\d+)?x\.)[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}"
+        r"(?![A-Za-z0-9-])",
         re.I,
     )
-    _EMAIL_OR_NO_SLASH = re.compile(r"^(?:mailto|xmpp|tel|sms):|^[^:/\\]*@", re.I)
+    _NO_SLASH = re.compile(r"^(?:mailto|xmpp|tel|sms):|^[^:/\\]*@", re.I)
+    # Inside a tag a URL ends at a quote as well.
+    _QUOTED = re.compile(r"(?<![A-Za-z0-9+.-])[A-Za-z][A-Za-z0-9+.-]*:(?:\\?[/\\]){2}[^\s<>\"'`]*", re.I)
 
-    @staticmethod
-    def _trim(url: str) -> tuple[str, str]:
-        """Splits off trailing punctuation that is prose, as GitHub does."""
-        end = len(url)
-        while end:
-            ch = url[end - 1]
-            if ch in ".,:;!?*_~'\"":
-                end -= 1
-            elif ch == ")" and url[:end].count(")") > url[:end].count("("):
-                end -= 1
-            else:
-                break
-        return url[:end], url[end:]
-
-    def bare_urls(self, text: str) -> str:
+    def scan(self, text: str, *, quoted: bool = False) -> str:
         def repl(m: re.Match[str]) -> str:
-            url, tail = self._trim(m.group(0))
-            if self._EMAIL_OR_NO_SLASH.match(url):
+            found = m.group(0)
+            linked = gfm_trim(found)
+            tail = found[len(linked) :]
+            if self._NO_SLASH.match(found):
                 return self.drop() + tail
-            if url.lower().startswith("www."):
-                check = "http://" + url
-            elif url[:1] in "/\\":
-                check = "https:" + url
-            else:
-                check = url
-            if url and target_allowed(check, relative_ok=False):
-                return m.group(0)
+            if found[:1] in "/\\":
+                return m.group(0) if self.allowed("https:" + linked, relative_ok=False) else self.drop() + tail
+            # What GitHub links is `linked`; it passes only if the URL in it
+            # passes and the rest is quote or bracket characters.
+            url = _strip_quote_tail(linked)
+            check = "http://" + url if url.lower().startswith("www.") else url
+            if url and self.allowed(check, relative_ok=False):
+                return found
             return self.drop() + tail
 
-        return self._URL.sub(repl, text)
+        return (self._QUOTED if quoted else self._URL).sub(repl, text)
 
     def run(self, text: str) -> str:
+        text = text.replace(_P_OPEN, "\ufffd").replace(_P_CLOSE, "\ufffd")
         text = _decode_safe_entities(text)
         text = self.autolinks(text)
         text = self.tags(text)
         text = self.inline_links(text)
         text = self.reference_definitions(text)
-        return self.bare_urls(text)
+        return self.restore(self.scan(text))
 
 
-def filter_links(text: str) -> tuple[str, int]:
+def filter_links(text: str, policy: Policy | None = None) -> tuple[str, int]:
     """Returns the text with foreign links removed, and how many were removed."""
-    f = _Filter()
+    f = _Filter(policy or _DEFAULT_POLICY)
     out = f.run(text)
     return out, f.removed
 
 
 def main(argv: list[str]) -> int:
-    if len(argv) != 3:
-        print("usage: link_filter.py IN OUT", file=sys.stderr)
-        return 2
-    with open(argv[1], encoding="utf-8", errors="replace", newline="") as fh:
+    parser = argparse.ArgumentParser(description="Remove links outside the allowlist from a bot reply.")
+    parser.add_argument("--repo", default=DEFAULT_REPO, help="OWNER/REPO the reply is posted in")
+    parser.add_argument("--base", default="", help="URL of the issue or pull request the reply is posted on")
+    parser.add_argument("--head-sha", default="", help="commit under review, which may be linked")
+    parser.add_argument("src")
+    parser.add_argument("dst")
+    args = parser.parse_args(argv[1:])
+    if args.base and not args.base.lower().startswith("https://github.com/"):
+        parser.error("--base must be a https://github.com/ URL")
+    policy = Policy(repo=args.repo, base=args.base, head_sha=args.head_sha, checker=GhChecker())
+    with open(args.src, encoding="utf-8", errors="replace", newline="") as fh:
         text = fh.read()
-    out, removed = filter_links(text)
-    with open(argv[2], "w", encoding="utf-8", newline="") as fh:
+    out, removed = filter_links(text, policy)
+    with open(args.dst, "w", encoding="utf-8", newline="") as fh:
         fh.write(out)
     if removed:
         print(

