@@ -478,3 +478,77 @@ func TestEgressFilterService_SyncNodes(t *testing.T) {
 		t.Fatalf("forced retry = %+v, want node a", got)
 	}
 }
+
+// Routing matches "ip" only against the address a client named, so a domain that
+// resolves to a private, loopback or listed address is caught only by freedom's final
+// rules, which see the resolved address. They come first, ahead of the template's allow.
+func TestInjectEgressFilter_FreedomBlocksResolvedAddresses(t *testing.T) {
+	freedomFinal := func(t *testing.T, template string, f egressfilter.Filter, own egressOwnTargets) []any {
+		t.Helper()
+		cfg := &xray.Config{
+			InboundConfigs:  []xray.InboundConfig{{Tag: "in-a"}},
+			RouterConfig:    json_util.RawMessage(`{"rules":[]}`),
+			OutboundConfigs: json_util.RawMessage(`[{"tag":"direct","protocol":"freedom","settings":{"finalRules":` + template + `}},{"tag":"blocked","protocol":"blackhole"}]`),
+		}
+		injectEgressFilter(cfg, []string{"in-a"}, f, own)
+		out := outboundsOf(t, cfg)[0]
+		final, _ := out["settings"].(map[string]any)["finalRules"].([]any)
+		// Xray must accept the rules; geoip ones need geo data files the test lacks.
+		var buildable []any
+		for _, r := range final {
+			if !slices.ContainsFunc(stringList(r.(map[string]any)["ip"]), func(ip string) bool { return strings.HasPrefix(ip, "geoip:") }) {
+				buildable = append(buildable, r)
+			}
+		}
+		buildFreedom(t, map[string]any{"settings": map[string]any{"finalRules": buildable}})
+		return final
+	}
+	ipsOf := func(rule any) []string { return stringList(rule.(map[string]any)["ip"]) }
+
+	t.Run("allow-only template", func(t *testing.T) {
+		final := freedomFinal(t, `[{"action":"allow"}]`,
+			egressfilter.Filter{Private: true, Server: true, Custom: []string{"203.0.113.0/24", "2001:db8:5::/48", "6667"}},
+			egressOwnTargets{Addrs: []string{"192.0.2.1"}, Ports: []uint16{2053}})
+		if len(final) != 3 {
+			t.Fatalf("finalRules = %v, want the server block, the address block and the template's allow", final)
+		}
+		block := final[1].(map[string]any)
+		if block["action"] != "block" || block["port"] != "1-52,54-65535" || block["network"] != nil {
+			t.Fatalf("address block = %v, want every network and every port but DNS", block)
+		}
+		ips := ipsOf(block)
+		for _, want := range []string{"10.0.0.0/8", "100.64.0.0/10", "127.0.0.0/8", "169.254.0.0/16", "fc00::/7", "fe80::/10", "::1/128", "203.0.113.0/24", "2001:db8:5::/48"} {
+			if !slices.Contains(ips, want) {
+				t.Errorf("address block lacks %s: %v", want, ips)
+			}
+		}
+		if final[2].(map[string]any)["action"] != "allow" {
+			t.Fatalf("the template's allow must stay last: %v", final)
+		}
+	})
+
+	t.Run("template already blocks geoip:private", func(t *testing.T) {
+		final := freedomFinal(t, `[{"action":"block","ip":["geoip:private"]},{"action":"allow"}]`,
+			egressfilter.Filter{Private: true, Custom: []string{"203.0.113.0/24"}}, egressOwnTargets{})
+		if len(final) != 3 {
+			t.Fatalf("finalRules = %v", final)
+		}
+		if ips := ipsOf(final[0]); !reflect.DeepEqual(ips, []string{"203.0.113.0/24"}) {
+			t.Fatalf("address block = %v, want only the listed address: the template blocks private already", ips)
+		}
+	})
+
+	t.Run("private only", func(t *testing.T) {
+		final := freedomFinal(t, `[{"action":"allow"}]`, egressfilter.Filter{Private: true}, egressOwnTargets{})
+		if len(final) != 2 || !slices.Contains(ipsOf(final[0]), "192.168.0.0/16") {
+			t.Fatalf("finalRules = %v, want the private block ahead of the allow", final)
+		}
+	})
+
+	t.Run("mail only changes no final rule", func(t *testing.T) {
+		final := freedomFinal(t, `[{"action":"allow"}]`, egressfilter.Filter{SMTP: true}, egressOwnTargets{})
+		if len(final) != 1 {
+			t.Fatalf("finalRules = %v, want the template's own", final)
+		}
+	})
+}

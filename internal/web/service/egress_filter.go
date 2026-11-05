@@ -605,9 +605,9 @@ type egressOwnTargets struct {
 var egressLoopback = []string{"127.0.0.0/8", "::1/128"}
 
 // injectEgressFilter puts the filter's blackhole rules ahead of every other rule for
-// client inbounds only. For the server's own ports it also adds a block finalRule to
-// each freedom outbound, since a client that names this server by domain is only
-// resolved there.
+// client inbounds only. For the address blocks (this server's ports, private and loopback
+// ranges, listed addresses) it also adds block finalRules to each freedom outbound, since
+// a client that names such an address by domain is only resolved there.
 func injectEgressFilter(cfg *xray.Config, clientTags []string, f egressfilter.Filter, own egressOwnTargets) {
 	if len(clientTags) == 0 || !f.Any() {
 		return
@@ -691,9 +691,13 @@ func injectEgressFilter(cfg *xray.Config, clientTags []string, f egressfilter.Fi
 	for _, r := range newRules {
 		r.(map[string]any)["outboundTag"] = blackhole
 	}
-	if len(serverPorts) > 0 {
-		addFreedomServerBlock(outbounds, append(slices.Clone(own.Addrs), egressLoopback...), egressfilter.PortList(serverPorts))
-	}
+	addFreedomBlocks(outbounds, freedomBlocks{
+		serverIPs:   append(slices.Clone(own.Addrs), egressLoopback...),
+		serverPorts: egressfilter.PortList(serverPorts),
+		private:     f.Private,
+		loopback:    f.Server,
+		customIPs:   custom.Strings()[:len(custom.V4)+len(custom.V6)],
+	})
 	rawOut, err := json.Marshal(outbounds)
 	if err != nil {
 		return
@@ -733,9 +737,25 @@ func ensureBlackholeOutbound(outbounds []map[string]any, tag string) (string, []
 	return name, append(outbounds, map[string]any{"tag": name, "protocol": "blackhole"})
 }
 
-// addFreedomServerBlock prepends a block finalRule to every freedom outbound that dials
-// for itself (a dialerProxy chain ignores finalRules).
-func addFreedomServerBlock(outbounds []map[string]any, ips []string, ports string) {
+// freedomBlocks is what freedom has to refuse after it resolves a domain: routing matches
+// "ip" only against the address the client named, so a domain that resolves to a private,
+// loopback or listed address (or to this server) would otherwise be dialled.
+type freedomBlocks struct {
+	serverIPs   []string
+	serverPorts string // empty: no server block
+	private     bool
+	loopback    bool
+	customIPs   []string
+}
+
+// egressFreedomPorts is every port but DNS, which the filter never blocks.
+const egressFreedomPorts = "1-52,54-65535"
+
+// addFreedomBlocks prepends block finalRules to every freedom outbound that dials for itself
+// (a dialerProxy chain ignores finalRules), ahead of the outbound's own rules, so a later
+// "allow" cannot let the destination through. Final rules see every connection the outbound
+// dials, after the domain is resolved.
+func addFreedomBlocks(outbounds []map[string]any, b freedomBlocks) {
 	for _, o := range outbounds {
 		if p, _ := o["protocol"].(string); !strings.EqualFold(p, "freedom") {
 			continue
@@ -752,10 +772,46 @@ func addFreedomServerBlock(outbounds []map[string]any, ips []string, ports strin
 			settings = map[string]any{}
 		}
 		existing, _ := settings["finalRules"].([]any)
-		block := map[string]any{"action": "block", "network": "tcp", "ip": toAnyList(ips), "port": ports}
-		settings["finalRules"] = append([]any{block}, existing...)
+		var blocks []any
+		if b.serverPorts != "" {
+			blocks = append(blocks, map[string]any{"action": "block", "network": "tcp", "ip": toAnyList(b.serverIPs), "port": b.serverPorts})
+		}
+		var ips []string
+		if b.private && !finalRulesBlockPrivate(existing) {
+			ips = append(append(ips, egressfilter.PrivateV4...), egressfilter.PrivateV6...)
+		}
+		if b.loopback {
+			ips = append(ips, egressLoopback...)
+		}
+		ips = append(ips, b.customIPs...)
+		if len(ips) > 0 {
+			slices.Sort(ips)
+			blocks = append(blocks, map[string]any{"action": "block", "ip": toAnyList(slices.Compact(ips)), "port": egressFreedomPorts})
+		}
+		if len(blocks) == 0 {
+			continue
+		}
+		settings["finalRules"] = append(blocks, existing...)
 		o["settings"] = settings
 	}
+}
+
+// finalRulesBlockPrivate reports whether the outbound's own final rules already block
+// geoip:private on every network and port before any rule that could allow it.
+func finalRulesBlockPrivate(rules []any) bool {
+	for _, v := range rules {
+		rule, _ := v.(map[string]any)
+		if action, _ := rule["action"].(string); !strings.EqualFold(action, "block") {
+			return false
+		}
+		if rule["network"] != nil || rule["port"] != nil {
+			continue
+		}
+		if slices.ContainsFunc(stringList(rule["ip"]), func(ip string) bool { return strings.EqualFold(ip, "geoip:private") }) {
+			return true
+		}
+	}
+	return false
 }
 
 // xrayInputs is what GetXrayConfig injects.
