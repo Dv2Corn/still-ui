@@ -1111,10 +1111,14 @@ func (s *InboundService) setRemoteTrafficLocked(nodeID int, snap *runtime.Traffi
 					deltaDown = 0
 				}
 			}
-			// Billed share; the node's disable latch is judged in billed bytes too (the node
-			// bills its own counters at the multiplier this master pushes).
 			deltaUp, deltaDown = scaleNodeTraffic(deltaUp, billing), scaleNodeTraffic(deltaDown, billing)
-			billedCanon := nodeTrafficCounter{Up: scaleNodeTraffic(canon.Up, billing), Down: scaleNodeTraffic(canon.Down, billing)}
+			// Off ×1 a node's disable latches only on this master's own billed count: its
+			// counter × today's multiplier would re-bill traffic from before a change.
+			latchCanon := canon
+			if billing != 1 {
+				latchCanon = nodeTrafficCounter{}
+			}
+			latchUsed := latchCanon.Up + latchCanon.Down
 
 			if _, rowExists := statByEmail[cs.Email]; !rowExists {
 				if dirty {
@@ -1168,7 +1172,7 @@ func (s *InboundService) setRemoteTrafficLocked(nodeID int, snap *runtime.Traffi
 				// Only a real latch to disabled is structural; one-way merge never
 				// re-enables from the node.
 				enableChanged := !clientFrozen && existing.Enable && !cs.Enable &&
-					!nodeDisableIsStale(existing, billedCanon.Up+billedCanon.Down, now, deltaUp, deltaDown)
+					!nodeDisableIsStale(existing, latchUsed, now, deltaUp, deltaDown)
 				metaChanged := !clientFrozen && (existing.Total != cs.Total || existing.Reset != cs.Reset || existing.ResetWeekday != cs.ResetWeekday)
 				if enableChanged || metaChanged || expiryChanged {
 					structuralChange = true
@@ -1227,7 +1231,7 @@ func (s *InboundService) setRemoteTrafficLocked(nodeID int, snap *runtime.Traffi
 				next.Down = clampTrafficCounter(row.Down + deltaDown)
 				next.LastOnline = max(row.LastOnline, cs.LastOnline)
 				if !clientFrozen {
-					if !cs.Enable && !nodeDisableIsStale(row, billedCanon.Up+billedCanon.Down, now, deltaUp, deltaDown) {
+					if !cs.Enable && !nodeDisableIsStale(row, latchUsed, now, deltaUp, deltaDown) {
 						next.Enable = false
 					}
 					next.ExpiryTime = mergeActivationExpiry(row.ExpiryTime, cs.ExpiryTime)
@@ -1237,7 +1241,7 @@ func (s *InboundService) setRemoteTrafficLocked(nodeID int, snap *runtime.Traffi
 				// A multi-attached client is reported once per inbound and an idle one
 				// every tick: rewriting an unchanged row only holds its lock longer.
 				if next != *row {
-					if err := s.mergeNodeClientTraffic(tx, cs, billedCanon, clientFrozen, deltaUp, deltaDown, now); err != nil {
+					if err := s.mergeNodeClientTraffic(tx, cs, latchCanon, clientFrozen, deltaUp, deltaDown, now); err != nil {
 						return false, err
 					}
 					*row = next

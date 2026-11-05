@@ -124,6 +124,16 @@ jobs:
             exit 1
           fi
 
+      - name: PostgreSQL node traffic billing
+        run: |
+          set -o pipefail
+          go test ./internal/web/service -run '^TestNodeBillingPostgres$' -count=1 -v | tee /tmp/postgres-node-billing.log
+          passed=$(grep -c -- '^--- PASS: TestNodeBillingPostgres ' /tmp/postgres-node-billing.log || true)
+          if [ "$passed" -ne 1 ]; then
+            echo "expected the node billing PostgreSQL test to pass, got $passed" >&2
+            exit 1
+          fi
+
       - name: PostgreSQL deferred-commit test
         run: |
           set -o pipefail

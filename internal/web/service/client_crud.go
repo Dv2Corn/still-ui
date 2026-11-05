@@ -158,10 +158,13 @@ func (s *ClientService) GetClientsByTrafficReset(period string) ([]ClientResetCy
 		return nil, err
 	}
 	// Depleted judges billed bytes, as the quota loop does.
-	if billing := localBillingMultiplier(db); billing != 1 {
-		for i := range cycles {
-			cycles[i].Up, cycles[i].Down = scaleNodeTraffic(cycles[i].Up, billing), scaleNodeTraffic(cycles[i].Down, billing)
-		}
+	rows := make([]xray.ClientTraffic, len(cycles))
+	for i, c := range cycles {
+		rows[i] = xray.ClientTraffic{Email: c.Email, Up: c.Up, Down: c.Down}
+	}
+	billedUsage(db, rows)
+	for i := range cycles {
+		cycles[i].Up, cycles[i].Down = rows[i].Up, rows[i].Down
 	}
 	return cycles, nil
 }
@@ -175,11 +178,11 @@ func quotaDisabledEmails(tx *gorm.DB, within []string) ([]string, error) {
 		return nil, err
 	}
 	// Own counters in billed bytes; cross-panel usage depletes too (a cut on pushed usage counts).
-	billing := localBillingMultiplier(tx)
 	rows := make([]xray.ClientTraffic, len(cycles))
 	for i, c := range cycles {
-		rows[i] = xray.ClientTraffic{Email: c.Email, Up: scaleNodeTraffic(c.Up, billing), Down: scaleNodeTraffic(c.Down, billing), Total: c.Total}
+		rows[i] = xray.ClientTraffic{Email: c.Email, Up: c.Up, Down: c.Down, Total: c.Total}
 	}
+	billedUsage(tx, rows)
 	overlayGlobalTrafficValues(tx, rows)
 	for i := range cycles {
 		cycles[i].Up, cycles[i].Down = rows[i].Up, rows[i].Down

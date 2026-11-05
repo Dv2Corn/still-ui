@@ -87,9 +87,9 @@ func TestNodeBillingMultiplierReachesNode(t *testing.T) {
 		t.Fatalf("node forgot the multiplier across a restart: %v", got)
 	}
 	limit(1)
-	eventually(t, 90*time.Second, "multiplier 1 clears the node's entry", func() (bool, string) {
+	eventually(t, 90*time.Second, "the node records the master's ×1", func() (bool, string) {
 		got := nodeBilling(t, node)
-		return len(got) == 0, fmt.Sprintf("node billing=%v", got)
+		return len(got) == 1 && firstM(got) == 1, fmt.Sprintf("node billing=%v", got)
 	})
 }
 

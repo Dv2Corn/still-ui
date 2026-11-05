@@ -94,15 +94,14 @@ const depletedClientsCondLocal = `((total > 0 AND up + down >= total)
 func depletedCond(tx *gorm.DB) (string, []any) {
 	now := tx.NowFunc()
 	freshSince := globalTrafficFreshSince(now)
-	billing := localBillingMultiplier(tx)
 	var probe int64
 	err := tx.Model(&model.ClientGlobalTraffic{}).
 		Where("updated_at >= ?", freshSince).
 		Limit(1).Count(&probe).Error
 	if err == nil && probe > 0 {
-		return billedLocalUsage(depletedClientsCond, billing), []any{now.UnixMilli(), freshSince}
+		return withBilledQuota(tx, depletedClientsCond, []any{now.UnixMilli(), freshSince})
 	}
-	return billedLocalUsage(depletedClientsCondLocal, billing), []any{now.UnixMilli()}
+	return withBilledQuota(tx, depletedClientsCondLocal, []any{now.UnixMilli()})
 }
 
 func (s *InboundService) disableInvalidClients(tx *gorm.DB, mutationBatch *trafficMutationBatch) (bool, int64, []int, error) {
@@ -329,11 +328,7 @@ func lifecycleDisabledEmails(tx *gorm.DB, rows []xray.ClientTraffic) (map[string
 	}
 	// Own counters in billed bytes, then cross-panel usage (depletedClientsCond); both
 	// rewrite the rows in place, so callers hand it copies.
-	if billing := localBillingMultiplier(tx); billing != 1 {
-		for i := range rows {
-			rows[i].Up, rows[i].Down = scaleNodeTraffic(rows[i].Up, billing), scaleNodeTraffic(rows[i].Down, billing)
-		}
-	}
+	billedUsage(tx, rows)
 	overlayGlobalTrafficValues(tx, rows)
 	disabled := make(map[string]struct{}, len(rows))
 	for i := range rows {
