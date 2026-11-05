@@ -88,12 +88,28 @@ Updating preserves your database and settings. Take a
 
 ## Uninstalling
 
-Menu option **6** or `x-ui uninstall`. It stops and disables the service, removes
-the service unit, and deletes `/etc/x-ui/` and the install folder. If the panel
-used a locally-installed PostgreSQL, it offers to purge that too (a separate,
-irreversible confirmation).
+Menu option **6** or `still-ui uninstall`. It stops and disables the panel and
+the `still-xray` service, removes their units and drop-ins, the `still-xray`
+user, the install folder and the menu, and **keeps the data**: the database,
+backups and `install-result.env` in `/etc/still-ui/` and the env file
+(`/etc/default/still-ui`, or `/etc/sysconfig/still-ui` on RHEL). Installing
+still-ui again picks them up, so the panel comes back with the same login,
+inbounds and clients.
 
-<Callout type="warn">
-  Uninstalling removes the database (`/etc/x-ui/x-ui.db`) and your configuration.
-  [Back up](/docs/operations/backup-restore) first if you might need it.
+The menu then asks **Also delete all data (database /etc/still-ui, clients,
+settings)?**, default No. Without a terminal (a script, a pipe) the data is
+always kept. For scripts:
+
+| Command                          | Data                                         |
+| -------------------------------- | -------------------------------------------- |
+| `still-ui uninstall --keep-data` | kept, no questions                           |
+| `still-ui uninstall --purge`     | deleted too, no questions                    |
+
+Deleting the data of a panel that used a locally installed PostgreSQL also
+offers to purge PostgreSQL (a separate, irreversible confirmation). The command
+exits 0 when everything was removed and 1 when something could not be.
+
+<Callout type="info">
+  Unlike 3x-ui, nothing is deleted unless you ask. To remove kept data later:
+  `rm -rf /etc/still-ui /etc/default/still-ui`.
 </Callout>

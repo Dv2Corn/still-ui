@@ -33,7 +33,10 @@
 #                            survives `still-ui restart` and a killed panel;
 #                            status/settings/restart-xray; a tampered archive,
 #                            a wrong .sha256 and a tampered update.sh are refused
-#                            with nothing changed; uninstall.
+#                            with nothing changed; uninstall keeps the data and
+#                            an install over it brings back the same login,
+#                            inbounds and clients; uninstall --purge removes
+#                            everything and the next install starts empty.
 #   su-inst-<image>-from-<tag>  a previous release with inbounds and clients,
 #                            `still-ui update` to this build while a download
 #                            runs through Xray -> same data, login, settings,
@@ -229,7 +232,7 @@ ctx.load_cert_chain("/srv/gh.crt", "/srv/gh.key")
 gh = http.server.ThreadingHTTPServer(("127.0.0.1", 443), GH)
 gh.socket = ctx.wrap_socket(gh.socket, server_side=True)
 threading.Thread(target=gh.serve_forever, daemon=True).start()
-http.server.ThreadingHTTPServer(("0.0.0.0", 8099), Slow).serve_forever()
+http.server.ThreadingHTTPServer(("45.45.45.45", 8099), Slow).serve_forever()
 PY
 
 # Inbounds before and after (sqlite3 -json rows): the same rows, and every
@@ -299,6 +302,14 @@ want_panel_max() { local kb m; kb=$(awk "/^MemTotal:/ {print \$2}" /proc/meminfo
 want_xray_max() { local kb m; kb=$(awk "/^MemTotal:/ {print \$2}" /proc/meminfo); m=$((kb / 2 / 1024)); ((m < 256)) && m=256; ((m > 4096)) && m=4096; echo $m; }
 inbounds_dump() { sqlite3 -json /etc/still-ui/x-ui.db "select id, remark, port, protocol, settings, stream_settings, enable from inbounds order by id"; }
 same_inbounds() { inbounds_dump > /root/t/inb.now; python3 /srv/same-inbounds.py /root/t/inb /root/t/inb.now; }
+program_gone() { local p bad=0
+    for p in /usr/local/still-ui /usr/bin/still-ui /etc/still-xray /etc/systemd/system/still-ui.service /etc/systemd/system/still-ui.service.d         /etc/systemd/system/still-xray.service /etc/systemd/system/still-xray.service.d; do [[ ! -e $p ]] || { echo "left behind: $p"; bad=1; }; done
+    systemctl cat still-ui > /dev/null 2>&1 && { echo "still-ui.service still known"; bad=1; }
+    systemctl cat still-xray > /dev/null 2>&1 && { echo "still-xray.service still known"; bad=1; }
+    id still-xray > /dev/null 2>&1 && { echo "user still-xray still exists"; bad=1; }
+    pgrep -fa "^/usr/local/still-ui/bin/xray-linux" && { echo "Xray still runs"; bad=1; }
+    ss -lnt | grep ":$1 " && { echo "panel port still open"; bad=1; }
+    return $bad; }
 xray_pid() { local i p; for i in $(seq 1 30); do p=$(mainpid still-xray); [[ $p != 0 ]] && systemctl is-active --quiet still-xray && { echo "$p"; return 0; }; sleep 1; done; return 1; }
 clients() { sqlite3 /etc/still-ui/x-ui.db "select email from client_traffics order by email" | tr "\n" " "; }
 tree_digest() { (find /usr/local/still-ui -type f ! -path "*/bin/config.json" ! -name "*.log" -print0 | sort -z | xargs -0 sha256sum; sha256sum /usr/bin/still-ui; find /etc/systemd/system -path "*still*" -type f -print0 | sort -z | xargs -0 sha256sum) | sha256sum | cut -c1-16; }
@@ -383,7 +394,8 @@ fresh_case() { # CT IMAGE
     installed_checks "$ct" "fresh"
     ck "$ct" "seed inbounds and clients through the API" 'res; python3 /srv/seed.py "$(url)" "$XUI_USERNAME" "$XUI_PASSWORD" --only vless-reality,vmess-ws,trojan-tls,mixed | tee /root/seed.json
         grep -qF "\"created\": [\"vless-reality\", \"vmess-ws\", \"trojan-tls\", \"mixed\"]" /root/seed.json'
-    ck "$ct" "Xray serves the new inbounds" 'for i in $(seq 1 90); do ss -lnt | grep -q ":24441 " && ss -lnt | grep -q ":24431 " && exit 0; sleep 1; done; ss -lnt; exit 1'
+    ck "$ct" "Xray serves the new inbounds, the unauthenticated proxy on 127.0.0.1 only" 'for i in $(seq 1 90); do ss -lnt | grep -q ":24441 " && ss -lnt | grep -q ":24431 " && break; sleep 1; done
+        ss -lntH "sport = :24441" | awk "{print \$4}" | grep -qx "127.0.0.1:24441" && [[ $(ss -lntH "sport = :24441" | wc -l) == 1 ]] || { ss -lnt; exit 1; }'
 
     # A second install of the same release: same files, same data, no duplicates.
     cx "$ct" "$LIB"'
@@ -428,23 +440,32 @@ fresh_case() { # CT IMAGE
     unchanged "$ct" "tampered update.sh"
     ck "$ct" "nothing was downloaded after a refused checksum" "! grep -q 'download/$TAMPERED_SCRIPT/still-ui-linux' /srv/gh/access.log"
 
-    # Uninstall (documented: like 3x-ui it also deletes the database).
-    ck "$ct" "'still-ui uninstall' removes panel, units, the still-xray user and the data" 'res; port=$XUI_PANEL_PORT
-        printf "y\n" | still-ui uninstall > /root/uninstall.log 2>&1; echo "exit status $?"; grep -q "Uninstalled Successfully" /root/uninstall.log || exit 1
-        sleep 2; bad=0
-        for p in /usr/local/still-ui /usr/bin/still-ui /etc/still-ui /etc/still-xray /etc/default/still-ui \
-            /etc/systemd/system/still-ui.service /etc/systemd/system/still-ui.service.d /etc/systemd/system/still-xray.service /etc/systemd/system/still-xray.service.d; do
-            [[ ! -e $p ]] || { echo "left behind: $p"; bad=1; }
-        done
-        systemctl cat still-ui > /dev/null 2>&1 && { echo "still-ui.service still known"; bad=1; }
-        systemctl cat still-xray > /dev/null 2>&1 && { echo "still-xray.service still known"; bad=1; }
-        id still-xray > /dev/null 2>&1 && { echo "user still-xray still exists"; bad=1; }
-        pgrep -fa "^/usr/local/still-ui/bin/xray-linux" && { echo "Xray still runs"; bad=1; }
-        ss -lnt | grep ":$port " && { echo "panel port still open"; bad=1; }
-        exit $bad'
+    # Uninstall keeps the data unless asked; a reinstall picks it up.
     latest "$ct" "$NEW"
-    ck "$ct" "a new install after the uninstall works" "$INSTALL_ENV bash /srv/gh/download/$NEW/install.sh < /dev/null > /root/install3.log 2>&1 || { tail -n 20 /root/install3.log; exit 1; }"
-    installed_checks "$ct" "reinstall"
+    cx "$ct" "$LIB"'
+        inbounds_dump > /root/t/inb; clients > /root/t/cl; cp /etc/still-ui/install-result.env /root/t/result.env
+        /usr/local/still-ui/x-ui setting -show true | grep -E "^(port|webBasePath):" > /root/t/settings'
+    ck "$ct" "'still-ui uninstall' (no terminal) removes the program, keeps the data, exits 0" 'res; port=$XUI_PANEL_PORT
+        printf "y\ny\n" | still-ui uninstall > /root/uninstall1.log 2>&1; rc=$?; tail -n 9 /root/uninstall1.log
+        [[ $rc == 0 ]] || { echo "exit status $rc"; exit 1; }
+        sleep 2; program_gone "$port" || exit 1
+        [[ -s /etc/still-ui/x-ui.db && -s /etc/still-ui/install-result.env && -s /etc/default/still-ui ]] || { echo "data deleted"; exit 1; }
+        grep -q "The data is kept" /root/uninstall1.log'
+    ck "$ct" "install over the kept data" "$INSTALL_ENV bash /srv/gh/download/$NEW/install.sh < /dev/null > /root/install3.log 2>&1 || { tail -n 20 /root/install3.log; exit 1; }
+        grep -q 'Username, Password, and WebBasePath are properly set' /root/install3.log"
+    ck "$ct" "install over the kept data: same login, port, base path, inbounds and clients" '
+        cmp /root/t/result.env /etc/still-ui/install-result.env && diff /root/t/settings <(/usr/local/still-ui/x-ui setting -show true | grep -E "^(port|webBasePath):") &&
+        same_inbounds && [[ $(clients) == $(cat /root/t/cl) && -n $(cat /root/t/cl) ]]'
+    installed_checks "$ct" "install over kept data"
+    ck "$ct" "a download through Xray works again over the kept inbounds" 'slow_start 3; slow_check 3'
+    ck "$ct" "'still-ui uninstall --purge' removes the program and the data, exits 0" 'res; port=$XUI_PANEL_PORT
+        still-ui uninstall --purge < /dev/null > /root/uninstall2.log 2>&1; rc=$?; tail -n 4 /root/uninstall2.log
+        [[ $rc == 0 ]] || { echo "exit status $rc"; exit 1; }
+        sleep 2; program_gone "$port" || exit 1
+        for p in /etc/still-ui /etc/default/still-ui; do [[ ! -e $p ]] || { echo "left behind: $p"; exit 1; }; done'
+    ck "$ct" "a fresh install after --purge starts empty with a new login" "$INSTALL_ENV bash /srv/gh/download/$NEW/install.sh < /dev/null > /root/install4.log 2>&1 || { tail -n 20 /root/install4.log; exit 1; }
+        ! cmp -s /root/t/result.env /etc/still-ui/install-result.env && [[ \$(sqlite3 /etc/still-ui/x-ui.db 'select count(*) from inbounds') == 0 ]]"
+    installed_checks "$ct" "install after purge"
     return "$CASE_FAILED"
 }
 

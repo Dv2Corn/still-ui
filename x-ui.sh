@@ -326,10 +326,11 @@ legacy_version() {
     still_run_release_script "" install.sh "$tag_version"
 }
 
-# Function to handle the deletion of the script file
+# Removes the menu script itself and ends the uninstall with STATUS (0 when
+# everything that had to go is gone).
 delete_script() {
     rm "$0" # Remove the script file itself
-    exit 1
+    exit "${1:-0}"
 }
 
 xui_env_file_path() {
@@ -346,13 +347,43 @@ xui_env_file_path() {
     esac
 }
 
+# Seam for the tests: whether the uninstall can ask its questions.
+_still_stdin_is_tty() {
+    [[ -t 0 ]]
+}
+
+# still-ui: uninstall removes the program and keeps the data unless asked.
+#   still-ui uninstall              asks; the data question defaults to No, and
+#                                   without a terminal the data is always kept
+#   still-ui uninstall --keep-data  no questions, keeps the data
+#   still-ui uninstall --purge      no questions, also deletes the data
+# The data is /etc/still-ui (database, backups, install-result.env, node key)
+# and the env file (PostgreSQL DSN, still-ui settings). install.sh finds both
+# again and comes back with the same login, inbounds and clients.
 uninstall() {
-    confirm "Are you sure you want to uninstall the panel? xray will also uninstalled!" "n"
-    if [[ $? != 0 ]]; then
-        if [[ $# == 0 ]]; then
-            show_menu
+    local data="" arg rc=0 p
+    for arg in "${@:2}"; do
+        case "$arg" in
+            --purge) data=purge ;;
+            --keep-data) data=keep ;;
+            *)
+                LOGE "Unknown option ${arg}: use --keep-data or --purge"
+                return 2
+                ;;
+        esac
+    done
+    if [[ -z "$data" ]]; then
+        confirm "Are you sure you want to uninstall the panel? xray will also uninstalled!" "n"
+        if [[ $? != 0 ]]; then
+            if [[ $# == 0 ]]; then
+                show_menu
+            fi
+            return 0
         fi
-        return 0
+        data=keep
+        if _still_stdin_is_tty; then
+            confirm "Also delete all data (database /etc/still-ui, clients, settings)?" "n" && data=purge
+        fi
     fi
 
     if [[ $release == "alpine" ]]; then
@@ -385,22 +416,50 @@ uninstall() {
         panel_used_postgres="true"
     fi
 
-    rm /etc/still-ui/ -rf
     rm ${xui_folder}/ -rf
-    rm -f "$db_env_file"
+    # The "x-ui" command migrate.sh left behind runs this menu, which is gone now.
+    if grep -qs "Installed by still-ui's migrate.sh" /usr/bin/x-ui; then
+        rm -f /usr/bin/x-ui
+    fi
 
-    if [[ "$panel_used_postgres" == "true" ]] && postgresql_installed; then
-        purge_postgresql
+    if [[ "$data" == "purge" ]]; then
+        rm /etc/still-ui/ -rf
+        rm -f "$db_env_file"
+        if [[ "$panel_used_postgres" == "true" ]] && postgresql_installed; then
+            purge_postgresql
+        fi
+    fi
+
+    for p in "${xui_folder}" "${xui_service}/still-ui.service" "${xui_service}/still-xray.service" /etc/init.d/still-ui; do
+        if [[ -e "$p" ]]; then
+            LOGE "Could not remove ${p}"
+            rc=1
+        fi
+    done
+    if [[ "$data" == "purge" && -e /etc/still-ui ]]; then
+        LOGE "Could not remove /etc/still-ui"
+        rc=1
     fi
 
     echo ""
-    echo -e "Uninstalled Successfully.\n"
+    if [[ $rc != 0 ]]; then
+        LOGE "Uninstall did not finish; remove the paths above by hand."
+    elif [[ "$data" == "purge" ]]; then
+        echo -e "Uninstalled Successfully, the data is deleted too.\n"
+    else
+        echo -e "Uninstalled Successfully. The data is kept:\n"
+        echo "  /etc/still-ui      database, backups, install-result.env"
+        [[ -e "$db_env_file" ]] && echo "  ${db_env_file}  settings$([[ "$panel_used_postgres" == "true" ]] && echo ", PostgreSQL connection (the database stays in PostgreSQL)")"
+        echo ""
+        echo "Installing still-ui again uses this data: same login, inbounds and clients."
+        echo -e "To delete it: ${yellow}rm -rf /etc/still-ui ${db_env_file}${plain}"
+    fi
     echo "If you need to install this panel again, you can use below command:"
     echo -e "${green}bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh)${plain}"
     echo ""
     # Trap the SIGTERM signal
-    trap delete_script SIGTERM
-    delete_script
+    trap 'delete_script "$rc"' SIGTERM
+    delete_script "$rc"
 }
 
 reset_user() {
@@ -517,8 +576,9 @@ check_config() {
         echo -e "${yellow}Could not auto-detect server IP from any provider.${plain}"
         while [[ -z "$server_ip" ]]; do
             # No terminal (a script, a pipe): print the URL with a placeholder
-            # instead of asking forever.
-            if ! read -rp "Please enter your server's public IPv4 address: " server_ip; then
+            # instead of asking forever. A last line without a newline still
+            # counts: read stores it and only then reports the end of input.
+            if ! read -rp "Please enter your server's public IPv4 address: " server_ip && [[ -z "$server_ip" ]]; then
                 echo
                 server_ip="SERVER_IP"
                 break
@@ -3715,7 +3775,8 @@ show_usage() {
 │  ${blue}still-ui migrate-rollback${plain}      - Undo a migration from 3x-ui      │
 │  ${blue}still-ui legacy${plain}                - Legacy version                   │
 │  ${blue}still-ui install${plain}               - Install                          │
-│  ${blue}still-ui uninstall${plain}             - Uninstall                        │
+│  ${blue}still-ui uninstall${plain}             - Uninstall (keeps the data)       │
+│  ${blue}still-ui uninstall --purge${plain}     - Uninstall and delete the data    │
 └────────────────────────────────────────────────────────────────┘"
 }
 
@@ -3905,7 +3966,7 @@ if [[ $# -gt 0 ]]; then
             check_uninstall 0 && install 0
             ;;
         "uninstall")
-            check_install 0 && uninstall 0
+            check_install 0 && uninstall 0 "${@:2}"
             ;;
         "update-all-geofiles")
             geo_updated=0
