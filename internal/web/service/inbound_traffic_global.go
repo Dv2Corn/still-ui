@@ -37,7 +37,7 @@ func (s *InboundService) AcceptGlobalTraffic(masterGuid string, traffics []*xray
 		return nil
 	}
 
-	return submitTrafficWrite(func() error {
+	return submitTrafficWriteBackground(func() error {
 		db := database.GetDB()
 		// The own counters at this push are the base later traffic is billed from (node billing).
 		type ownCounters struct {
