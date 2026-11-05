@@ -2739,7 +2739,7 @@
           "silent": "Not used by subscriptions",
           "silentHint": "This probe has not reported recently, so subscriptions ignore its results.",
           "allFailing": "Not used by subscriptions",
-          "allFailingHint": "Every endpoint fails at once on this probe. That usually means its own network or test URL is broken, so subscriptions ignore it."
+          "allFailingHint": "Every endpoint fails at once on this probe, and so does its check without the VPN (or, without that check, endpoints on several servers fail). That usually means its own network or test URL is broken, so subscriptions ignore it."
         }
       }
     }

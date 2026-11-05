@@ -181,19 +181,63 @@ func TestSubVerdictAutoMinAgents(t *testing.T) {
 	}
 }
 
-// Every target of one agent failing at once points at the agent's network or its test URL.
+// Every target of one agent failing at once, with its own check without the VPN failing too,
+// points at the agent's network or its test URL.
 func TestSubVerdictIgnoresAnAgentThatFailsEverything(t *testing.T) {
+	w := newSubProbeWorld(t)
+	a := w.agent(time.Minute, 1, 2)
+	w.check(a, "1@vpn.example.com:443", 2, time.Minute)
+	w.check(a, "2@vpn.example.com:8443", 2, time.Minute)
+	w.check(a, ReachDirectKey, 1, time.Minute)
+	v := w.verdicts(reorder)
+	if v.Unreachable(1, "vpn.example.com", 443) || v.Unreachable(2, "vpn.example.com", 8443) {
+		t.Fatal("an agent failing on every target and on its direct check must be ignored")
+	}
+	if v.ignored[a.Id] != ReachSubIgnoredAllFailing {
+		t.Fatalf("reason = %q", v.ignored[a.Id])
+	}
+}
+
+// A censor blocking a whole server address makes a probe of only that server fail everywhere.
+// Its direct check passing shows the probe's own network works, so the block is believed.
+func TestSubVerdictBelievesAWholeServerBlock(t *testing.T) {
 	w := newSubProbeWorld(t)
 	a := w.agent(time.Minute, 1, 2)
 	w.check(a, "1@vpn.example.com:443", 2, time.Minute)
 	w.check(a, "2@vpn.example.com:8443", 2, time.Minute)
 	w.check(a, ReachDirectKey, 0, time.Minute)
 	v := w.verdicts(reorder)
-	if v.Unreachable(1, "vpn.example.com", 443) || v.Unreachable(2, "vpn.example.com", 8443) {
-		t.Fatal("an agent failing on every target must be ignored")
+	if !v.Unreachable(1, "vpn.example.com", 443) || !v.Unreachable(2, "vpn.example.com", 8443) {
+		t.Fatal("a probe whose direct check passes must be trusted when a whole server fails")
 	}
-	if v.ignored[a.Id] != ReachSubIgnoredAllFailing {
-		t.Fatalf("reason = %q", v.ignored[a.Id])
+	if reason := v.ignored[a.Id]; reason != "" {
+		t.Fatalf("trusted probe marked ignored: %q", reason)
+	}
+}
+
+// Without a direct check: every endpoint of one host failing looks like a blocked server and is
+// believed; failures on two or more hosts at once point at the probe.
+func TestSubVerdictWithoutADirectCheckJudgesByHosts(t *testing.T) {
+	w := newSubProbeWorld(t)
+	one := w.agent(time.Minute, 1, 2)
+	w.check(one, "1@vpn.example.com:443", 2, time.Minute)
+	w.check(one, "2@vpn.example.com:8443", 2, time.Minute)
+	many := w.agent(time.Minute, 3, 4)
+	w.check(many, "3@a.example.com:443", 2, time.Minute)
+	w.check(many, "4@b.example.com:443", 2, time.Minute)
+	stale := w.agent(time.Minute, 5, 6)
+	w.check(stale, "5@c.example.com:443", 2, time.Minute)
+	w.check(stale, "6@d.example.com:443", 2, time.Minute)
+	w.check(stale, ReachDirectKey, 0, 2*time.Hour)
+	v := w.verdicts(reorder)
+	if !v.Unreachable(1, "vpn.example.com", 443) || v.ignored[one.Id] != "" {
+		t.Fatalf("one host failing everywhere must be believed (ignored %q)", v.ignored[one.Id])
+	}
+	if v.Unreachable(3, "a.example.com", 443) || v.ignored[many.Id] != ReachSubIgnoredAllFailing {
+		t.Fatalf("several hosts failing at once must be ignored (ignored %q)", v.ignored[many.Id])
+	}
+	if v.Unreachable(5, "c.example.com", 443) || v.ignored[stale.Id] != ReachSubIgnoredAllFailing {
+		t.Fatalf("a direct check older than the cut-off says nothing (ignored %q)", v.ignored[stale.Id])
 	}
 }
 

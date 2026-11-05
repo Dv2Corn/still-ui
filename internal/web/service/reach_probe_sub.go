@@ -188,12 +188,11 @@ func (s *ReachProbeService) SubscriptionVerdicts(policy ReachSubPolicy) (*ReachS
 			out.ignored[probe.Id] = ReachSubIgnoredSilent
 			continue
 		}
-		down, fresh, err := freshReachFailures(probe, since)
+		down, fresh, direct, err := freshReachFailures(probe, since)
 		if err != nil {
 			return nil, err
 		}
-		// Every target failing at once is more likely the agent's own network or test URL.
-		if fresh >= 2 && len(down) == fresh {
+		if fresh >= 2 && len(down) == fresh && reachOwnNetworkBroken(down, direct) {
 			out.ignored[probe.Id] = ReachSubIgnoredAllFailing
 			continue
 		}
@@ -215,9 +214,39 @@ func (s *ReachProbeService) SubscriptionVerdicts(policy ReachSubPolicy) (*ReachS
 	return out, nil
 }
 
-// freshReachFailures returns the normalized keys of the probe's targets that are down and the
-// number of its targets checked since the cut-off; the direct check and dropped inbounds are skipped.
-func freshReachFailures(probe *model.ReachProbe, since int64) ([]string, int, error) {
+// What the probe's own check without the VPN said since the cut-off.
+const (
+	reachDirectUnknown = iota
+	reachDirectOk
+	reachDirectFailing
+)
+
+// reachOwnNetworkBroken decides, for a probe that fails on every endpoint it checks, whether the
+// cause is more likely its own network or test URL than a block. A passing direct check means the
+// probe's network works, so a censor blocking a whole server is believed. A failing one means it
+// does not. Without a direct check, failures spread over two or more hosts point at the probe;
+// every endpoint of one host failing is what a blocked server address looks like.
+func reachOwnNetworkBroken(down []string, direct int) bool {
+	switch direct {
+	case reachDirectOk:
+		return false
+	case reachDirectFailing:
+		return true
+	}
+	hosts := map[string]bool{}
+	for _, key := range down {
+		_, endpoint, _ := strings.Cut(key, "@")
+		if host, _, err := net.SplitHostPort(endpoint); err == nil {
+			hosts[host] = true
+		}
+	}
+	return len(hosts) >= 2
+}
+
+// freshReachFailures returns the normalized keys of the probe's targets that are down, the
+// number of its targets checked since the cut-off (the direct check and dropped inbounds are
+// skipped) and what its direct check said in that time.
+func freshReachFailures(probe *model.ReachProbe, since int64) ([]string, int, int, error) {
 	db := database.GetDB()
 	var lastChecks []struct {
 		TargetKey string
@@ -225,20 +254,33 @@ func freshReachFailures(probe *model.ReachProbe, since int64) ([]string, int, er
 	}
 	if err := db.Model(&model.ReachProbeResult{}).Select("target_key, MAX(at) AS last").
 		Where("probe_id = ? AND at >= ?", probe.Id, since).Group("target_key").Scan(&lastChecks).Error; err != nil {
-		return nil, 0, err
+		return nil, 0, reachDirectUnknown, err
 	}
 	fresh := map[string]bool{}
+	directFresh := false
 	for _, c := range lastChecks {
-		if id, ok := reachTargetInbound(c.TargetKey); ok && c.TargetKey != ReachDirectKey && slices.Contains(probe.InboundIds, id) {
+		if c.TargetKey == ReachDirectKey {
+			directFresh = true
+		} else if id, ok := reachTargetInbound(c.TargetKey); ok && slices.Contains(probe.InboundIds, id) {
 			fresh[c.TargetKey] = true
 		}
 	}
 	var states []model.ReachProbeTarget
 	if err := db.Where("probe_id = ?", probe.Id).Order("target_key asc").Find(&states).Error; err != nil {
-		return nil, 0, err
+		return nil, 0, reachDirectUnknown, err
 	}
 	var down []string
+	direct := reachDirectUnknown
 	for _, st := range states {
+		if st.TargetKey == ReachDirectKey {
+			if directFresh {
+				direct = reachDirectOk
+				if st.ConsecutiveFails > 0 {
+					direct = reachDirectFailing
+				}
+			}
+			continue
+		}
 		if !fresh[st.TargetKey] || st.Status != ReachStatusFail || st.ConsecutiveFails < ReachProbeFailThreshold {
 			continue
 		}
@@ -246,7 +288,7 @@ func freshReachFailures(probe *model.ReachProbe, since int64) ([]string, int, er
 			down = append(down, key)
 		}
 	}
-	return down, len(fresh), nil
+	return down, len(fresh), direct, nil
 }
 
 // annotateSubscriptionState marks each target with what subscriptions currently do with it.
