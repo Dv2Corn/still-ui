@@ -5,6 +5,9 @@
 <p>
   <a href="https://www.gnu.org/licenses/gpl-3.0.en.html"><img src="https://img.shields.io/badge/license-GPL%20V3-blue.svg?longCache=true" alt="مجوز: GPL-3.0"></a>
   <a href="https://github.com/MHSanaei/3x-ui"><img src="https://img.shields.io/badge/based%20on-3x--ui%20v3.11.0-555" alt="بر پایهٔ 3x-ui v3.11.0"></a>
+  <a href="https://github.com/Dv2Corn/still-ui/releases/latest"><img src="https://img.shields.io/github/v/release/Dv2Corn/still-ui?label=release" alt="آخرین نسخه"></a>
+  <a href="https://github.com/Dv2Corn/still-ui/actions/workflows/ci.yml?query=branch%3Amain"><img src="https://github.com/Dv2Corn/still-ui/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://github.com/Dv2Corn/still-ui/attestations"><img src="https://img.shields.io/badge/builds-attested-2ea44f" alt="بیلدهای انتشار با GitHub Actions گواهی شده‌اند"></a>
 </p>
 
 **still-ui** یک فورک از پنل [3x-ui](https://github.com/MHSanaei/3x-ui) ساختهٔ MHSanaei است؛ همان پنل وب برای [Xray-core](https://github.com/XTLS/Xray-core). پایهٔ آن نسخهٔ **v3.11.0** از 3x-ui است و هر کاری که آن پنل انجام می‌دهد، still-ui هم انجام می‌دهد: همان پروتکل‌ها، همان رابط کاربری و همان پایگاه داده.
