@@ -285,10 +285,8 @@ func TestResetClientTrafficLimitByEmail_ReenablesDepletedClient(t *testing.T) {
 // not only the inbound whose reset ran first.
 func TestResetTrafficByEmail_ReenablesEveryInboundOfTheClient(t *testing.T) {
 	setupBulkDB(t)
-	// The panel runs each inbound's reset on the serial traffic writer. Without
-	// it the fan-out runs the two resets side by side, and the second can read
-	// the record as still off after the first zeroed the counters, so it keeps
-	// the client off as if disabled by hand (about one run in ten).
+	// Resets run on the serial writer; side by side the second can read the record still
+	// off after the first zeroed it, and keep the client off (about one run in ten).
 	resetTrafficWriterForTest(t)
 	StartTrafficWriter()
 	svc := &ClientService{}
