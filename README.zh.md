@@ -28,6 +28,11 @@
 - **Telegram 健康告警。** Xray 未运行、Xray 重启过于频繁、面板或 Xray 内存接近上限、磁盘已满、证书即将过期、备份失败。问题出现时发一条消息，持续期间定期提醒，修复后再发一条。
 - **自动加载续期后的证书。** Xray 每小时（或每 `ocspStapling` 秒）会自行重新读取 TLS 和 Hysteria 入站的证书文件。面板每分钟通过握手（TLS，Hysteria 用 QUIC）检查每个入站实际提供的证书；如果续期后内核在该时间内没有加载新文件（或入站使用 `oneTimeLoading`），或者正在提供的证书将在一小时内过期，只重启 Xray：使用 `still-xray` 服务时自动重启；Xray 在面板内部运行时（Docker，或 STILL_XRAY_UNIT=off），只有在 `/etc/default/still-ui` 中设置 `STILL_CERT_RESTART=on` 才会重启，因为这种重启会断开所有客户端；未设置时标签只显示证书已续期。概览页上的“证书”标签显示每个入站提供的证书及其有效期，并提前警告（提前一周；对于 IP 上的短期证书则提前其有效期的四分之一）。
 - **AmneziaWG 转发缓冲区复用。** 经内置 AmneziaWG 的每个 TCP 连接都会新分配两个 32 KiB 复制缓冲区；现在改为从池中获取。仅转发部分：每个连接的分配约 69 KB → 2.9 KB。整个面板在 2 vCPU / 2 GiB 测试服务器上，经 AmneziaWG 每秒 100 个短连接、持续 5 分钟、各 3 次，3x-ui v3.11.0 对比 still-ui：负载下面板平均内存 403 → 176 MiB，峰值 525 → 211 MiB，空闲时相同。方法、限制和原始数据：[bench/awg-relay-churn](bench/awg-relay-churn/README.md)。
+- **Clash/Mihomo 订阅中的 Auto 组。** 订阅有两台或更多服务器时，Clash/Mihomo 配置会多出一个 `Auto` 组：应用通过隧道测试每台服务器并自动切换到可用的一台（最快的一台，容差 50 ms，每 300 秒检测一次；或第一台有响应的）。`Auto` 是 `PROXY` 中的默认选择，仍可手动选服务器。新安装默认开启；已有面板请在订阅设置中开启 **Auto group**。
+- **订阅参考可达性探测结果。** 探测报告为不可用（连续两次失败）的入口，其链接可以移到订阅末尾或隐藏，适用于所有格式：链接、JSON 和 Clash。用户至少保留一条链接；没有新的探测结果时不做任何改动。默认关闭。
+- **客户端出站过滤。** 可以禁止客户端经 25 端口发信（新安装默认开启）、访问服务器后面的私有网络和服务器自身的面板与 SSH 端口，以及你列出的地址和端口。对经 Xray 的所有客户端入站生效，有 `nft` 时也对内核模式的 AmneziaWG 客户端生效；主面板可以把过滤规则下发给节点。
+- **每个节点的月流量上限。** 主面板按月（从你选定的重置日起）统计节点自身入站的流量，在 80%（可调）和达到上限时发送 Telegram 告警，并可在下一周期前关闭该节点的入站。计费系数（0.1 到 100）按比例换算该节点计入客户端统计的流量。默认不设上限。
+- **一条命令添加节点。** **节点 → 用命令添加** 会生成一次性邀请（默认 30 分钟有效，可撤销）；在新服务器上以 root 运行面板给出的命令，即可从发行版安装 still-ui、把它设为节点并加入主面板。无需手动复制 API 令牌和证书指纹；节点在做任何改动前会先校验主面板的密钥。[说明（英文）](docs/content/docs/en/operations/multi-node.mdx)。
 
 ### 进行中
 
@@ -40,13 +45,13 @@
 以 root 身份运行：
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh)
+bash <(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh)
 ```
 
 如需安装指定版本，在末尾加上版本标签（标签格式为 `vX.Y.Z-still.N`）：
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh) v1.4.0
+bash <(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh) v1.4.0
 ```
 
 使用已下载的发行版压缩包安装：
@@ -142,7 +147,7 @@ still-ui update
 
 ```bash
 still-ui legacy
-bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh) v<tag>
+bash <(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh) v<tag>
 ```
 
 回滚到没有 `still-xray` 服务的版本（例如 `v3.11.0-still.1`）：`still-ui legacy` 会在安装前停止该服务；如果手动运行旧版安装脚本，请先执行 `systemctl disable --now still-xray`。
@@ -212,7 +217,7 @@ scripts/xray-build/build.sh /tmp/xray-out amd64 arm64
 一条命令即可把正在运行的 3x-ui 迁移到 still-ui，并保留客户端和你所依赖的一切：
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh) migrate
+bash <(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh) migrate
 ```
 
 它会做这些事：

@@ -28,6 +28,11 @@ The name says what we are after: a server you set up once and then leave alone.
 - **Health alerts in Telegram.** Xray not running, Xray restarting too often, panel or Xray memory near its limit, a full disk, a certificate about to expire, a failed backup. One message when it starts, a reminder while it lasts, one when it is fixed.
 - **Renewed certificates are picked up automatically.** Xray rereads the certificate files of TLS and Hysteria inbounds by itself once an hour (or every `ocspStapling` seconds). Once a minute the panel does a handshake (TLS, or QUIC for Hysteria) to see which certificate each inbound really serves; if the core has not picked up a renewed file within that time (or the inbound uses `oneTimeLoading`), or the served certificate expires within an hour, only Xray is restarted: by itself with the `still-xray` service, and with Xray inside the panel (Docker, or STILL_XRAY_UNIT=off) only with `STILL_CERT_RESTART=on` in `/etc/default/still-ui`, because that restart drops every client; without it the tag just says the certificate was renewed. The “Certificates” tag on the overview page shows what each inbound serves and until when, and warns in advance (a week ahead, or a quarter of the lifetime for short-lived IP certificates).
 - **AmneziaWG relay buffers are reused.** Every TCP connection through the embedded AmneziaWG allocated two fresh 32 KiB copy buffers; they now come from a pool. The relay alone: about 69 KB → 2.9 KB allocated per connection. The whole panel on a 2 vCPU / 2 GiB test server, 100 short connections per second through AmneziaWG for 5 minutes, 3 runs each, 3x-ui v3.11.0 vs still-ui: panel memory under load 403 → 176 MiB on average, peak 525 → 211 MiB, the same at rest. Method, limits and raw data: [bench/awg-relay-churn](bench/awg-relay-churn/README.md).
+- **An Auto group in Clash/Mihomo subscriptions.** With two or more servers, the Clash/Mihomo profile gets an `Auto` group: the app tests every server through the tunnel and moves to a working one by itself (fastest with a 50 ms tolerance, checked every 300 s, or the first that answers). `Auto` is the default choice in `PROXY`; picking a server by hand still works. On for new installs; on a panel that existed before, turn on **Auto group** in the subscription settings.
+- **Subscriptions follow the reachability probes.** A link whose endpoint the [probes](#check-reachability-from-russia) report down (two failed checks in a row) can be moved to the end of the subscription or left out, in every format: links, JSON and Clash. A user always keeps at least one link, and without fresh probe results nothing changes. Off by default.
+- **An egress filter for clients.** Clients can be kept from sending mail on port 25 (on by default for new installs), from reaching private networks behind the server and the server's own panel and SSH ports, and from addresses and ports you list. It applies to every client inbound through Xray and, with `nft`, to AmneziaWG kernel-mode clients; a master can hand it to its nodes. [Details](#mobile-networks-in-russia).
+- **A monthly traffic limit for each node.** The master counts the traffic of a node's own inbounds per month (from the reset day you pick), sends a Telegram alert at 80% (adjustable) and at the limit, and can turn the node's inbounds off until the next period. An accounting multiplier from 0.1 to 100 scales that node's traffic in client totals. No limit by default.
+- **Adding a node takes one command.** **Nodes → Add with a command** makes a one-time invitation (valid 30 minutes by default, can be revoked); running the command it shows as root on a new server installs still-ui from the release, sets it up as a node and adds it to the master. No API tokens or certificate pins to copy by hand; the node checks the master's key before it changes anything. [Guide](docs/content/docs/en/operations/multi-node.mdx).
 
 ### In progress
 
@@ -40,16 +45,16 @@ The full plan (in Russian) is in [docs/ROADMAP.md](docs/ROADMAP.md).
 Run as root:
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh)
+bash <(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh)
 ```
 
 To install a specific release, pass its tag (tags look like `vX.Y.Z-still.N`):
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh) v1.4.0
+bash <(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh) v1.4.0
 ```
 
-Releases after 1.5.0 also publish `install.sh` itself, listed in the release's `SHA256SUMS`. To run exactly the installer of a release and check it first:
+These commands run the installer of the latest release: since 1.5.1 every release publishes `install.sh` itself and lists it in its `SHA256SUMS`, so nothing is run from a branch. To check the installer before running it:
 
 ```bash
 curl -fsSLO https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh
@@ -154,7 +159,7 @@ Roll back to an earlier release — `still-ui legacy` asks for the version; or r
 
 ```bash
 still-ui legacy
-bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh) v<tag>
+bash <(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh) v<tag>
 ```
 
 Rolling back to a release without the `still-xray` service (for example `v3.11.0-still.1`): `still-ui legacy` stops the service before installing; if you run an older installer by hand, run `systemctl disable --now still-xray` first.
@@ -249,7 +254,7 @@ Everything else that builds or goes into the archive is pinned in [`scripts/stil
 One command moves a running 3x-ui to still-ui and keeps everything clients and you rely on:
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh) migrate
+bash <(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh) migrate
 ```
 
 What it does:

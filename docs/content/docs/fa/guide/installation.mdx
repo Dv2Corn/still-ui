@@ -24,13 +24,13 @@ Virtuozzo، Arch، Manjaro، openSUSE (Tumbleweed/Leap)، Alpine — و همچن
 دستور مدیریتی `x-ui` را نصب می‌کند.
 
 ```bash title="latest stable"
-bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh)
+bash <(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh)
 ```
 
 برای نصب یک **نسخهٔ مشخص**، تگ آن را در انتها اضافه کنید:
 
 ```bash title="pinned version"
-bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh) v1.5.0
+bash <(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh) v1.5.0
 ```
 
 پس از پایان نصب، مشخصات ورود چاپ‌شده را یادداشت کنید و دستور `x-ui` را اجرا کنید تا
@@ -102,7 +102,7 @@ still-ui هیچ ایمیج آمادهٔ کانتینری منتشر نمی‌ک�
 `/etc/still-ui/install-result.env` بنویسد:
 
 ```bash
-XUI_NONINTERACTIVE=1 bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh)
+XUI_NONINTERACTIVE=1 bash <(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh)
 ```
 
 دایرکتوری [`deploy/`](https://github.com/Dv2Corn/still-ui/tree/main/deploy) در مخزن

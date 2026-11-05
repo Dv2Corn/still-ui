@@ -24,13 +24,13 @@ Virtuozzo, Arch, Manjaro, openSUSE (Tumbleweed/Leap), Alpine — а также �
 настраивает службу и устанавливает команду управления `x-ui`.
 
 ```bash title="latest stable"
-bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh)
+bash <(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh)
 ```
 
 Чтобы установить **конкретную версию**, добавьте её тег:
 
 ```bash title="pinned version"
-bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh) v1.5.0
+bash <(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh) v1.5.0
 ```
 
 По завершении запишите выведенные данные для входа и выполните `x-ui`, чтобы
@@ -103,7 +103,7 @@ docker compose --profile postgres up -d
 записав их в `/etc/still-ui/install-result.env`:
 
 ```bash
-XUI_NONINTERACTIVE=1 bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh)
+XUI_NONINTERACTIVE=1 bash <(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh)
 ```
 
 В каталоге [`deploy/`](https://github.com/Dv2Corn/still-ui/tree/main/deploy)

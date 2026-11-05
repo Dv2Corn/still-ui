@@ -22,13 +22,13 @@ Virtuozzo、Arch、Manjaro、openSUSE（Tumbleweed/Leap）、Alpine——以及 
 并安装 `x-ui` 管理命令。
 
 ```bash title="latest stable"
-bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh)
+bash <(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh)
 ```
 
 在命令后附加标签即可安装**指定版本**：
 
 ```bash title="pinned version"
-bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh) v1.5.0
+bash <(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh) v1.5.0
 ```
 
 安装完成后，记下打印出的登录信息并运行 `x-ui` 打开
@@ -97,7 +97,7 @@ still-ui 不发布预构建的容器镜像：Compose 会用仓库中的 `Dockerf
 `/etc/still-ui/install-result.env`：
 
 ```bash
-XUI_NONINTERACTIVE=1 bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh)
+XUI_NONINTERACTIVE=1 bash <(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh)
 ```
 
 仓库的 [`deploy/`](https://github.com/Dv2Corn/still-ui/tree/main/deploy)
