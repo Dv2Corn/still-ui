@@ -49,6 +49,8 @@ var (
 	ErrNodeInviteUnauthorized = errors.New("the invitation is not valid: it is unknown, already used, revoked or expired")
 	// ErrNodeInviteBusy means another enrollment with the same token is running.
 	ErrNodeInviteBusy = errors.New("this invitation is being used by another enrollment right now")
+	// ErrNodeInviteRevoked means the invitation was revoked while its node was being added.
+	ErrNodeInviteRevoked = errors.New("the invitation was revoked while the node was being added")
 
 	nodeEnrollNameRe     = regexp.MustCompile(`[^A-Za-z0-9._-]+`)
 	nodeEnrollBasePathRe = regexp.MustCompile(`^/[A-Za-z0-9._~/%+-]*$`)
@@ -71,7 +73,7 @@ func NodeEnrollHTTPStatus(err error) int {
 	switch {
 	case errors.As(err, &r):
 		return r.status
-	case errors.Is(err, ErrNodeInviteUnauthorized):
+	case errors.Is(err, ErrNodeInviteUnauthorized), errors.Is(err, ErrNodeInviteRevoked):
 		return http.StatusUnauthorized
 	case errors.Is(err, ErrNodeInviteBusy):
 		return http.StatusConflict
@@ -326,13 +328,40 @@ func (s *NodeEnrollService) Enroll(ctx context.Context, token string, req *nodee
 		logger.Warningf("node enrollment: invitation #%d from %s refused: %s", row.Id, remoteIP, msg)
 		return nil, err
 	}
-	if err := db.Model(&model.NodeInvite{}).Where("id = ? AND claimed_at = ?", row.Id, now).
-		Updates(map[string]any{"claimed_at": 0, "used_at": s.clock(), "used_from_ip": remoteIP, "node_id": resp.NodeId, "last_error": ""}).Error; err != nil {
-		logger.Warning("node enrollment: marking invitation", row.Id, "used:", err)
+	spent := db.Model(&model.NodeInvite{}).Where("id = ? AND claimed_at = ? AND revoked_at = 0", row.Id, now).
+		Updates(map[string]any{"claimed_at": 0, "used_at": s.clock(), "used_from_ip": remoteIP, "node_id": resp.NodeId, "last_error": ""})
+	if spent.Error != nil || spent.RowsAffected != 1 {
+		return nil, s.undoEnrollment(row.Id, now, resp.NodeId, remoteIP, spent.Error)
 	}
 	logger.Infof("node enrollment: invitation #%d used from %s; node %q (#%d) added at %s, TLS %s",
 		row.Id, remoteIP, resp.Name, resp.NodeId, resp.Address, resp.TlsVerifyMode)
 	return resp, nil
+}
+
+// undoEnrollment removes a node added under an invitation that was revoked (or lost its claim)
+// before it was spent; the agent gets no node and the invitation records why.
+func (s *NodeEnrollService) undoEnrollment(inviteID int, claimedAt int64, nodeID int, remoteIP string, cause error) error {
+	db := database.GetDB()
+	reason, ret := "revoked while the node was being added; the node was removed", ErrNodeInviteRevoked
+	var inv model.NodeInvite
+	if err := db.Where("id = ?", inviteID).First(&inv).Error; err == nil && inv.RevokedAt == 0 {
+		reason, ret = "the claim lapsed before the node was added; the node was removed", ErrNodeInviteBusy
+	}
+	if cause != nil {
+		reason, ret = "marking the invitation used failed; the node was removed", cause
+	}
+	if err := s.nodeService.Delete(nodeID); err != nil {
+		logger.Warningf("node enrollment: removing node #%d of invitation #%d: %v; disabling it", nodeID, inviteID, err)
+		if err := db.Model(&model.Node{}).Where("id = ?", nodeID).Update("enable", false).Error; err != nil {
+			logger.Warning("node enrollment: disabling node", nodeID, ":", err)
+		}
+	}
+	if err := db.Model(&model.NodeInvite{}).Where("id = ? AND claimed_at = ?", inviteID, claimedAt).
+		Updates(map[string]any{"claimed_at": 0, "last_error": reason}).Error; err != nil {
+		logger.Warning("node enrollment: recording invitation", inviteID, ":", err)
+	}
+	logger.Warningf("node enrollment: invitation #%d from %s: %s", inviteID, remoteIP, reason)
+	return ret
 }
 
 func refuse(status int, format string, a ...any) error {

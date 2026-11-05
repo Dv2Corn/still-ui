@@ -312,3 +312,36 @@ func TestNodeInvitePendingCap(t *testing.T) {
 		t.Fatal("unbounded unused invitations")
 	}
 }
+
+func TestNodeEnrollRevokedMidwayAddsNoNode(t *testing.T) {
+	f := newEnrollFixture(t)
+	_, inv := f.invite(t, NodeInviteInput{})
+	views, _ := f.svc.ListInvites()
+	id := views[0].Id
+	// The admin revokes after the claim, while the master probes the node.
+	f.accept = func(n *model.Node) error {
+		if n.TlsVerifyMode != "pin" {
+			return errors.New("x509: certificate signed by unknown authority")
+		}
+		if err := f.svc.RevokeInvite(id); err != nil {
+			t.Errorf("revoke during enrollment: %v", err)
+		}
+		return nil
+	}
+	resp, err := f.svc.Enroll(context.Background(), inv.Token, goodRequest(), "203.0.113.7")
+	if !errors.Is(err, ErrNodeInviteRevoked) || resp != nil || NodeEnrollHTTPStatus(err) != http.StatusUnauthorized {
+		t.Fatalf("Enroll = %+v, %v: a revoked invitation must hand out nothing", resp, err)
+	}
+	var nodes int64
+	database.GetDB().Model(&model.Node{}).Count(&nodes)
+	if nodes != 0 {
+		t.Fatalf("%d node(s) left from a revoked invitation", nodes)
+	}
+	views, _ = f.svc.ListInvites()
+	if views[0].Status != "revoked" || views[0].NodeId != 0 || !strings.Contains(views[0].LastError, "revoked while the node was being added") {
+		t.Fatalf("audit row %+v", views[0])
+	}
+	if _, err := f.svc.Enroll(context.Background(), inv.Token, goodRequest(), "203.0.113.7"); !errors.Is(err, ErrNodeInviteUnauthorized) {
+		t.Fatalf("retry after revoke: %v", err)
+	}
+}
