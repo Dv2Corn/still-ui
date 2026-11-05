@@ -339,25 +339,32 @@ func TestClashAutoGroupRemoteTemplates(t *testing.T) {
 		auto     ClashAutoGroup
 		check    func(t *testing.T, out string, doc clashDoc)
 	}{
-		{name: "uses Auto with several proxies", template: remoteClashTemplateWithAuto, proxies: 2, auto: autoGroupOn(),
+		{
+			name: "uses Auto with several proxies", template: remoteClashTemplateWithAuto, proxies: 2, auto: autoGroupOn(),
 			check: func(t *testing.T, out string, doc clashDoc) {
 				if clashGroup(doc, "Streaming") == nil || clashGroup(doc, "Auto") == nil || groupMembers(t, clashGroup(doc, "PROXY"))[0] != "Auto" {
 					t.Fatalf("remote template with Auto:\n%s", out)
 				}
-			}},
-		{name: "uses Auto with one proxy", template: remoteClashTemplateWithAuto, proxies: 1, auto: autoGroupOn(),
+			},
+		},
+		{
+			name: "uses Auto with one proxy", template: remoteClashTemplateWithAuto, proxies: 1, auto: autoGroupOn(),
 			check: func(t *testing.T, out string, doc clashDoc) {
 				if clashGroup(doc, "Auto") == nil {
 					t.Fatalf("Auto missing for a template that routes to it:\n%s", out)
 				}
-			}},
-		{name: "uses Auto while it is off", template: remoteClashTemplateWithAuto, proxies: 2,
+			},
+		},
+		{
+			name: "uses Auto while it is off", template: remoteClashTemplateWithAuto, proxies: 2,
 			check: func(t *testing.T, out string, doc clashDoc) {
 				if clashGroup(doc, "Auto") == nil || slicesContain(groupMembers(t, clashGroup(doc, "PROXY")), "Auto") {
 					t.Fatalf("Auto off with a template using it:\n%s", out)
 				}
-			}},
-		{name: "defines its own Auto", template: remoteClashTemplateOwnAuto, proxies: 2, auto: autoGroupOn(),
+			},
+		},
+		{
+			name: "defines its own Auto", template: remoteClashTemplateOwnAuto, proxies: 2, auto: autoGroupOn(),
 			check: func(t *testing.T, out string, doc clashDoc) {
 				count := 0
 				for _, g := range doc.Groups {
@@ -371,7 +378,8 @@ func TestClashAutoGroupRemoteTemplates(t *testing.T) {
 				if count != 1 {
 					t.Fatalf("Auto groups = %d, want the template's one:\n%s", count, out)
 				}
-			}},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

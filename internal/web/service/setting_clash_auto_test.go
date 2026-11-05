@@ -47,8 +47,10 @@ func TestUpdateAllSettingSubClashAutoGroup(t *testing.T) {
 		wantInterval  int
 		wantTolerance int
 	}{
-		{name: "fallback with custom check", groupType: "fallback", url: " https://cp.cloudflare.com/generate_204 ", interval: 120, tolerance: 0,
-			wantType: "fallback", wantURL: "https://cp.cloudflare.com/generate_204", wantInterval: 120, wantTolerance: 0},
+		{
+			name: "fallback with custom check", groupType: "fallback", url: " https://cp.cloudflare.com/generate_204 ", interval: 120, tolerance: 0,
+			wantType: "fallback", wantURL: "https://cp.cloudflare.com/generate_204", wantInterval: 120, wantTolerance: 0,
+		},
 		{name: "unset fields take defaults", wantType: "url-test", wantURL: DefaultSubClashAutoGroupURL, wantInterval: 300, wantTolerance: 0},
 		{name: "unknown type", groupType: "load-balance", interval: 300, wantErr: true},
 		{name: "relative url", url: "/generate_204", interval: 300, wantErr: true},
