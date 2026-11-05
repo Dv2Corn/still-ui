@@ -9,16 +9,20 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
 from link_filter import (
     FALLBACK_NOTE,
     REMOVED,
+    FilterTooComplex,
     Policy,
     StaticChecker,
     filter_links,
+    filter_text,
     host_allowed,
+    is_commonmark_open_tag,
     path_allowed,
     plain_fallback,
     rendered_link_failures,
@@ -99,14 +103,14 @@ class FilterTest(unittest.TestCase):
             "// comment.example here",
             "x := a // see b.go",
             "config.json, x-ui.db and install.sh",
-            "#12 and @maintainer",
+            "#12, GH-12 and @Dv2Corn",
             "<!-- claude-issue:run 5 -->\n<!-- claude-issue:analyst -->",
             "Reviewed head: 0123456789abcdef0123456789abcdef01234567",
             "if a < b and c > d",
             "arr[i](x)",
             "github.com/mhsanaei/3x-ui/v3@v3.11.0 and golang.org/x/crypto@v0.40.0",
             "pkg@latest, icon@2x.png, logo@1.5x.webp, `go install x@v1.2.3-beta`",
-            "user @ host, @maintainer, a@b",
+            "user @ host, a@b",
             "Tel: +1 and hotel:x and Note: y",
             "map[string]: x and [label]: ../pull/2",
             "List<String> and Vec<T> and <b>bold</b>",
@@ -445,6 +449,114 @@ class FilterTest(unittest.TestCase):
             self.assertKept(text)
 
 
+class ReferenceTest(unittest.TestCase):
+    """Shapes GitHub links or notifies when the page is viewed."""
+
+    def assertNeutralized(self, text, expected, n, policy=POLICY):
+        out, removed, neutralized = filter_text(text, policy)
+        self.assertEqual((out, removed, neutralized), (expected, 0, n))
+
+    def assertKept(self, text, policy=POLICY):
+        self.assertNeutralized(text, text, 0, policy)
+
+    def test_mentions_only_of_the_owner_and_the_author(self):
+        reporter = Policy(checker=CHECKER, author="Reporter")
+        self.assertKept("Thanks @Dv2Corn and @dv2corn.", reporter)
+        self.assertKept("Thanks @reporter.", reporter)
+        self.assertNeutralized("cc @stranger, @XTLS.", "cc `@stranger`, `@XTLS`.", 2, reporter)
+        self.assertNeutralized("cc @reporter", "cc `@reporter`", 1)  # no author given
+        self.assertNeutralized("cc @XTLS/core and @Dv2Corn/team", "cc `@XTLS/core` and `@Dv2Corn/team`", 2)
+        self.assertNeutralized("(@stranger)", "(`@stranger`)", 1)
+
+    def test_cross_repository_references(self):
+        self.assertKept("See MHSanaei/3x-ui#7042, XTLS/Xray-core#1 and Dv2Corn/still-ui#3.")
+        self.assertNeutralized("See SagerNet/sing-box#12.", "See `SagerNet/sing-box#12`.", 1)
+        self.assertKept(f"Fixed in Dv2Corn/still-ui@{GOOD}.")
+        for ref in (f"Dv2Corn/still-ui@{FORK}", "Dv2Corn/still-ui@0123abc", "MHSanaei/3x-ui@282990a",
+                    f"attacker/repo@{GOOD}", f"attacker@{GOOD}", "Dv2Corn@0123abc"):
+            self.assertNeutralized(f"see {ref} now", f"see `{ref}` now", 1)
+
+    def test_bare_shas(self):
+        self.assertKept(f"Fixed by {GOOD}.")
+        for sha in (FORK, "0123abc", "DEADBEEF12", "1234567890"):
+            self.assertNeutralized(f"commit {sha}.", f"commit `{sha}`.", 1)
+        review = Policy(base="https://github.com/Dv2Corn/still-ui/pull/9", head_sha=FORK, checker=CHECKER)
+        self.assertKept(f"Reviewed head: {FORK}", review)
+        # Not a SHA: too short, too long, or part of a word or path.
+        self.assertKept("abc1234x 0x1234567 " + "a" * 64 + " v1.2.3 /0123abc 2096 #1234567")
+
+    def test_code_and_links_are_left_alone(self):
+        self.assertKept("`@stranger SagerNet/sing-box#1 0123abc`")
+        self.assertKept("```\n@stranger 0123abc\n```\n")
+        self.assertKept("~~~~\n@stranger\n~~~\nstill code\n~~~~\n")
+        self.assertKept("[@stranger 0123abc](https://github.com/Dv2Corn/still-ui)")
+        self.assertKept(f"https://github.com/Dv2Corn/still-ui/commit/{GOOD} and https://github.com/Dv2Corn/still-ui/issues/1#x")
+        # A code span ends where its closing run does; what follows is text.
+        self.assertNeutralized("`x`@stranger", "`x` `@stranger`", 1)
+        self.assertNeutralized("``a ` b``@stranger`", "``a ` b`` `@stranger` `", 1)
+        # An unclosed backtick is literal, and a blank line ends a span.
+        self.assertNeutralized("`x @stranger", "`x `@stranger`", 1)
+        self.assertNeutralized("`x\n\n@stranger`", "`x\n\n`@stranger` `", 1)
+        self.assertNeutralized("\\`@stranger`", "\\` `@stranger` `", 1)
+
+
+class ComplexityTest(unittest.TestCase):
+    """Hostile input must not make the text pass slow."""
+
+    def assertFast(self, text, limit=1.0):
+        start = time.monotonic()
+        try:
+            filter_links(text, POLICY)
+        except FilterTooComplex:
+            pass
+        elapsed = time.monotonic() - start
+        self.assertLess(elapsed, limit, f"{elapsed:.2f}s for {text[:30]!r}...")
+        return elapsed
+
+    def test_pathological_inputs_finish_quickly(self):
+        for text in (
+            "<a" + " \n" * 20000 + "x",
+            "<a" + "  x" * 300,
+            "<a" + " \n" * 20000 + ">",
+            "<a " * 20000,
+            '<x "q" ' * 8000 + ">",
+            "<a b=" * 20000,
+            "[a](b" + " " * 50000,
+            "[a" * 20000,
+            "](" * 30000,
+            "]:\n" + ">" * 50000,
+            "https://github.com/Dv2Corn/still-ui" + ")" * 30000,
+            "https://evil.example/" + "&a;" * 20000,
+            "x@" + "a." * 20000 + "b1",
+            "".join("`" * k + "x" for k in range(1, 300)),
+            "@a " * 20000,
+            "a/b#1 " * 10000,
+            "0123abc " * 10000,
+            "&#58;" * 30000,
+            ("<a " * 300 + ">") * 60,
+        ):
+            self.assertFast(text)
+
+    def test_the_open_tag_check_is_linear_and_capped(self):
+        start = time.monotonic()
+        self.assertFalse(is_commonmark_open_tag("<a" + " \n" * 20000 + "x"))
+        self.assertFalse(is_commonmark_open_tag("<a" + " \n" * 900 + "x"))
+        self.assertFalse(is_commonmark_open_tag("<a" + " \t" * 900 + "b" * 100 + "="))
+        # Two spaces between attributes and no `>`: the previous pattern took
+        # 3 s for 22 attributes and four times longer for every two more.
+        self.assertFalse(is_commonmark_open_tag("<a" + "  x" * 300))
+        self.assertFalse(is_commonmark_open_tag("<a" + " \n x" * 200))
+        self.assertTrue(is_commonmark_open_tag("<a" + "  x" * 300 + ">"))
+        self.assertTrue(is_commonmark_open_tag('<a\n  href="x" b c=\'d\' e=f/>'))
+        self.assertFalse(is_commonmark_open_tag('<a href="x\ny">'))
+        self.assertLess(time.monotonic() - start, 1.0)
+
+    def test_too_much_work_fails_closed(self):
+        group = '<x "q" ' * 300 + ">\n\n"
+        with self.assertRaises(FilterTooComplex):
+            filter_links(group * 10, POLICY)
+
+
 class GateTest(unittest.TestCase):
     def failures(self, rendered, policy=POLICY):
         return rendered_link_failures(rendered, policy)
@@ -570,6 +682,17 @@ class CliTest(unittest.TestCase):
         proc, out = self.run_cli("x\n", "--gate", "--no-filter", "--repo", "o/r", "--base", "https://github.com/o/r/pull/7")
         self.assertEqual(out, FALLBACK_NOTE + "\n\n~~~~\nx\n~~~~\n")
         self.assertIn("Could not render", proc.stdout)
+
+    def test_too_complex_input_is_posted_as_plain_text(self):
+        text = ('<x "q" ' * 300 + ">\n\n") * 10
+        proc, out = self.run_cli(text)
+        self.assertEqual(out, FALLBACK_NOTE + "\n\n~~~~\n" + text + "~~~~\n")
+        self.assertIn("too complex", proc.stdout)
+
+    def test_author_may_be_mentioned(self):
+        proc, out = self.run_cli("@someone @o @x\n", "--repo", "o/r", "--author", "someone")
+        self.assertEqual(out, "@someone @o `@x`\n")
+        self.assertIn("::notice::Put 1 reference(s)", proc.stdout)
 
     def test_no_filter_skips_the_text_pass(self):
         api = {"markdown": "<p>x</p>"}

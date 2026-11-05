@@ -35,9 +35,16 @@ Two layers:
   that passes) and checks each against the same policy. If any fails, or the
   render fails, OUT is the text as plain text inside a fence that renders no
   link, under one line saying why.
+What GitHub links only when a page is viewed - `owner/repo#N`,
+`owner/repo@sha`, `user@sha`, bare SHAs, `@user`, `@org/team` - a render
+before posting cannot prove, so the text pass puts each one that does not
+point at an allowed repository in inline code; @mentions only of the
+repository owner and --author stay. Every pattern is linear (possessive
+quantifiers) and tags are read within TAG_CAP characters; input that costs
+more than WORK_CAP readings is posted as plain text.
 
-Usage: python3 -I link_filter.py [--repo OWNER/REPO] [--base URL]
-                                  [--head-sha SHA] [--gate] [--no-filter] IN OUT
+Usage: python3 -I link_filter.py [--repo OWNER/REPO] [--base URL] [--head-sha SHA]
+                                  [--author LOGIN] [--gate] [--no-filter] IN OUT
 Writes the result to OUT. Prints one GitHub `::warning::` per layer that
 acted, with counts only: the links themselves are attacker text and never
 printed. Stdlib only: the post job installs nothing.
@@ -181,12 +188,16 @@ class Policy:
     # The commit under review: the PR reviewer links its code.
     head_sha: str = ""
     checker: RefChecker = field(default_factory=RefChecker)
+    # The issue or pull request author: with the repository owner, the only
+    # account a reply may @mention.
+    author: str = ""
 
     def __post_init__(self) -> None:
         owner, _, name = self.repo.partition("/")
         if not (_NAME.match(owner) and _NAME.match(name)):
             raise ValueError("--repo must be OWNER/REPO")
         self.own = (owner.lower(), name.lower())
+        self.mentionable = {owner.lower()} | ({self.author.lower()} if self.author else set())
         if not self.base:
             self.base = f"https://github.com/{self.repo}/issues/1"
 
@@ -352,17 +363,28 @@ def _decode_safe_entities(text: str) -> str:
 
 def gfm_trim(url: str) -> str:
     """What GitHub's autolink extension keeps of `url`: trailing ?!.,:*_~,
-    an unbalanced trailing `)` and a trailing entity-like `&name;` go."""
-    while url:
-        if url[-1] in "?!.,:*_~":
-            url = url[:-1]
-        elif url[-1] == ")" and url.count(")") > url.count("("):
-            url = url[:-1]
-        elif re.search(r"&[A-Za-z0-9]+;$", url):
-            url = re.sub(r"&[A-Za-z0-9]+;$", "", url)
+    an unbalanced trailing `)` and a trailing entity-like `&name;` go.
+    Linear in the length of `url`."""
+    opens, closes = url.count("("), url.count(")")
+    end = len(url)
+    while end:
+        ch = url[end - 1]
+        if ch in "?!.,:*_~":
+            end -= 1
+        elif ch == ")" and closes > opens:
+            end -= 1
+            closes -= 1
+        elif ch == ";":
+            k = end - 2
+            while k >= 0 and url[k].isascii() and url[k].isalnum():
+                k -= 1
+            if k >= 0 and url[k] == "&" and k < end - 2:
+                end = k
+            else:
+                break
         else:
             break
-    return url
+    return url[:end]
 
 
 # A URL in code or in a quote ends at these too; whatever of them GitHub's
@@ -372,9 +394,7 @@ _QUOTE_TAIL = "`'\"]>)?!.,:*_~"
 
 
 def _strip_quote_tail(url: str) -> str:
-    while url and url[-1] in _QUOTE_TAIL:
-        url = url[:-1]
-    return url
+    return url.rstrip(_QUOTE_TAIL)
 
 
 # Attributes whose value a browser follows or loads.
@@ -385,65 +405,92 @@ _URL_ATTRS = frozenset(
 )
 _SPACE = " \t\n\r\f"
 
+# Hostile input must not make the reading slow: no pattern below can
+# backtrack more than linearly (possessive quantifiers, Python 3.11+), and a
+# start tag is read only within TAG_CAP characters - a longer one counts as
+# never closing (fail closed).
+TAG_CAP = 1024
+# The most attribute readings one reply may cost before the text pass gives
+# up and the reply is posted as plain text (fail closed).
+WORK_CAP = 200_000
+
+
+class FilterTooComplex(Exception):
+    """The text pass gave up on the input; post it as plain text."""
+
+
 # A CommonMark raw-HTML open tag (spec 6.6), kept narrower than the spec:
-# quoted values hold no line ending. Only such a span is set aside.
-_CM_WS = r"(?:[ \t]+\n?[ \t]*|\n[ \t]*)"
-_CM_OPT_WS = r"[ \t]*\n?[ \t]*"
+# quoted values hold no line ending. Only such a span is set aside. Every
+# quantifier is possessive and every alternation starts on disjoint
+# characters, so a match costs linear time.
+_CM_SPACE = r"[ \t]*+(?:\n[ \t]*+)?+"
 _CM_OPEN_TAG = re.compile(
-    r"<[A-Za-z][A-Za-z0-9-]*"
-    rf"(?:{_CM_WS}[A-Za-z_:][A-Za-z0-9_.:-]*(?:{_CM_OPT_WS}={_CM_OPT_WS}"
-    r"(?:[^\s\"'=<>`]+|'[^'\n]*'|\"[^\"\n]*\"))?)*"
-    rf"{_CM_OPT_WS}/?>"
+    r"<[A-Za-z][A-Za-z0-9-]*+"
+    r"(?:(?=[ \t\n])" + _CM_SPACE + r"[A-Za-z_:][A-Za-z0-9_.:-]*+"
+    r"(?:" + _CM_SPACE + r"=" + _CM_SPACE + r"(?:[^\s\"'=<>`]++|'[^'\n]*+'|\"[^\"\n]*+\"))?+)*+"
+    + _CM_SPACE + r"/?>"
 )
+
+
+def is_commonmark_open_tag(span: str) -> bool:
+    """Whether `span` is one whole CommonMark open tag; False past TAG_CAP."""
+    return len(span) <= TAG_CAP and _CM_OPEN_TAG.fullmatch(span) is not None
+
+
+# An HTML5 start tag, read as a browser's tokenizer reads it (quoted values
+# may hold `>`, attribute names may hold quotes or start with `=`). After an
+# attribute, `=` may not follow: that means its quoted value never closed.
+_H5_TAG = re.compile(
+    r"<[A-Za-z][^\s/>]*+"
+    r"(?:[\s/]*+[^\s/>][^\s/>=]*+(?:\s*+=\s*+(?:\"[^\"]*+\"|'[^']*+'|(?![\"'])[^\s>]*+))?+(?!\s*+=))*+"
+    r"[\s/]*+>"
+)
+_H5_NAME = re.compile(r"<[A-Za-z][^\s/>]*+")
+_H5_SEP = re.compile(r"[\s/]*+")
+_H5_ATTR_NAME = re.compile(r"[^\s/>][^\s/>=]*+")
+_H5_EQ = re.compile(r"\s*+=\s*+")
+_H5_UNQUOTED = re.compile(r"[^\s>]*+")
 
 
 def scan_start_tag(text: str, i: int) -> tuple[int, list[tuple[str, str]]] | None:
     """Reads the start tag at text[i] (`<` then a letter) the way an HTML5
-    tokenizer does: quoted values may hold `>`, names may hold quotes. Returns
-    the index after its `>` and its (name, value) attributes, or None when the
-    tag never closes."""
-    n = len(text)
-    j = i + 1
-    while j < n and text[j] not in _SPACE + "/>":
-        j += 1
+    tokenizer does. Returns the index after its `>` and its (name, value)
+    attributes, or None when the tag does not close within TAG_CAP."""
+    limit = min(len(text), i + TAG_CAP)
+    # No `>` in reach: no tag here (a fast check that keeps `<a <a <a ...` linear).
+    if text.find(">", i, limit) < 0:
+        return None
+    whole = _H5_TAG.match(text, i, limit)
+    if whole is None:
+        return None
+    end = whole.end()
+    j = _H5_NAME.match(text, i, end).end()
     attrs: list[tuple[str, str]] = []
     while True:
-        while j < n and text[j] in _SPACE + "/":
-            j += 1
-        if j >= n:
-            return None
+        j = _H5_SEP.match(text, j, end).end()
         if text[j] == ">":
-            return j + 1, attrs
-        start = j
-        j += 1  # an attribute name may start with `=`
-        while j < n and text[j] not in _SPACE + "/>=":
-            j += 1
-        name = text[start:j].lower()
-        k = j
-        while k < n and text[k] in _SPACE:
-            k += 1
+            return end, attrs
+        name_match = _H5_ATTR_NAME.match(text, j, end)
+        j = name_match.end()
         value = ""
-        if k < n and text[k] == "=":
-            k += 1
-            while k < n and text[k] in _SPACE:
-                k += 1
-            if k < n and text[k] in "\"'":
-                end = text.find(text[k], k + 1)
-                if end < 0:
-                    return None
-                value, j = text[k + 1 : end], end + 1
+        eq = _H5_EQ.match(text, j, end)
+        if eq:
+            k = eq.end()
+            if text[k] in "\"'":
+                close = text.index(text[k], k + 1, end)
+                value, j = text[k + 1 : close], close + 1
             else:
-                start = k
-                while k < n and text[k] not in _SPACE + ">":
-                    k += 1
-                value, j = text[start:k], k
-        attrs.append((name, value))
+                unquoted = _H5_UNQUOTED.match(text, k, end)
+                value, j = unquoted.group(0), unquoted.end()
+        attrs.append((name_match.group(0).lower(), value))
 
 
 class _Filter:
     def __init__(self, policy: Policy) -> None:
         self.policy = policy
         self.removed = 0
+        self.neutralized = 0
+        self.work = 0
         self.kept: list[str] = []
 
     def allowed(self, target: str, *, relative_ok: bool = True) -> bool:
@@ -492,11 +539,15 @@ class _Filter:
                 continue
             scanned = scan_start_tag(text, i)
             if scanned is None:
-                if "=" in text[i:].split("\n\n", 1)[0]:
+                stop = text.find("\n\n", i, i + TAG_CAP)
+                if text.find("=", i, stop if stop >= 0 else i + TAG_CAP) >= 0:
                     out.append(text[pos:i] + self.drop() + " ")
                     pos = i + 1
                 continue
             end, attrs = scanned
+            self.work += len(attrs) + 1
+            if self.work > WORK_CAP:
+                raise FilterTooComplex
             bad = any(
                 name in _URL_ATTRS
                 and any(not self.allowed(t) for t in (re.split(r"[\s,]+", html.unescape(value)) or [""]))
@@ -504,7 +555,7 @@ class _Filter:
             )
             if bad:
                 out.append(text[pos:i] + self.drop())
-            elif _CM_OPEN_TAG.fullmatch(text, i, end):
+            elif is_commonmark_open_tag(text[i:end]):
                 # A CommonMark raw-HTML open tag stays as it is; its quoted
                 # values are read only here. Anything GitHub might read as
                 # text instead is left to the passes below.
@@ -520,13 +571,14 @@ class _Filter:
     # [text](target "title") and ![alt](target): text stays, the link goes.
     # An escaped `\[` opens no link.
     _INLINE = re.compile(
-        r"(?<!\\)(!?)\[((?:[^\[\]\\]|\\.|\[(?:[^\[\]\\]|\\.)*\])*)\]\(\s*(<[^<>\n]*>|(?:[^\s()\\]|\\.|\([^\s()]*\))*)"
-        r"(?:\s+(?:\"[^\"]*\"|'[^']*'|\([^()]*\)))?\s*\)",
+        r"(?<!\\)(!?)\[((?:[^\[\]\\]++|\\.|\[(?:[^\[\]\\]++|\\.)*+\])*+)\]\(\s*+"
+        r"(<[^<>\n]*+>|(?:[^\s()\\]++|\\.|\([^\s()]*+\))*+)"
+        r"(?:\s++(?:\"[^\"]*+\"|'[^']*+'|\([^()]*+\)))?+\s*+\)",
         re.S,
     )
     # Any `](target` the pattern above could not read whole (deeper brackets,
     # odd titles): its target alone is removed.
-    _LEFTOVER = re.compile(r"\]\(\s*(<[^<>\n]*>|[^\s)]*)")
+    _LEFTOVER = re.compile(r"\]\(\s*+(<[^<>\n]*+>|[^\s)]*+)")
 
     def inline_links(self, text: str) -> str:
         def repl(m: re.Match[str]) -> str:
@@ -550,7 +602,7 @@ class _Filter:
     # `]: target` anywhere - a reference definition, also inside a block quote
     # or a list item and with the target on the next line - keeps its label;
     # a foreign target goes.
-    _REFDEF = re.compile(r"\]:[ \t]*(?:\n[ \t>]*)?(<[^<>\n]*>|\S+)")
+    _REFDEF = re.compile(r"\]:[ \t]*+(?:\n[ \t>]*+)?+(<[^<>\n]*+>|\S++)")
 
     def reference_definitions(self, text: str) -> str:
         def repl(m: re.Match[str]) -> str:
@@ -571,18 +623,19 @@ class _Filter:
     # `pkg@v1.2.3` stays, and `icon@2x.png` is a file name, not an address).
     _END = r"[^\s<" + _P_OPEN + r"]"
     _URL = re.compile(
-        r"(?<![A-Za-z0-9+.-])[A-Za-z][A-Za-z0-9+.-]*:(?:\\?[/\\]){2}" + _END + "*"
-        r"|(?<![A-Za-z0-9.@/:_\\-])www\." + _END + "+"
-        r"|(?<![A-Za-z0-9.@/:_\\-])[/\\]{2}[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+(?=[/\\:?#\s)\]]|$)[^\s<>\"'`\[\]"
-        + _P_OPEN + r"]*"
-        r"|(?<![A-Za-z0-9+.-])(?:mailto|xmpp|tel|sms):[^\s<>\"'`\[\]" + _P_OPEN + r"]+"
-        r"|(?<![A-Za-z0-9._+/-])[A-Za-z0-9._+-]+@(?!\d+(?:\.\d+)?x\.)[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}"
-        r"(?![A-Za-z0-9-])",
+        r"(?<![A-Za-z0-9+.-])[A-Za-z][A-Za-z0-9+.-]*+:(?:\\?[/\\]){2}" + _END + "*+"
+        r"|(?<![A-Za-z0-9.@/:_\\-])www\." + _END + "++"
+        r"|(?<![A-Za-z0-9.@/:_\\-])[/\\]{2}[A-Za-z0-9-]++(?:\.[A-Za-z0-9-]++)++(?=[/\\:?#\s)\]]|$)[^\s<>\"'`\[\]"
+        + _P_OPEN + r"]*+"
+        r"|(?<![A-Za-z0-9+.-])(?:mailto|xmpp|tel|sms):[^\s<>\"'`\[\]" + _P_OPEN + r"]++"
+        # An address candidate; repl keeps it unless the last label is letters.
+        r"|(?<![A-Za-z0-9._+/-])[A-Za-z0-9._+-]++@(?!\d+(?:\.\d+)?x\.)[A-Za-z0-9-]++(?:\.[A-Za-z0-9-]++)++",
         re.I,
     )
     _NO_SLASH = re.compile(r"^(?:mailto|xmpp|tel|sms):|^[^:/\\]*@", re.I)
     # Inside a tag a URL ends at a quote as well.
-    _QUOTED = re.compile(r"(?<![A-Za-z0-9+.-])[A-Za-z][A-Za-z0-9+.-]*:(?:\\?[/\\]){2}[^\s<>\"'`]*", re.I)
+    _QUOTED = re.compile(r"(?<![A-Za-z0-9+.-])[A-Za-z][A-Za-z0-9+.-]*+:(?:\\?[/\\]){2}[^\s<>\"'`]*+", re.I)
+    _ADDRESS_END = re.compile(r"\.[A-Za-z]{2,}$")
 
     def scan(self, text: str, *, quoted: bool = False) -> str:
         def repl(m: re.Match[str]) -> str:
@@ -590,6 +643,8 @@ class _Filter:
             linked = gfm_trim(found)
             tail = found[len(linked) :]
             if self._NO_SLASH.match(found):
+                if "@" in found and ":" not in found.split("@", 1)[0] and not self._ADDRESS_END.search(found):
+                    return found  # `pkg@v1.2.3`: no address
                 return self.drop() + tail
             if found[:1] in "/\\":
                 return m.group(0) if self.allowed("https:" + linked, relative_ok=False) else self.drop() + tail
@@ -598,10 +653,117 @@ class _Filter:
             url = _strip_quote_tail(linked)
             check = "http://" + url if url.lower().startswith("www.") else url
             if url and self.allowed(check, relative_ok=False):
-                return found
+                # Set aside, so the reference pass below leaves it whole.
+                return found if quoted else self.protect(found)
             return self.drop() + tail
 
         return (self._QUOTED if quoted else self._URL).sub(repl, text)
+
+    # GitHub turns these into links or notifications when the page is VIEWED,
+    # so a render before posting proves nothing about them: `owner/repo#N`,
+    # `owner/repo@sha`, `user@sha`, bare 7-40 hex SHAs, `@user` and
+    # `@org/team`. Outside code each one that does not point at an allowed
+    # repository (or account) goes into an inline code span.
+    _REFERENCE = re.compile(
+        r"(?P<mention>(?<![A-Za-z0-9_.@/\\-])@(?P<who>[A-Za-z0-9][A-Za-z0-9-]{0,38})"
+        r"(?P<team>/[A-Za-z0-9][A-Za-z0-9_.-]{0,99})?(?![A-Za-z0-9_-]))"
+        r"|(?P<ref>(?<![A-Za-z0-9_./@\\-])(?P<o>[A-Za-z0-9][A-Za-z0-9-]{0,38})/(?P<r>[A-Za-z0-9_.-]{1,100})"
+        r"(?:#(?P<n>[0-9]{1,10})|@(?P<s>[0-9a-fA-F]{7,40}))(?![A-Za-z0-9_-]))"
+        r"|(?P<usersha>(?<![A-Za-z0-9_./@\\-])[A-Za-z0-9][A-Za-z0-9-]{0,38}@[0-9a-fA-F]{7,40}(?![A-Za-z0-9_.-]))"
+        r"|(?P<sha>(?<![A-Za-z0-9_./@#\\-])[0-9a-fA-F]{7,40}(?![A-Za-z0-9_-]))"
+    )
+
+    def _reference_allowed(self, m: re.Match[str]) -> bool:
+        p = self.policy
+        if m.group("mention"):
+            return not m.group("team") and m.group("who").lower() in p.mentionable
+        if m.group("ref"):
+            owner, repo = m.group("o"), m.group("r")
+            if not p.repo_allowed(owner, repo):
+                return False
+            return m.group("n") is not None or p.ref_ok(owner, repo, m.group("s"))
+        if m.group("usersha"):
+            return False
+        owner, repo = p.repo.split("/", 1)
+        return p.ref_ok(owner, repo, m.group("sha"))
+
+    def _code_ranges(self, text: str) -> list[tuple[int, int]]:
+        """Fenced code blocks and code spans, read narrowly: what is not
+        surely code is treated as text (and its references neutralised)."""
+        ranges: list[tuple[int, int]] = []
+        prose: list[tuple[int, int]] = []
+        fence = None
+        start = 0
+        para = 0
+        pos = 0
+        for line in text.splitlines(keepends=True):
+            m = re.match(r"[ \t]{0,3}(`{3,}+|~{3,}+)", line)
+            if fence is None and m and not (m.group(1)[0] == "`" and "`" in line[m.end():]):
+                fence, start = m.group(1), pos
+                prose.append((para, pos))
+            elif fence is not None and m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence) \
+                    and not line[m.end():].strip():
+                ranges.append((start, pos + len(line)))
+                fence, para = None, pos + len(line)
+            pos += len(line)
+        if fence is not None:
+            ranges.append((start, len(text)))
+        else:
+            prose.append((para, len(text)))
+        # Code spans inside each stretch of prose, never across a blank line.
+        for lo, hi in prose:
+            for block in re.finditer(r"(?:(?!\n[ \t]*\n).)++", text[lo:hi], re.S):
+                runs = [(r.start(), r.end()) for r in re.finditer(r"`++", block.group(0))]
+                by_len: dict[int, list[int]] = {}
+                for idx, (a, b) in enumerate(runs):
+                    by_len.setdefault(b - a, []).append(idx)
+                nxt: dict[int, int] = {}
+                used_upto = -1
+                for idx, (a, b) in enumerate(runs):
+                    if idx <= used_upto:
+                        continue
+                    if a > 0 and block.group(0)[a - 1] == "\\":
+                        continue
+                    same = by_len[b - a]
+                    k = nxt.get(b - a, 0)
+                    while k < len(same) and same[k] <= idx:
+                        k += 1
+                    nxt[b - a] = k
+                    if k < len(same):
+                        close = same[k]
+                        off = lo + block.start()
+                        ranges.append((off + a, off + runs[close][1]))
+                        used_upto = close
+        return sorted(ranges)
+
+    def references(self, text: str) -> str:
+        out = []
+        pos = 0
+        for lo, hi in self._code_ranges(text) + [(len(text), len(text))]:
+            if lo < pos:
+                continue
+            out.append(self._neutralize(text, pos, lo))
+            out.append(text[lo:hi])
+            pos = hi
+        return "".join(out)
+
+    def _neutralize(self, text: str, lo: int, hi: int) -> str:
+        """text[lo:hi] with each disallowed reference in a code span; the
+        patterns see the characters around the stretch too."""
+        out = []
+        pos = lo
+        for m in self._REFERENCE.finditer(text, lo, hi):
+            if self._reference_allowed(m):
+                continue
+            self.neutralized += 1
+            before = text[m.start() - 1] if m.start() else ""
+            after = text[m.end()] if m.end() < len(text) else ""
+            # A space keeps the code span from merging with a neighbouring backtick.
+            out.append(text[pos : m.start()] + (" " if before == "`" else "") + f"`{m.group(0)}`"
+                       + (" " if after == "`" else ""))
+            pos = m.end()
+        out.append(text[pos:hi])
+        return "".join(out)
 
     def run(self, text: str) -> str:
         text = text.replace(_P_OPEN, "\ufffd").replace(_P_CLOSE, "\ufffd")
@@ -610,14 +772,22 @@ class _Filter:
         text = self.tags(text)
         text = self.inline_links(text)
         text = self.reference_definitions(text)
-        return self.restore(self.scan(text))
+        text = self.scan(text)
+        return self.restore(self.references(text))
 
 
 def filter_links(text: str, policy: Policy | None = None) -> tuple[str, int]:
-    """Returns the text with foreign links removed, and how many were removed."""
+    """Returns the text with foreign links removed, and how many were removed.
+    Raises FilterTooComplex when the input costs too much to read."""
+    out, removed, _ = filter_text(text, policy)
+    return out, removed
+
+
+def filter_text(text: str, policy: Policy | None = None) -> tuple[str, int, int]:
+    """filter_links, plus how many references were put in code."""
     f = _Filter(policy or _DEFAULT_POLICY)
     out = f.run(text)
-    return out, f.removed
+    return out, f.removed, f.neutralized
 
 
 # --- The gate: what GitHub renders is what is checked. ---------------------
@@ -733,6 +903,7 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--repo", default=DEFAULT_REPO, help="OWNER/REPO the reply is posted in")
     parser.add_argument("--base", default="", help="URL of the issue or pull request the reply is posted on")
     parser.add_argument("--head-sha", default="", help="commit under review, which may be linked")
+    parser.add_argument("--author", default="", help="issue or pull request author, who may be @mentioned")
     parser.add_argument("--gate", action="store_true", help="check GitHub's rendering; fall back to plain text")
     parser.add_argument("--no-filter", action="store_true", help="skip the text pass (the input already had it)")
     parser.add_argument("src")
@@ -740,16 +911,24 @@ def main(argv: list[str]) -> int:
     args = parser.parse_args(argv[1:])
     if args.base and not args.base.lower().startswith("https://github.com/"):
         parser.error("--base must be a https://github.com/ URL")
-    policy = Policy(repo=args.repo, base=args.base, head_sha=args.head_sha, checker=GhChecker())
+    if args.author and not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9-]{0,38}(?:\[bot\])?", args.author):
+        parser.error("--author must be a GitHub login")
+    policy = Policy(repo=args.repo, base=args.base, head_sha=args.head_sha, checker=GhChecker(), author=args.author)
     with open(args.src, encoding="utf-8", errors="replace", newline="") as fh:
         text = fh.read()
     if not args.no_filter:
-        text, removed = filter_links(text, policy)
+        try:
+            text, removed, neutralized = filter_text(text, policy)
+        except (FilterTooComplex, RecursionError):
+            print("::warning::The reply was too complex to check its links; it was posted as plain text.")
+            text, removed, neutralized = plain_fallback(text), 0, 0
         if removed:
             print(
                 f"::warning::Removed {removed} link(s) outside the allowlist (this repository, "
                 "MHSanaei/3x-ui and XTLS on GitHub; docs.github.com; xtls.github.io) from the reply before posting it."
             )
+        if neutralized:
+            print(f"::notice::Put {neutralized} reference(s) or mention(s) in code so GitHub does not link them.")
     if args.gate:
         text = gate(text, policy)
     with open(args.dst, "w", encoding="utf-8", newline="") as fh:

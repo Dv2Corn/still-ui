@@ -637,7 +637,9 @@ head; plus docs.github.com and xtls.github.io. Relative links are resolved again
 PR page; e-mail addresses go too. That text pass is cosmetic; the boundary is the gate after
 it: GitHub renders the finished reply (`gh api markdown`), every URL in that HTML is checked
 against the same rules, and if one fails (or the render fails) the reply is posted as plain
-text in a fence. So a hostile issue or PR cannot get its link posted by the bot.
+text in a fence. References GitHub links only at view time (`owner/repo#N`, SHAs, `@user`)
+are put in inline code unless they point at an allowed repository, and only the owner and the
+issue/PR author may be @mentioned. So a hostile issue or PR cannot get its link posted by the bot.
 
 ---
 

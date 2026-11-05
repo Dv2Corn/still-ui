@@ -102,6 +102,7 @@ class AnalystPostTest(unittest.TestCase):
             REPO="owner/repo",
             TRIGGER="issues",
             TITLE_AT_START=title_at_start,
+            AUTHOR="reporter",
         )
         # The post job runs in a checkout of .github/scripts; so does the step here.
         proc = subprocess.run(["bash", str(tmp / "step.sh")], env=env, capture_output=True, text=True, cwd=REPO_ROOT)
@@ -231,6 +232,19 @@ class AnalystPostTest(unittest.TestCase):
         posted, _, out = self.run_step("Analysis.\n<!-- claude-issue:analyst -->\n", None, self.OPEN, [], api=self.API, render=rendered)
         self.assertEqual(posted, f"Analysis.\n<!-- claude-issue:run {RUN_ID} -->\n<!-- claude-issue:analyst -->\n")
         self.assertNotIn("::warning::", out)
+
+    def test_mentions_and_references_are_neutralised_before_posting(self):
+        reply = (
+            "@owner @reporter: see #12, SagerNet/sing-box#3, @stranger and " + self.FORK + ".\n"
+            "<!-- claude-issue:analyst -->\n"
+        )
+        posted, _, out = self.run_step(reply, None, self.OPEN, [], api=self.API)
+        self.assertEqual(
+            posted,
+            "@owner @reporter: see #12, `SagerNet/sing-box#3`, `@stranger` and `" + self.FORK + "`.\n"
+            f"<!-- claude-issue:run {RUN_ID} -->\n<!-- claude-issue:analyst -->\n",
+        )
+        self.assertIn("::notice::Put 3 reference(s)", out)
 
     def test_a_reply_without_foreign_links_is_posted_unchanged_and_quietly(self):
         reply = "Fixed in https://github.com/XTLS/Xray-core/pull/1 (see https://xtls.github.io/config/).\n<!-- claude-issue:analyst -->\n"

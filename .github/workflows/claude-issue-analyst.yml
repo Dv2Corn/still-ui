@@ -400,6 +400,8 @@ jobs:
         env:
           DIR: ${{ runner.temp }}/analyst
           TITLE_AT_START: ${{ github.event.issue.title }}
+          # Besides the repository owner, the only account the reply may @mention.
+          AUTHOR: ${{ github.event.issue.user.login }}
         run: |
           set -euo pipefail
           body="$DIR/comment.md"
@@ -425,7 +427,7 @@ jobs:
           reply="$RUNNER_TEMP/reply.md"
           grep -vE '^[[:space:]]*<!-- claude-issue:run [0-9]+ -->[[:space:]]*$' "$body" | sed '$d' > "$RUNNER_TEMP/prose.md"
           python3 -I .github/scripts/link_filter.py --gate --repo "$REPO" --base "https://github.com/${REPO}/issues/${ISSUE}" \
-            "$RUNNER_TEMP/prose.md" "$reply"
+            --author "$AUTHOR" "$RUNNER_TEMP/prose.md" "$reply"
           printf '<!-- claude-issue:run %s -->\n<!-- claude-issue:analyst -->\n' "$GITHUB_RUN_ID" >> "$reply"
           gh issue comment "$ISSUE" -R "$REPO" --body-file "$reply"
 
