@@ -99,6 +99,13 @@ type memUsage struct {
 	limitKind string // "MemoryMax" or "RAM"
 }
 
+// memoryClearMargin and diskClearMargin are how many points below its threshold a raised alert
+// must fall to clear: Go keeps a busy core near GOMEMLIMIT (85% of MemoryMax) on purpose.
+const (
+	memoryClearMargin = 15
+	diskClearMargin   = 5
+)
+
 // memoryChecks compares the panel and the core with their systemd MemoryMax (cgroup v2), or with
 // the machine's RAM when there is none. A core that is the panel's child shares the panel's cgroup
 // and is checked once with it.
@@ -116,21 +123,25 @@ func memoryChecks(threshold int) []health.Check {
 			pids = append(pids, memProc{"Xray", pid})
 		}
 	}
-	usages := collectMemory(pids, total)
 	var checks []health.Check
-	for _, u := range usages {
-		pct := health.Percent(u.used, u.limit)
-		checks = append(checks, health.Check{
-			Key: "mem:" + u.name, Event: string(eventbus.EventProcessMemory), Confirm: 3,
-			Problem: u.limit > 0 && pct >= float64(threshold),
-			Params: map[string]string{
-				"Process": u.name, "Percent": strconv.FormatFloat(pct, 'f', 0, 64),
-				"Used": mib(u.used), "Limit": mib(u.limit), "LimitKind": u.limitKind,
-				"Threshold": strconv.Itoa(threshold),
-			},
-		})
+	for _, u := range collectMemory(pids, total) {
+		checks = append(checks, memoryCheck(u, threshold))
 	}
 	return checks
+}
+
+func memoryCheck(u memUsage, threshold int) health.Check {
+	pct := health.Percent(u.used, u.limit)
+	return health.Check{
+		Key: "mem:" + u.name, Event: string(eventbus.EventProcessMemory), Confirm: 3, Settle: 3,
+		Problem: u.limit > 0 && pct >= float64(threshold),
+		Hold:    u.limit > 0 && pct >= float64(threshold-memoryClearMargin),
+		Params: map[string]string{
+			"Process": u.name, "Percent": strconv.FormatFloat(pct, 'f', 0, 64),
+			"Used": mib(u.used), "Limit": mib(u.limit), "LimitKind": u.limitKind,
+			"Threshold": strconv.Itoa(threshold),
+		},
+	}
 }
 
 // memProc is a process whose memory is watched.
@@ -218,8 +229,9 @@ func diskChecks(threshold int) []health.Check {
 		}
 		seen[id] = true
 		checks = append(checks, health.Check{
-			Key: "disk:" + p, Event: string(eventbus.EventDiskHigh),
+			Key: "disk:" + p, Event: string(eventbus.EventDiskHigh), Settle: 3,
 			Problem: u.UsedPercent >= float64(threshold),
+			Hold:    u.UsedPercent >= float64(threshold-diskClearMargin),
 			Params: map[string]string{
 				"Path": p, "Percent": strconv.FormatFloat(u.UsedPercent, 'f', 0, 64),
 				"Free": mib(u.Free), "Threshold": strconv.Itoa(threshold),

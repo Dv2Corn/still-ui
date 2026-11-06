@@ -219,7 +219,7 @@ export class AllSetting {
   backupTelegram = false;
   alertXrayRestarts = 3;
   alertXrayRestartWindow = 10;
-  alertMemory = 80;
+  alertMemory = 90;
   alertDisk = 90;
   alertCertDays = 7;
   alertRemindHours = 6;

@@ -284,7 +284,7 @@ var defaultValueMap = map[string]string{
 	// Server health alerts (still-ui): thresholds shared by every notifier
 	"alertXrayRestarts":      "3",
 	"alertXrayRestartWindow": "10",
-	"alertMemory":            "80",
+	"alertMemory":            "90",
 	"alertDisk":              "90",
 	"alertCertDays":          "7",
 	"alertRemindHours":       "6",

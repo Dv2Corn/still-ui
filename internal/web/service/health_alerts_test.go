@@ -6,6 +6,7 @@ import (
 	"encoding/pem"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -158,5 +159,37 @@ func TestListenerCertIsTheServedCertificate(t *testing.T) {
 	}
 	if got := listenerCert("subscription", certFile); got == nil || !got.NotAfter.Equal(notAfter(renewed)) {
 		t.Fatalf("no subscription listener: listenerCert expires %v, want the file's %v", expiry(got), notAfter(renewed))
+	}
+}
+
+// A busy core lives near GOMEMLIMIT (85% of MemoryMax): at the default threshold it never alerts,
+// and once over the threshold the alert holds until the figure is well below it.
+func TestMemoryAlertDoesNotFlapAroundTheThreshold(t *testing.T) {
+	threshold, _ := strconv.Atoi(defaultValueMap["alertMemory"])
+	tr := health.NewTracker()
+	t0 := time.Date(2026, 11, 6, 10, 0, 0, 0, time.UTC)
+	i := 0
+	feed := func(percents ...uint64) []health.Phase {
+		var out []health.Phase
+		for _, p := range percents {
+			i++
+			c := memoryCheck(memUsage{name: "Xray", used: p << 20, limit: 100 << 20, limitKind: "MemoryMax"}, threshold)
+			for _, n := range tr.Observe(t0.Add(time.Duration(i)*time.Minute), 6*time.Hour, []health.Check{c}) {
+				out = append(out, n.Phase)
+			}
+		}
+		return out
+	}
+	if got := feed(84, 86, 85, 87, 83, 86, 85, 86); len(got) != 0 {
+		t.Fatalf("a core at GOMEMLIMIT alerted: %v", got)
+	}
+	if got := feed(92, 93, 91); len(got) != 1 || got[0] != health.Raised {
+		t.Fatalf("three rounds over %d%% = %v, want raised", threshold, got)
+	}
+	if got := feed(85, 80, 76, 89, 70, 72, 91, 70, 71); len(got) != 0 {
+		t.Fatalf("back near GOMEMLIMIT = %v, want the raised alert held", got)
+	}
+	if got := feed(60); len(got) != 1 || got[0] != health.Resolved {
+		t.Fatalf("third round below the clear level = %v, want resolved", got)
 	}
 }
