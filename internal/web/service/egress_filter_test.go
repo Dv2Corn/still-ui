@@ -236,6 +236,43 @@ func TestInjectEgressFilter_PrivateRuleOnlyWhenNotAlreadyBlocked(t *testing.T) {
 	}
 }
 
+// DNS (port 53) passes every address block, as in the nftables half and the UI text, and a
+// blocked freedom destination is closed at once instead of being held open for 30-90 s.
+func TestInjectEgressFilter_KeepsDNSAndRefusesAtOnce(t *testing.T) {
+	cfg := &xray.Config{
+		InboundConfigs:  []xray.InboundConfig{{Tag: "in-a"}},
+		RouterConfig:    json_util.RawMessage(`{"rules":[]}`),
+		OutboundConfigs: json_util.RawMessage(`[{"tag":"direct","protocol":"freedom"},{"tag":"blocked","protocol":"blackhole"}]`),
+	}
+	injectEgressFilter(cfg, []string{"in-a"}, egressfilter.Filter{Private: true, Server: true, Custom: []string{"203.0.113.0/24"}},
+		egressOwnTargets{Addrs: []string{"192.0.2.1"}, Ports: []uint16{2053}})
+	rules := routingRules(t, cfg)
+	for _, tag := range []string{"egress-filter-private", "egress-filter-loopback", "egress-filter-custom-ip"} {
+		i := slices.IndexFunc(rules, func(r map[string]any) bool { return r["ruleTag"] == tag })
+		if i < 0 || rules[i]["port"] != "1-52,54-65535" {
+			t.Errorf("rule %s = %v, want every port but DNS", tag, rules)
+		}
+	}
+	own := make([]any, 0, len(rules))
+	for _, r := range rules {
+		if r["ruleTag"] != "egress-filter-private" { // geoip needs geo data files
+			own = append(own, r)
+		}
+	}
+	assertXrayAccepts(t, "the egress filter rules", buildGoldenRouting(map[string]any{"rules": own}))
+	freedom := outboundsOf(t, cfg)[0]
+	final, _ := freedom["settings"].(map[string]any)["finalRules"].([]any)
+	if len(final) != 2 {
+		t.Fatalf("finalRules = %v, want the server block and the address block", final)
+	}
+	for _, r := range final {
+		if delay, ok := r.(map[string]any)["blockDelay"]; !ok || delay != float64(0) {
+			t.Errorf("final rule %v: want blockDelay 0, not xray-core's default 30-90 s hold", r)
+		}
+	}
+	buildFreedom(t, freedom)
+}
+
 // A template without a blackhole gets one under a free tag; a freedom outbound that
 // dials through another one gets no final rule, which Xray would ignore anyway.
 func TestInjectEgressFilter_BlackholeAndDialerProxy(t *testing.T) {

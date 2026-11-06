@@ -748,16 +748,16 @@ func injectEgressFilter(cfg *xray.Config, clientTags []string, f egressfilter.Fi
 		rule("mail", map[string]any{"network": "tcp", "port": egressfilter.PortList(mail)})
 	}
 	if f.Private && !privateCovered {
-		rule("private", map[string]any{"ip": []any{"geoip:private"}})
+		rule("private", map[string]any{"ip": []any{"geoip:private"}, "port": egressFreedomPorts})
 	}
 	if f.Server {
-		rule("loopback", map[string]any{"ip": toAnyList(egressLoopback)})
+		rule("loopback", map[string]any{"ip": toAnyList(egressLoopback), "port": egressFreedomPorts})
 		if len(serverPorts) > 0 && len(own.Addrs) > 0 {
 			rule("server", map[string]any{"network": "tcp", "ip": toAnyList(own.Addrs), "port": egressfilter.PortList(serverPorts)})
 		}
 	}
 	if ips := custom.Strings()[:len(custom.V4)+len(custom.V6)]; len(ips) > 0 {
-		rule("custom-ip", map[string]any{"ip": toAnyList(ips)})
+		rule("custom-ip", map[string]any{"ip": toAnyList(ips), "port": egressFreedomPorts})
 	}
 	if len(custom.Ports) > 0 {
 		rule("custom-port", map[string]any{"port": egressfilter.PortList(custom.Ports)})
@@ -826,7 +826,8 @@ type freedomBlocks struct {
 	customIPs   []string
 }
 
-// egressFreedomPorts is every port but DNS, which the filter never blocks.
+// egressFreedomPorts is every port but DNS, which the filter never blocks; blockDelay 0 on a final
+// rule closes a refused connection at once (xray-core holds it 30-90 s by default).
 const egressFreedomPorts = "1-52,54-65535"
 
 // addFreedomBlocks prepends block finalRules (checked after resolution) to every freedom outbound that
@@ -850,7 +851,7 @@ func addFreedomBlocks(outbounds []map[string]any, b freedomBlocks) {
 		existing, _ := settings["finalRules"].([]any)
 		var blocks []any
 		if b.serverPorts != "" {
-			blocks = append(blocks, map[string]any{"action": "block", "network": "tcp", "ip": toAnyList(b.serverIPs), "port": b.serverPorts})
+			blocks = append(blocks, map[string]any{"action": "block", "network": "tcp", "ip": toAnyList(b.serverIPs), "port": b.serverPorts, "blockDelay": 0})
 		}
 		var ips []string
 		if b.private && !finalRulesBlockPrivate(existing) {
@@ -862,7 +863,7 @@ func addFreedomBlocks(outbounds []map[string]any, b freedomBlocks) {
 		ips = append(ips, b.customIPs...)
 		if len(ips) > 0 {
 			slices.Sort(ips)
-			blocks = append(blocks, map[string]any{"action": "block", "ip": toAnyList(slices.Compact(ips)), "port": egressFreedomPorts})
+			blocks = append(blocks, map[string]any{"action": "block", "ip": toAnyList(slices.Compact(ips)), "port": egressFreedomPorts, "blockDelay": 0})
 		}
 		if len(blocks) == 0 {
 			continue
