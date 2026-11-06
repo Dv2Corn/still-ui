@@ -211,6 +211,10 @@ func writeDBSnapshot(dst string) error {
 	return nil
 }
 
+// pgDumpTimeout bounds one pg_dump: a hung server must not hold backupRunMu, and with it every
+// later scheduled backup, forever without a backup.failed alert.
+var pgDumpTimeout = time.Hour
+
 func pgDumpToFile(dst string) error {
 	bin, err := exec.LookPath("pg_dump")
 	if err != nil {
@@ -220,12 +224,18 @@ func pgDumpToFile(dst string) error {
 	if err != nil {
 		return fmt.Errorf("invalid PostgreSQL DSN: %w", err)
 	}
-	cmd := exec.CommandContext(context.Background(), bin, "--format=custom", "--no-owner", "--no-privileges",
+	ctx, cancel := context.WithTimeout(context.Background(), pgDumpTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, bin, "--format=custom", "--no-owner", "--no-privileges",
 		"--file", dst, "--dbname", dbname)
 	cmd.Env = env
+	cmd.WaitDelay = 10 * time.Second
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
+		if ctx.Err() != nil {
+			return fmt.Errorf("pg_dump did not finish within %s: is PostgreSQL answering?", pgDumpTimeout)
+		}
 		return fmt.Errorf("pg_dump failed: %w: %s", err, strings.TrimSpace(stderr.String()))
 	}
 	_ = os.Chmod(dst, 0o600)
