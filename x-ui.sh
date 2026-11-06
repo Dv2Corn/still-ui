@@ -360,26 +360,9 @@ _still_stdin_is_tty() {
 # The data is /etc/still-ui (database, backups, install-result.env, node key)
 # and the env file (PostgreSQL DSN, still-ui settings). install.sh finds both
 # again and comes back with the same login, inbounds and clients.
-# _still_unretire_3xui: a plain install that imported 3x-ui moved x-ui's service files and pointed
-# its acme.sh renewals at still-ui (install.sh _still_import_3xui); an uninstall puts both back.
-_still_unretire_3xui() {
-    local retired=/root/still-ui-3x-ui-retired src dst
-    [[ -d "$retired" ]] || return 0
-    if [[ -s "$retired/acme-hooks.tsv" && -f "${xui_folder}/migrate.sh" ]]; then
-        # shellcheck source=/dev/null
-        if (. "${xui_folder}/migrate.sh" && restore_acme_hooks "$retired/acme-hooks.tsv"); then
-            rm -f "$retired/acme-hooks.tsv"
-        else
-            LOGE "Could not put back every acme.sh renewal hook listed in $retired/acme-hooks.tsv"
-        fi
-    fi
-    [[ -d "$retired/files" ]] || return 0
-    while IFS= read -r -d '' src; do
-        dst="${src#"$retired/files"}"
-        [[ -e "$dst" ]] && continue
-        mkdir -p "$(dirname "$dst")" && mv "$src" "$dst" && echo "Put back ${dst} (3x-ui)"
-    done < <(find "$retired/files" -mindepth 1 \( -name x-ui.service -o -name x-ui.service.d -o -name x-ui \) -prune -print0)
-}
+# still_retired_3xui: the folder where a plain install's 3x-ui import put x-ui's service files
+# and the record of its acme.sh hooks (install.sh _still_import_3xui), with the migrate.sh that undoes it.
+still_retired_3xui=/root/still-ui-3x-ui-retired
 
 uninstall() {
     local data="" arg rc=0 p
@@ -406,7 +389,11 @@ uninstall() {
             confirm "Also delete all data (database /etc/still-ui, clients, settings)?" "n" && data=purge
         fi
     fi
-    _still_unretire_3xui
+    # With the data gone nothing of still-ui comes back, so 3x-ui does: its unit and acme.sh hooks.
+    # Kept data is for a reinstall, which does not import 3x-ui again: 3x-ui stays retired.
+    if [[ "$data" == "purge" && -f "${still_retired_3xui}/migrate.sh" ]]; then
+        bash "${still_retired_3xui}/migrate.sh" restore-import "${still_retired_3xui}" || rc=1
+    fi
 
     if [[ $release == "alpine" ]]; then
         rc-service still-ui stop
@@ -480,6 +467,9 @@ uninstall() {
         echo ""
         echo "Installing still-ui again uses this data: same login, inbounds and clients."
         echo -e "To delete it: ${yellow}rm -rf /etc/still-ui ${db_env_file}${plain}"
+        if [[ -f "${still_retired_3xui}/migrate.sh" ]]; then
+            echo -e "3x-ui stays retired. To go back to it: ${yellow}bash ${still_retired_3xui}/migrate.sh restore-import ${still_retired_3xui} && systemctl enable --now x-ui${plain}"
+        fi
     fi
     echo "If you need to install this panel again, you can use below command:"
     echo -e "${green}bash <(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh)${plain}"

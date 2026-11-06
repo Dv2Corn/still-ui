@@ -728,6 +728,34 @@ restore_acme_hooks() {
     return "$rc"
 }
 
+# restore_import DIR: undoes what a plain install's 3x-ui import retired into DIR (install.sh
+# _still_import_3xui): x-ui's service files go back to their paths, acme.sh hooks to x-ui.
+restore_import() {
+    local dir="${1%/}" src dst rc=0
+    [[ -d "${dir}/files" || -f "${dir}/acme-hooks.tsv" ]] || die "${dir} holds nothing a 3x-ui import retired."
+    if [[ -s "${dir}/acme-hooks.tsv" ]]; then
+        if restore_acme_hooks "${dir}/acme-hooks.tsv"; then
+            rm -f "${dir}/acme-hooks.tsv"
+        else
+            err "Could not put back every acme.sh renewal hook listed in ${dir}/acme-hooks.tsv."
+            rc=1
+        fi
+    fi
+    if [[ -d "${dir}/files" ]]; then
+        while IFS= read -r -d '' src; do
+            dst="${src#"${dir}/files"}"
+            if [[ -e "$dst" ]]; then
+                warn "${dst} exists; leaving the retired copy in ${src}."
+                continue
+            fi
+            (umask 022 && mkdir -p "$(dirname "$dst")") && mv "$src" "$dst" && info "Put back ${dst}" || rc=1
+        done < <(find "${dir}/files" -mindepth 1 \( -name x-ui.service -o -name x-ui.service.d -o -name x-ui \) -prune -print0)
+    fi
+    command -v systemctl > /dev/null 2>&1 && systemctl daemon-reload > /dev/null 2>&1
+    ((rc == 0)) && info "3x-ui is back; start it with: systemctl enable --now x-ui"
+    return "$rc"
+}
+
 # Keeps 3x-ui from starting next to still-ui: its unit is in the backup.
 retire_xui() {
     local d
@@ -1029,9 +1057,10 @@ cmd_rollback() {
 
 usage() {
     cat << EOF
-usage: $0 migrate | migrate-rollback [BACKUP_DIR]
+usage: $0 migrate | migrate-rollback [BACKUP_DIR] | restore-import DIR
   migrate            move this host's 3x-ui to still-ui (backup, checks, automatic rollback)
   migrate-rollback   restore 3x-ui from the newest (or the given) /root/still-ui-migrate-* backup
+  restore-import     put back what a plain install's 3x-ui import retired into DIR
 EOF
 }
 
@@ -1044,6 +1073,9 @@ main() {
         migrate-rollback | rollback)
             shift
             cmd_rollback "$@"
+            ;;
+        restore-import)
+            restore_import "${2:?usage: $0 restore-import DIR}"
             ;;
         *)
             usage

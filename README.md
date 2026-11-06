@@ -280,7 +280,7 @@ still-ui migrate-rollback
 
 Changes made in still-ui after the migration (new clients, traffic counters) do not travel back to 3x-ui. Without a terminal, set `STILL_UI_MIGRATE_YES=1`. A PostgreSQL setup needs `pg_dump` and `pg_restore` on the server. Tested on Debian 12 and Ubuntu 24.04 with 3x-ui 3.11.0 (SQLite and PostgreSQL), 3.7.0, 2.9.4, 2.6.7, 2.4.11, 2.3.15, 2.2.8 and 2.0.2 (`scripts/test-migrate.sh`).
 
-A plain install also offers to take over `/etc/x-ui/x-ui.db` (non-interactive: `STILL_UI_IMPORT_3XUI=yes`), without the checks and the backup above. It stops 3x-ui, moves its unit to `/root/still-ui-3x-ui-retired/` and points acme.sh renewals at still-ui too; `still-ui uninstall` puts both back.
+A plain install also offers to take over `/etc/x-ui/x-ui.db` (non-interactive: `STILL_UI_IMPORT_3XUI=yes`), without the checks and the backup above. It stops 3x-ui, moves its unit to `/root/still-ui-3x-ui-retired/` and points acme.sh renewals at still-ui too; `bash /root/still-ui-3x-ui-retired/migrate.sh restore-import /root/still-ui-3x-ui-retired` puts both back (`still-ui uninstall --purge` runs it; an uninstall that keeps the data for a reinstall leaves 3x-ui retired).
 
 The panel and the subscription server pick up a renewed certificate file within half a minute, without a restart.
 

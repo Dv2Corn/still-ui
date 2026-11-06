@@ -195,13 +195,12 @@ mutate "install: 3x-ui import leaves acme.sh restarting x-ui" install.sh _still_
     'install.sh: the 3x-ui import retires x-ui'"'"'s unit and points acme.sh renewals at still-ui'
 mutate "install: retired drop-in folders collide" install.sh _still_import_3xui 'mv "$unit" "${retired}/files${unit}"' 'rm -rf "${retired}/files/$(basename "$unit")"; mv "$unit" "${retired}/files/$(basename "$unit")"' \
     'install.sh: the 3x-ui import retires x-ui'"'"'s unit and points acme.sh renewals at still-ui'
-mutate "menu: uninstall leaves acme.sh restarting still-ui" x-ui.sh _still_unretire_3xui '&& restore_acme_hooks "$retired/acme-hooks.tsv"' '&& :' \
-    'x-ui.sh: uninstall puts back what a 3x-ui import retired'
-mutate "menu: uninstall leaves x-ui's unit retired" x-ui.sh _still_unretire_3xui 'mv "$src" "$dst" &&' 'false &&' \
-    'x-ui.sh: uninstall puts back what a 3x-ui import retired'
-mutate "menu: uninstall does not put 3x-ui back" x-ui.sh uninstall '    _still_unretire_3xui
-' '' \
-    'x-ui.sh: uninstall puts x-ui'"'"'s retired unit back before reloading systemd'
+mutate "menu: uninstall --purge leaves 3x-ui retired" x-ui.sh uninstall '"$data" == "purge" && -f "${still_retired_3xui}/migrate.sh"' '"$data" == "never" && -f "${still_retired_3xui}/migrate.sh"' \
+    'x-ui.sh: uninstall --purge puts back what a 3x-ui import retired'
+mutate "menu: kept-data uninstall brings 3x-ui back" x-ui.sh uninstall '"$data" == "purge" && -f "${still_retired_3xui}/migrate.sh"' '-f "${still_retired_3xui}/migrate.sh"' \
+    'x-ui.sh: uninstall keeping the data leaves an imported 3x-ui retired'
+mutate "install: 3x-ui import keeps no migrate.sh to undo it" install.sh _still_import_3xui 'cp "${xui_folder}/migrate.sh" "${retired}/migrate.sh" &&' 'false &&' \
+    'install.sh: the retired migrate.sh puts back'
 mutate "menu: uninstall keeps the torrent block" x-ui.sh uninstall '        nft delete table inet still_torrent_block > /dev/null 2>&1' '        :' \
     'x-ui.sh: uninstall removes the program and, by default, keeps the data (exit 0)'
 mutate "menu: reinstall hint from a branch" x-ui.sh uninstall 'https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh' 'https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh' \

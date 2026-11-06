@@ -665,23 +665,27 @@ import_retires_xui() {
     count "$R/root/still-ui-3x-ui-retired/acme-hooks.tsv" "Le_ReloadCmd" 1
 }
 t "install.sh: the 3x-ui import retires x-ui's unit and points acme.sh renewals at still-ui" import_retires_xui
-# The way back from an import is 'still-ui uninstall': with the hooks left on still-ui, a renewal
-# started still-ui next to 3x-ui, or (still-ui gone) never restarted 3x-ui on a 6-day certificate.
+# The way back from an import: with the hooks left on still-ui, a renewal started still-ui next
+# to 3x-ui, or (still-ui gone) never restarted 3x-ui on a 6-day certificate.
 import_way_back() {
     import_setup || return 1
-    STILL_UI_IMPORT_3XUI=yes _still_import_3xui > /dev/null
-    load "$XUI_SH" _still_unretire_3xui || return 1
-    LOGE() { echo "[ERR] $*"; }
-    _still_unretire_3xui > "$R/out"
+    STILL_UI_IMPORT_3XUI=yes _still_import_3xui > "$R/out"
+    local kept="$R/root/still-ui-3x-ui-retired"
+    has "$R/out" "bash $kept/migrate.sh restore-import $kept"
+    # The retired copy of migrate.sh runs on its own (still-ui may be gone); systemctl is the stub.
+    rm -f "$xui_folder/migrate.sh"
+    export R
+    export -f systemctl log_call
+    bash "$kept/migrate.sh" restore-import "$kept" > "$R/out" 2>&1 || afail "restore-import failed: $(cat "$R/out")"
     has "$xui_service/x-ui.service" "ExecStart=/usr/local/x-ui/x-ui"
     has "$xui_service/x-ui.service.d/50-local.conf" "MemoryMax=450M"
     has "$R/etc/systemd/system.control/x-ui.service.d/50-MemoryMax.conf" "MemoryMax=650M"
     local conf="$R/acme/203.0.113.5_ecc/203.0.113.5.conf" cmd
     cmd=$(sed -n "s/^Le_ReloadCmd='__ACME_BASE64__START_\(.*\)__ACME_BASE64__END_'$/\1/p" "$conf" | base64 -d)
     eq "$cmd" "systemctl restart x-ui 2>/dev/null || rc-service x-ui restart 2>/dev/null || true" "(reload command back)"
-    hasnt "$R/out" "[ERR]"
+    called "systemctl daemon-reload"
 }
-t "x-ui.sh: uninstall puts back what a 3x-ui import retired: x-ui's unit, drop-ins and acme.sh hooks" import_way_back
+t "install.sh: the retired migrate.sh puts back x-ui's unit, drop-ins and acme.sh hooks of a 3x-ui import" import_way_back
 import_no() {
     import_setup || return 1
     _still_import_3xui > /dev/null
@@ -961,7 +965,8 @@ t "update.sh: a read-only install folder stops the update before anything change
 
 xui_setup() {
     fresh_root
-    for f in uninstall delete_script xui_env_file_path confirm postgresql_installed _still_stdin_is_tty _still_unretire_3xui; do load "$XUI_SH" "$f" || return 1; done
+    for f in uninstall delete_script xui_env_file_path confirm postgresql_installed _still_stdin_is_tty; do load "$XUI_SH" "$f" || return 1; done
+    still_retired_3xui="$R/root/still-ui-3x-ui-retired"
     purge_postgresql() { log_call purge_postgresql; }
     show_menu() { log_call show_menu; }
     LOGE() { echo "[ERR] $*"; }
@@ -1028,16 +1033,31 @@ uninstall_default_keeps() {
     not_called purge_postgresql
 }
 t "x-ui.sh: uninstall removes the program and, by default, keeps the data (exit 0)" uninstall_default_keeps
-uninstall_unretires() {
+# retired_setup: what a 3x-ui import left, with a migrate.sh that records being run.
+retired_setup() {
+    mkdir -p "$still_retired_3xui/files$xui_service"
+    printf '[Service]\n' > "$still_retired_3xui/files$xui_service/x-ui.service"
+    printf '#!/bin/bash\necho "$*" > "%s/restore-run"\n' "$R" > "$still_retired_3xui/migrate.sh"
+}
+# Kept data is for a reinstall, which never imports 3x-ui again: putting 3x-ui's unit and hooks
+# back here would start it next to the reinstalled still-ui at the next renewal.
+uninstall_keep_leaves_3xui_retired() {
     xui_setup || return 1
-    mkdir -p "$R/root/still-ui-3x-ui-retired/files$xui_service"
-    printf '[Service]\n' > "$R/root/still-ui-3x-ui-retired/files$xui_service/x-ui.service"
+    retired_setup
     un $'y\n' 0
     eq "$st" 0 "(exit status)"
-    has "$xui_service/x-ui.service" "[Service]"
-    called "systemctl daemon-reload"
+    [[ ! -e "$R/restore-run" ]] || afail "3x-ui restored although still-ui's data is kept"
+    has "$R/out" "bash $still_retired_3xui/migrate.sh restore-import $still_retired_3xui"
 }
-t "x-ui.sh: uninstall puts x-ui's retired unit back before reloading systemd" uninstall_unretires
+t "x-ui.sh: uninstall keeping the data leaves an imported 3x-ui retired and says how to go back" uninstall_keep_leaves_3xui_retired
+uninstall_unretires() {
+    xui_setup || return 1
+    retired_setup
+    un '' 0 --purge
+    eq "$st" 0 "(exit status)"
+    eq "$(cat "$R/restore-run" 2> /dev/null)" "restore-import $still_retired_3xui" "(migrate.sh call)"
+}
+t "x-ui.sh: uninstall --purge puts back what a 3x-ui import retired" uninstall_unretires
 uninstall_answer_no_keeps() {
     xui_setup || return 1
     un $'y\nn\n' 0

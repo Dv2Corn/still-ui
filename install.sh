@@ -558,14 +558,16 @@ _still_import_3xui() {
             echo -e "${yellow}Could not move ${unit} aside; x-ui can still be started.${plain}"
     done
     [[ $release == "alpine" ]] || systemctl daemon-reload > /dev/null 2>&1
+    # A copy of migrate.sh stays with the retired files: it puts them back, still-ui installed or not.
     if [[ -f "${xui_folder}/migrate.sh" ]]; then
+        cp "${xui_folder}/migrate.sh" "${retired}/migrate.sh" && chmod 700 "${retired}/migrate.sh"
         (
             # shellcheck source=/dev/null
             . "${xui_folder}/migrate.sh" && retarget_acme_hooks "${retired}/acme-hooks.tsv"
         )
     fi
     echo -e "${green}Copied the 3x-ui database to /etc/still-ui/x-ui.db; x-ui is stopped and its service file is in ${retired}.${plain}"
-    echo -e "${green}Your panel login, inbounds and clients are kept. To go back: still-ui uninstall (it puts x-ui's service file and acme.sh renewals back), then systemctl enable --now x-ui.${plain}"
+    echo -e "${green}Your panel login, inbounds and clients are kept. To go back to 3x-ui: stop still-ui, then bash ${retired}/migrate.sh restore-import ${retired} && systemctl enable --now x-ui.${plain}"
 }
 
 # write_install_result <user> <pass> <port> <webpath> <scheme> <host> <token> <dbtype>

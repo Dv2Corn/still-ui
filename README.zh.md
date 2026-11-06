@@ -243,7 +243,7 @@ still-ui migrate-rollback
 
 迁移后在 still-ui 中做的改动（新客户端、流量计数）不会同步回 3x-ui。没有终端时，请设置 `STILL_UI_MIGRATE_YES=1`。使用 PostgreSQL 时，服务器上需要有 `pg_dump` 和 `pg_restore`。已在 Debian 12 和 Ubuntu 24.04 上测试，3x-ui 版本为 3.11.0（SQLite 和 PostgreSQL）、3.7.0、2.9.4、2.6.7、2.4.11、2.3.15、2.2.8 和 2.0.2（`scripts/test-migrate.sh`）。
 
-普通安装也会提议接管 `/etc/x-ui/x-ui.db`（非交互方式：`STILL_UI_IMPORT_3XUI=yes`），但不包含上述检查和备份。它会停止 3x-ui，把它的单元文件移到 `/root/still-ui-3x-ui-retired/`，同样让 acme.sh 续期指向 still-ui；`still-ui uninstall` 会把两者恢复原样。
+普通安装也会提议接管 `/etc/x-ui/x-ui.db`（非交互方式：`STILL_UI_IMPORT_3XUI=yes`），但不包含上述检查和备份。它会停止 3x-ui，把它的单元文件移到 `/root/still-ui-3x-ui-retired/`，同样让 acme.sh 续期指向 still-ui；`bash /root/still-ui-3x-ui-retired/migrate.sh restore-import /root/still-ui-3x-ui-retired` 会把两者恢复原样（`still-ui uninstall --purge` 会自动执行；保留数据以便重装的卸载会让 3x-ui 保持停用）。
 
 面板和订阅服务器会在半分钟内自动使用续期后的证书文件，无需重启。
 

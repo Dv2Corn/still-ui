@@ -243,7 +243,7 @@ still-ui migrate-rollback
 
 تغییراتی که پس از مهاجرت در still-ui ایجاد شده‌اند (کلاینت‌های جدید، شمارنده‌های ترافیک) به 3x-ui برنمی‌گردند. بدون ترمینال، `STILL_UI_MIGRATE_YES=1` را تنظیم کنید. راه‌اندازی با PostgreSQL به `pg_dump` و `pg_restore` روی سرور نیاز دارد. آزموده‌شده روی Debian 12 و Ubuntu 24.04 با 3x-ui 3.11.0 (SQLite و PostgreSQL)، 3.7.0، 2.9.4، 2.6.7، 2.4.11، 2.3.15، 2.2.8 و 2.0.2 (`scripts/test-migrate.sh`).
 
-نصب معمولی هم پیشنهاد می‌کند `/etc/x-ui/x-ui.db` را بردارد (بدون تعامل: `STILL_UI_IMPORT_3XUI=yes`)، اما بدون بررسی‌ها و پشتیبانی که در بالا آمد. این کار 3x-ui را متوقف می‌کند، یونیت آن را به `/root/still-ui-3x-ui-retired/` منتقل می‌کند و تمدیدهای acme.sh را هم به still-ui می‌سپارد؛ `still-ui uninstall` هر دو را برمی‌گرداند.
+نصب معمولی هم پیشنهاد می‌کند `/etc/x-ui/x-ui.db` را بردارد (بدون تعامل: `STILL_UI_IMPORT_3XUI=yes`)، اما بدون بررسی‌ها و پشتیبانی که در بالا آمد. این کار 3x-ui را متوقف می‌کند، یونیت آن را به `/root/still-ui-3x-ui-retired/` منتقل می‌کند و تمدیدهای acme.sh را هم به still-ui می‌سپارد؛ `bash /root/still-ui-3x-ui-retired/migrate.sh restore-import /root/still-ui-3x-ui-retired` هر دو را برمی‌گرداند (`still-ui uninstall --purge` آن را اجرا می‌کند؛ حذفی که داده‌ها را برای نصب دوباره نگه می‌دارد، 3x-ui را کنار گذاشته باقی می‌گذارد).
 
 پنل و سرور اشتراک، فایل گواهیِ تمدیدشده را ظرف نیم دقیقه و بدون راه‌اندازی دوباره به کار می‌گیرند.
 
