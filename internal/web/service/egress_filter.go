@@ -149,7 +149,7 @@ func (s *EgressFilterService) ServerPorts() []uint16 {
 			ports = append(ports, uint16(p))
 		}
 	}
-	if p, err := s.settingService.GetPort(); err == nil {
+	if p, err := s.settingService.GetListenPort(); err == nil {
 		add(p)
 	}
 	for _, p := range sshdPorts(sshdConfigPath) {
@@ -168,13 +168,15 @@ func (s *EgressFilterService) ServerPorts() []uint16 {
 	return slices.Compact(ports)
 }
 
-// sshdPorts reads "Port" lines from sshd_config and its drop-in directory; 22 when none.
+// sshdPorts reads sshd_config and its drop-ins: a ListenAddress with a port listens there, one
+// without listens on the Port values (22 when there are none).
 func sshdPorts(path string) []int {
 	files := []string{path}
 	if more, err := filepath.Glob(filepath.Join(filepath.Dir(path), "sshd_config.d", "*.conf")); err == nil {
 		files = append(files, more...)
 	}
-	var ports []int
+	var ports, listenPorts []int
+	portlessListen, anyListen := false, false
 	for _, file := range files {
 		f, err := os.Open(file)
 		if err != nil {
@@ -183,19 +185,43 @@ func sshdPorts(path string) []int {
 		sc := bufio.NewScanner(f)
 		for sc.Scan() {
 			fields := strings.Fields(sc.Text())
-			if len(fields) < 2 || !strings.EqualFold(fields[0], "port") {
+			if len(fields) < 2 {
 				continue
 			}
-			if p, err := strconv.Atoi(fields[1]); err == nil && p > 0 && p <= 65535 {
-				ports = append(ports, p)
+			switch {
+			case strings.EqualFold(fields[0], "port"):
+				if p, err := strconv.Atoi(fields[1]); err == nil && p > 0 && p <= 65535 {
+					ports = append(ports, p)
+				}
+			case strings.EqualFold(fields[0], "listenaddress"):
+				anyListen = true
+				if p, ok := listenAddressPort(fields[1]); ok {
+					listenPorts = append(listenPorts, p)
+				} else {
+					portlessListen = true
+				}
 			}
 		}
 		_ = f.Close()
 	}
 	if len(ports) == 0 {
-		return []int{22}
+		ports = []int{22}
 	}
-	return ports
+	out := listenPorts
+	if !anyListen || portlessListen {
+		out = append(out, ports...)
+	}
+	slices.Sort(out)
+	return slices.Compact(out)
+}
+
+func listenAddressPort(addr string) (int, bool) {
+	_, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return 0, false
+	}
+	p, err := strconv.Atoi(port)
+	return p, err == nil && p > 0 && p <= 65535
 }
 
 func interfaceAddrs() []string {
@@ -436,6 +462,10 @@ var egressNodeSync = struct {
 	m map[int]*egressNodeSyncState
 }{m: map[int]*egressNodeSyncState{}}
 
+// egressSyncRun lets one SyncNodes run at a time, from reading the settings to recording the
+// results, so a push of an older filter can never reach a node after a newer one.
+var egressSyncRun sync.Mutex
+
 func egressNodeStates() []EgressFilterNodeState {
 	egressNodeSync.Lock()
 	defer egressNodeSync.Unlock()
@@ -477,6 +507,8 @@ func pushEgressFilterToNode(ctx context.Context, n *model.Node, req ManagedEgres
 // SyncNodes hands the filter to nodes in scope and releases the rest, once per change or restart;
 // unreachable or refusing nodes are retried later (force retries refused ones now).
 func (s *EgressFilterService) SyncNodes(force bool) {
+	egressSyncRun.Lock()
+	defer egressSyncRun.Unlock()
 	nodes, err := s.nodeService.GetAll()
 	if err != nil || len(nodes) == 0 {
 		return
@@ -722,16 +754,16 @@ func injectEgressFilter(cfg *xray.Config, clientTags []string, f egressfilter.Fi
 		rule("mail", map[string]any{"network": "tcp", "port": egressfilter.PortList(mail)})
 	}
 	if f.Private && !privateCovered {
-		rule("private", map[string]any{"ip": []any{"geoip:private"}})
+		rule("private", map[string]any{"ip": []any{"geoip:private"}, "port": egressFreedomPorts})
 	}
 	if f.Server {
-		rule("loopback", map[string]any{"ip": toAnyList(egressLoopback)})
+		rule("loopback", map[string]any{"ip": toAnyList(egressLoopback), "port": egressFreedomPorts})
 		if len(serverPorts) > 0 && len(own.Addrs) > 0 {
 			rule("server", map[string]any{"network": "tcp", "ip": toAnyList(own.Addrs), "port": egressfilter.PortList(serverPorts)})
 		}
 	}
 	if ips := custom.Strings()[:len(custom.V4)+len(custom.V6)]; len(ips) > 0 {
-		rule("custom-ip", map[string]any{"ip": toAnyList(ips)})
+		rule("custom-ip", map[string]any{"ip": toAnyList(ips), "port": egressFreedomPorts})
 	}
 	if len(custom.Ports) > 0 {
 		rule("custom-port", map[string]any{"port": egressfilter.PortList(custom.Ports)})
@@ -800,7 +832,8 @@ type freedomBlocks struct {
 	customIPs   []string
 }
 
-// egressFreedomPorts is every port but DNS, which the filter never blocks.
+// egressFreedomPorts is every port but DNS, which the filter never blocks; blockDelay 0 on a final
+// rule closes a refused connection at once (xray-core holds it 30-90 s by default).
 const egressFreedomPorts = "1-52,54-65535"
 
 // addFreedomBlocks prepends block finalRules (checked after resolution) to every freedom outbound that
@@ -824,7 +857,7 @@ func addFreedomBlocks(outbounds []map[string]any, b freedomBlocks) {
 		existing, _ := settings["finalRules"].([]any)
 		var blocks []any
 		if b.serverPorts != "" {
-			blocks = append(blocks, map[string]any{"action": "block", "network": "tcp", "ip": toAnyList(b.serverIPs), "port": b.serverPorts})
+			blocks = append(blocks, map[string]any{"action": "block", "network": "tcp", "ip": toAnyList(b.serverIPs), "port": b.serverPorts, "blockDelay": 0})
 		}
 		var ips []string
 		if b.private && !finalRulesBlockPrivate(existing) {
@@ -836,7 +869,7 @@ func addFreedomBlocks(outbounds []map[string]any, b freedomBlocks) {
 		ips = append(ips, b.customIPs...)
 		if len(ips) > 0 {
 			slices.Sort(ips)
-			blocks = append(blocks, map[string]any{"action": "block", "ip": toAnyList(slices.Compact(ips)), "port": egressFreedomPorts})
+			blocks = append(blocks, map[string]any{"action": "block", "ip": toAnyList(slices.Compact(ips)), "port": egressFreedomPorts, "blockDelay": 0})
 		}
 		if len(blocks) == 0 {
 			continue

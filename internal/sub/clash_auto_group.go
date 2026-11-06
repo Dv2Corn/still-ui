@@ -10,9 +10,8 @@ import (
 // their own. Custom Clash rules and remote templates may reference it.
 const clashAutoGroupName = "Auto"
 
-// ClashAutoGroup configures the Clash/Mihomo "Auto" group. With Enabled the
-// group lists every proxy and is the first, default choice of the PROXY
-// select group; manual choice stays available there.
+// ClashAutoGroup configures the Clash/Mihomo "Auto" group: when Enabled it tests every proxy and is
+// the first, default choice of PROXY, where manual choice stays.
 type ClashAutoGroup struct {
 	Enabled   bool
 	Type      string
@@ -30,9 +29,8 @@ func defaultClashAutoGroup() ClashAutoGroup {
 	}
 }
 
-// normalized replaces values a client would reject with the defaults, so a
-// hand-edited database row cannot break every Clash subscription.
-// NewSUBController applies it once to whatever the settings hold.
+// normalized replaces values a client would reject with the defaults, so a hand-edited row cannot
+// break every Clash subscription; NewSUBController applies it once.
 func (g ClashAutoGroup) normalized() ClashAutoGroup {
 	def := defaultClashAutoGroup()
 	g.Type = strings.TrimSpace(g.Type)
@@ -88,14 +86,8 @@ func loadClashAutoGroup(settings *service.SettingService) ClashAutoGroup {
 	return g
 }
 
-// clashProxyGroups builds the PROXY select group and, when wanted, the Auto
-// group. names are the selectable proxies (without DIRECT); members are the
-// real proxies the Auto group may test.
-//
-// The Auto group is shown — first in PROXY, so it is the default — only when
-// enabled and there is a choice to make (two or more proxies). It is still
-// emitted, outside PROXY, when the custom rules mention it, so a template that
-// routes to Auto keeps working for a single-proxy or Auto-off subscription.
+// clashProxyGroups builds PROXY (names, then DIRECT) and Auto (members): Auto leads PROXY when on with
+// two or more proxies, and is emitted outside PROXY whenever the custom rules route to it.
 func (g ClashAutoGroup) clashProxyGroups(names, members []string, templateMentionsAuto bool) []map[string]any {
 	show := g.Enabled && len(members) >= 2
 	selectable := make([]string, 0, len(names)+2)

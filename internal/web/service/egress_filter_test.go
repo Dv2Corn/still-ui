@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/xtls/xray-core/infra/conf"
 
@@ -236,6 +237,43 @@ func TestInjectEgressFilter_PrivateRuleOnlyWhenNotAlreadyBlocked(t *testing.T) {
 	}
 }
 
+// DNS (port 53) passes every address block, as in the nftables half and the UI text, and a
+// blocked freedom destination is closed at once instead of being held open for 30-90 s.
+func TestInjectEgressFilter_KeepsDNSAndRefusesAtOnce(t *testing.T) {
+	cfg := &xray.Config{
+		InboundConfigs:  []xray.InboundConfig{{Tag: "in-a"}},
+		RouterConfig:    json_util.RawMessage(`{"rules":[]}`),
+		OutboundConfigs: json_util.RawMessage(`[{"tag":"direct","protocol":"freedom"},{"tag":"blocked","protocol":"blackhole"}]`),
+	}
+	injectEgressFilter(cfg, []string{"in-a"}, egressfilter.Filter{Private: true, Server: true, Custom: []string{"203.0.113.0/24"}},
+		egressOwnTargets{Addrs: []string{"192.0.2.1"}, Ports: []uint16{2053}})
+	rules := routingRules(t, cfg)
+	for _, tag := range []string{"egress-filter-private", "egress-filter-loopback", "egress-filter-custom-ip"} {
+		i := slices.IndexFunc(rules, func(r map[string]any) bool { return r["ruleTag"] == tag })
+		if i < 0 || rules[i]["port"] != "1-52,54-65535" {
+			t.Errorf("rule %s = %v, want every port but DNS", tag, rules)
+		}
+	}
+	own := make([]any, 0, len(rules))
+	for _, r := range rules {
+		if r["ruleTag"] != "egress-filter-private" { // geoip needs geo data files
+			own = append(own, r)
+		}
+	}
+	assertXrayAccepts(t, "the egress filter rules", buildGoldenRouting(map[string]any{"rules": own}))
+	freedom := outboundsOf(t, cfg)[0]
+	final, _ := freedom["settings"].(map[string]any)["finalRules"].([]any)
+	if len(final) != 2 {
+		t.Fatalf("finalRules = %v, want the server block and the address block", final)
+	}
+	for _, r := range final {
+		if delay, ok := r.(map[string]any)["blockDelay"]; !ok || delay != float64(0) {
+			t.Errorf("final rule %v: want blockDelay 0, not xray-core's default 30-90 s hold", r)
+		}
+	}
+	buildFreedom(t, freedom)
+}
+
 // A template without a blackhole gets one under a free tag; a freedom outbound that
 // dials through another one gets no final rule, which Xray would ignore anyway.
 func TestInjectEgressFilter_BlackholeAndDialerProxy(t *testing.T) {
@@ -333,6 +371,37 @@ func TestEgressFilterService_ServerPorts(t *testing.T) {
 	got := (&EgressFilterService{}).ServerPorts()
 	if want := []uint16{22, 2053, 2200}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("server ports = %v, want %v (no subscription port 2096, no inbound port 2222)", got, want)
+	}
+}
+
+// The panel listens on XUI_PORT when it is set (docker-compose.yml documents it), not on the stored port.
+func TestEgressFilterService_ServerPortsFollowXUIPort(t *testing.T) {
+	setupConflictDB(t)
+	useFakeEgress(t)
+	t.Setenv("XUI_PORT", "8080")
+	if got, want := (&EgressFilterService{}).ServerPorts(), []uint16{2222, 8080}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("server ports = %v, want %v (the port the panel listens on, not the stored 2053)", got, want)
+	}
+}
+
+// sshd listens on a ListenAddress port instead of Port for that address; Port (22 by default)
+// applies only to addresses given without one.
+func TestSshdPortsReadListenAddress(t *testing.T) {
+	tests := map[string][]int{
+		"ListenAddress 0.0.0.0:2222\n":                                     {2222},
+		"ListenAddress [::]:2200\nListenAddress 0.0.0.0\n":                 {22, 2200},
+		"Port 2022\nListenAddress 10.0.0.1:2222\nListenAddress 10.0.0.2\n": {2022, 2222},
+		"ListenAddress ::\n":                                               {22},
+		"Port 2022\nListenAddress 10.0.0.1:2222\n":                         {2222},
+	}
+	for config, want := range tests {
+		path := filepath.Join(t.TempDir(), "sshd_config")
+		if err := os.WriteFile(path, []byte(config), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if got := sshdPorts(path); !reflect.DeepEqual(got, want) {
+			t.Errorf("sshd_config %q: ports %v, want %v", config, got, want)
+		}
 	}
 }
 
@@ -477,6 +546,53 @@ func TestEgressFilterService_SyncNodes(t *testing.T) {
 	svc.SyncNodes(true)
 	if got := pushes(); len(got) != 1 || got[0].node != a {
 		t.Fatalf("forced retry = %+v, want node a", got)
+	}
+}
+
+// A sync that read the old filter must finish before one for the new filter starts: otherwise
+// the node can take the old push last while the master marks the new one synced.
+func TestEgressFilterService_SyncNodesNeverOvertakesAnEarlierSync(t *testing.T) {
+	setupConflictDB(t)
+	useFakeEgress(t)
+	svc := &EgressFilterService{}
+	a := addEgressNode(t, "a", "online")
+	recordPushes(t, map[int]error{a: errors.New("refused")})
+	oldFilter := egressfilter.Filter{SMTP: true}
+	if _, err := svc.SetLocal(EgressFilterSettings{Filter: oldFilter, NodeScope: EgressNodeScopeSelected, NodeIds: []int{a}}); err != nil {
+		t.Fatal(err)
+	}
+
+	var mu sync.Mutex
+	var delivered []egressfilter.Filter
+	entered, release := make(chan struct{}), make(chan struct{})
+	egressFilterPush = func(_ context.Context, _ *model.Node, req ManagedEgressFilterRequest) error {
+		if !req.Filter.Private {
+			close(entered)
+			<-release
+		}
+		mu.Lock()
+		delivered = append(delivered, *req.Filter)
+		mu.Unlock()
+		return nil
+	}
+	cron := make(chan struct{})
+	go func() { svc.SyncNodes(true); close(cron) }() // the minute cron once the retry delay is over
+	<-entered
+	apply := make(chan error, 1)
+	go func() {
+		_, err := svc.SetLocal(EgressFilterSettings{Filter: egressfilter.Filter{SMTP: true, Private: true}, NodeScope: EgressNodeScopeSelected, NodeIds: []int{a}})
+		apply <- err
+	}()
+	time.Sleep(200 * time.Millisecond)
+	close(release)
+	<-cron
+	if err := <-apply; err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(delivered) != 2 || !delivered[1].Private {
+		t.Fatalf("pushes reached the node as %+v, want the old filter first and the new one last", delivered)
 	}
 }
 

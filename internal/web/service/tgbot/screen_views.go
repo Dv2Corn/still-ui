@@ -251,10 +251,8 @@ func (t *Tgbot) screenCommands(chatID int64, isAdmin bool) {
 	t.renderScreen(chatID, t.newScreen("commands", t.I18nBot(key), t.backRow()))
 }
 
-// sendBackupScreen delivers the backup and summary as ONE message (file plus
-// caption); a summary too long for a caption is sent after the file. The copy
-// is encrypted exactly as a scheduled one (service.PrepareChatBackup), and only
-// an admin chat receives it.
+// sendBackupScreen sends the backup, encrypted as a scheduled one, and its summary as ONE message to
+// an admin chat; a summary too long for a caption follows the file.
 func (t *Tgbot) sendBackupScreen(chatID int64) {
 	if !checkAdmin(chatID) {
 		logger.Warning("Backup asked for in chat ", chatID, ", which is not a Telegram admin chat: not sent")

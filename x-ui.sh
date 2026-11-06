@@ -352,6 +352,10 @@ _still_stdin_is_tty() {
     [[ -t 0 ]]
 }
 
+# still_retired_3xui: the folder where a plain install's 3x-ui import put x-ui's service files
+# and the record of its acme.sh hooks (install.sh _still_import_3xui), with the migrate.sh that undoes it.
+still_retired_3xui=/root/still-ui-3x-ui-retired
+
 # still-ui: uninstall removes the program and keeps the data unless asked.
 #   still-ui uninstall              asks; the data question defaults to No, and
 #                                   without a terminal the data is always kept
@@ -360,10 +364,6 @@ _still_stdin_is_tty() {
 # The data is /etc/still-ui (database, backups, install-result.env, node key)
 # and the env file (PostgreSQL DSN, still-ui settings). install.sh finds both
 # again and comes back with the same login, inbounds and clients.
-# still_retired_3xui: the folder where a plain install's 3x-ui import put x-ui's service files
-# and the record of its acme.sh hooks (install.sh _still_import_3xui), with the migrate.sh that undoes it.
-still_retired_3xui=/root/still-ui-3x-ui-retired
-
 uninstall() {
     local data="" arg rc=0 p
     for arg in "${@:2}"; do
@@ -429,6 +429,14 @@ uninstall() {
     if [[ -r "$db_env_file" ]] && grep -q '^XUI_DB_TYPE=postgres' "$db_env_file"; then
         panel_used_postgres="true"
     fi
+    # A database folder moved with XUI_DB_FOLDER may hold more than still-ui's data: never deleted.
+    local db_folder=""
+    if [[ -r "$db_env_file" ]]; then
+        db_folder=$(sed -n 's/^XUI_DB_FOLDER=//p' "$db_env_file" | tail -n 1)
+        db_folder=${db_folder#[\"\']}
+        db_folder=${db_folder%[\"\']}
+    fi
+    [[ "${db_folder%/}" == /etc/still-ui ]] && db_folder=""
 
     rm ${xui_folder}/ -rf
     # The "x-ui" command migrate.sh left behind runs this menu, which is gone now.
@@ -458,15 +466,19 @@ uninstall() {
     echo ""
     if [[ $rc != 0 ]]; then
         LOGE "Uninstall did not finish; remove the paths above by hand."
+    elif [[ "$data" == "purge" && -n "$db_folder" ]]; then
+        echo -e "Uninstalled Successfully. /etc/still-ui and ${db_env_file} are deleted, but not the database folder ${db_folder} (XUI_DB_FOLDER): delete it yourself if only still-ui uses it.\n"
     elif [[ "$data" == "purge" ]]; then
         echo -e "Uninstalled Successfully, the data is deleted too.\n"
     else
         echo -e "Uninstalled Successfully. The data is kept:\n"
         echo "  /etc/still-ui      database, backups, install-result.env"
+        [[ -n "$db_folder" ]] && echo "  ${db_folder}  database (XUI_DB_FOLDER)"
         [[ -e "$db_env_file" ]] && echo "  ${db_env_file}  settings$([[ "$panel_used_postgres" == "true" ]] && echo ", PostgreSQL connection (the database stays in PostgreSQL)")"
         echo ""
         echo "Installing still-ui again uses this data: same login, inbounds and clients."
         echo -e "To delete it: ${yellow}rm -rf /etc/still-ui ${db_env_file}${plain}"
+        [[ -n "$db_folder" ]] && echo "The database folder ${db_folder} is not in that command: delete it too if only still-ui uses it."
         if [[ -f "${still_retired_3xui}/migrate.sh" ]]; then
             echo -e "3x-ui stays retired. To go back to it: ${yellow}bash ${still_retired_3xui}/migrate.sh restore-import ${still_retired_3xui} && systemctl enable --now x-ui${plain}"
         fi

@@ -291,10 +291,8 @@ func (a *ServerController) installXray(c *gin.Context) {
 	jsonMsg(c, I18nWeb(c, "pages.index.xraySwitchVersionPopover"), err)
 }
 
-// updatePanel starts a panel self-update to the latest release. A "dev=true"
-// form value (sent by the master node updater of older releases) is refused:
-// still-ui publishes no dev builds. The response's runId identifies this
-// update for a later getUpdateStatus poll.
+// updatePanel starts a self-update to the latest release and returns its runId for getUpdateStatus;
+// dev=true (an older master's node updater) is refused, as still-ui publishes no dev builds.
 func (a *ServerController) updatePanel(c *gin.Context) {
 	devParam := c.PostForm("dev")
 	var runID int64
@@ -323,9 +321,8 @@ func (a *ServerController) getUpdateStatus(c *gin.Context) {
 	jsonObj(c, a.panelService.GetUpdateStatus(), nil)
 }
 
-// setUpdateChannel stores the update channel. still-ui publishes no dev
-// builds, so only the stable channel can be chosen; turning the dev channel
-// off (a setting left by an older release) still works.
+// setUpdateChannel stores the update channel: only stable, as still-ui publishes no dev builds;
+// turning off a dev channel an older release left on still works.
 func (a *ServerController) setUpdateChannel(c *gin.Context) {
 	dev, err := strconv.ParseBool(c.PostForm("dev"))
 	if err != nil {

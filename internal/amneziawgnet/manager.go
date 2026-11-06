@@ -158,15 +158,14 @@ func (m *Manager) Ensure(d Desired) error {
 // Device in place via IpcSet); or the interface's own address(es)/effective
 // MTU changed -- S4 counts, the default MTU derives from it (these are fixed
 // at netstack-construction time, so the only option is closing the old
-// Device and building a fresh one). I1-I5 also rebuild: amneziawg-go cannot
-// change them under live traffic without a data race (see
-// signaturePacketsFingerprint). Like an MTU edit, that resets the inbound's
-// open in-tunnel connections, which a rare admin edit of I1-I5 can afford.
+// Device and building a fresh one).
 func (m *Manager) ensureLocked(d Desired) error {
 	inst, opts := d.Instance, d.Options
 	if opts.Logger == nil {
 		opts.Logger = verboseLoggerIfEnabled(inst.Id)
 	}
+	// I1-I5 rebuild like an MTU edit and reset open tunnels; a rare edit can afford
+	// that, an IpcSet of them races live handshakes (signaturePacketsFingerprint).
 	structFP := addressFingerprint(inst) + "|" + signaturePacketsFingerprint(inst.Obfuscation)
 
 	cur, exists := m.ifaces[inst.Id]

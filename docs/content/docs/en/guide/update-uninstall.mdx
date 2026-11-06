@@ -92,7 +92,8 @@ Menu option **6** or `still-ui uninstall`. It stops and disables the panel and
 the `still-xray` service, removes their units and drop-ins, the `still-xray`
 user, the install folder and the menu, and **keeps the data**: the database,
 backups and `install-result.env` in `/etc/still-ui/` and the env file
-(`/etc/default/still-ui`, or `/etc/sysconfig/still-ui` on RHEL). Installing
+(`/etc/default/still-ui` on Debian and Ubuntu, `/etc/sysconfig/still-ui` on
+RHEL, `/etc/conf.d/still-ui` on Arch, Manjaro and Alpine). Installing
 still-ui again picks them up, so the panel comes back with the same login,
 inbounds and clients.
 
@@ -109,7 +110,13 @@ Deleting the data of a panel that used a locally installed PostgreSQL also
 offers to purge PostgreSQL (a separate, irreversible confirmation). The command
 exits 0 when everything was removed and 1 when something could not be.
 
+A database folder moved with `XUI_DB_FOLDER` is never deleted, even with
+`--purge`: it may hold other data. The command names it; delete it yourself if
+only still-ui uses it.
+
 <Callout type="info">
-  Unlike 3x-ui, nothing is deleted unless you ask. To remove kept data later:
-  `rm -rf /etc/still-ui /etc/default/still-ui`.
+  Unlike 3x-ui, nothing is deleted unless you ask. To remove kept data later,
+  delete `/etc/still-ui` and the env file above, for example
+  `rm -rf /etc/still-ui /etc/default/still-ui` on Debian and Ubuntu; the
+  uninstall prints the exact command for the server.
 </Callout>

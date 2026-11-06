@@ -33,9 +33,8 @@ import (
 // It handles panel restart, updates, and system-level panel controls.
 type PanelService struct{}
 
-// PanelUpdateInfo contains the current and latest available panel versions.
-// Channel is always "stable": still-ui publishes no dev builds. The commit
-// fields are kept for API compatibility and stay empty.
+// PanelUpdateInfo contains the current and latest panel versions. Channel is always "stable" (no dev
+// builds); the commit fields stay empty, kept for API compatibility.
 type PanelUpdateInfo struct {
 	Channel         string `json:"channel"`
 	CurrentVersion  string `json:"currentVersion"`
@@ -46,10 +45,8 @@ type PanelUpdateInfo struct {
 }
 
 const (
-	// releaseDownloadBase is where release files live: <base>/<tag>/<name>.
-	// The updater is a release file listed in that release's SHA256SUMS, so
-	// the script that runs as root is the one the release build published and
-	// attested, never a branch head.
+	// releaseDownloadBase/<tag>/<name> are release files: the updater run as root is the one the
+	// release build published, attested and listed in SHA256SUMS, never a branch head.
 	releaseDownloadBase  = "https://github.com/" + config.ReleaseRepo + "/releases/download"
 	panelUpdaterName     = "update.sh"
 	releaseSumsName      = "SHA256SUMS"
@@ -142,9 +139,8 @@ func (s *PanelService) RestartPanel(delay time.Duration) error {
 	return nil
 }
 
-// GetUpdateInfo checks GitHub for the latest still-ui release and compares
-// it with the running version. A dev-channel setting left on by an older
-// release is ignored: still-ui publishes no dev builds.
+// GetUpdateInfo compares the latest still-ui release with the running version; a dev channel left
+// on by an older release is ignored (no dev builds).
 func (s *PanelService) GetUpdateInfo() (*PanelUpdateInfo, error) {
 	latest, err := fetchLatestPanelVersion()
 	if err != nil {
@@ -159,9 +155,8 @@ func (s *PanelService) GetUpdateInfo() (*PanelUpdateInfo, error) {
 	}, nil
 }
 
-// StartUpdate starts the official updater for the latest release. Returns the
-// run ID to pass to GetUpdateStatus so the caller can tell this run's result
-// apart from a stale one.
+// StartUpdate starts the updater for the latest release and returns the run ID that tells this run's
+// result in GetUpdateStatus apart from a stale one.
 func (s *PanelService) StartUpdate() (int64, error) {
 	return s.startUpdate()
 }
@@ -217,9 +212,8 @@ func (s *PanelService) startUpdate() (int64, error) {
 		return 0, fmt.Errorf("bash is required to run the panel updater: %w", err)
 	}
 
-	// The updater of the release it installs: update.sh from that release,
-	// checked against the release's SHA256SUMS, and XUI_UPDATE_TAG makes it
-	// install that same release.
+	// update.sh of the release it installs, checked against that release's SHA256SUMS;
+	// XUI_UPDATE_TAG makes it install that same release.
 	updateTag, err := fetchLatestPanelVersion()
 	if err != nil {
 		return 0, fmt.Errorf("find the latest release: %w", err)
@@ -364,10 +358,8 @@ func releaseUpdateSlot() {
 	updateMu.Unlock()
 }
 
-// downloadPanelUpdater downloads update.sh of release tag from base and
-// returns the path of a 0700 temp file holding it. The script must match the
-// sha256 the release's SHA256SUMS lists for it; a missing SHA256SUMS, a
-// missing entry or a mismatch refuse the update and leave no file behind.
+// downloadPanelUpdater writes update.sh of release tag to a 0700 temp file only if it matches the
+// release's SHA256SUMS; a missing list, entry or a mismatch refuse and leave no file.
 func downloadPanelUpdater(ctx context.Context, client *http.Client, base, tag string) (string, error) {
 	if !releaseTagRegex.MatchString(tag) {
 		return "", fmt.Errorf("download panel updater: %q is not a release tag", tag)

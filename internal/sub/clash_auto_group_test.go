@@ -328,6 +328,18 @@ rules:
   - MATCH,PROXY
 `
 
+const remoteClashTemplateAutoBackToProxy = `
+proxy-groups:
+  - name: Auto
+    type: select
+    proxies: [Streaming, DIRECT]
+  - name: Streaming
+    type: select
+    proxies: [PROXY, DIRECT]
+rules:
+  - MATCH,PROXY
+`
+
 func TestClashAutoGroupRemoteTemplates(t *testing.T) {
 	if _, _, err := normalizeClashRouting([]byte(remoteClashTemplateWithAuto)); err != nil {
 		t.Fatalf("a remote template that uses Auto is refused at fetch time: %v", err)
@@ -377,6 +389,20 @@ func TestClashAutoGroupRemoteTemplates(t *testing.T) {
 				}
 				if count != 1 {
 					t.Fatalf("Auto groups = %d, want the template's one:\n%s", count, out)
+				}
+				if groupMembers(t, clashGroup(doc, "PROXY"))[0] != "Auto" {
+					t.Fatalf("the template's own Auto is not the default in PROXY:\n%s", out)
+				}
+			},
+		},
+		{
+			name: "own Auto leads back to PROXY", template: remoteClashTemplateAutoBackToProxy, proxies: 2, auto: autoGroupOn(),
+			check: func(t *testing.T, out string, doc clashDoc) {
+				if !slicesContain(groupMembers(t, clashGroup(doc, "Auto")), "Streaming") {
+					t.Fatalf("template's own Auto was replaced:\n%s", out)
+				}
+				if slicesContain(groupMembers(t, clashGroup(doc, "PROXY")), "Auto") {
+					t.Fatalf("PROXY -> Auto -> Streaming -> PROXY is a loop Mihomo refuses:\n%s", out)
 				}
 			},
 		},

@@ -109,11 +109,13 @@ func TestNodeInviteStoresOnlyTheHashAndPinsTheMaster(t *testing.T) {
 
 func TestNodeInviteRefusesPlainHTTPMaster(t *testing.T) {
 	f := newEnrollFixture(t)
-	if _, err := f.svc.CreateInvite(context.Background(), NodeInviteInput{MasterUrl: "http://master.example.com:2053/"}); err == nil {
-		t.Fatal("an invitation for a plain-HTTP master would send its token in clear text")
+	if _, err := f.svc.CreateInvite(context.Background(), NodeInviteInput{MasterUrl: "http://master.example.com:2053/"}); err == nil ||
+		!strings.Contains(err.Error(), "must be https://") {
+		t.Fatalf("plain-HTTP master: %v; an invitation for it would send its token in clear text", err)
 	}
-	if _, err := f.svc.CreateInvite(context.Background(), NodeInviteInput{MasterUrl: "https://m.example.com/", ValidMinutes: 2}); err == nil {
-		t.Fatal("validity below 5 minutes accepted")
+	if _, err := f.svc.CreateInvite(context.Background(), NodeInviteInput{MasterUrl: "https://m.example.com/", ValidMinutes: 2}); err == nil ||
+		!strings.Contains(err.Error(), "valid for 5 minutes to 24 hours") {
+		t.Fatalf("validity below 5 minutes: %v", err)
 	}
 }
 
@@ -199,8 +201,8 @@ func TestNodeEnrollRefusesRevokedAndExpired(t *testing.T) {
 	if _, err := f.svc.Enroll(context.Background(), inv.Token, goodRequest(), "203.0.113.7"); !errors.Is(err, ErrNodeInviteUnauthorized) {
 		t.Fatalf("revoked: %v", err)
 	}
-	if err := f.svc.RevokeInvite(views[0].Id); err == nil {
-		t.Fatal("revoking twice must say there is nothing to revoke")
+	if err := f.svc.RevokeInvite(views[0].Id); err == nil || !strings.Contains(err.Error(), "no unused invitation with that id") {
+		t.Fatalf("revoking twice: %v, want it to say there is nothing to revoke", err)
 	}
 
 	_, inv = f.invite(t, NodeInviteInput{ValidMinutes: 10})
@@ -308,8 +310,9 @@ func TestNodeInvitePendingCap(t *testing.T) {
 	for range nodeInviteMaxPending {
 		f.invite(t, NodeInviteInput{})
 	}
-	if _, err := f.svc.CreateInvite(context.Background(), NodeInviteInput{MasterUrl: "https://m.example.com/"}); err == nil {
-		t.Fatal("unbounded unused invitations")
+	if _, err := f.svc.CreateInvite(context.Background(), NodeInviteInput{MasterUrl: "https://m.example.com/"}); err == nil ||
+		!strings.Contains(err.Error(), "unused invitations; revoke some first") {
+		t.Fatalf("over the pending cap: %v, want the cap refusal", err)
 	}
 }
 

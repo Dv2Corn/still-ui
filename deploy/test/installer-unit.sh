@@ -1140,6 +1140,23 @@ uninstall_pg() {
     not_called purge_postgresql
 }
 t "x-ui.sh: the PostgreSQL purge is offered only when deleting the data of a PostgreSQL panel" uninstall_pg
+uninstall_db_folder() {
+    xui_setup || return 1
+    mkdir -p "$R/srv/still-db"
+    echo db > "$R/srv/still-db/x-ui.db"
+    printf 'XUI_XRAY_UNIT=still-xray\nXUI_DB_FOLDER="%s"\n' "$R/srv/still-db" > "$R/etc/default/still-ui"
+    un '' 0 --purge
+    eq "$st" 0 "(exit status)"
+    eq "$(cat "$R/srv/still-db/x-ui.db" 2> /dev/null)" db "(a folder XUI_DB_FOLDER names is never deleted)"
+    hasnt "$R/out" "the data is deleted too"
+    has "$R/out" "$R/srv/still-db"
+    xui_setup || return 1
+    mkdir -p "$R/srv/still-db"
+    printf 'XUI_DB_FOLDER=%s\n' "$R/srv/still-db" > "$R/etc/default/still-ui"
+    un '' 0 --keep-data
+    has "$R/out" "$R/srv/still-db"
+}
+t "x-ui.sh: uninstall names the database folder XUI_DB_FOLDER moved, and --purge never claims it is gone" uninstall_db_folder
 uninstall_xui_wrapper() {
     xui_setup || return 1
     printf "#!/bin/sh\n# Installed by still-ui's migrate.sh: this host now runs still-ui.\nexec /usr/bin/still-ui \"\$@\"\n" > "$R/usr/bin/x-ui"

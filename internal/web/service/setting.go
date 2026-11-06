@@ -787,6 +787,14 @@ func (s *SettingService) GetPort() (int, error) {
 	return s.getInt("webPort")
 }
 
+// GetListenPort is the port the panel listens on: a valid XUI_PORT overrides the stored webPort.
+func (s *SettingService) GetListenPort() (int, error) {
+	if port, configured, err := config.GetPortOverride(); configured && err == nil {
+		return port, nil
+	}
+	return s.GetPort()
+}
+
 func (s *SettingService) SetPort(port int) error {
 	return s.setInt("webPort", port)
 }

@@ -284,14 +284,16 @@ type unitMeta struct {
 	TuicRelays     map[string]int    `json:"tuicRelays,omitempty"`
 	RelayPasswords map[string]string `json:"relayPasswords,omitempty"`
 	CoreVersion    string            `json:"coreVersion,omitempty"`
+	// CoreStillBuild is nil in metadata written before the build was recorded.
+	CoreStillBuild *bool `json:"coreStillBuild,omitempty"`
 }
 
 // RelayPasswords supplies the loopback relay passwords kept beside the unit's config (0600, root),
 // so a restarted panel reuses them instead of trusting whatever a config's inbounds claim.
 var RelayPasswords func() map[string]string
 
-func writeUnitMeta(cfg *Config, coreVersion string) error {
-	meta := unitMeta{CoreVersion: coreVersion}
+func writeUnitMeta(cfg *Config, coreVersion string, coreStillBuild bool) error {
+	meta := unitMeta{CoreVersion: coreVersion, CoreStillBuild: &coreStillBuild}
 	if RelayPasswords != nil {
 		meta.RelayPasswords = RelayPasswords()
 	}
@@ -328,14 +330,14 @@ func applyUnitMeta(cfg *Config, meta unitMeta) {
 }
 
 // writeUnitConfig installs data as the unit's config and as its last known good copy.
-func writeUnitConfig(cfg *Config, data []byte, coreVersion string) error {
+func writeUnitConfig(cfg *Config, data []byte, coreVersion string, coreStillBuild bool) error {
 	if err := writeFileAtomic(unitConfigPath(), data, 0o640); err != nil {
 		return err
 	}
 	if err := writeFileAtomic(unitLastGoodPath(), data, 0o640); err != nil {
 		return err
 	}
-	return writeUnitMeta(cfg, coreVersion)
+	return writeUnitMeta(cfg, coreVersion, coreStillBuild)
 }
 
 // startUnit tests the config, installs it and restarts the unit; a config that passes the test
@@ -378,7 +380,7 @@ func (p *process) startUnit() error {
 			logger.Warning("xray unit: could not record the last good config:", err)
 		}
 		p.refreshVersion()
-		if err := writeUnitMeta(p.config, p.GetXrayVersion()); err != nil {
+		if err := writeUnitMeta(p.config, p.GetXrayVersion(), p.IsStillBuild()); err != nil {
 			logger.Warning("xray unit: could not record config metadata:", err)
 		}
 		pruneCertMirrors(p.config)
@@ -463,9 +465,14 @@ func AdoptRunningUnit() *Process {
 	p.unit = u
 	p.adoptedRelayPasswords = meta.RelayPasswords
 	p.refreshVersion()
-	if installed := p.GetXrayVersion(); binaryReplacedSince(st) && meta.CoreVersion != installed {
+	installed, installedStill := p.GetXrayVersion(), p.IsStillBuild()
+	otherBuild := meta.CoreStillBuild != nil && *meta.CoreStillBuild != installedStill
+	if binaryReplacedSince(st) && (meta.CoreVersion != installed || otherBuild) {
 		p.mu.Lock()
 		p.version, p.installedVersion = cmp.Or(meta.CoreVersion, "Unknown"), installed
+		if meta.CoreStillBuild != nil {
+			p.stillBuild, p.installedStillBuild = *meta.CoreStillBuild, installedStill
+		}
 		p.mu.Unlock()
 	}
 	p.refreshAPIPort()
@@ -510,7 +517,18 @@ func (p *Process) CoreRestartNeeded() string {
 	if p.installedVersion == "" {
 		return ""
 	}
-	return fmt.Sprintf("Xray %s is installed but the running core is still %s: restart Xray to run it", p.installedVersion, p.version)
+	installed, running := p.installedVersion, p.version
+	if installed == running {
+		installed, running = installed+" ("+xrayBuildLabel(p.installedStillBuild)+")", running+" ("+xrayBuildLabel(p.stillBuild)+")"
+	}
+	return fmt.Sprintf("Xray %s is installed but the running core is still %s: restart Xray to run it", installed, running)
+}
+
+func xrayBuildLabel(still bool) string {
+	if still {
+		return "still-ui build"
+	}
+	return "official build"
 }
 
 // makeUnitFolder creates a missing folder the core reads through its group; an existing one is
