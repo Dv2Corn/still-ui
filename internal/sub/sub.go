@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mhsanaei/3x-ui/v3/internal/certreload"
 	"github.com/mhsanaei/3x-ui/v3/internal/logger"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/common"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/locale"
@@ -430,12 +431,12 @@ func (s *Server) Start() (err error) {
 		return err
 	}
 
+	certreload.Register("subscription", nil)
 	if certFile != "" || keyFile != "" {
-		cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+		pair, err := certreload.Load(certFile, keyFile)
 		if err == nil {
-			c := &tls.Config{
-				Certificates: []tls.Certificate{cert},
-			}
+			certreload.Register("subscription", pair)
+			c := &tls.Config{GetCertificate: pair.GetCertificate}
 			listener = network.NewAutoHttpsListener(listener)
 			listener = tls.NewListener(listener, c)
 			logger.Info("Sub server running HTTPS on", listener.Addr())
@@ -467,6 +468,7 @@ func (s *Server) Start() (err error) {
 // Stop gracefully shuts down the subscription server and closes the listener.
 func (s *Server) Stop() error {
 	s.cancel()
+	certreload.Register("subscription", nil)
 	if s.sub != nil {
 		s.sub.Close()
 	}

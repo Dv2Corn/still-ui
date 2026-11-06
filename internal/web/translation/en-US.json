@@ -2695,6 +2695,7 @@
       "tokenOnce": "Copy the token now: the panel keeps only its hash and cannot show it again.",
       "installCommand": "Install on the probe machine (Linux, as root):",
       "installHint": "The command installs the agent with Xray and a systemd timer, then runs the first check.",
+      "insecureHttp": "This panel is open over plain http://. The installer refuses an http:// panel address: the probe's token, the panel's secret path and the keys of every inbound it checks would cross the network in clear text, in front of the censor the probe sits behind. Open the panel over https:// (a certificate in the panel settings) and create the command there.",
       "token": "Token",
       "deleteConfirm": "Delete probe \"{name}\"?",
       "deleteHint": "Its token stops working, its client is removed from the inbounds and its history is deleted.",

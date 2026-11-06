@@ -75,7 +75,7 @@ load() {
     ' "$file")
     [[ -n "$def" ]] || { echo "missing function $name in $file"; return 1; }
     def=$(printf '%s\n' "$def" | sed -E \
-        "s#(^|[^A-Za-z0-9_.}/])(/proc/meminfo|/swapfile|/etc/[A-Za-z0-9._-]+|/run/systemd/system|/usr/bin|/var/log/still-[a-z]+|/root/still-ui-migrate)#\1${R}\2#g")
+        "s#(^|[^A-Za-z0-9_.}/])(/proc/meminfo|/swapfile|/etc/[A-Za-z0-9._-]+|/run/systemd/system|/usr/bin|/var/log/still-[a-z]+|/root/still-ui-migrate|/root/still-ui-3x-ui-retired)#\1${R}\2#g")
     # Anything else absolute that is not a stubbed program path is a test bug.
     left=$(printf '%s\n' "${def//"$R"/@ROOT@}" | grep -v '^[[:space:]]*#' |
         grep -oE '(^|[^A-Za-z0-9_.}/$@])/(etc|proc|run|var|usr|root|swapfile|sys|boot|opt|home|srv)(/[A-Za-z0-9._-]*)*' |
@@ -157,7 +157,9 @@ case "$1" in
     xray-unit-check)
         if [[ "${2:-}" == -h ]]; then
             [[ "${STUB_UNIT_CHECK:-new}" == old ]] && { echo "unknown command"; exit 2; }
-            echo "  -net-admin   the drop-in grants CAP_NET_ADMIN"; exit 0
+            echo "  -net-admin   the unit grants CAP_NET_ADMIN"
+            [[ "${STUB_UNIT_CHECK:-new}" == no-devices ]] || echo "  -devices     PrivateDevices=no"
+            exit 0
         fi
         [[ "${STUB_UNIT_CHECK_RC:-0}" == 0 ]] || echo "inbound 3 needs TPROXY"
         exit "${STUB_UNIT_CHECK_RC:-0}" ;;
@@ -397,12 +399,32 @@ for script in "$INSTALL_SH" "$UPDATE_SH"; do
     t "$s: an unknown STILL_XRAY_UNIT value is treated as auto" xray_bogus
     xray_net_admin() {
         xray_setup || return 1
+        _still_xray_unit > /dev/null || return 1
+        count "$R/calls" "x-ui xray-unit-check -net-admin" 1
+        # A template without the capability is checked without it.
+        sed -i 's/ CAP_NET_ADMIN$//' "$xui_folder/still-xray.service"
+        : > "$R/calls"
+        _still_xray_unit > /dev/null || return 1
+        called "x-ui xray-unit-check"
+        not_called "-net-admin"
         mkdir -p "$xui_service/still-xray.service.d"
         printf '[Service]\nAmbientCapabilities=CAP_NET_ADMIN\n' > "$xui_service/still-xray.service.d/30-local.conf"
         _still_xray_unit > /dev/null || return 1
         called "x-ui xray-unit-check -net-admin"
     }
-    t "$s: a local CAP_NET_ADMIN drop-in is passed to xray-unit-check" xray_net_admin
+    t "$s: the CAP_NET_ADMIN of the unit or a local drop-in is passed to xray-unit-check" xray_net_admin
+    xray_devices() {
+        xray_setup || return 1
+        mkdir -p "$xui_service/still-xray.service.d"
+        printf '[Service]\nPrivateDevices=no\n' > "$xui_service/still-xray.service.d/30-tun.conf"
+        _still_xray_unit > /dev/null || return 1
+        called "x-ui xray-unit-check -net-admin -devices"
+        : > "$R/calls"
+        STUB_UNIT_CHECK=no-devices _still_xray_unit > /dev/null || return 1
+        called "x-ui xray-unit-check -net-admin"
+        not_called "-devices"
+    }
+    t "$s: a PrivateDevices=no drop-in is passed as -devices when the check knows it" xray_devices
     xray_no_systemd() {
         xray_setup || return 1
         rmdir "$R/run/systemd/system"
@@ -595,7 +617,19 @@ import_setup() {
     echo db > "$R/etc/x-ui/x-ui.db"
     echo wal > "$R/etc/x-ui/x-ui.db-wal"
     echo key > "$R/etc/x-ui/node_token_key.json"
-    echo 'XUI_DB_TYPE=sqlite' > "$R/etc/default/x-ui"
+    printf 'XUI_DB_TYPE=sqlite\nXUI_DB_FOLDER=/etc/x-ui\nexport XUI_LOG_FOLDER=/var/log/x-ui\n' > "$R/etc/default/x-ui"
+    printf '[Service]\nExecStart=/usr/local/x-ui/x-ui\n' > "$xui_service/x-ui.service"
+    mkdir -p "$xui_service/x-ui.service.d"
+    printf '[Service]\nMemoryMax=450M\n' > "$xui_service/x-ui.service.d/50-local.conf"
+    mkdir -p "$R/etc/systemd/system.control/x-ui.service.d"
+    printf '[Service]\nMemoryMax=650M\n' > "$R/etc/systemd/system.control/x-ui.service.d/50-MemoryMax.conf"
+    # 3x-ui's acme.sh certificate for the server IP, reloadcmd base64-encoded as acme.sh 3.x writes it.
+    export STILL_UI_ACME_HOME="$R/acme"
+    mkdir -p "$R/acme/203.0.113.5_ecc"
+    printf "Le_Domain='203.0.113.5'\nLe_ReloadCmd='__ACME_BASE64__START_%s__ACME_BASE64__END_'\nLe_NextRenewTime='1'\n" \
+        "$(printf '%s' 'systemctl restart x-ui 2>/dev/null || rc-service x-ui restart 2>/dev/null || true' | base64 -w0)" \
+        > "$R/acme/203.0.113.5_ecc/203.0.113.5.conf"
+    cp "$repo_root/migrate.sh" "$xui_folder/migrate.sh"
 }
 import_yes() {
     import_setup || return 1
@@ -604,11 +638,54 @@ import_yes() {
     eq "$(cat "$R/etc/still-ui/x-ui.db-wal")" wal
     eq "$(cat "$R/etc/still-ui/node_token_key.json")" key
     has "$R/etc/default/still-ui" XUI_DB_TYPE=sqlite
+    hasnt "$R/etc/default/still-ui" XUI_DB_FOLDER
+    hasnt "$R/etc/default/still-ui" XUI_LOG_FOLDER
+    eq "$(stat -c %a "$R/etc/default/still-ui")" 600 "(env file mode)"
     eq "$(cat "$R/etc/x-ui/x-ui.db")" db "(3x-ui's database changed)"
     called "systemctl stop x-ui"
     called "systemctl disable x-ui"
 }
 t "install.sh: STILL_UI_IMPORT_3XUI=yes copies the 3x-ui database and stops x-ui" import_yes
+# After the import 3x-ui's acme.sh renewal ran "systemctl restart x-ui": 3x-ui came up next to
+# still-ui on the same ports, while still-ui's own certificate expired.
+import_retires_xui() {
+    import_setup || return 1
+    STILL_UI_IMPORT_3XUI=yes _still_import_3xui > "$R/out"
+    [[ ! -e "$xui_service/x-ui.service" && ! -e "$xui_service/x-ui.service.d" ]] || afail "x-ui's unit can still start"
+    local kept="$R/root/still-ui-3x-ui-retired/files"
+    has "$kept$xui_service/x-ui.service" "ExecStart=/usr/local/x-ui/x-ui"
+    has "$kept$xui_service/x-ui.service.d/50-local.conf" "MemoryMax=450M"
+    # Two drop-in folders of the same name (an operator's and systemctl set-property's) both survive.
+    has "$kept$R/etc/systemd/system.control/x-ui.service.d/50-MemoryMax.conf" "MemoryMax=650M"
+    called "systemctl daemon-reload"
+    local conf="$R/acme/203.0.113.5_ecc/203.0.113.5.conf" cmd
+    cmd=$(sed -n "s/^Le_ReloadCmd='__ACME_BASE64__START_\(.*\)__ACME_BASE64__END_'$/\1/p" "$conf" | base64 -d)
+    eq "$cmd" "systemctl restart still-ui 2>/dev/null || rc-service still-ui restart 2>/dev/null || true" "(reload command)"
+    has "$conf" "Le_NextRenewTime='1'"
+    count "$R/root/still-ui-3x-ui-retired/acme-hooks.tsv" "Le_ReloadCmd" 1
+}
+t "install.sh: the 3x-ui import retires x-ui's unit and points acme.sh renewals at still-ui" import_retires_xui
+# The way back from an import: with the hooks left on still-ui, a renewal started still-ui next
+# to 3x-ui, or (still-ui gone) never restarted 3x-ui on a 6-day certificate.
+import_way_back() {
+    import_setup || return 1
+    STILL_UI_IMPORT_3XUI=yes _still_import_3xui > "$R/out"
+    local kept="$R/root/still-ui-3x-ui-retired"
+    has "$R/out" "bash $kept/migrate.sh restore-import $kept"
+    # The retired copy of migrate.sh runs on its own (still-ui may be gone); systemctl is the stub.
+    rm -f "$xui_folder/migrate.sh"
+    export R
+    export -f systemctl log_call
+    bash "$kept/migrate.sh" restore-import "$kept" > "$R/out" 2>&1 || afail "restore-import failed: $(cat "$R/out")"
+    has "$xui_service/x-ui.service" "ExecStart=/usr/local/x-ui/x-ui"
+    has "$xui_service/x-ui.service.d/50-local.conf" "MemoryMax=450M"
+    has "$R/etc/systemd/system.control/x-ui.service.d/50-MemoryMax.conf" "MemoryMax=650M"
+    local conf="$R/acme/203.0.113.5_ecc/203.0.113.5.conf" cmd
+    cmd=$(sed -n "s/^Le_ReloadCmd='__ACME_BASE64__START_\(.*\)__ACME_BASE64__END_'$/\1/p" "$conf" | base64 -d)
+    eq "$cmd" "systemctl restart x-ui 2>/dev/null || rc-service x-ui restart 2>/dev/null || true" "(reload command back)"
+    called "systemctl daemon-reload"
+}
+t "install.sh: the retired migrate.sh puts back x-ui's unit, drop-ins and acme.sh hooks of a 3x-ui import" import_way_back
 import_no() {
     import_setup || return 1
     _still_import_3xui > /dev/null
@@ -889,6 +966,7 @@ t "update.sh: a read-only install folder stops the update before anything change
 xui_setup() {
     fresh_root
     for f in uninstall delete_script xui_env_file_path confirm postgresql_installed _still_stdin_is_tty; do load "$XUI_SH" "$f" || return 1; done
+    still_retired_3xui="$R/root/still-ui-3x-ui-retired"
     purge_postgresql() { log_call purge_postgresql; }
     show_menu() { log_call show_menu; }
     LOGE() { echo "[ERR] $*"; }
@@ -922,6 +1000,9 @@ program_gone() {
     called "userdel still-xray"
     called "systemctl daemon-reload"
     called "nft delete table inet still_egress_filter"
+    called "nft delete table inet still_torrent_block"
+    has "$R/out" "releases/latest/download/install.sh"
+    hasnt "$R/out" "raw.githubusercontent.com"
     local p
     for p in "$xui_service/still-ui.service" "$xui_service/still-ui.service.d" "$xui_service/still-xray.service" \
         "$xui_service/still-xray.service.d" "$R/etc/still-xray" "$R/var/log/still-xray" "$xui_folder" "$R/usr/bin/still-ui"; do
@@ -952,6 +1033,31 @@ uninstall_default_keeps() {
     not_called purge_postgresql
 }
 t "x-ui.sh: uninstall removes the program and, by default, keeps the data (exit 0)" uninstall_default_keeps
+# retired_setup: what a 3x-ui import left, with a migrate.sh that records being run.
+retired_setup() {
+    mkdir -p "$still_retired_3xui/files$xui_service"
+    printf '[Service]\n' > "$still_retired_3xui/files$xui_service/x-ui.service"
+    printf '#!/bin/bash\necho "$*" > "%s/restore-run"\n' "$R" > "$still_retired_3xui/migrate.sh"
+}
+# Kept data is for a reinstall, which never imports 3x-ui again: putting 3x-ui's unit and hooks
+# back here would start it next to the reinstalled still-ui at the next renewal.
+uninstall_keep_leaves_3xui_retired() {
+    xui_setup || return 1
+    retired_setup
+    un $'y\n' 0
+    eq "$st" 0 "(exit status)"
+    [[ ! -e "$R/restore-run" ]] || afail "3x-ui restored although still-ui's data is kept"
+    has "$R/out" "bash $still_retired_3xui/migrate.sh restore-import $still_retired_3xui"
+}
+t "x-ui.sh: uninstall keeping the data leaves an imported 3x-ui retired and says how to go back" uninstall_keep_leaves_3xui_retired
+uninstall_unretires() {
+    xui_setup || return 1
+    retired_setup
+    un '' 0 --purge
+    eq "$st" 0 "(exit status)"
+    eq "$(cat "$R/restore-run" 2> /dev/null)" "restore-import $still_retired_3xui" "(migrate.sh call)"
+}
+t "x-ui.sh: uninstall --purge puts back what a 3x-ui import retired" uninstall_unretires
 uninstall_answer_no_keeps() {
     xui_setup || return 1
     un $'y\nn\n' 0
@@ -1205,8 +1311,9 @@ xray_unit() {
     local u="$UNIT_DIR/still-xray.service"
     has "$u" "User=still-xray"
     has "$u" "Group=still-xray"
-    eq "$(sed -n 's/^AmbientCapabilities=//p' "$u")" CAP_NET_BIND_SERVICE
-    eq "$(sed -n 's/^CapabilityBoundingSet=//p' "$u")" CAP_NET_BIND_SERVICE
+    eq "$(sed -n 's/^AmbientCapabilities=//p' "$u")" "CAP_NET_BIND_SERVICE CAP_NET_ADMIN"
+    eq "$(sed -n 's/^CapabilityBoundingSet=//p' "$u")" "CAP_NET_BIND_SERVICE CAP_NET_ADMIN"
+    has "$u" "PrivateDevices=yes"
     has "$u" "NoNewPrivileges=yes"
     has "$u" "ProtectSystem=strict"
     has "$u" "Restart=always"
@@ -1215,7 +1322,7 @@ xray_unit() {
     has "$u" "Environment=XRAY_LOCATION_ASSET=@XRAY_ASSETS@"
     if grep -qE '^(BindsTo|PartOf|Requires)=.*still-ui' "$u"; then echo "still-xray tied to the panel"; return 1; fi
 }
-t "units: still-xray runs unprivileged with CAP_NET_BIND_SERVICE only and outlives the panel" xray_unit
+t "units: still-xray runs unprivileged with CAP_NET_BIND_SERVICE and CAP_NET_ADMIN only and outlives the panel" xray_unit
 
 echo
 echo "$passes passed, $failures failed"

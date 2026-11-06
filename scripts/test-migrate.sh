@@ -37,6 +37,13 @@ PANEL_PORT=2053
 BASE_PATH=panelpath
 FAILED=0
 RESULTS=()
+# The reload command 3x-ui's install.sh gives acme.sh for an IP certificate.
+XUI_RELOAD='systemctl restart x-ui 2>/dev/null || rc-service x-ui restart 2>/dev/null || true'
+ACME_DIR=/root/.acme.sh/203.0.113.9_ecc
+ACME_CONF="$ACME_DIR/203.0.113.9.conf"
+# hook: the reload command in ACME_CONF, decoded.
+# shellcheck disable=SC2016
+ACME_HOOK='hook() { local v; v=$(sed -n "s/^Le_ReloadCmd=.__ACME_BASE64__START_\(.*\)__ACME_BASE64__END_.$/\1/p" '"$ACME_CONF"'); printf "%s" "$v" | base64 -d; }'
 
 log() { echo "[$(date +%H:%M:%S)] $*"; }
 
@@ -191,6 +198,13 @@ run_case() { # ct image tag mode
     check "$ct" "3x-ui $tag runs with Xray" "systemctl is-active x-ui && xray_exe | grep -q '^/usr/local/x-ui/'"
     snapshot "$ct" /root/t/pre "$PRE_DB"
     in_ct "$ct" "(cd / && find usr/local/x-ui -type f ! -name config.json ! -name '*.log' -print0 | xargs -0 sha256sum) > /root/t/xui-files.sha256"
+    # An acme.sh certificate as 3x-ui's installer sets it up for the server IP (the container
+    # cannot get a real one): its renewal must restart still-ui after the migration.
+    printf "Le_Domain='203.0.113.9'\nLe_ReloadCmd='__ACME_BASE64__START_%s__ACME_BASE64__END_'\nLe_NextRenewTime='1'\n" \
+        "$(printf '%s' "$XUI_RELOAD" | base64 -w0)" > "$LOG_DIR/acme.conf"
+    in_ct "$ct" "mkdir -p $ACME_DIR"
+    incus file push -q "$LOG_DIR/acme.conf" "$ct$ACME_CONF"
+    in_ct "$ct" "sha256sum $ACME_CONF > /root/t/acme.sha256"
 
     local env="STILL_UI_ARCHIVE=/root/t/still-ui-linux-amd64.tar.gz STILL_UI_INSTALL_SCRIPT=/root/t/install.sh STILL_UI_MIGRATE_SCRIPT=/root/t/migrate.sh STILL_UI_MIGRATE_YES=1"
     local rc
@@ -218,6 +232,7 @@ run_case() { # ct image tag mode
         check "$ct" "automatic rollback: 3x-ui active and enabled, still-ui gone" \
             "systemctl is-active x-ui && systemctl is-enabled x-ui && ! systemctl cat still-ui && [[ ! -e /usr/local/still-ui && ! -e /usr/bin/still-ui && ! -e /etc/still-ui ]]"
         check "$ct" "backup state is rolled-back" "grep -qx rolled-back /root/still-ui-migrate-*/STATE"
+        check "$ct" "acme.sh renewal hook untouched" "sha256sum --quiet -c /root/t/acme.sha256"
     else
         in_ct "$ct" "$env bash /root/t/install.sh migrate" > "$LOG_DIR/migrate.log" 2>&1
         rc=$?
@@ -229,6 +244,12 @@ run_case() { # ct image tag mode
             "B=\$(ls -d /root/still-ui-migrate-*); [[ \$(stat -c %a \$B) == 700 ]] && (cd \$B && sha256sum --quiet -c manifest.sha256) && grep -qx migrated \$B/STATE"
         check "$ct" "same login works on still-ui" "python3 /root/t/test-migrate-seed.py http://127.0.0.1:$PANEL_PORT/$BASE_PATH $USER_NAME $USER_PASS --check-login"
         check "$ct" "'x-ui' opens still-ui's menu" "grep -q 'exec /usr/bin/still-ui' /usr/bin/x-ui"
+        check "$ct" "packages were installed while 3x-ui still ran" \
+            "B=\$(ls -d /root/still-ui-migrate-*); [[ -s \$B/install-deps.log ]] && grep -q 'Packages were installed before 3x-ui was stopped' \$B/install.log"
+        check "$ct" "acme.sh renewal now restarts still-ui, and that works" \
+            "$ACME_HOOK; [[ \$(hook) == '${XUI_RELOAD//x-ui/still-ui}' ]] && grep -qx \"Le_NextRenewTime='1'\" $ACME_CONF &&
+             pid=\$(systemctl show -p MainPID --value still-ui) && bash -c \"\$(hook)\" && sleep 3 && systemctl is-active still-ui &&
+             [[ \$(systemctl show -p MainPID --value still-ui) != \"\$pid\" ]]"
         snapshot "$ct" /root/t/migrated "$STILL_DB"
         if same_view "$ct" pre migrated > "$LOG_DIR/view-migrated.txt" 2>&1; then
             log "  ok   same ports, inbounds, answers; subscriptions: $(tr -s ' \n' ' ' < "$LOG_DIR/view-migrated.txt")"
@@ -247,6 +268,7 @@ run_case() { # ct image tag mode
         rc=$?
         sed 's/^/  | /' "$LOG_DIR/rollback.log" | grep -E 'ok  |running again|differs|FAIL|finished' | head -n 10
         result "$rc" "migrate-rollback exit 0" "migrate-rollback exit $rc"
+        check "$ct" "acme.sh renewal restarts x-ui again" "$ACME_HOOK; [[ \$(hook) == '$XUI_RELOAD' ]]"
         check "$ct" "3x-ui active and enabled again, still-ui gone" \
             "systemctl is-active x-ui && systemctl is-enabled x-ui && ! systemctl cat still-ui && [[ ! -e /usr/local/still-ui && ! -e /usr/bin/still-ui && ! -e /etc/still-ui ]] && ! grep -q 'exec /usr/bin/still-ui' /usr/bin/x-ui"
         if [[ "$mode" == "pg" ]]; then

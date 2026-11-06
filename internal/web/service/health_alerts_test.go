@@ -1,11 +1,16 @@
 package service
 
 import (
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/pem"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
+	"github.com/mhsanaei/3x-ui/v3/internal/certreload"
 	"github.com/mhsanaei/3x-ui/v3/internal/eventbus"
 	"github.com/mhsanaei/3x-ui/v3/internal/health"
 )
@@ -103,5 +108,88 @@ func TestDiskChecksDeduplicateFileSystems(t *testing.T) {
 	}
 	if diskChecks(0) != nil {
 		t.Fatal("threshold 0 must turn the check off")
+	}
+}
+
+func expiry(c *x509.Certificate) any {
+	if c == nil {
+		return nil
+	}
+	return c.NotAfter
+}
+
+func writeKeyPair(t *testing.T, dir string, c tls.Certificate) (string, string) {
+	t.Helper()
+	keyDER, err := x509.MarshalPKCS8PrivateKey(c.PrivateKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	certFile, keyFile := filepath.Join(dir, "fullchain.pem"), filepath.Join(dir, "privkey.pem")
+	writeTree(t, dir, map[string]string{
+		"fullchain.pem": string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: c.Certificate[0]})),
+		"privkey.pem":   string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyDER})),
+	})
+	return certFile, keyFile
+}
+
+// The alert follows what the panel listener serves: a renewed file it has not taken yet does not
+// hide the expiring certificate clients still get, and without a listener the file is read.
+func TestListenerCertIsTheServedCertificate(t *testing.T) {
+	dir := t.TempDir()
+	expiring := selfSigned(t, time.Now().Add(2*time.Hour))
+	certFile, keyFile := writeKeyPair(t, dir, expiring)
+	pair, err := certreload.Load(certFile, keyFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	renewed := selfSigned(t, time.Now().Add(60*24*time.Hour))
+	writeKeyPair(t, dir, renewed)
+
+	notAfter := func(c tls.Certificate) time.Time {
+		leaf, err := x509.ParseCertificate(c.Certificate[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		return leaf.NotAfter
+	}
+	certreload.Register("panel", pair)
+	t.Cleanup(func() { certreload.Register("panel", nil) })
+	if got := listenerCert("panel", certFile); got == nil || !got.NotAfter.Equal(notAfter(expiring)) {
+		t.Fatalf("listenerCert expires %v, want %v: the expiring certificate the listener still serves", expiry(got), notAfter(expiring))
+	}
+	if got := listenerCert("subscription", certFile); got == nil || !got.NotAfter.Equal(notAfter(renewed)) {
+		t.Fatalf("no subscription listener: listenerCert expires %v, want the file's %v", expiry(got), notAfter(renewed))
+	}
+}
+
+// A busy core lives near GOMEMLIMIT (85% of MemoryMax): at the default threshold it never alerts,
+// and once over the threshold the alert holds until the figure is well below it.
+func TestMemoryAlertDoesNotFlapAroundTheThreshold(t *testing.T) {
+	threshold, _ := strconv.Atoi(defaultValueMap["alertMemory"])
+	tr := health.NewTracker()
+	t0 := time.Date(2026, 11, 6, 10, 0, 0, 0, time.UTC)
+	i := 0
+	feed := func(percents ...uint64) []health.Phase {
+		var out []health.Phase
+		for _, p := range percents {
+			i++
+			c := memoryCheck(memUsage{name: "Xray", used: p << 20, limit: 100 << 20, limitKind: "MemoryMax"}, threshold)
+			for _, n := range tr.Observe(t0.Add(time.Duration(i)*time.Minute), 6*time.Hour, []health.Check{c}) {
+				out = append(out, n.Phase)
+			}
+		}
+		return out
+	}
+	if got := feed(84, 86, 85, 87, 83, 86, 85, 86); len(got) != 0 {
+		t.Fatalf("a core at GOMEMLIMIT alerted: %v", got)
+	}
+	if got := feed(92, 93, 91); len(got) != 1 || got[0] != health.Raised {
+		t.Fatalf("three rounds over %d%% = %v, want raised", threshold, got)
+	}
+	if got := feed(85, 80, 76, 89, 70, 72, 91, 70, 71); len(got) != 0 {
+		t.Fatalf("back near GOMEMLIMIT = %v, want the raised alert held", got)
+	}
+	if got := feed(60); len(got) != 1 || got[0] != health.Resolved {
+		t.Fatalf("third round below the clear level = %v, want resolved", got)
 	}
 }

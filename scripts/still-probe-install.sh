@@ -15,6 +15,8 @@
 #                     from FILE; "-" reads standard input
 #   --token TOKEN     the token on the command line (visible in ps; deprecated)
 #   --pin SHA256      pin the panel's TLS certificate (hex SHA-256), for a self-signed panel
+#   --insecure-http   accept an http:// panel URL: the token and the inbound keys then
+#                     cross the network (and the censor the probe sits behind) in clear text
 #   --release TAG     still-ui release to install the agent from (default: latest)
 #   --archive FILE    install from a local still-probe-linux-<arch>.tar.gz instead of downloading
 #   --uninstall       remove the agent, its timer, user and state
@@ -29,7 +31,7 @@ USER_NAME=still-probe
 
 die() { echo "still-probe-install: $*" >&2; exit 1; }
 
-panel="" token="" token_file="" pin="" release="latest" archive="" uninstall=0
+panel="" token="" token_file="" pin="" release="latest" archive="" uninstall=0 insecure_http=0
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --panel) panel="${2:-}"; shift 2 ;;
@@ -38,10 +40,11 @@ while [[ $# -gt 0 ]]; do
             echo "still-probe-install: warning: --token puts the token on the command line, where every local user can read it (ps, /proc); use STILL_PROBE_TOKEN or --token-file instead" >&2 ;;
         --token-file) token_file="${2:-}"; shift 2 ;;
         --pin) pin="${2:-}"; shift 2 ;;
+        --insecure-http) insecure_http=1; shift ;;
         --release) release="${2:-}"; shift 2 ;;
         --archive) archive="${2:-}"; shift 2 ;;
         --uninstall) uninstall=1; shift ;;
-        -h|--help) sed -n '2,23p' "$0" 2>/dev/null || true; exit 0 ;;
+        -h|--help) sed -n '2,25p' "$0" 2>/dev/null || true; exit 0 ;;
         *) die "unknown option $1" ;;
     esac
 done
@@ -73,8 +76,20 @@ read_token() {
     unset STILL_PROBE_TOKEN
 }
 
-# deploy/test/probe-install-token.sh sources this file to test read_token;
-# everything below installs.
+# check_panel: a URL that is safe to write into the config, and https:// unless
+# --insecure-http accepts plain text.
+check_panel() {
+    local panel_re='^https?://[]A-Za-z0-9.:[-]+(/[A-Za-z0-9._~/%+-]*)?$'
+    [[ "$panel" =~ $panel_re ]] || die "--panel must be the panel URL, e.g. https://panel.example.com:2053/path/"
+    if [[ "$panel" == http://* ]]; then
+        [[ $insecure_http -eq 1 ]] || die "--panel is http://: the probe token, the panel's secret path and the keys of every inbound it checks would cross the network in clear text. Use the panel's https:// address (--pin SHA256 for a self-signed certificate), or add --insecure-http to accept that."
+        echo "still-probe-install: WARNING: --insecure-http: the probe talks to the panel unencrypted; anyone on the path sees its token and the inbound keys" >&2
+    fi
+    [[ "$panel" == */ ]] || panel="$panel/"
+}
+
+# deploy/test/release-scripts.sh sources this file to test read_token and
+# check_panel; everything below installs.
 if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
     return 0
 fi
@@ -96,11 +111,9 @@ fi
 read_token
 
 # Values go into a JSON file written by printf, so they are checked strictly.
-panel_re='^https?://[]A-Za-z0-9.:[-]+(/[A-Za-z0-9._~/%+-]*)?$'
-[[ "$panel" =~ $panel_re ]] || die "--panel must be the panel URL, e.g. https://panel.example.com:2053/path/"
+check_panel
 [[ "$token" =~ ^[A-Za-z0-9]{48}$ ]] || die "the token must be the 48-character token from the Probes page (STILL_PROBE_TOKEN, --token-file or standard input)"
 [[ -z "$pin" || "$pin" =~ ^[A-Fa-f0-9:]{64,95}$ ]] || die "--pin must be a hex SHA-256"
-[[ "$panel" == */ ]] || panel="$panel/"
 
 case "$(uname -m)" in
     x86_64|amd64) arch=amd64 ;;
@@ -140,8 +153,10 @@ install -d -m 0750 -o root -g "$USER_NAME" "$ETC"
 install -d -m 0700 -o "$USER_NAME" -g "$USER_NAME" "$STATE"
 
 umask 027
-printf '{\n  "panel": "%s",\n  "token": "%s",\n  "panelCertSha256": "%s",\n  "xray": "%s/xray",\n  "stateDir": "%s"\n}\n' \
-    "$panel" "$token" "$pin" "$PREFIX" "$STATE" > "$ETC/config.json.new"
+insecure_json=false
+[[ $insecure_http -eq 1 ]] && insecure_json=true
+printf '{\n  "panel": "%s",\n  "token": "%s",\n  "panelCertSha256": "%s",\n  "insecureHttp": %s,\n  "xray": "%s/xray",\n  "stateDir": "%s"\n}\n' \
+    "$panel" "$token" "$pin" "$insecure_json" "$PREFIX" "$STATE" > "$ETC/config.json.new"
 chown root:"$USER_NAME" "$ETC/config.json.new"
 chmod 0640 "$ETC/config.json.new"
 mv -f "$ETC/config.json.new" "$ETC/config.json"
@@ -158,7 +173,8 @@ Type=oneshot
 User=$USER_NAME
 Group=$USER_NAME
 ExecStart=$PREFIX/still-probe run -config $ETC/config.json
-TimeoutStartSec=300
+# A run checks up to 129 targets, four at a time, 30 s each, plus the job and the report.
+TimeoutStartSec=1800
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes

@@ -31,7 +31,8 @@ const (
 // run; install.sh and update.sh keep Xray inside the panel when it exits with unitCheckBlocked.
 func xrayUnitCheck(args []string) int {
 	fs := flag.NewFlagSet("xray-unit-check", flag.ContinueOnError)
-	netAdmin := fs.Bool("net-admin", false, "the still-xray service was given CAP_NET_ADMIN by a local drop-in")
+	netAdmin := fs.Bool("net-admin", false, "the still-xray service has CAP_NET_ADMIN (the shipped unit grants it)")
+	devices := fs.Bool("devices", false, "a drop-in gives the still-xray service the host's /dev (PrivateDevices=no)")
 	if err := fs.Parse(args); err != nil {
 		return unitCheckError
 	}
@@ -51,7 +52,7 @@ func xrayUnitCheck(args []string) int {
 		fmt.Fprintln(os.Stderr, "cannot build the Xray config:", err)
 		return unitCheckError
 	}
-	blockers := xray.UnitBlockers(cfg, *netAdmin)
+	blockers := xray.UnitBlockers(cfg, xray.UnitCaps{NetAdmin: *netAdmin, Devices: *devices})
 	for _, b := range blockers {
 		fmt.Println(b)
 	}

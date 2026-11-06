@@ -146,8 +146,13 @@ mutate "install: still-xray despite a refusing check" install.sh+update.sh _stil
 mutate "install: still-xray without systemd" install.sh+update.sh _still_xray_unit \
     '[[ -d /run/systemd/system ]] || return 0' ':' \
     'install.sh: without systemd as PID 1 nothing is written'
-mutate "install: CAP_NET_ADMIN drop-in not passed to the check" install.sh+update.sh _still_xray_unit 'net_admin="-net-admin"' 'net_admin=""' \
-    'install.sh: a local CAP_NET_ADMIN drop-in is passed to xray-unit-check'
+mutate "install: CAP_NET_ADMIN not passed to the check" install.sh+update.sh _still_xray_unit '&& check_flags+=(-net-admin)' '&& :' \
+    'install.sh: the CAP_NET_ADMIN of the unit or a local drop-in is passed to xray-unit-check'
+mutate "install: the template's CAP_NET_ADMIN ignored" install.sh+update.sh _still_xray_unit \
+    'grep -qs '"'"'^AmbientCapabilities=.*CAP_NET_ADMIN'"'"' "$template" "${xui_service}"' 'grep -qs '"'"'^AmbientCapabilities=.*CAP_NET_ADMIN'"'"' "${xui_service}"' \
+    'install.sh: the CAP_NET_ADMIN of the unit or a local drop-in is passed to xray-unit-check'
+mutate "install: PrivateDevices=no not passed to the check" install.sh+update.sh _still_xray_unit '            check_flags+=(-devices)' '            :' \
+    'install.sh: a PrivateDevices=no drop-in is passed as -devices when the check knows it'
 mutate "install: still-xray assets placeholder left" install.sh+update.sh _still_xray_unit '-e "s#@XRAY_ASSETS@#${bin_dir}#g"' '' \
     'install.sh: auto mode moves Xray to still-xray when xray-unit-check passes'
 mutate "install: still-xray not disabled when refused" install.sh+update.sh _still_xray_unit \
@@ -182,6 +187,24 @@ mutate "install: 3x-ui import over an existing database" install.sh _still_impor
     'install.sh: no 3x-ui import without consent, never over an existing still-ui database'
 mutate "install: 3x-ui import by default" install.sh _still_import_3xui 'STILL_UI_IMPORT_3XUI:-no' 'STILL_UI_IMPORT_3XUI:-yes' \
     'install.sh: no 3x-ui import without consent, never over an existing still-ui database'
+mutate "install: 3x-ui import keeps XUI_DB_FOLDER" install.sh _still_import_3xui '|BIN_FOLDER|LOG_FOLDER|MAIN_FOLDER)=' '|BIN_FOLDER|MAIN_FOLDER)=' \
+    'install.sh: STILL_UI_IMPORT_3XUI=yes copies the 3x-ui database and stops x-ui'
+mutate "install: 3x-ui import leaves x-ui's unit in place" install.sh _still_import_3xui 'mv "$unit" "${retired}/files${unit}" ||' 'false ||' \
+    'install.sh: the 3x-ui import retires x-ui'"'"'s unit and points acme.sh renewals at still-ui'
+mutate "install: 3x-ui import leaves acme.sh restarting x-ui" install.sh _still_import_3xui '&& retarget_acme_hooks "${retired}/acme-hooks.tsv"' '&& :' \
+    'install.sh: the 3x-ui import retires x-ui'"'"'s unit and points acme.sh renewals at still-ui'
+mutate "install: retired drop-in folders collide" install.sh _still_import_3xui 'mv "$unit" "${retired}/files${unit}"' 'rm -rf "${retired}/files/$(basename "$unit")"; mv "$unit" "${retired}/files/$(basename "$unit")"' \
+    'install.sh: the 3x-ui import retires x-ui'"'"'s unit and points acme.sh renewals at still-ui'
+mutate "menu: uninstall --purge leaves 3x-ui retired" x-ui.sh uninstall '"$data" == "purge" && -f "${still_retired_3xui}/migrate.sh"' '"$data" == "never" && -f "${still_retired_3xui}/migrate.sh"' \
+    'x-ui.sh: uninstall --purge puts back what a 3x-ui import retired'
+mutate "menu: kept-data uninstall brings 3x-ui back" x-ui.sh uninstall '"$data" == "purge" && -f "${still_retired_3xui}/migrate.sh"' '-f "${still_retired_3xui}/migrate.sh"' \
+    'x-ui.sh: uninstall keeping the data leaves an imported 3x-ui retired'
+mutate "install: 3x-ui import keeps no migrate.sh to undo it" install.sh _still_import_3xui 'cp "${xui_folder}/migrate.sh" "${retired}/migrate.sh" &&' 'false &&' \
+    'install.sh: the retired migrate.sh puts back'
+mutate "menu: uninstall keeps the torrent block" x-ui.sh uninstall '        nft delete table inet still_torrent_block > /dev/null 2>&1' '        :' \
+    'x-ui.sh: uninstall removes the program and, by default, keeps the data (exit 0)'
+mutate "menu: reinstall hint from a branch" x-ui.sh uninstall 'https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh' 'https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh' \
+    'x-ui.sh: uninstall removes the program and, by default, keeps the data (exit 0)'
 mutate "install: install-result.env not shell-escaped" install.sh write_install_result "printf 'XUI_PASSWORD=%q\n'" "printf 'XUI_PASSWORD=%s\n'" \
     'install.sh: install-result.env is 0600 and safely source-able with any password'
 mutate "install: install-result.env readable by all" install.sh write_install_result 'chmod 600 "$result_file"' 'chmod 644 "$result_file"' \
@@ -199,14 +222,19 @@ mutate "install: seccomp filter on old systemd" install.sh _xui_service_write_pa
     'install.sh: the sandbox drop-in lists the folders from the env file (escaped, no whitespace paths, filter only on systemd >= 239)'
 mutate "update: env file ignored by the sandbox drop-in" update.sh _xui_service_write_paths_dropin '        source "$env_file"' '        :' \
     'update.sh: the sandbox drop-in lists the folders from the env file (escaped, no whitespace paths, filter only on systemd >= 239)'
-mutate "units: still-xray gets CAP_NET_ADMIN" still-xray.service "" \
-    'CapabilityBoundingSet=CAP_NET_BIND_SERVICE' 'CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_ADMIN' \
-    'units: still-xray runs unprivileged with CAP_NET_BIND_SERVICE only and outlives the panel'
+mutate "units: still-xray loses CAP_NET_ADMIN" still-xray.service "" \
+    'AmbientCapabilities=CAP_NET_BIND_SERVICE CAP_NET_ADMIN' 'AmbientCapabilities=CAP_NET_BIND_SERVICE' \
+    'units: still-xray runs unprivileged with CAP_NET_BIND_SERVICE and CAP_NET_ADMIN only and outlives the panel'
+mutate "units: still-xray gets CAP_SYS_ADMIN" still-xray.service "" \
+    'CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_ADMIN' 'CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_ADMIN CAP_SYS_ADMIN' \
+    'units: still-xray runs unprivileged with CAP_NET_BIND_SERVICE and CAP_NET_ADMIN only and outlives the panel'
+mutate "units: still-xray sees the host's /dev" still-xray.service "" 'PrivateDevices=yes' 'PrivateDevices=no' \
+    'units: still-xray runs unprivileged with CAP_NET_BIND_SERVICE and CAP_NET_ADMIN only and outlives the panel'
 mutate "units: still-xray runs as root" still-xray.service "" 'User=still-xray' 'User=root' \
-    'units: still-xray runs unprivileged with CAP_NET_BIND_SERVICE only'
+    'units: still-xray runs unprivileged with CAP_NET_BIND_SERVICE and CAP_NET_ADMIN only'
 mutate "units: still-xray stops with the panel" still-xray.service "" '[Unit]' '[Unit]
 PartOf=still-ui.service' \
-    'units: still-xray runs unprivileged with CAP_NET_BIND_SERVICE only and outlives the panel'
+    'units: still-xray runs unprivileged with CAP_NET_BIND_SERVICE and CAP_NET_ADMIN only and outlives the panel'
 mutate "units: panel unit pulls still-xray down" x-ui.service.debian "" '[Unit]' '[Unit]
 BindsTo=still-xray.service' \
     'units: panel unit hardening, and no lifecycle tie to still-xray'

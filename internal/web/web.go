@@ -19,6 +19,7 @@ import (
 
 	"github.com/mhsanaei/3x-ui/v3/internal/amneziawgkern"
 	"github.com/mhsanaei/3x-ui/v3/internal/amneziawgnet"
+	"github.com/mhsanaei/3x-ui/v3/internal/certreload"
 	"github.com/mhsanaei/3x-ui/v3/internal/config"
 	"github.com/mhsanaei/3x-ui/v3/internal/eventbus"
 	"github.com/mhsanaei/3x-ui/v3/internal/logger"
@@ -652,12 +653,12 @@ func (s *Server) start(restartXray bool, startTgBot bool) (err error) {
 		return err
 	}
 	listener = network.NewLimitListener(listener, network.MaxPanelConns, network.MaxPanelConnsPerSource)
+	certreload.Register("panel", nil)
 	if certFile != "" || keyFile != "" {
-		cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+		pair, err := certreload.Load(certFile, keyFile)
 		if err == nil {
-			c := &tls.Config{
-				Certificates: []tls.Certificate{cert},
-			}
+			certreload.Register("panel", pair)
+			c := &tls.Config{GetCertificate: pair.GetCertificate}
 			// Opt-in node mTLS: when a trust CA is configured, request and verify
 			// client certs (VerifyClientCertIfGiven keeps browsers working). With
 			// no CA the listener is unchanged.
@@ -838,6 +839,7 @@ func (s *Server) StopPanelOnly() error {
 
 func (s *Server) stop(stopXray bool, stopTgBot bool) error {
 	s.cancel()
+	certreload.Register("panel", nil)
 	var err1 error
 	var err2 error
 	if s.httpServer != nil {

@@ -249,7 +249,7 @@ _still_size_mib() {
 # STILL_XRAY_MEMORY_MAX (e.g. 1G, default half the RAM within 256M..4G) caps the core.
 _still_xray_unit() {
     local env_file setting template unit temp_file xray_bin bin_dir dropin_dir dropin
-    local mem_kb max_mb gomem_mb check_out check_rc net_admin current
+    local mem_kb max_mb gomem_mb check_out check_rc current check_flags
     [[ -n "${xui_service:-}" ]] || return 0
     command -v systemctl > /dev/null 2>&1 || return 0
     # systemctl without systemd as PID 1 (some containers) cannot run a unit.
@@ -274,10 +274,15 @@ _still_xray_unit() {
             ;;
     esac
     if [[ "$setting" == "auto" && -s "$template" && -x "$xray_bin" ]]; then
-        net_admin=""
-        grep -qs 'CAP_NET_ADMIN' "${xui_service}"/still-xray.service.d/*.conf && net_admin="-net-admin"
+        # What the unit about to be written and the local drop-ins give the core.
+        check_flags=()
+        grep -qs '^AmbientCapabilities=.*CAP_NET_ADMIN' "$template" "${xui_service}"/still-xray.service.d/*.conf && check_flags+=(-net-admin)
+        if grep -qsE '^PrivateDevices=(no|false|0|off)$' "${xui_service}"/still-xray.service.d/*.conf &&
+            "${xui_folder}/x-ui" xray-unit-check -h 2>&1 | grep -q -- '-devices'; then
+            check_flags+=(-devices)
+        fi
         if "${xui_folder}/x-ui" xray-unit-check -h 2>&1 | grep -q -- '-net-admin'; then
-            check_out=$("${xui_folder}/x-ui" xray-unit-check ${net_admin} 2>&1)
+            check_out=$("${xui_folder}/x-ui" xray-unit-check "${check_flags[@]}" 2>&1)
             check_rc=$?
         else
             # An older release without the check: it cannot vouch for its config, so nothing moves.
@@ -363,7 +368,7 @@ _still_xray_unit() {
     _still_env_set "$env_file" XUI_XRAY_UNIT still-xray || return 1
     systemctl daemon-reload > /dev/null 2>&1 || true
     systemctl enable still-xray > /dev/null 2>&1 || true
-    echo -e "${green}Xray runs as its own service still-xray${max_mb:+ (MemoryMax=${max_mb}M)}: restarting or updating the panel keeps clients connected.${plain}"
+    echo -e "${green}Xray runs as its own service still-xray${max_mb:+ (MemoryMax=${max_mb}M)}: restarting or updating the panel keeps the clients of Xray inbounds connected.${plain}"
     return 0
 }
 
@@ -537,11 +542,32 @@ _still_import_3xui() {
     for src_env in /etc/default/x-ui /etc/conf.d/x-ui /etc/sysconfig/x-ui; do
         dst_env="${src_env%/x-ui}/still-ui"
         if [[ -f "$src_env" && ! -e "$dst_env" ]]; then
-            cp -a "$src_env" "$dst_env"
+            # 3x-ui's folders stay behind: XUI_DB_FOLDER=/etc/x-ui would open 3x-ui's live database.
+            (umask 077 && grep -Ev '^[[:space:]]*(export[[:space:]]+)?XUI_(DB_FOLDER|BIN_FOLDER|LOG_FOLDER|MAIN_FOLDER)=' "$src_env" > "$dst_env")
+            chmod 600 "$dst_env"
         fi
     done
-    echo -e "${green}Copied the 3x-ui database to /etc/still-ui/x-ui.db; x-ui is stopped and disabled.${plain}"
-    echo -e "${green}Your panel login, inbounds and clients are kept. To go back: systemctl enable --now x-ui (after stopping still-ui).${plain}"
+    # A stopped, disabled x-ui still starts on "systemctl restart x-ui", which 3x-ui's acme.sh
+    # renewal runs: its unit goes aside, and the renewal restarts still-ui instead.
+    # The files keep their full path under files/, where 'still-ui uninstall' puts them back from.
+    local retired=/root/still-ui-3x-ui-retired unit
+    install -d -m 700 "$retired"
+    for unit in "${xui_service}/x-ui.service" "${xui_service}/x-ui.service.d" /etc/systemd/system.control/x-ui.service.d /etc/init.d/x-ui; do
+        [[ -e "$unit" && ! -e "${retired}/files${unit}" ]] || continue
+        mkdir -p "${retired}/files$(dirname "$unit")" && mv "$unit" "${retired}/files${unit}" ||
+            echo -e "${yellow}Could not move ${unit} aside; x-ui can still be started.${plain}"
+    done
+    [[ $release == "alpine" ]] || systemctl daemon-reload > /dev/null 2>&1
+    # A copy of migrate.sh stays with the retired files: it puts them back, still-ui installed or not.
+    if [[ -f "${xui_folder}/migrate.sh" ]]; then
+        cp "${xui_folder}/migrate.sh" "${retired}/migrate.sh" && chmod 700 "${retired}/migrate.sh"
+        (
+            # shellcheck source=/dev/null
+            . "${xui_folder}/migrate.sh" && retarget_acme_hooks "${retired}/acme-hooks.tsv"
+        )
+    fi
+    echo -e "${green}Copied the 3x-ui database to /etc/still-ui/x-ui.db; x-ui is stopped and its service file is in ${retired}.${plain}"
+    echo -e "${green}Your panel login, inbounds and clients are kept. To go back to 3x-ui: stop still-ui, then bash ${retired}/migrate.sh restore-import ${retired} && systemctl enable --now x-ui.${plain}"
 }
 
 # write_install_result <user> <pass> <port> <webpath> <scheme> <host> <token> <dbtype>
@@ -2603,9 +2629,18 @@ _still_node_enroll() {
 case "${1:-}" in
     migrate | migrate-rollback) _still_migrate "$@" ;;
     node-enroll) _still_node_enroll ;;
+    # migrate.sh installs the packages while 3x-ui still serves clients.
+    install-deps)
+        install_base
+        exit $?
+        ;;
 esac
 
 echo -e "${green}Running...${plain}"
-install_base
+if [[ "${STILL_UI_MIGRATING:-}" == "1" && "${STILL_UI_DEPS_INSTALLED:-}" == "1" ]]; then
+    echo "Packages were installed before 3x-ui was stopped."
+else
+    install_base
+fi
 _still_swap_check
 install_x-ui $1

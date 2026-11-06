@@ -34,6 +34,11 @@ type Check struct {
 	// Confirm is how many problem observations in a row raise the alert (at least 1), so a
 	// one-minute spike or a core that systemd brings back within seconds stays quiet.
 	Confirm int
+	// Hold marks a value between the clear and the raise threshold: a raised alert stays
+	// raised, and an unraised one starts counting again (hysteresis against flapping).
+	Hold bool
+	// Settle is how many good observations in a row resolve a raised alert (at least 1).
+	Settle int
 	// Params fill the message; the last problem's params also go with the resolved notice.
 	Params map[string]string
 }
@@ -49,6 +54,7 @@ type Notice struct {
 
 type state struct {
 	bad      int
+	good     int
 	raised   bool
 	since    time.Time
 	lastSent time.Time
@@ -83,6 +89,15 @@ func (t *Tracker) Observe(now time.Time, remind time.Duration, checks []Check) [
 		notice := func(phase Phase, params map[string]string) {
 			out = append(out, Notice{Key: c.Key, Event: c.Event, Phase: phase, Since: st.since, Params: maps.Clone(params)})
 		}
+		if c.Hold && !c.Problem {
+			st.bad, st.good = 0, 0
+			continue
+		}
+		if !c.Problem && st.raised {
+			if st.good++; st.good < max(c.Settle, 1) {
+				continue
+			}
+		}
 		if !c.Problem {
 			if st.raised {
 				params := maps.Clone(st.params)
@@ -95,7 +110,8 @@ func (t *Tracker) Observe(now time.Time, remind time.Duration, checks []Check) [
 			*st = state{}
 			continue
 		}
-		if st.bad == 0 {
+		st.good = 0
+		if st.bad == 0 && !st.raised {
 			st.since = now
 		}
 		st.bad++

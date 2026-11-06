@@ -2695,6 +2695,7 @@
       "tokenOnce": "Salin token sekarang: panel hanya menyimpan hash-nya dan tidak bisa menampilkannya lagi.",
       "installCommand": "Instal di mesin probe (Linux, sebagai root):",
       "installHint": "Perintah ini memasang agen bersama Xray dan timer systemd, lalu menjalankan pengecekan pertama.",
+      "insecureHttp": "Panel ini dibuka melalui http:// tanpa enkripsi. Penginstal menolak alamat panel http://: token probe, path rahasia panel, dan kunci setiap inbound yang diperiksanya akan melintasi jaringan sebagai teks biasa, di depan sensor tempat probe berada. Buka panel melalui https:// (sertifikat di pengaturan panel) lalu buat perintahnya di sana.",
       "token": "Token",
       "deleteConfirm": "Hapus probe \"{name}\"?",
       "deleteHint": "Tokennya berhenti berfungsi, kliennya dilepas dari inbound, dan riwayatnya dihapus.",

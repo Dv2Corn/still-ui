@@ -83,6 +83,39 @@ func TestTrackerConfirmIgnoresShortBlips(t *testing.T) {
 	}
 }
 
+// A memory figure that lives around the threshold must not raise and resolve every few minutes:
+// it resolves only after Settle good rounds, and a value in the hold band changes nothing.
+func TestTrackerHysteresis(t *testing.T) {
+	tr := NewTracker()
+	t0 := time.Date(2026, 11, 6, 10, 0, 0, 0, time.UTC)
+	round := 0
+	observe := func(problem, hold bool) []Phase {
+		round++
+		c := Check{Key: "mem:Xray", Event: "process.memory", Problem: problem, Hold: hold, Confirm: 3, Settle: 3}
+		return phases(tr.Observe(t0.Add(time.Duration(round)*time.Minute), 6*time.Hour, []Check{c}))
+	}
+	// 91, 86 (hold), 91, 91: the hold band breaks the streak, so three bad rounds in a row are needed.
+	for i, step := range []struct{ problem, hold bool }{{true, false}, {false, true}, {true, false}, {true, false}} {
+		if got := observe(step.problem, step.hold); len(got) != 0 {
+			t.Fatalf("round %d before a sustained problem = %v", i, got)
+		}
+	}
+	if got := observe(true, false); len(got) != 1 || got[0] != Raised {
+		t.Fatalf("third bad round in a row = %v, want raised", got)
+	}
+	// Back and forth inside the band and once below it: still raised, nothing sent.
+	for i, step := range []struct{ problem, hold bool }{{false, true}, {false, false}, {false, true}, {false, false}, {false, false}, {true, false}} {
+		if got := observe(step.problem, step.hold); len(got) != 0 {
+			t.Fatalf("flapping round %d = %v, want silence", i, got)
+		}
+	}
+	observe(false, false)
+	observe(false, false)
+	if got := observe(false, false); len(got) != 1 || got[0] != Resolved {
+		t.Fatalf("third good round in a row = %v, want resolved", got)
+	}
+}
+
 func TestTrackerForgetsVanishedConditions(t *testing.T) {
 	tr := NewTracker()
 	t0 := time.Now()

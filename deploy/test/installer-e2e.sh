@@ -352,10 +352,10 @@ installed_checks() { # CT LABEL
     # Incus/LXC adds /run/systemd/system/service.d/zzz-lxc-service.conf with
     # NoNewPrivileges=no to every service, so in a container only the unit's own
     # setting can be checked; the capability sets are the kernel's.
-    ck "$ct" "$l: still-xray runs as still-xray with CAP_NET_BIND_SERVICE only" '
+    ck "$ct" "$l: still-xray runs as still-xray with CAP_NET_BIND_SERVICE and CAP_NET_ADMIN only" '
         p=$(xray_pid) || exit 1; grep -E "^(Uid|Cap|NoNewPrivs)" /proc/$p/status
-        [[ $(stat -c %U /proc/$p) == still-xray ]] && grep -qx "CapEff:	0000000000000400" /proc/$p/status &&
-            grep -qx "CapBnd:	0000000000000400" /proc/$p/status && grep -qx "CapPrm:	0000000000000400" /proc/$p/status &&
+        [[ $(stat -c %U /proc/$p) == still-xray ]] && grep -qx "CapEff:	0000000000001400" /proc/$p/status &&
+            grep -qx "CapBnd:	0000000000001400" /proc/$p/status && grep -qx "CapPrm:	0000000000001400" /proc/$p/status &&
             { grep -qx "NoNewPrivs:	1" /proc/$p/status || { grep -qx "NoNewPrivileges=no" /run/systemd/system/service.d/zzz-lxc-service.conf &&
                 grep -qx "NoNewPrivileges=yes" /etc/systemd/system/still-xray.service; }; }'
     # An update leaves the running core alone (clients stay connected), so after

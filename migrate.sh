@@ -1,8 +1,8 @@
 #!/bin/bash
 # still-ui: move an existing 3x-ui installation to still-ui, and back.
 #
-#   bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh) migrate
-#   bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh) migrate-rollback [DIR]
+#   bash <(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh) migrate
+#   bash <(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh) migrate-rollback [DIR]
 #   still-ui migrate-rollback [DIR]          (after a migration)
 #
 # migrate:
@@ -24,8 +24,8 @@
 #      subscriptions are byte-identical;
 #   5. on any failure after 3x-ui was stopped it rolls back on its own.
 #   3x-ui's own files are not modified. On success its unit is removed (it is
-#   in the backup) so it cannot start next to still-ui, and /usr/bin/x-ui runs
-#   still-ui's menu.
+#   in the backup) so it cannot start next to still-ui, /usr/bin/x-ui runs
+#   still-ui's menu, and acme.sh renewals that restarted x-ui restart still-ui.
 #
 # migrate-rollback [DIR] restores 3x-ui from the newest (or the given) backup
 # folder: binaries, unit, env file, database; moves still-ui's database to
@@ -42,6 +42,9 @@
 #   STILL_UI_MIGRATE_ALLOW_NEWER=1  also migrate a 3x-ui newer than still-ui's base
 #   STILL_UI_MIGRATE_ANY_FORK=1     also migrate an install that is not MHSanaei/3x-ui
 #   STILL_UI_MIGRATE_TIMEOUT=SEC    how long still-ui may take to come up (default 120)
+#   STILL_UI_MIGRATE_INSTALL_TIMEOUT=SEC  how long the installer may run while 3x-ui
+#                                   is stopped before the migration rolls back (default 600)
+#   STILL_UI_ACME_HOME=DIR          root's acme.sh folder (default /root/.acme.sh)
 #   STILL_UI_MIGRATE_TEST_FAIL=health  test hook: fail the post-start check so the
 #                                   automatic rollback runs
 
@@ -61,6 +64,10 @@ MIN_VERSION="2.0.0"
 FAIL2BAN_FILES=(/etc/fail2ban/jail.d/3x-ipl.conf /etc/fail2ban/jail.d/3x-ipl-backend.conf
     /etc/fail2ban/filter.d/3x-ipl.conf /etc/fail2ban/action.d/3x-ipl.conf)
 TIMEOUT="${STILL_UI_MIGRATE_TIMEOUT:-120}"
+INSTALL_TIMEOUT="${STILL_UI_MIGRATE_INSTALL_TIMEOUT:-600}"
+ACME_HOME="${STILL_UI_ACME_HOME:-/root/.acme.sh}"
+# acme.sh settings of a certificate that run a command; 3x-ui sets Le_ReloadCmd.
+ACME_HOOK_KEYS=(Le_ReloadCmd Le_RenewHook Le_PreHook Le_PostHook)
 # Host name the checks ask for when the panel has no domain set (RFC 2606).
 PROBE_HOST="migrate-check.invalid"
 
@@ -542,6 +549,23 @@ hand_db_to_still_ui() {
     return 0
 }
 
+# install_deps: the packages the installer needs, installed while 3x-ui still serves
+# clients, so a slow or hung package mirror costs no downtime. A failure is not fatal:
+# the installer never stopped for it either, and the packages are usually there.
+DEPS_INSTALLED=0
+install_deps() {
+    if ! grep -q 'install-deps)' "${WORK}/install.sh"; then
+        warn "This install.sh cannot install its packages ahead; it does so while 3x-ui is stopped."
+        return 0
+    fi
+    info "Installing the packages still-ui needs (log: ${BK}/install-deps.log) ..."
+    if ! (cd "$WORK" && umask 022 && timeout -k 30 "$INSTALL_TIMEOUT" env NONINTERACTIVE=1 XUI_NONINTERACTIVE=1 \
+        DEBIAN_FRONTEND=noninteractive bash "${WORK}/install.sh" install-deps < /dev/null > "${BK}/install-deps.log" 2>&1); then
+        warn "Could not install the packages (see ${BK}/install-deps.log); going on with what the system has."
+    fi
+    DEPS_INSTALLED=1
+}
+
 run_install() {
     local fail2ban=false f
     for f in "${FAIL2BAN_FILES[@]}"; do
@@ -549,9 +573,10 @@ run_install() {
     done
     info "Installing still-ui (log: ${BK}/install.log) ..."
     # The installer creates program files and folders others must read:
-    # it runs with the usual umask, not this script's 077.
-    (cd "$WORK" && umask 022 && env NONINTERACTIVE=1 XUI_NONINTERACTIVE=1 STILL_UI_MIGRATING=1 \
-        STILL_UI_ARCHIVE="$STILL_ARCHIVE" XUI_ENABLE_FAIL2BAN="$fail2ban" \
+    # it runs with the usual umask, not this script's 077. 3x-ui is stopped
+    # now: a hung installer must end in the rollback, not in a long outage.
+    (cd "$WORK" && umask 022 && timeout -k 30 "$INSTALL_TIMEOUT" env NONINTERACTIVE=1 XUI_NONINTERACTIVE=1 STILL_UI_MIGRATING=1 \
+        STILL_UI_DEPS_INSTALLED="$DEPS_INSTALLED" STILL_UI_ARCHIVE="$STILL_ARCHIVE" XUI_ENABLE_FAIL2BAN="$fail2ban" \
         bash "${WORK}/install.sh" < /dev/null > "${BK}/install.log" 2>&1)
 }
 
@@ -626,6 +651,111 @@ check_still_ui() {
     return 0
 }
 
+# --- certificate renewal hooks ---------------------------------------------
+
+# acme_config_home: where root's acme.sh keeps the settings of its certificates.
+acme_config_home() {
+    local cfg
+    cfg=$(env_value "${ACME_HOME}/acme.sh.env" LE_CONFIG_HOME)
+    echo "${cfg:-$ACME_HOME}"
+}
+
+# hook_for_still_ui CMD: CMD with every restart/reload/start/stop of 3x-ui's service
+# (systemctl, service, rc-service, its x-ui command) aimed at still-ui instead.
+hook_for_still_ui() {
+    printf '%s' "$1" | sed -E \
+        -e 's/(systemctl[[:space:]]+(-[-a-z]+[[:space:]]+)*(restart|reload|try-restart|reload-or-restart|try-reload-or-restart|start|stop)[[:space:]]+)x-ui(\.service)?([^[:alnum:]_.-]|$)/\1still-ui\5/g' \
+        -e 's/((^|[^[:alnum:]_-])(rc-)?service[[:space:]]+)x-ui([[:space:]]|$)/\1still-ui\4/g' \
+        -e 's#(^|[;&|[:space:]])(/usr/bin/)?x-ui([[:space:]]+(restart|start|stop))#\1still-ui\3#g'
+}
+
+# set_conf_line FILE KEY LINE: the first KEY= line of FILE becomes LINE; mode and owner stay.
+set_conf_line() {
+    local tmp
+    tmp=$(mktemp "${1}.XXXXXX") || return 1
+    if cp -p "$1" "$tmp" && K="$2=" L="$3" awk 'index($0, ENVIRON["K"]) == 1 && !done { print ENVIRON["L"]; done = 1; next } { print }' "$1" > "$tmp" &&
+        mv -f "$tmp" "$1"; then
+        return 0
+    fi
+    rm -f "$tmp"
+    return 1
+}
+
+# retarget_acme_hooks RECORD: acme.sh renewals that restart 3x-ui restart still-ui instead;
+# the panel reads its certificate when it starts. Each changed line is kept in RECORD
+# (file, key, original line) for restore_acme_hooks.
+retarget_acme_hooks() {
+    local record="$1" conf key line value cmd new encoded
+    for conf in "$(acme_config_home)"/*/*.conf; do
+        [[ -f "$conf" && "$conf" != *.csr.conf ]] || continue
+        for key in "${ACME_HOOK_KEYS[@]}"; do
+            line=$(grep -m1 "^${key}=" "$conf") || continue
+            value="${line#"${key}="}"
+            value="${value#\'}"
+            value="${value%\'}"
+            encoded=0
+            # acme.sh 3.x writes these settings base64-encoded between two markers.
+            if [[ "$value" == __ACME_BASE64__START_*__ACME_BASE64__END_ ]]; then
+                value="${value#__ACME_BASE64__START_}"
+                cmd=$(printf '%s' "${value%__ACME_BASE64__END_}" | base64 -d 2> /dev/null) || continue
+                encoded=1
+            else
+                cmd="$value"
+            fi
+            new=$(hook_for_still_ui "$cmd")
+            [[ "$new" != "$cmd" ]] || continue
+            ((encoded)) && new="__ACME_BASE64__START_$(printf '%s' "$new" | base64 | tr -d '\n')__ACME_BASE64__END_"
+            set_conf_line "$conf" "$key" "${key}='${new}'" || {
+                warn "Could not update ${key} in ${conf}; renewing that certificate still restarts x-ui."
+                continue
+            }
+            printf '%s\t%s\t%s\n' "$conf" "$key" "$line" >> "$record"
+            info "acme.sh: renewing $(basename "$conf" .conf) now restarts still-ui"
+        done
+    done
+    return 0
+}
+
+# restore_acme_hooks RECORD: puts back the lines retarget_acme_hooks changed, nothing else,
+# so what renewals wrote since (next renewal time, ...) stays.
+restore_acme_hooks() {
+    local conf key line rc=0
+    [[ -f "$1" ]] || return 0
+    while IFS=$'\t' read -r conf key line; do
+        [[ -f "$conf" && -n "$key" ]] || continue
+        set_conf_line "$conf" "$key" "$line" || rc=1
+    done < "$1"
+    return "$rc"
+}
+
+# restore_import DIR: undoes what a plain install's 3x-ui import retired into DIR (install.sh
+# _still_import_3xui): x-ui's service files go back to their paths, acme.sh hooks to x-ui.
+restore_import() {
+    local dir="${1%/}" src dst rc=0
+    [[ -d "${dir}/files" || -f "${dir}/acme-hooks.tsv" ]] || die "${dir} holds nothing a 3x-ui import retired."
+    if [[ -s "${dir}/acme-hooks.tsv" ]]; then
+        if restore_acme_hooks "${dir}/acme-hooks.tsv"; then
+            rm -f "${dir}/acme-hooks.tsv"
+        else
+            err "Could not put back every acme.sh renewal hook listed in ${dir}/acme-hooks.tsv."
+            rc=1
+        fi
+    fi
+    if [[ -d "${dir}/files" ]]; then
+        while IFS= read -r -d '' src; do
+            dst="${src#"${dir}/files"}"
+            if [[ -e "$dst" ]]; then
+                warn "${dst} exists; leaving the retired copy in ${src}."
+                continue
+            fi
+            (umask 022 && mkdir -p "$(dirname "$dst")") && mv "$src" "$dst" && info "Put back ${dst}" || rc=1
+        done < <(find "${dir}/files" -mindepth 1 \( -name x-ui.service -o -name x-ui.service.d -o -name x-ui \) -prune -print0)
+    fi
+    command -v systemctl > /dev/null 2>&1 && systemctl daemon-reload > /dev/null 2>&1
+    ((rc == 0)) && info "3x-ui is back; start it with: systemctl enable --now x-ui"
+    return "$rc"
+}
+
 # Keeps 3x-ui from starting next to still-ui: its unit is in the backup.
 retire_xui() {
     local d
@@ -644,6 +774,8 @@ retire_xui() {
 exec /usr/bin/still-ui "$@"
 EOF
     chmod 755 /usr/bin/x-ui
+    retarget_acme_hooks "${BK}/acme-hooks.tsv"
+    write_sums
 }
 
 on_exit() {
@@ -698,6 +830,7 @@ cmd_migrate() {
 
     make_backup
     mv "$before" "${BK}/before"
+    install_deps
 
     info "Stopping 3x-ui ..."
     stop_xui || die "Could not stop x-ui cleanly."
@@ -709,7 +842,7 @@ cmd_migrate() {
     echo "stopped" > "${BK}/STATE"
 
     hand_db_to_still_ui || die "Could not give still-ui the database."
-    run_install || die "The still-ui installer failed (see ${BK}/install.log)."
+    run_install || die "The still-ui installer failed or ran longer than ${INSTALL_TIMEOUT}s (see ${BK}/install.log)."
     check_still_ui || die "still-ui did not pass the checks."
 
     retire_xui
@@ -792,6 +925,10 @@ do_rollback() {
     rm -rf "$STILL_DIR" /usr/bin/still-ui /etc/systemd/system/still-ui.service /etc/systemd/system/still-ui.service.d \
         /etc/systemd/system/still-xray.service /etc/systemd/system/still-xray.service.d
     [[ -d /var/log/still-ui ]] && mv /var/log/still-ui "${after}/var-log-still-ui"
+    # Its Xray's config and the copies of the TLS keys it reads.
+    [[ -d /etc/still-xray ]] && mv /etc/still-xray "${after}/etc-still-xray"
+    [[ -d /var/log/still-xray ]] && mv /var/log/still-xray "${after}/var-log-still-xray"
+    restore_acme_hooks "${dir}/acme-hooks.tsv" || { warn "Could not put back every acme.sh renewal hook (${dir}/acme-hooks.tsv)."; rc=1; }
 
     # 2. 3x-ui's files, exactly as backed up.
     if ! (cd / && sha256sum --quiet -c "${dir}/usr-local-x-ui.sha256" > /dev/null 2>&1); then
@@ -920,9 +1057,10 @@ cmd_rollback() {
 
 usage() {
     cat << EOF
-usage: $0 migrate | migrate-rollback [BACKUP_DIR]
+usage: $0 migrate | migrate-rollback [BACKUP_DIR] | restore-import DIR
   migrate            move this host's 3x-ui to still-ui (backup, checks, automatic rollback)
   migrate-rollback   restore 3x-ui from the newest (or the given) /root/still-ui-migrate-* backup
+  restore-import     put back what a plain install's 3x-ui import retired into DIR
 EOF
 }
 
@@ -935,6 +1073,9 @@ main() {
         migrate-rollback | rollback)
             shift
             cmd_rollback "$@"
+            ;;
+        restore-import)
+            restore_import "${2:?usage: $0 restore-import DIR}"
             ;;
         *)
             usage

@@ -2695,6 +2695,7 @@
       "tokenOnce": "Anahtarı şimdi kopyalayın: panel yalnızca özetini saklar ve tekrar gösteremez.",
       "installCommand": "Yoklayıcı makineye kurulum (Linux, root olarak):",
       "installHint": "Komut ajanı Xray ve bir systemd zamanlayıcısı ile kurar, ardından ilk kontrolü çalıştırır.",
+      "insecureHttp": "Bu panel şifresiz http:// üzerinden açıldı. Yükleyici http:// panel adresini kabul etmez: sondanın belirteci, panelin gizli yolu ve denetlediği her inbound'un anahtarları ağda düz metin olarak, sondanın arkasında durduğu sansürcünün gözü önünde geçerdi. Paneli https:// ile açın (panel ayarlarında bir sertifika) ve komutu orada oluşturun.",
       "token": "Anahtar",
       "deleteConfirm": "\"{name}\" yoklayıcısı silinsin mi?",
       "deleteHint": "Anahtarı çalışmaz olur, istemcisi gelen bağlantılardan kaldırılır ve geçmişi silinir.",

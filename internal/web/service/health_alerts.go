@@ -1,6 +1,7 @@
 package service
 
 import (
+	"crypto/x509"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 	"github.com/shirou/gopsutil/v4/disk"
 	"github.com/shirou/gopsutil/v4/mem"
 
+	"github.com/mhsanaei/3x-ui/v3/internal/certreload"
 	"github.com/mhsanaei/3x-ui/v3/internal/certwatch"
 	"github.com/mhsanaei/3x-ui/v3/internal/config"
 	"github.com/mhsanaei/3x-ui/v3/internal/eventbus"
@@ -97,6 +99,13 @@ type memUsage struct {
 	limitKind string // "MemoryMax" or "RAM"
 }
 
+// memoryClearMargin and diskClearMargin are how many points below its threshold a raised alert
+// must fall to clear: Go keeps a busy core near GOMEMLIMIT (85% of MemoryMax) on purpose.
+const (
+	memoryClearMargin = 15
+	diskClearMargin   = 5
+)
+
 // memoryChecks compares the panel and the core with their systemd MemoryMax (cgroup v2), or with
 // the machine's RAM when there is none. A core that is the panel's child shares the panel's cgroup
 // and is checked once with it.
@@ -114,21 +123,25 @@ func memoryChecks(threshold int) []health.Check {
 			pids = append(pids, memProc{"Xray", pid})
 		}
 	}
-	usages := collectMemory(pids, total)
 	var checks []health.Check
-	for _, u := range usages {
-		pct := health.Percent(u.used, u.limit)
-		checks = append(checks, health.Check{
-			Key: "mem:" + u.name, Event: string(eventbus.EventProcessMemory), Confirm: 3,
-			Problem: u.limit > 0 && pct >= float64(threshold),
-			Params: map[string]string{
-				"Process": u.name, "Percent": strconv.FormatFloat(pct, 'f', 0, 64),
-				"Used": mib(u.used), "Limit": mib(u.limit), "LimitKind": u.limitKind,
-				"Threshold": strconv.Itoa(threshold),
-			},
-		})
+	for _, u := range collectMemory(pids, total) {
+		checks = append(checks, memoryCheck(u, threshold))
 	}
 	return checks
+}
+
+func memoryCheck(u memUsage, threshold int) health.Check {
+	pct := health.Percent(u.used, u.limit)
+	return health.Check{
+		Key: "mem:" + u.name, Event: string(eventbus.EventProcessMemory), Confirm: 3, Settle: 3,
+		Problem: u.limit > 0 && pct >= float64(threshold),
+		Hold:    u.limit > 0 && pct >= float64(threshold-memoryClearMargin),
+		Params: map[string]string{
+			"Process": u.name, "Percent": strconv.FormatFloat(pct, 'f', 0, 64),
+			"Used": mib(u.used), "Limit": mib(u.limit), "LimitKind": u.limitKind,
+			"Threshold": strconv.Itoa(threshold),
+		},
+	}
 }
 
 // memProc is a process whose memory is watched.
@@ -216,8 +229,9 @@ func diskChecks(threshold int) []health.Check {
 		}
 		seen[id] = true
 		checks = append(checks, health.Check{
-			Key: "disk:" + p, Event: string(eventbus.EventDiskHigh),
+			Key: "disk:" + p, Event: string(eventbus.EventDiskHigh), Settle: 3,
 			Problem: u.UsedPercent >= float64(threshold),
+			Hold:    u.UsedPercent >= float64(threshold-diskClearMargin),
 			Params: map[string]string{
 				"Path": p, "Percent": strconv.FormatFloat(u.UsedPercent, 'f', 0, 64),
 				"Free": mib(u.Free), "Threshold": strconv.Itoa(threshold),
@@ -260,12 +274,8 @@ func (s *HealthAlertService) certChecks(now time.Time, days int) []health.Check 
 			continue
 		}
 		seen[path] = true
-		data, err := os.ReadFile(path)
-		if err != nil {
-			continue
-		}
-		cert, err := health.ParseCertificate(data)
-		if err != nil {
+		cert := listenerCert(f.where, path)
+		if cert == nil {
 			continue
 		}
 		add("cert:file:"+path, f.where+" ("+path+")", certSubject(cert.Subject.CommonName, cert.DNSNames), cert.NotBefore, cert.NotAfter)
@@ -279,6 +289,23 @@ func (s *HealthAlertService) certChecks(now time.Time, days int) []health.Check 
 		add("cert:inbound:"+st.Tag, "inbound "+st.Tag, info.Subject, time.Unix(info.NotBefore, 0), time.Unix(info.NotAfter, 0))
 	}
 	return checks
+}
+
+// listenerCert is the certificate the panel or subscription listener (role) serves from path,
+// or the file's own while that listener serves none (not started, plain HTTP).
+func listenerCert(role, path string) *x509.Certificate {
+	if served, file, ok := certreload.Served(role); ok && file == path && served != nil {
+		return served
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	cert, err := health.ParseCertificate(data)
+	if err != nil {
+		return nil
+	}
+	return cert
 }
 
 func certSubject(cn string, dns []string) string {

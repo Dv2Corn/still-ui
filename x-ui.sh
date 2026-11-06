@@ -242,7 +242,7 @@ still_migrate() {
         script=$(ls -1d /root/still-ui-migrate-*/migrate.sh 2> /dev/null | sort -r | head -n 1)
     fi
     if [[ -z "$script" || ! -f "$script" ]]; then
-        LOGE "No migrate.sh in ${xui_folder}. Update still-ui first, or run: bash <(curl -Ls https://raw.githubusercontent.com/${still_release_repo}/main/install.sh) $1"
+        LOGE "No migrate.sh in ${xui_folder}. Update still-ui first, or run: bash <(curl -Ls https://github.com/${still_release_repo}/releases/latest/download/install.sh) $1"
         return 1
     fi
     bash "$script" "$@"
@@ -352,6 +352,10 @@ _still_stdin_is_tty() {
     [[ -t 0 ]]
 }
 
+# still_retired_3xui: the folder where a plain install's 3x-ui import put x-ui's service files
+# and the record of its acme.sh hooks (install.sh _still_import_3xui), with the migrate.sh that undoes it.
+still_retired_3xui=/root/still-ui-3x-ui-retired
+
 # still-ui: uninstall removes the program and keeps the data unless asked.
 #   still-ui uninstall              asks; the data question defaults to No, and
 #                                   without a terminal the data is always kept
@@ -385,6 +389,11 @@ uninstall() {
             confirm "Also delete all data (database /etc/still-ui, clients, settings)?" "n" && data=purge
         fi
     fi
+    # With the data gone nothing of still-ui comes back, so 3x-ui does: its unit and acme.sh hooks.
+    # Kept data is for a reinstall, which does not import 3x-ui again: 3x-ui stays retired.
+    if [[ "$data" == "purge" && -f "${still_retired_3xui}/migrate.sh" ]]; then
+        bash "${still_retired_3xui}/migrate.sh" restore-import "${still_retired_3xui}" || rc=1
+    fi
 
     if [[ $release == "alpine" ]]; then
         rc-service still-ui stop
@@ -408,8 +417,11 @@ uninstall() {
         systemctl daemon-reload
         systemctl reset-failed
     fi
-    # The egress filter's nftables table (AmneziaWG kernel clients) goes with the panel.
-    if command -v nft > /dev/null 2>&1; then nft delete table inet still_egress_filter > /dev/null 2>&1; fi
+    # The nftables tables of the egress filter and the torrent block go with the panel.
+    if command -v nft > /dev/null 2>&1; then
+        nft delete table inet still_egress_filter > /dev/null 2>&1
+        nft delete table inet still_torrent_block > /dev/null 2>&1
+    fi
 
     local panel_used_postgres="false"
     local db_env_file
@@ -467,9 +479,12 @@ uninstall() {
         echo "Installing still-ui again uses this data: same login, inbounds and clients."
         echo -e "To delete it: ${yellow}rm -rf /etc/still-ui ${db_env_file}${plain}"
         [[ -n "$db_folder" ]] && echo "The database folder ${db_folder} is not in that command: delete it too if only still-ui uses it."
+        if [[ -f "${still_retired_3xui}/migrate.sh" ]]; then
+            echo -e "3x-ui stays retired. To go back to it: ${yellow}bash ${still_retired_3xui}/migrate.sh restore-import ${still_retired_3xui} && systemctl enable --now x-ui${plain}"
+        fi
     fi
     echo "If you need to install this panel again, you can use below command:"
-    echo -e "${green}bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh)${plain}"
+    echo -e "${green}bash <(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh)${plain}"
     echo ""
     # Trap the SIGTERM signal
     trap 'delete_script "$rc"' SIGTERM

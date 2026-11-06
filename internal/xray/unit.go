@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -349,7 +350,7 @@ func (p *process) startUnit() error {
 	if err := makeUnitFolder(config.GetXrayUnitFolder()); err != nil {
 		return err
 	}
-	if err := UnitListenError(p.config); err != nil {
+	if err := UnitConfigError(p.config); err != nil {
 		return fmt.Errorf("%w: %w", ErrConfigRejected, err)
 	}
 	// `xray run -test` runs as root and would pass; the core and the rollback would both fail.
@@ -543,18 +544,77 @@ func makeUnitFolder(dir string) error {
 // its RuntimeDirectory, and /dev/shm, which PrivateDevices shares with the host.
 var unitSocketFolders = []string{"/run/still-xray/", "/dev/shm/"}
 
-// UnitListenError refuses an inbound listening on a unix socket the unit's sandbox hides
-// (PrivateTmp) or makes read-only (ProtectSystem=strict); in 3x-ui's child mode any path works.
-func UnitListenError(cfg *Config) error {
+// UnitConfigError refuses what the running still-xray service cannot do: a unix socket its
+// sandbox hides, or what needs more than the unit grants; in 3x-ui's child mode anything goes.
+func UnitConfigError(cfg *Config) error {
 	if cfg == nil || !UnitMode() {
 		return nil
 	}
-	for _, ib := range cfg.InboundConfigs {
-		if p := unitSocketProblem(ib); p != "" {
-			return errors.New(p)
-		}
+	unit, _ := unitCaps(config.GetXrayUnit())
+	if blockers := UnitBlockers(cfg, unit); len(blockers) > 0 {
+		return errors.New(blockers[0])
 	}
 	return nil
+}
+
+// UnitRestartNeeded reports a config the running core cannot serve but a restart of its unit can:
+// update.sh gave the unit CAP_NET_ADMIN and left the core running, so it started without it.
+func UnitRestartNeeded(cfg *Config) bool {
+	if cfg == nil || !UnitMode() {
+		return false
+	}
+	unit, running := unitCaps(config.GetXrayUnit())
+	return len(UnitBlockers(cfg, running)) > len(UnitBlockers(cfg, unit))
+}
+
+// procStatusFile is a seam for tests.
+var procStatusFile = func(pid int) string { return fmt.Sprintf("/proc/%d/status", pid) }
+
+// unitCaps reads what the unit gives a core it starts, and what its running core has; unknown
+// counts as everything, so a failed systemctl does not refuse a config the core may run.
+func unitCaps(name string) (unit, running UnitCaps) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	out, err := systemctlCommand(ctx, "show", name, "-p", "AmbientCapabilities", "-p", "PrivateDevices", "-p", "MainPID")
+	if err != nil {
+		all := UnitCaps{NetAdmin: true, Devices: true}
+		return all, all
+	}
+	pid := 0
+	for line := range strings.SplitSeq(string(out), "\n") {
+		key, value, _ := strings.Cut(strings.TrimSpace(line), "=")
+		switch key {
+		case "AmbientCapabilities":
+			unit.NetAdmin = slices.Contains(strings.Fields(strings.ToLower(value)), "cap_net_admin")
+		case "PrivateDevices":
+			unit.Devices = value == "no"
+		case "MainPID":
+			pid, _ = strconv.Atoi(value)
+		}
+	}
+	running = unit
+	if has, ok := processHasNetAdmin(pid); ok {
+		running.NetAdmin = has
+	}
+	return unit, running
+}
+
+// processHasNetAdmin reads CAP_NET_ADMIN (bit 12) from the effective set of process pid.
+func processHasNetAdmin(pid int) (has, ok bool) {
+	if pid <= 0 {
+		return false, false
+	}
+	raw, err := os.ReadFile(procStatusFile(pid))
+	if err != nil {
+		return false, false
+	}
+	for line := range strings.SplitSeq(string(raw), "\n") {
+		if rest, found := strings.CutPrefix(line, "CapEff:"); found {
+			mask, err := strconv.ParseUint(strings.TrimSpace(rest), 16, 64)
+			return err == nil && mask&(1<<12) != 0, err == nil
+		}
+	}
+	return false, false
 }
 
 // extAssetRef matches the external geo files a config names (ext:file.dat:tag).

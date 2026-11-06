@@ -207,6 +207,95 @@ expect "an archive without install.sh stops the migration" contains "$(fetch_cas
 expect_not "nothing is fetched from a branch" grep -q 'raw.githubusercontent.com/${REPO}/main' "$repo_root/migrate.sh"
 unset -f curl
 
+# --- acme.sh renewals restart still-ui after the migration -----------------
+# 3x-ui's installers set these reload commands; after the migration x-ui.service is gone, so
+# "systemctl restart x-ui" fails and the panel kept serving the expired certificate.
+expect "systemctl restart" equals "$(hook_for_still_ui 'systemctl restart x-ui')" 'systemctl restart still-ui'
+expect "systemctl, rc-service fallback" equals "$(hook_for_still_ui 'systemctl restart x-ui 2>/dev/null || rc-service x-ui restart 2>/dev/null || true')" \
+    'systemctl restart still-ui 2>/dev/null || rc-service still-ui restart 2>/dev/null || true'
+expect "nginx reload, then x-ui" equals "$(hook_for_still_ui 'systemctl reload nginx ; systemctl restart x-ui.service')" 'systemctl reload nginx ; systemctl restart still-ui'
+expect "the x-ui menu command" equals "$(hook_for_still_ui 'x-ui restart')" 'still-ui restart'
+expect "x-ui as part of another name is left alone" equals "$(hook_for_still_ui 'systemctl restart x-ui-helper; /opt/x-ui/x-ui restart')" \
+    'systemctl restart x-ui-helper; /opt/x-ui/x-ui restart'
+
+ACME_HOME="$test_dir/acme"
+mkdir -p "$ACME_HOME/203.0.113.5_ecc" "$ACME_HOME/panel.example.com" "$ACME_HOME/other.example.com"
+b64() { printf '%s' "$1" | base64 | tr -d '\n'; }
+ip_conf="$ACME_HOME/203.0.113.5_ecc/203.0.113.5.conf"
+dom_conf="$ACME_HOME/panel.example.com/panel.example.com.conf"
+other_conf="$ACME_HOME/other.example.com/other.example.com.conf"
+printf "Le_Domain='203.0.113.5'\nLe_ReloadCmd='__ACME_BASE64__START_%s__ACME_BASE64__END_'\nLe_NextRenewTime='100'\n" \
+    "$(b64 'systemctl restart x-ui 2>/dev/null || rc-service x-ui restart 2>/dev/null || true')" > "$ip_conf"
+printf "Le_Domain='panel.example.com'\nLe_ReloadCmd='systemctl restart x-ui'\nLe_PostHook='__ACME_BASE64__START_%s__ACME_BASE64__END_'\n" "$(b64 'x-ui start')" > "$dom_conf"
+printf "Le_Domain='other.example.com'\nLe_ReloadCmd='__ACME_BASE64__START_%s__ACME_BASE64__END_'\n" "$(b64 'systemctl reload nginx')" > "$other_conf"
+printf "Le_ReloadCmd='systemctl restart x-ui'\n" > "$ACME_HOME/panel.example.com/panel.example.com.csr.conf"
+chmod 600 "$ip_conf"
+cp "$other_conf" "$test_dir/other.before"
+hook_of() { # FILE KEY: the command a hook line holds, decoded
+    local v
+    v=$(sed -n "s/^$2='\(.*\)'$/\1/p" "$1")
+    if [[ "$v" == __ACME_BASE64__START_* ]]; then
+        v="${v#__ACME_BASE64__START_}"
+        printf '%s' "${v%__ACME_BASE64__END_}" | base64 -d
+    else
+        printf '%s' "$v"
+    fi
+}
+retarget_acme_hooks "$test_dir/acme-hooks.tsv" > /dev/null
+expect "IP certificate: base64 reload command restarts still-ui" equals "$(hook_of "$ip_conf" Le_ReloadCmd)" \
+    'systemctl restart still-ui 2>/dev/null || rc-service still-ui restart 2>/dev/null || true'
+expect "IP certificate: stays base64-encoded" grep -q "^Le_ReloadCmd='__ACME_BASE64__START_" "$ip_conf"
+expect "IP certificate: other settings kept" grep -qx "Le_NextRenewTime='100'" "$ip_conf"
+expect "IP certificate: mode kept" equals "$(stat -c %a "$ip_conf" 2> /dev/null || stat -f %Lp "$ip_conf")" 600
+expect "domain: plain reload command" equals "$(hook_of "$dom_conf" Le_ReloadCmd)" 'systemctl restart still-ui'
+expect "domain: post hook too" equals "$(hook_of "$dom_conf" Le_PostHook)" 'still-ui start'
+expect "a certificate that never restarted x-ui is untouched" cmp -s "$other_conf" "$test_dir/other.before"
+expect "the CSR settings file is not a domain config" grep -q 'restart x-ui' "$ACME_HOME/panel.example.com/panel.example.com.csr.conf"
+expect "three changed lines recorded" equals "$(wc -l < "$test_dir/acme-hooks.tsv" | tr -d ' ')" 3
+expect_not "no temporary file left" compgen -G "$ACME_HOME/*/*.conf.*"
+# A renewal after the migration rewrites Le_NextRenewTime; the rollback must put back
+# only the hook lines, not the whole file.
+sed -i.bak "s/^Le_NextRenewTime='100'$/Le_NextRenewTime='200'/" "$ip_conf" && rm -f "$ip_conf.bak"
+restore_acme_hooks "$test_dir/acme-hooks.tsv"
+expect "rollback: x-ui reload command back" equals "$(hook_of "$ip_conf" Le_ReloadCmd)" \
+    'systemctl restart x-ui 2>/dev/null || rc-service x-ui restart 2>/dev/null || true'
+expect "rollback: domain hooks back" equals "$(hook_of "$dom_conf" Le_ReloadCmd)/$(hook_of "$dom_conf" Le_PostHook)" 'systemctl restart x-ui/x-ui start'
+expect "rollback: what the renewal wrote stays" grep -qx "Le_NextRenewTime='200'" "$ip_conf"
+printf 'export LE_WORKING_DIR="%s"\nexport LE_CONFIG_HOME="%s"\n' "$ACME_HOME" "$test_dir/acme-config" > "$ACME_HOME/acme.sh.env"
+expect "LE_CONFIG_HOME of acme.sh.env is where the settings are" equals "$(acme_config_home)" "$test_dir/acme-config"
+rm -f "$ACME_HOME/acme.sh.env"
+
+# --- 3x-ui stays up while packages install; the stopped window is bounded --
+# A stub install.sh records how it was called; $STUB_DIR/hang makes it hang like a dead mirror.
+WORK="$test_dir/inst-work" BK="$test_dir/inst-bk"
+mkdir -p "$WORK" "$BK"
+cat > "$WORK/install.sh" << 'STUB'
+# install-deps) is what migrate.sh looks for.
+echo "args=$* migrating=${STILL_UI_MIGRATING:-} deps=${STILL_UI_DEPS_INSTALLED:-}" >> "$STUB_DIR/install-calls"
+[[ -e "$STUB_DIR/hang" ]] && exec sleep 30
+exit 0
+STUB
+STILL_ARCHIVE=/dev/null
+DEPS_INSTALLED=0
+install_deps > /dev/null
+run_install > /dev/null
+expect "packages are installed on their own step, then the installer skips them" equals "$(cat "$test_dir/install-calls")" \
+    "$(printf 'args=install-deps migrating= deps=\nargs= migrating=1 deps=1')"
+INSTALL_TIMEOUT=1
+start=$SECONDS
+touch "$test_dir/hang"
+quiet_run_install() { run_install > /dev/null; }
+expect_not "an installer that hangs while 3x-ui is stopped fails (and the migration rolls back)" quiet_run_install
+expect "it is given up on after INSTALL_TIMEOUT" test $((SECONDS - start)) -lt 20
+: > "$test_dir/install-calls"
+DEPS_INSTALLED=0
+start=$SECONDS
+install_deps > /dev/null
+expect "a hung package mirror before the stop does not stop the migration" equals "$DEPS_INSTALLED" 1
+expect "and is given up on as well" test $((SECONDS - start)) -lt 20
+rm -f "$test_dir/hang"
+INSTALL_TIMEOUT=600
+
 echo
 if ((failures > 0)); then
     echo "$failures check(s) failed"

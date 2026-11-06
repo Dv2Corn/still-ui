@@ -280,3 +280,26 @@ func TestRemoveStaleBackupWork(t *testing.T) {
 		t.Error("a work folder in use was removed")
 	}
 }
+
+// A PostgreSQL that accepts the connection and never answers used to hang pg_dump, and with it
+// POST /panel/api/server/localBackup and every later scheduled backup, without an alert.
+func TestPgDumpGivesUpOnAHungServer(t *testing.T) {
+	bin := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bin, "pg_dump"), []byte("#!/bin/sh\nexec sleep 60\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("XUI_DB_DSN", "postgres://xui:secret@127.0.0.1:5432/xui?sslmode=disable")
+	prev := pgDumpTimeout
+	pgDumpTimeout = 300 * time.Millisecond
+	t.Cleanup(func() { pgDumpTimeout = prev })
+
+	start := time.Now()
+	err := pgDumpToFile(filepath.Join(t.TempDir(), "x.dump"))
+	if err == nil || !strings.Contains(err.Error(), "did not finish within 300ms") {
+		t.Fatalf("pgDumpToFile = %v, want the timeout", err)
+	}
+	if took := time.Since(start); took > 15*time.Second {
+		t.Fatalf("pgDumpToFile returned after %v", took)
+	}
+}
