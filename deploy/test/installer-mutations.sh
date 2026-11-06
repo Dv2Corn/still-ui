@@ -182,6 +182,12 @@ mutate "install: 3x-ui import over an existing database" install.sh _still_impor
     'install.sh: no 3x-ui import without consent, never over an existing still-ui database'
 mutate "install: 3x-ui import by default" install.sh _still_import_3xui 'STILL_UI_IMPORT_3XUI:-no' 'STILL_UI_IMPORT_3XUI:-yes' \
     'install.sh: no 3x-ui import without consent, never over an existing still-ui database'
+mutate "install: 3x-ui import keeps XUI_DB_FOLDER" install.sh _still_import_3xui '|BIN_FOLDER|LOG_FOLDER|MAIN_FOLDER)=' '|BIN_FOLDER|MAIN_FOLDER)=' \
+    'install.sh: STILL_UI_IMPORT_3XUI=yes copies the 3x-ui database and stops x-ui'
+mutate "install: 3x-ui import leaves x-ui's unit in place" install.sh _still_import_3xui '        mv "$unit" "$retired/" ||' '        false ||' \
+    'install.sh: the 3x-ui import retires x-ui'"'"'s unit and points acme.sh renewals at still-ui'
+mutate "install: 3x-ui import leaves acme.sh restarting x-ui" install.sh _still_import_3xui '&& retarget_acme_hooks "${retired}/acme-hooks.tsv"' '&& :' \
+    'install.sh: the 3x-ui import retires x-ui'"'"'s unit and points acme.sh renewals at still-ui'
 mutate "install: install-result.env not shell-escaped" install.sh write_install_result "printf 'XUI_PASSWORD=%q\n'" "printf 'XUI_PASSWORD=%s\n'" \
     'install.sh: install-result.env is 0600 and safely source-able with any password'
 mutate "install: install-result.env readable by all" install.sh write_install_result 'chmod 600 "$result_file"' 'chmod 644 "$result_file"' \

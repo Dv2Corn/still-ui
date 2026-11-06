@@ -537,11 +537,29 @@ _still_import_3xui() {
     for src_env in /etc/default/x-ui /etc/conf.d/x-ui /etc/sysconfig/x-ui; do
         dst_env="${src_env%/x-ui}/still-ui"
         if [[ -f "$src_env" && ! -e "$dst_env" ]]; then
-            cp -a "$src_env" "$dst_env"
+            # 3x-ui's folders stay behind: XUI_DB_FOLDER=/etc/x-ui would open 3x-ui's live database.
+            (umask 077 && grep -Ev '^[[:space:]]*(export[[:space:]]+)?XUI_(DB_FOLDER|BIN_FOLDER|LOG_FOLDER|MAIN_FOLDER)=' "$src_env" > "$dst_env")
+            chmod 600 "$dst_env"
         fi
     done
-    echo -e "${green}Copied the 3x-ui database to /etc/still-ui/x-ui.db; x-ui is stopped and disabled.${plain}"
-    echo -e "${green}Your panel login, inbounds and clients are kept. To go back: systemctl enable --now x-ui (after stopping still-ui).${plain}"
+    # A stopped, disabled x-ui still starts on "systemctl restart x-ui", which 3x-ui's acme.sh
+    # renewal runs: its unit goes aside, and the renewal restarts still-ui instead.
+    local retired=/etc/still-ui/3x-ui-retired unit
+    install -d -m 700 "$retired"
+    for unit in "${xui_service}/x-ui.service" "${xui_service}/x-ui.service.d" /etc/systemd/system.control/x-ui.service.d /etc/init.d/x-ui; do
+        [[ -e "$unit" ]] || continue
+        rm -rf "${retired:?}/$(basename "$unit")"
+        mv "$unit" "$retired/" || echo -e "${yellow}Could not move ${unit} aside; x-ui can still be started.${plain}"
+    done
+    [[ $release == "alpine" ]] || systemctl daemon-reload > /dev/null 2>&1
+    if [[ -f "${xui_folder}/migrate.sh" ]]; then
+        (
+            # shellcheck source=/dev/null
+            . "${xui_folder}/migrate.sh" && retarget_acme_hooks "${retired}/acme-hooks.tsv"
+        )
+    fi
+    echo -e "${green}Copied the 3x-ui database to /etc/still-ui/x-ui.db; x-ui is stopped and its service file is in ${retired}.${plain}"
+    echo -e "${green}Your panel login, inbounds and clients are kept. To go back: stop still-ui, copy x-ui.service from ${retired} back to ${xui_service}, then systemctl daemon-reload && systemctl enable --now x-ui.${plain}"
 }
 
 # write_install_result <user> <pass> <port> <webpath> <scheme> <host> <token> <dbtype>

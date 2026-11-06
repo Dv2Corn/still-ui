@@ -595,7 +595,17 @@ import_setup() {
     echo db > "$R/etc/x-ui/x-ui.db"
     echo wal > "$R/etc/x-ui/x-ui.db-wal"
     echo key > "$R/etc/x-ui/node_token_key.json"
-    echo 'XUI_DB_TYPE=sqlite' > "$R/etc/default/x-ui"
+    printf 'XUI_DB_TYPE=sqlite\nXUI_DB_FOLDER=/etc/x-ui\nexport XUI_LOG_FOLDER=/var/log/x-ui\n' > "$R/etc/default/x-ui"
+    printf '[Service]\nExecStart=/usr/local/x-ui/x-ui\n' > "$xui_service/x-ui.service"
+    mkdir -p "$xui_service/x-ui.service.d"
+    printf '[Service]\nMemoryMax=450M\n' > "$xui_service/x-ui.service.d/50-local.conf"
+    # 3x-ui's acme.sh certificate for the server IP, reloadcmd base64-encoded as acme.sh 3.x writes it.
+    export STILL_UI_ACME_HOME="$R/acme"
+    mkdir -p "$R/acme/203.0.113.5_ecc"
+    printf "Le_Domain='203.0.113.5'\nLe_ReloadCmd='__ACME_BASE64__START_%s__ACME_BASE64__END_'\nLe_NextRenewTime='1'\n" \
+        "$(printf '%s' 'systemctl restart x-ui 2>/dev/null || rc-service x-ui restart 2>/dev/null || true' | base64 -w0)" \
+        > "$R/acme/203.0.113.5_ecc/203.0.113.5.conf"
+    cp "$repo_root/migrate.sh" "$xui_folder/migrate.sh"
 }
 import_yes() {
     import_setup || return 1
@@ -604,11 +614,30 @@ import_yes() {
     eq "$(cat "$R/etc/still-ui/x-ui.db-wal")" wal
     eq "$(cat "$R/etc/still-ui/node_token_key.json")" key
     has "$R/etc/default/still-ui" XUI_DB_TYPE=sqlite
+    hasnt "$R/etc/default/still-ui" XUI_DB_FOLDER
+    hasnt "$R/etc/default/still-ui" XUI_LOG_FOLDER
+    eq "$(stat -c %a "$R/etc/default/still-ui")" 600 "(env file mode)"
     eq "$(cat "$R/etc/x-ui/x-ui.db")" db "(3x-ui's database changed)"
     called "systemctl stop x-ui"
     called "systemctl disable x-ui"
 }
 t "install.sh: STILL_UI_IMPORT_3XUI=yes copies the 3x-ui database and stops x-ui" import_yes
+# After the import 3x-ui's acme.sh renewal ran "systemctl restart x-ui": 3x-ui came up next to
+# still-ui on the same ports, while still-ui's own certificate expired.
+import_retires_xui() {
+    import_setup || return 1
+    STILL_UI_IMPORT_3XUI=yes _still_import_3xui > "$R/out"
+    [[ ! -e "$xui_service/x-ui.service" && ! -e "$xui_service/x-ui.service.d" ]] || afail "x-ui's unit can still start"
+    has "$R/etc/still-ui/3x-ui-retired/x-ui.service" "ExecStart=/usr/local/x-ui/x-ui"
+    has "$R/etc/still-ui/3x-ui-retired/x-ui.service.d/50-local.conf" "MemoryMax=450M"
+    called "systemctl daemon-reload"
+    local conf="$R/acme/203.0.113.5_ecc/203.0.113.5.conf" cmd
+    cmd=$(sed -n "s/^Le_ReloadCmd='__ACME_BASE64__START_\(.*\)__ACME_BASE64__END_'$/\1/p" "$conf" | base64 -d)
+    eq "$cmd" "systemctl restart still-ui 2>/dev/null || rc-service still-ui restart 2>/dev/null || true" "(reload command)"
+    has "$conf" "Le_NextRenewTime='1'"
+    count "$R/etc/still-ui/3x-ui-retired/acme-hooks.tsv" "Le_ReloadCmd" 1
+}
+t "install.sh: the 3x-ui import retires x-ui's unit and points acme.sh renewals at still-ui" import_retires_xui
 import_no() {
     import_setup || return 1
     _still_import_3xui > /dev/null
