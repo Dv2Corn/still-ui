@@ -91,8 +91,9 @@ x-ui
 گزینهٔ منوی **۶** یا `still-ui uninstall`. پنل و سرویس `still-xray` را متوقف و
 غیرفعال می‌کند، یونیت‌ها و افزونه‌هایشان، کاربر `still-xray`، پوشهٔ نصب و منو را
 حذف می‌کند و **داده‌ها را نگه می‌دارد**: پایگاه‌داده، نسخه‌های پشتیبان و
-`install-result.env` در `/etc/still-ui/` و فایل تنظیمات (`/etc/default/still-ui`،
-یا `/etc/sysconfig/still-ui` در RHEL). اگر still-ui را دوباره نصب کنید، همین
+`install-result.env` در `/etc/still-ui/` و فایل تنظیمات (`/etc/default/still-ui`
+در Debian و Ubuntu، `/etc/sysconfig/still-ui` در RHEL و `/etc/conf.d/still-ui` در
+Arch، Manjaro و Alpine). اگر still-ui را دوباره نصب کنید، همین
 داده‌ها را برمی‌دارد و ورود، اینباندها و کلاینت‌ها همان می‌مانند.
 
 سپس منو می‌پرسد **Also delete all data (database /etc/still-ui, clients,
@@ -108,7 +109,13 @@ settings)?** (پیش‌فرض: خیر). بدون ترمینال (اسکریپت 
 پاک‌سازی PostgreSQL هم داده می‌شود (یک تأیید جداگانه و برگشت‌ناپذیر). کد خروج
 ۰ است اگر همه‌چیز حذف شود و ۱ اگر چیزی حذف نشود.
 
+پوشهٔ پایگاه‌داده‌ای که با `XUI_DB_FOLDER` جابه‌جا شده، هرگز پاک نمی‌شود، حتی با
+`--purge`: ممکن است داده‌های دیگری هم در آن باشد. دستور نام آن را می‌گوید؛ اگر
+فقط still-ui از آن استفاده می‌کند، خودتان پاکش کنید.
+
 <Callout type="info">
   برخلاف 3x-ui، تا خودتان نخواهید چیزی پاک نمی‌شود. برای پاک کردن داده‌های
-  نگه‌داشته‌شده بعداً: `rm -rf /etc/still-ui /etc/default/still-ui`.
+  نگه‌داشته‌شده بعداً، `/etc/still-ui` و فایل تنظیمات بالا را پاک کنید، مثلاً
+  `rm -rf /etc/still-ui /etc/default/still-ui` در Debian و Ubuntu؛ دستور حذف،
+  فرمان دقیق را برای همان سرور چاپ می‌کند.
 </Callout>
