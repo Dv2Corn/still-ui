@@ -549,12 +549,13 @@ _still_import_3xui() {
     done
     # A stopped, disabled x-ui still starts on "systemctl restart x-ui", which 3x-ui's acme.sh
     # renewal runs: its unit goes aside, and the renewal restarts still-ui instead.
-    local retired=/etc/still-ui/3x-ui-retired unit
+    # The files keep their full path under files/, where 'still-ui uninstall' puts them back from.
+    local retired=/root/still-ui-3x-ui-retired unit
     install -d -m 700 "$retired"
     for unit in "${xui_service}/x-ui.service" "${xui_service}/x-ui.service.d" /etc/systemd/system.control/x-ui.service.d /etc/init.d/x-ui; do
-        [[ -e "$unit" ]] || continue
-        rm -rf "${retired:?}/$(basename "$unit")"
-        mv "$unit" "$retired/" || echo -e "${yellow}Could not move ${unit} aside; x-ui can still be started.${plain}"
+        [[ -e "$unit" && ! -e "${retired}/files${unit}" ]] || continue
+        mkdir -p "${retired}/files$(dirname "$unit")" && mv "$unit" "${retired}/files${unit}" ||
+            echo -e "${yellow}Could not move ${unit} aside; x-ui can still be started.${plain}"
     done
     [[ $release == "alpine" ]] || systemctl daemon-reload > /dev/null 2>&1
     if [[ -f "${xui_folder}/migrate.sh" ]]; then
@@ -564,7 +565,7 @@ _still_import_3xui() {
         )
     fi
     echo -e "${green}Copied the 3x-ui database to /etc/still-ui/x-ui.db; x-ui is stopped and its service file is in ${retired}.${plain}"
-    echo -e "${green}Your panel login, inbounds and clients are kept. To go back: stop still-ui, copy x-ui.service from ${retired} back to ${xui_service}, then systemctl daemon-reload && systemctl enable --now x-ui.${plain}"
+    echo -e "${green}Your panel login, inbounds and clients are kept. To go back: still-ui uninstall (it puts x-ui's service file and acme.sh renewals back), then systemctl enable --now x-ui.${plain}"
 }
 
 # write_install_result <user> <pass> <port> <webpath> <scheme> <host> <token> <dbtype>

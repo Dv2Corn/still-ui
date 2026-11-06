@@ -189,10 +189,19 @@ mutate "install: 3x-ui import by default" install.sh _still_import_3xui 'STILL_U
     'install.sh: no 3x-ui import without consent, never over an existing still-ui database'
 mutate "install: 3x-ui import keeps XUI_DB_FOLDER" install.sh _still_import_3xui '|BIN_FOLDER|LOG_FOLDER|MAIN_FOLDER)=' '|BIN_FOLDER|MAIN_FOLDER)=' \
     'install.sh: STILL_UI_IMPORT_3XUI=yes copies the 3x-ui database and stops x-ui'
-mutate "install: 3x-ui import leaves x-ui's unit in place" install.sh _still_import_3xui '        mv "$unit" "$retired/" ||' '        false ||' \
+mutate "install: 3x-ui import leaves x-ui's unit in place" install.sh _still_import_3xui 'mv "$unit" "${retired}/files${unit}" ||' 'false ||' \
     'install.sh: the 3x-ui import retires x-ui'"'"'s unit and points acme.sh renewals at still-ui'
 mutate "install: 3x-ui import leaves acme.sh restarting x-ui" install.sh _still_import_3xui '&& retarget_acme_hooks "${retired}/acme-hooks.tsv"' '&& :' \
     'install.sh: the 3x-ui import retires x-ui'"'"'s unit and points acme.sh renewals at still-ui'
+mutate "install: retired drop-in folders collide" install.sh _still_import_3xui 'mv "$unit" "${retired}/files${unit}"' 'rm -rf "${retired}/files/$(basename "$unit")"; mv "$unit" "${retired}/files/$(basename "$unit")"' \
+    'install.sh: the 3x-ui import retires x-ui'"'"'s unit and points acme.sh renewals at still-ui'
+mutate "menu: uninstall leaves acme.sh restarting still-ui" x-ui.sh _still_unretire_3xui '&& restore_acme_hooks "$retired/acme-hooks.tsv"' '&& :' \
+    'x-ui.sh: uninstall puts back what a 3x-ui import retired'
+mutate "menu: uninstall leaves x-ui's unit retired" x-ui.sh _still_unretire_3xui 'mv "$src" "$dst" &&' 'false &&' \
+    'x-ui.sh: uninstall puts back what a 3x-ui import retired'
+mutate "menu: uninstall does not put 3x-ui back" x-ui.sh uninstall '    _still_unretire_3xui
+' '' \
+    'x-ui.sh: uninstall puts x-ui'"'"'s retired unit back before reloading systemd'
 mutate "menu: uninstall keeps the torrent block" x-ui.sh uninstall '        nft delete table inet still_torrent_block > /dev/null 2>&1' '        :' \
     'x-ui.sh: uninstall removes the program and, by default, keeps the data (exit 0)'
 mutate "menu: reinstall hint from a branch" x-ui.sh uninstall 'https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh' 'https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh' \

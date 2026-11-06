@@ -111,7 +111,7 @@ On update, `x-ui xray-unit-check` looks at the current config first. Xray stays 
 - listens on a unix socket outside `/run/still-xray/` and `/dev/shm/` (the service has its own `/tmp` and sees the rest read-only; use e.g. `/dev/shm/xray.sock,0666`),
 - is a TUN inbound: it needs `/dev/net/tun`, which the service's sandbox hides; a drop-in of your own in `/etc/systemd/system/still-xray.service.d/` with `PrivateDevices=no` allows it, then run the update again.
 
-TPROXY and socket marks (policy routing, WARP) work in the service: it has `CAP_NET_ADMIN`. The panel refuses a change the running service cannot do and says why, for example a socket mark after a local drop-in took the capability away.
+TPROXY and socket marks (policy routing, WARP) work in the service: it has `CAP_NET_ADMIN`. The panel refuses a change the running service cannot do and says why, for example a socket mark after a local drop-in took the capability away; a core still running from before the update that gave the service the capability is restarted once for a change that needs it.
 
 Settings in `/etc/default/still-ui`: `STILL_XRAY_UNIT=off` keeps Xray inside the panel (as in 3x-ui), `STILL_XRAY_UNIT=on` forces the service, unset means automatic. `STILL_XRAY_MEMORY_MAX` caps the core (half the RAM by default, 256M to 4G). After a change run `still-ui update`. Docker images have no systemd and always keep Xray inside the panel.
 
@@ -280,7 +280,7 @@ still-ui migrate-rollback
 
 Changes made in still-ui after the migration (new clients, traffic counters) do not travel back to 3x-ui. Without a terminal, set `STILL_UI_MIGRATE_YES=1`. A PostgreSQL setup needs `pg_dump` and `pg_restore` on the server. Tested on Debian 12 and Ubuntu 24.04 with 3x-ui 3.11.0 (SQLite and PostgreSQL), 3.7.0, 2.9.4, 2.6.7, 2.4.11, 2.3.15, 2.2.8 and 2.0.2 (`scripts/test-migrate.sh`).
 
-A plain install also offers to take over `/etc/x-ui/x-ui.db` (non-interactive: `STILL_UI_IMPORT_3XUI=yes`), without the checks and the backup above. It stops 3x-ui, moves its unit to `/etc/still-ui/3x-ui-retired/` and points acme.sh renewals at still-ui too.
+A plain install also offers to take over `/etc/x-ui/x-ui.db` (non-interactive: `STILL_UI_IMPORT_3XUI=yes`), without the checks and the backup above. It stops 3x-ui, moves its unit to `/root/still-ui-3x-ui-retired/` and points acme.sh renewals at still-ui too; `still-ui uninstall` puts both back.
 
 The panel and the subscription server pick up a renewed certificate file within half a minute, without a restart.
 

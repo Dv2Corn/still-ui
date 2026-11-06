@@ -101,7 +101,7 @@ Xray 什么时候会重启？入站结构变化时（面板会提示）、点击
 - 监听 `/run/still-xray/` 和 `/dev/shm/` 以外的 unix 套接字（该服务有自己独立的 `/tmp`，其他路径对它都是只读的；可改用例如 `/dev/shm/xray.sock,0666`），
 - 是 TUN 入站：它需要 `/dev/net/tun`，而服务的沙箱隐藏了它；在 `/etc/systemd/system/still-xray.service.d/` 中用你自己的 drop-in 设置 `PrivateDevices=no` 即可允许，然后重新运行升级。
 
-TPROXY 和套接字标记（策略路由、WARP）在该服务中可用：它拥有 `CAP_NET_ADMIN`。正在运行的服务做不到的更改会被面板拒绝并说明原因，例如本地 drop-in 去掉了该权限后的套接字标记。
+TPROXY 和套接字标记（策略路由、WARP）在该服务中可用：它拥有 `CAP_NET_ADMIN`。正在运行的服务做不到的更改会被面板拒绝并说明原因，例如本地 drop-in 去掉了该权限后的套接字标记；若内核仍是在服务获得该权限的升级之前启动的，需要它的更改会让内核重启一次。
 
 `/etc/default/still-ui` 中的设置：`STILL_XRAY_UNIT=off` 把 Xray 留在面板内部（与 3x-ui 相同），`STILL_XRAY_UNIT=on` 强制使用该服务，不设置则自动判断。`STILL_XRAY_MEMORY_MAX` 为内核设置内存上限（默认内存的一半，256M 到 4G）。修改后运行 `still-ui update`。Docker 镜像没有 systemd，始终把 Xray 留在面板内部。
 
@@ -243,7 +243,7 @@ still-ui migrate-rollback
 
 迁移后在 still-ui 中做的改动（新客户端、流量计数）不会同步回 3x-ui。没有终端时，请设置 `STILL_UI_MIGRATE_YES=1`。使用 PostgreSQL 时，服务器上需要有 `pg_dump` 和 `pg_restore`。已在 Debian 12 和 Ubuntu 24.04 上测试，3x-ui 版本为 3.11.0（SQLite 和 PostgreSQL）、3.7.0、2.9.4、2.6.7、2.4.11、2.3.15、2.2.8 和 2.0.2（`scripts/test-migrate.sh`）。
 
-普通安装也会提议接管 `/etc/x-ui/x-ui.db`（非交互方式：`STILL_UI_IMPORT_3XUI=yes`），但不包含上述检查和备份。它会停止 3x-ui，把它的单元文件移到 `/etc/still-ui/3x-ui-retired/`，同样让 acme.sh 续期指向 still-ui。
+普通安装也会提议接管 `/etc/x-ui/x-ui.db`（非交互方式：`STILL_UI_IMPORT_3XUI=yes`），但不包含上述检查和备份。它会停止 3x-ui，把它的单元文件移到 `/root/still-ui-3x-ui-retired/`，同样让 acme.sh 续期指向 still-ui；`still-ui uninstall` 会把两者恢复原样。
 
 面板和订阅服务器会在半分钟内自动使用续期后的证书文件，无需重启。
 

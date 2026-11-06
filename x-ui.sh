@@ -360,6 +360,27 @@ _still_stdin_is_tty() {
 # The data is /etc/still-ui (database, backups, install-result.env, node key)
 # and the env file (PostgreSQL DSN, still-ui settings). install.sh finds both
 # again and comes back with the same login, inbounds and clients.
+# _still_unretire_3xui: a plain install that imported 3x-ui moved x-ui's service files and pointed
+# its acme.sh renewals at still-ui (install.sh _still_import_3xui); an uninstall puts both back.
+_still_unretire_3xui() {
+    local retired=/root/still-ui-3x-ui-retired src dst
+    [[ -d "$retired" ]] || return 0
+    if [[ -s "$retired/acme-hooks.tsv" && -f "${xui_folder}/migrate.sh" ]]; then
+        # shellcheck source=/dev/null
+        if (. "${xui_folder}/migrate.sh" && restore_acme_hooks "$retired/acme-hooks.tsv"); then
+            rm -f "$retired/acme-hooks.tsv"
+        else
+            LOGE "Could not put back every acme.sh renewal hook listed in $retired/acme-hooks.tsv"
+        fi
+    fi
+    [[ -d "$retired/files" ]] || return 0
+    while IFS= read -r -d '' src; do
+        dst="${src#"$retired/files"}"
+        [[ -e "$dst" ]] && continue
+        mkdir -p "$(dirname "$dst")" && mv "$src" "$dst" && echo "Put back ${dst} (3x-ui)"
+    done < <(find "$retired/files" -mindepth 1 \( -name x-ui.service -o -name x-ui.service.d -o -name x-ui \) -prune -print0)
+}
+
 uninstall() {
     local data="" arg rc=0 p
     for arg in "${@:2}"; do
@@ -385,6 +406,7 @@ uninstall() {
             confirm "Also delete all data (database /etc/still-ui, clients, settings)?" "n" && data=purge
         fi
     fi
+    _still_unretire_3xui
 
     if [[ $release == "alpine" ]]; then
         rc-service still-ui stop

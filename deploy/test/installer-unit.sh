@@ -75,7 +75,7 @@ load() {
     ' "$file")
     [[ -n "$def" ]] || { echo "missing function $name in $file"; return 1; }
     def=$(printf '%s\n' "$def" | sed -E \
-        "s#(^|[^A-Za-z0-9_.}/])(/proc/meminfo|/swapfile|/etc/[A-Za-z0-9._-]+|/run/systemd/system|/usr/bin|/var/log/still-[a-z]+|/root/still-ui-migrate)#\1${R}\2#g")
+        "s#(^|[^A-Za-z0-9_.}/])(/proc/meminfo|/swapfile|/etc/[A-Za-z0-9._-]+|/run/systemd/system|/usr/bin|/var/log/still-[a-z]+|/root/still-ui-migrate|/root/still-ui-3x-ui-retired)#\1${R}\2#g")
     # Anything else absolute that is not a stubbed program path is a test bug.
     left=$(printf '%s\n' "${def//"$R"/@ROOT@}" | grep -v '^[[:space:]]*#' |
         grep -oE '(^|[^A-Za-z0-9_.}/$@])/(etc|proc|run|var|usr|root|swapfile|sys|boot|opt|home|srv)(/[A-Za-z0-9._-]*)*' |
@@ -621,6 +621,8 @@ import_setup() {
     printf '[Service]\nExecStart=/usr/local/x-ui/x-ui\n' > "$xui_service/x-ui.service"
     mkdir -p "$xui_service/x-ui.service.d"
     printf '[Service]\nMemoryMax=450M\n' > "$xui_service/x-ui.service.d/50-local.conf"
+    mkdir -p "$R/etc/systemd/system.control/x-ui.service.d"
+    printf '[Service]\nMemoryMax=650M\n' > "$R/etc/systemd/system.control/x-ui.service.d/50-MemoryMax.conf"
     # 3x-ui's acme.sh certificate for the server IP, reloadcmd base64-encoded as acme.sh 3.x writes it.
     export STILL_UI_ACME_HOME="$R/acme"
     mkdir -p "$R/acme/203.0.113.5_ecc"
@@ -650,16 +652,36 @@ import_retires_xui() {
     import_setup || return 1
     STILL_UI_IMPORT_3XUI=yes _still_import_3xui > "$R/out"
     [[ ! -e "$xui_service/x-ui.service" && ! -e "$xui_service/x-ui.service.d" ]] || afail "x-ui's unit can still start"
-    has "$R/etc/still-ui/3x-ui-retired/x-ui.service" "ExecStart=/usr/local/x-ui/x-ui"
-    has "$R/etc/still-ui/3x-ui-retired/x-ui.service.d/50-local.conf" "MemoryMax=450M"
+    local kept="$R/root/still-ui-3x-ui-retired/files"
+    has "$kept$xui_service/x-ui.service" "ExecStart=/usr/local/x-ui/x-ui"
+    has "$kept$xui_service/x-ui.service.d/50-local.conf" "MemoryMax=450M"
+    # Two drop-in folders of the same name (an operator's and systemctl set-property's) both survive.
+    has "$kept$R/etc/systemd/system.control/x-ui.service.d/50-MemoryMax.conf" "MemoryMax=650M"
     called "systemctl daemon-reload"
     local conf="$R/acme/203.0.113.5_ecc/203.0.113.5.conf" cmd
     cmd=$(sed -n "s/^Le_ReloadCmd='__ACME_BASE64__START_\(.*\)__ACME_BASE64__END_'$/\1/p" "$conf" | base64 -d)
     eq "$cmd" "systemctl restart still-ui 2>/dev/null || rc-service still-ui restart 2>/dev/null || true" "(reload command)"
     has "$conf" "Le_NextRenewTime='1'"
-    count "$R/etc/still-ui/3x-ui-retired/acme-hooks.tsv" "Le_ReloadCmd" 1
+    count "$R/root/still-ui-3x-ui-retired/acme-hooks.tsv" "Le_ReloadCmd" 1
 }
 t "install.sh: the 3x-ui import retires x-ui's unit and points acme.sh renewals at still-ui" import_retires_xui
+# The way back from an import is 'still-ui uninstall': with the hooks left on still-ui, a renewal
+# started still-ui next to 3x-ui, or (still-ui gone) never restarted 3x-ui on a 6-day certificate.
+import_way_back() {
+    import_setup || return 1
+    STILL_UI_IMPORT_3XUI=yes _still_import_3xui > /dev/null
+    load "$XUI_SH" _still_unretire_3xui || return 1
+    LOGE() { echo "[ERR] $*"; }
+    _still_unretire_3xui > "$R/out"
+    has "$xui_service/x-ui.service" "ExecStart=/usr/local/x-ui/x-ui"
+    has "$xui_service/x-ui.service.d/50-local.conf" "MemoryMax=450M"
+    has "$R/etc/systemd/system.control/x-ui.service.d/50-MemoryMax.conf" "MemoryMax=650M"
+    local conf="$R/acme/203.0.113.5_ecc/203.0.113.5.conf" cmd
+    cmd=$(sed -n "s/^Le_ReloadCmd='__ACME_BASE64__START_\(.*\)__ACME_BASE64__END_'$/\1/p" "$conf" | base64 -d)
+    eq "$cmd" "systemctl restart x-ui 2>/dev/null || rc-service x-ui restart 2>/dev/null || true" "(reload command back)"
+    hasnt "$R/out" "[ERR]"
+}
+t "x-ui.sh: uninstall puts back what a 3x-ui import retired: x-ui's unit, drop-ins and acme.sh hooks" import_way_back
 import_no() {
     import_setup || return 1
     _still_import_3xui > /dev/null
@@ -939,7 +961,7 @@ t "update.sh: a read-only install folder stops the update before anything change
 
 xui_setup() {
     fresh_root
-    for f in uninstall delete_script xui_env_file_path confirm postgresql_installed _still_stdin_is_tty; do load "$XUI_SH" "$f" || return 1; done
+    for f in uninstall delete_script xui_env_file_path confirm postgresql_installed _still_stdin_is_tty _still_unretire_3xui; do load "$XUI_SH" "$f" || return 1; done
     purge_postgresql() { log_call purge_postgresql; }
     show_menu() { log_call show_menu; }
     LOGE() { echo "[ERR] $*"; }
@@ -1006,6 +1028,16 @@ uninstall_default_keeps() {
     not_called purge_postgresql
 }
 t "x-ui.sh: uninstall removes the program and, by default, keeps the data (exit 0)" uninstall_default_keeps
+uninstall_unretires() {
+    xui_setup || return 1
+    mkdir -p "$R/root/still-ui-3x-ui-retired/files$xui_service"
+    printf '[Service]\n' > "$R/root/still-ui-3x-ui-retired/files$xui_service/x-ui.service"
+    un $'y\n' 0
+    eq "$st" 0 "(exit status)"
+    has "$xui_service/x-ui.service" "[Service]"
+    called "systemctl daemon-reload"
+}
+t "x-ui.sh: uninstall puts x-ui's retired unit back before reloading systemd" uninstall_unretires
 uninstall_answer_no_keeps() {
     xui_setup || return 1
     un $'y\nn\n' 0
