@@ -249,7 +249,7 @@ _still_size_mib() {
 # STILL_XRAY_MEMORY_MAX (e.g. 1G, default half the RAM within 256M..4G) caps the core.
 _still_xray_unit() {
     local env_file setting template unit temp_file xray_bin bin_dir dropin_dir dropin
-    local mem_kb max_mb gomem_mb check_out check_rc net_admin current
+    local mem_kb max_mb gomem_mb check_out check_rc current check_flags
     [[ -n "${xui_service:-}" ]] || return 0
     command -v systemctl > /dev/null 2>&1 || return 0
     # systemctl without systemd as PID 1 (some containers) cannot run a unit.
@@ -274,10 +274,15 @@ _still_xray_unit() {
             ;;
     esac
     if [[ "$setting" == "auto" && -s "$template" && -x "$xray_bin" ]]; then
-        net_admin=""
-        grep -qs 'CAP_NET_ADMIN' "${xui_service}"/still-xray.service.d/*.conf && net_admin="-net-admin"
+        # What the unit about to be written and the local drop-ins give the core.
+        check_flags=()
+        grep -qs '^AmbientCapabilities=.*CAP_NET_ADMIN' "$template" "${xui_service}"/still-xray.service.d/*.conf && check_flags+=(-net-admin)
+        if grep -qsE '^PrivateDevices=(no|false|0|off)$' "${xui_service}"/still-xray.service.d/*.conf &&
+            "${xui_folder}/x-ui" xray-unit-check -h 2>&1 | grep -q -- '-devices'; then
+            check_flags+=(-devices)
+        fi
         if "${xui_folder}/x-ui" xray-unit-check -h 2>&1 | grep -q -- '-net-admin'; then
-            check_out=$("${xui_folder}/x-ui" xray-unit-check ${net_admin} 2>&1)
+            check_out=$("${xui_folder}/x-ui" xray-unit-check "${check_flags[@]}" 2>&1)
             check_rc=$?
         else
             # An older release without the check: it cannot vouch for its config, so nothing moves.
@@ -363,7 +368,7 @@ _still_xray_unit() {
     _still_env_set "$env_file" XUI_XRAY_UNIT still-xray || return 1
     systemctl daemon-reload > /dev/null 2>&1 || true
     systemctl enable still-xray > /dev/null 2>&1 || true
-    echo -e "${green}Xray runs as its own service still-xray${max_mb:+ (MemoryMax=${max_mb}M)}: restarting or updating the panel keeps clients connected.${plain}"
+    echo -e "${green}Xray runs as its own service still-xray${max_mb:+ (MemoryMax=${max_mb}M)}: restarting or updating the panel keeps the clients of Xray inbounds connected.${plain}"
     return 0
 }
 

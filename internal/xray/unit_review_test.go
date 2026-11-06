@@ -92,7 +92,7 @@ func TestUnitStartRefusesAGeoFileTheCoreCannotRead(t *testing.T) {
 	}
 }
 
-func TestUnitListenErrorAllowsOnlySocketsTheServiceShares(t *testing.T) {
+func TestUnitConfigErrorAllowsOnlySocketsTheServiceShares(t *testing.T) {
 	setupFakeUnit(t)
 	cases := []struct {
 		listen string
@@ -109,11 +109,36 @@ func TestUnitListenErrorAllowsOnlySocketsTheServiceShares(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.listen, func(t *testing.T) {
 			cfg := &Config{InboundConfigs: []InboundConfig{{Tag: "fallback", Listen: json_util.RawMessage(tc.listen)}}}
-			err := UnitListenError(cfg)
+			err := UnitConfigError(cfg)
 			if (err == nil) != tc.ok {
-				t.Fatalf("UnitListenError(%s) = %v, want ok=%v", tc.listen, err, tc.ok)
+				t.Fatalf("UnitConfigError(%s) = %v, want ok=%v", tc.listen, err, tc.ok)
 			}
 		})
+	}
+}
+
+// A freedom outbound with sockopt.mark passes `xray run -test` (it runs as root) and then fails
+// every connection with "failed to set SO_MARK" under a unit without CAP_NET_ADMIN.
+func TestUnitConfigErrorFollowsTheRunningUnitsCapabilities(t *testing.T) {
+	f := setupFakeUnit(t)
+	marked := unitTestConfig("warning")
+	marked.OutboundConfigs = json_util.RawMessage(`[{"tag":"warp","protocol":"freedom","streamSettings":{"sockopt":{"mark":51820}}}]`)
+	if err := UnitConfigError(marked); err != nil {
+		t.Fatalf("the shipped unit (CAP_NET_ADMIN) refuses a socket mark: %v", err)
+	}
+	f.ambient = "cap_net_bind_service"
+	err := UnitConfigError(marked)
+	if err == nil || !strings.Contains(err.Error(), `outbound "warp" (socket mark) needs CAP_NET_ADMIN`) {
+		t.Fatalf("a unit without CAP_NET_ADMIN: UnitConfigError = %v, want the socket mark refused", err)
+	}
+	if err := NewProcess(marked).Start(); !errors.Is(err, ErrConfigRejected) {
+		t.Fatalf("Start() under that unit = %v, want ErrConfigRejected before the core restarts", err)
+	}
+	f.ambient = ""
+	tun := unitTestConfig("warning")
+	tun.InboundConfigs = append(tun.InboundConfigs, InboundConfig{Tag: "tun0", Protocol: "tun"})
+	if err := UnitConfigError(tun); err == nil || !strings.Contains(err.Error(), "/dev/net/tun") {
+		t.Fatalf("TUN under the sandboxed unit: UnitConfigError = %v, want it refused", err)
 	}
 }
 

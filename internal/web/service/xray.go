@@ -1633,7 +1633,7 @@ func (s *XrayService) RestartXray(isForce bool) error {
 			return fmt.Errorf("xray %s", refused)
 		}
 		// Hot-added inbounds bypass the unit start that refuses these too.
-		if err := xray.UnitListenError(xrayConfig); err != nil {
+		if err := xray.UnitConfigError(xrayConfig); err != nil {
 			xrayState.holdBack("config refused: " + err.Error())
 			return fmt.Errorf("xray config refused: %w", err)
 		}

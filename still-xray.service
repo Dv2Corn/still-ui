@@ -22,10 +22,11 @@ RestartSteps=5
 RestartMaxDelaySec=5
 LimitNOFILE=1048576
 
-# Least privilege: bind ports below 1024 and nothing else. Inbounds that need more
-# (TPROXY, TUN, sockopt mark) take a local drop-in with CAP_NET_ADMIN/CAP_NET_RAW.
-AmbientCapabilities=CAP_NET_BIND_SERVICE
-CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+# Low ports, and CAP_NET_ADMIN for what configs ask of the network: sockopt mark (policy
+# routing, WARP) and TPROXY; without it they fail per connection while the core looks healthy.
+# TUN also needs /dev/net/tun, which PrivateDevices hides: such a config keeps Xray in the panel.
+AmbientCapabilities=CAP_NET_BIND_SERVICE CAP_NET_ADMIN
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_ADMIN
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes

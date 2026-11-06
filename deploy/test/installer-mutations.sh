@@ -146,8 +146,13 @@ mutate "install: still-xray despite a refusing check" install.sh+update.sh _stil
 mutate "install: still-xray without systemd" install.sh+update.sh _still_xray_unit \
     '[[ -d /run/systemd/system ]] || return 0' ':' \
     'install.sh: without systemd as PID 1 nothing is written'
-mutate "install: CAP_NET_ADMIN drop-in not passed to the check" install.sh+update.sh _still_xray_unit 'net_admin="-net-admin"' 'net_admin=""' \
-    'install.sh: a local CAP_NET_ADMIN drop-in is passed to xray-unit-check'
+mutate "install: CAP_NET_ADMIN not passed to the check" install.sh+update.sh _still_xray_unit '&& check_flags+=(-net-admin)' '&& :' \
+    'install.sh: the CAP_NET_ADMIN of the unit or a local drop-in is passed to xray-unit-check'
+mutate "install: the template's CAP_NET_ADMIN ignored" install.sh+update.sh _still_xray_unit \
+    'grep -qs '"'"'^AmbientCapabilities=.*CAP_NET_ADMIN'"'"' "$template" "${xui_service}"' 'grep -qs '"'"'^AmbientCapabilities=.*CAP_NET_ADMIN'"'"' "${xui_service}"' \
+    'install.sh: the CAP_NET_ADMIN of the unit or a local drop-in is passed to xray-unit-check'
+mutate "install: PrivateDevices=no not passed to the check" install.sh+update.sh _still_xray_unit '            check_flags+=(-devices)' '            :' \
+    'install.sh: a PrivateDevices=no drop-in is passed as -devices when the check knows it'
 mutate "install: still-xray assets placeholder left" install.sh+update.sh _still_xray_unit '-e "s#@XRAY_ASSETS@#${bin_dir}#g"' '' \
     'install.sh: auto mode moves Xray to still-xray when xray-unit-check passes'
 mutate "install: still-xray not disabled when refused" install.sh+update.sh _still_xray_unit \
@@ -205,14 +210,19 @@ mutate "install: seccomp filter on old systemd" install.sh _xui_service_write_pa
     'install.sh: the sandbox drop-in lists the folders from the env file (escaped, no whitespace paths, filter only on systemd >= 239)'
 mutate "update: env file ignored by the sandbox drop-in" update.sh _xui_service_write_paths_dropin '        source "$env_file"' '        :' \
     'update.sh: the sandbox drop-in lists the folders from the env file (escaped, no whitespace paths, filter only on systemd >= 239)'
-mutate "units: still-xray gets CAP_NET_ADMIN" still-xray.service "" \
-    'CapabilityBoundingSet=CAP_NET_BIND_SERVICE' 'CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_ADMIN' \
-    'units: still-xray runs unprivileged with CAP_NET_BIND_SERVICE only and outlives the panel'
+mutate "units: still-xray loses CAP_NET_ADMIN" still-xray.service "" \
+    'AmbientCapabilities=CAP_NET_BIND_SERVICE CAP_NET_ADMIN' 'AmbientCapabilities=CAP_NET_BIND_SERVICE' \
+    'units: still-xray runs unprivileged with CAP_NET_BIND_SERVICE and CAP_NET_ADMIN only and outlives the panel'
+mutate "units: still-xray gets CAP_SYS_ADMIN" still-xray.service "" \
+    'CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_ADMIN' 'CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_ADMIN CAP_SYS_ADMIN' \
+    'units: still-xray runs unprivileged with CAP_NET_BIND_SERVICE and CAP_NET_ADMIN only and outlives the panel'
+mutate "units: still-xray sees the host's /dev" still-xray.service "" 'PrivateDevices=yes' 'PrivateDevices=no' \
+    'units: still-xray runs unprivileged with CAP_NET_BIND_SERVICE and CAP_NET_ADMIN only and outlives the panel'
 mutate "units: still-xray runs as root" still-xray.service "" 'User=still-xray' 'User=root' \
-    'units: still-xray runs unprivileged with CAP_NET_BIND_SERVICE only'
+    'units: still-xray runs unprivileged with CAP_NET_BIND_SERVICE and CAP_NET_ADMIN only'
 mutate "units: still-xray stops with the panel" still-xray.service "" '[Unit]' '[Unit]
 PartOf=still-ui.service' \
-    'units: still-xray runs unprivileged with CAP_NET_BIND_SERVICE only and outlives the panel'
+    'units: still-xray runs unprivileged with CAP_NET_BIND_SERVICE and CAP_NET_ADMIN only and outlives the panel'
 mutate "units: panel unit pulls still-xray down" x-ui.service.debian "" '[Unit]' '[Unit]
 BindsTo=still-xray.service' \
     'units: panel unit hardening, and no lifecycle tie to still-xray'

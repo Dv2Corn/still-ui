@@ -1,6 +1,7 @@
 package xray
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -23,6 +24,7 @@ type fakeUnit struct {
 	pid       int
 	nrestarts int
 	startMono uint64 // ExecMainStartTimestampMonotonic, µs since boot; 0 reads as 1
+	ambient   string // AmbientCapabilities; "" reads as the shipped unit's
 	calls     []string
 }
 
@@ -32,6 +34,9 @@ func (f *fakeUnit) systemctl(_ context.Context, args ...string) ([]byte, error) 
 	f.calls = append(f.calls, args[0])
 	switch args[0] {
 	case "show":
+		if slices.Contains(args, "AmbientCapabilities") {
+			return fmt.Appendf(nil, "AmbientCapabilities=%s\nPrivateDevices=yes\n", cmp.Or(f.ambient, "cap_net_admin cap_net_bind_service")), nil
+		}
 		return fmt.Appendf(nil, "ActiveState=%s\nMainPID=%d\nNRestarts=%d\nExecMainStartTimestampMonotonic=%d\n",
 			f.active, f.pid, f.nrestarts, max(f.startMono, 1)), nil
 	case "restart":

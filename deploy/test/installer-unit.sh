@@ -157,7 +157,9 @@ case "$1" in
     xray-unit-check)
         if [[ "${2:-}" == -h ]]; then
             [[ "${STUB_UNIT_CHECK:-new}" == old ]] && { echo "unknown command"; exit 2; }
-            echo "  -net-admin   the drop-in grants CAP_NET_ADMIN"; exit 0
+            echo "  -net-admin   the unit grants CAP_NET_ADMIN"
+            [[ "${STUB_UNIT_CHECK:-new}" == no-devices ]] || echo "  -devices     PrivateDevices=no"
+            exit 0
         fi
         [[ "${STUB_UNIT_CHECK_RC:-0}" == 0 ]] || echo "inbound 3 needs TPROXY"
         exit "${STUB_UNIT_CHECK_RC:-0}" ;;
@@ -397,12 +399,32 @@ for script in "$INSTALL_SH" "$UPDATE_SH"; do
     t "$s: an unknown STILL_XRAY_UNIT value is treated as auto" xray_bogus
     xray_net_admin() {
         xray_setup || return 1
+        _still_xray_unit > /dev/null || return 1
+        count "$R/calls" "x-ui xray-unit-check -net-admin" 1
+        # A template without the capability is checked without it.
+        sed -i 's/ CAP_NET_ADMIN$//' "$xui_folder/still-xray.service"
+        : > "$R/calls"
+        _still_xray_unit > /dev/null || return 1
+        called "x-ui xray-unit-check"
+        not_called "-net-admin"
         mkdir -p "$xui_service/still-xray.service.d"
         printf '[Service]\nAmbientCapabilities=CAP_NET_ADMIN\n' > "$xui_service/still-xray.service.d/30-local.conf"
         _still_xray_unit > /dev/null || return 1
         called "x-ui xray-unit-check -net-admin"
     }
-    t "$s: a local CAP_NET_ADMIN drop-in is passed to xray-unit-check" xray_net_admin
+    t "$s: the CAP_NET_ADMIN of the unit or a local drop-in is passed to xray-unit-check" xray_net_admin
+    xray_devices() {
+        xray_setup || return 1
+        mkdir -p "$xui_service/still-xray.service.d"
+        printf '[Service]\nPrivateDevices=no\n' > "$xui_service/still-xray.service.d/30-tun.conf"
+        _still_xray_unit > /dev/null || return 1
+        called "x-ui xray-unit-check -net-admin -devices"
+        : > "$R/calls"
+        STUB_UNIT_CHECK=no-devices _still_xray_unit > /dev/null || return 1
+        called "x-ui xray-unit-check -net-admin"
+        not_called "-devices"
+    }
+    t "$s: a PrivateDevices=no drop-in is passed as -devices when the check knows it" xray_devices
     xray_no_systemd() {
         xray_setup || return 1
         rmdir "$R/run/systemd/system"
@@ -1217,8 +1239,9 @@ xray_unit() {
     local u="$UNIT_DIR/still-xray.service"
     has "$u" "User=still-xray"
     has "$u" "Group=still-xray"
-    eq "$(sed -n 's/^AmbientCapabilities=//p' "$u")" CAP_NET_BIND_SERVICE
-    eq "$(sed -n 's/^CapabilityBoundingSet=//p' "$u")" CAP_NET_BIND_SERVICE
+    eq "$(sed -n 's/^AmbientCapabilities=//p' "$u")" "CAP_NET_BIND_SERVICE CAP_NET_ADMIN"
+    eq "$(sed -n 's/^CapabilityBoundingSet=//p' "$u")" "CAP_NET_BIND_SERVICE CAP_NET_ADMIN"
+    has "$u" "PrivateDevices=yes"
     has "$u" "NoNewPrivileges=yes"
     has "$u" "ProtectSystem=strict"
     has "$u" "Restart=always"
@@ -1227,7 +1250,7 @@ xray_unit() {
     has "$u" "Environment=XRAY_LOCATION_ASSET=@XRAY_ASSETS@"
     if grep -qE '^(BindsTo|PartOf|Requires)=.*still-ui' "$u"; then echo "still-xray tied to the panel"; return 1; fi
 }
-t "units: still-xray runs unprivileged with CAP_NET_BIND_SERVICE only and outlives the panel" xray_unit
+t "units: still-xray runs unprivileged with CAP_NET_BIND_SERVICE and CAP_NET_ADMIN only and outlives the panel" xray_unit
 
 echo
 echo "$passes passed, $failures failed"

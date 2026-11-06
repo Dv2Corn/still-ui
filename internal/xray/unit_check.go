@@ -41,36 +41,44 @@ func streamSockopt(raw []byte) sockopt {
 	return stream.Sockopt
 }
 
-// UnitBlockers lists what in cfg the still-xray service cannot run: a unix socket outside the
-// folders its sandbox shares, and, unless the unit was given CAP_NET_ADMIN by a local drop-in
-// (netAdmin), TPROXY, TUN and socket marks, which need that capability. install.sh and
-// update.sh keep Xray inside the panel when this is not empty, instead of breaking the inbound.
-func UnitBlockers(cfg *Config, netAdmin bool) []string {
+// UnitCaps is what the still-xray service may do beyond binding low ports.
+type UnitCaps struct {
+	NetAdmin bool // CAP_NET_ADMIN: socket marks, TPROXY (the shipped unit grants it)
+	Devices  bool // the host's /dev (PrivateDevices off): /dev/net/tun for TUN
+}
+
+// UnitBlockers lists what in cfg the still-xray service with caps cannot run: a unix socket
+// outside the folders its sandbox shares, TPROXY and socket marks without CAP_NET_ADMIN, TUN
+// without that and /dev/net/tun. install.sh and update.sh keep Xray in the panel when it is not empty.
+func UnitBlockers(cfg *Config, caps UnitCaps) []string {
 	if cfg == nil {
 		return nil
 	}
 	var out []string
 	needs := func(what string) {
-		out = append(out, what+" needs CAP_NET_ADMIN, which the still-xray service does not have (grant it in a drop-in in still-xray.service.d, or keep Xray inside the panel)")
+		out = append(out, what+" needs CAP_NET_ADMIN, which the still-xray service was not given (a drop-in in still-xray.service.d takes it away, or the unit is older than this panel: run still-ui update)")
 	}
 	for _, ib := range cfg.InboundConfigs {
 		if p := unitSocketProblem(ib); p != "" {
 			out = append(out, p)
 		}
-		if netAdmin {
+		if ib.Protocol == "tun" {
+			if !caps.NetAdmin || !caps.Devices {
+				out = append(out, fmt.Sprintf("inbound %q (TUN) needs /dev/net/tun and CAP_NET_ADMIN, which the still-xray service's sandbox does not give (PrivateDevices): keep Xray inside the panel with STILL_XRAY_UNIT=off", ib.Tag))
+			}
 			continue
 		}
-		so := streamSockopt(ib.StreamSettings)
-		switch {
-		case ib.Protocol == "tun":
-			needs(fmt.Sprintf("inbound %q (TUN)", ib.Tag))
+		if caps.NetAdmin {
+			continue
+		}
+		switch so := streamSockopt(ib.StreamSettings); {
 		case so.Tproxy == "tproxy":
 			needs(fmt.Sprintf("inbound %q (TPROXY)", ib.Tag))
 		case so.Mark != 0:
 			needs(fmt.Sprintf("inbound %q (socket mark)", ib.Tag))
 		}
 	}
-	if netAdmin || len(cfg.OutboundConfigs) == 0 {
+	if caps.NetAdmin || len(cfg.OutboundConfigs) == 0 {
 		return out
 	}
 	var outbounds []struct {

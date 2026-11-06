@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -347,7 +348,7 @@ func (p *process) startUnit() error {
 	if err := makeUnitFolder(config.GetXrayUnitFolder()); err != nil {
 		return err
 	}
-	if err := UnitListenError(p.config); err != nil {
+	if err := UnitConfigError(p.config); err != nil {
 		return fmt.Errorf("%w: %w", ErrConfigRejected, err)
 	}
 	// `xray run -test` runs as root and would pass; the core and the rollback would both fail.
@@ -525,18 +526,38 @@ func makeUnitFolder(dir string) error {
 // its RuntimeDirectory, and /dev/shm, which PrivateDevices shares with the host.
 var unitSocketFolders = []string{"/run/still-xray/", "/dev/shm/"}
 
-// UnitListenError refuses an inbound listening on a unix socket the unit's sandbox hides
-// (PrivateTmp) or makes read-only (ProtectSystem=strict); in 3x-ui's child mode any path works.
-func UnitListenError(cfg *Config) error {
+// UnitConfigError refuses what the running still-xray service cannot do: a unix socket its
+// sandbox hides, or what needs more than the unit grants; in 3x-ui's child mode anything goes.
+func UnitConfigError(cfg *Config) error {
 	if cfg == nil || !UnitMode() {
 		return nil
 	}
-	for _, ib := range cfg.InboundConfigs {
-		if p := unitSocketProblem(ib); p != "" {
-			return errors.New(p)
-		}
+	if blockers := UnitBlockers(cfg, unitCaps(config.GetXrayUnit())); len(blockers) > 0 {
+		return errors.New(blockers[0])
 	}
 	return nil
+}
+
+// unitCaps reads what systemd gives the unit now; unknown counts as everything, so a failed
+// systemctl does not refuse a config the core may well run (its start would say so).
+func unitCaps(name string) UnitCaps {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	out, err := systemctlCommand(ctx, "show", name, "-p", "AmbientCapabilities", "-p", "PrivateDevices")
+	if err != nil {
+		return UnitCaps{NetAdmin: true, Devices: true}
+	}
+	caps := UnitCaps{}
+	for line := range strings.SplitSeq(string(out), "\n") {
+		key, value, _ := strings.Cut(strings.TrimSpace(line), "=")
+		switch key {
+		case "AmbientCapabilities":
+			caps.NetAdmin = slices.Contains(strings.Fields(strings.ToLower(value)), "cap_net_admin")
+		case "PrivateDevices":
+			caps.Devices = value == "no"
+		}
+	}
+	return caps
 }
 
 // extAssetRef matches the external geo files a config names (ext:file.dat:tag).

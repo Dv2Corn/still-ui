@@ -28,7 +28,7 @@ func TestUnitBlockers(t *testing.T) {
 		},
 		OutboundConfigs: json_util.RawMessage(`[{"tag":"direct","protocol":"freedom"},{"tag":"blocked","protocol":"blackhole"}]`),
 	}
-	if got := UnitBlockers(plain, false); len(got) != 0 {
+	if got := UnitBlockers(plain, UnitCaps{}); len(got) != 0 {
 		t.Fatalf("an ordinary config is blocked: %v", got)
 	}
 
@@ -42,7 +42,7 @@ func TestUnitBlockers(t *testing.T) {
 		},
 		OutboundConfigs: json_util.RawMessage(`[{"tag":"out-mark","protocol":"freedom","streamSettings":{"sockopt":{"mark":2}}}]`),
 	}
-	got := UnitBlockers(blocked, false)
+	got := UnitBlockers(blocked, UnitCaps{})
 	want := []string{`"sock"`, `"tp" (TPROXY)`, `"tun0" (TUN)`, `"marked" (socket mark)`, `"out-mark" (socket mark)`}
 	if len(got) != len(want) {
 		t.Fatalf("got %d blockers %v, want %d", len(got), got, len(want))
@@ -53,12 +53,17 @@ func TestUnitBlockers(t *testing.T) {
 		}
 	}
 
-	// A drop-in granting CAP_NET_ADMIN lifts the capability blockers, not the socket path.
-	got = UnitBlockers(blocked, true)
-	if len(got) != 1 || !strings.Contains(got[0], "/var/run/xray.sock") {
-		t.Fatalf("with CAP_NET_ADMIN = %v, want only the socket path", got)
+	// The shipped unit grants CAP_NET_ADMIN: marks and TPROXY run, TUN still lacks /dev/net/tun.
+	got = UnitBlockers(blocked, UnitCaps{NetAdmin: true})
+	if len(got) != 2 || !strings.Contains(got[0], "/var/run/xray.sock") || !strings.Contains(got[1], `"tun0" (TUN) needs /dev/net/tun`) {
+		t.Fatalf("with CAP_NET_ADMIN = %v, want the socket path and TUN", got)
 	}
-	if UnitBlockers(nil, false) != nil {
+	// A drop-in with PrivateDevices=no as well: only the socket path is left.
+	got = UnitBlockers(blocked, UnitCaps{NetAdmin: true, Devices: true})
+	if len(got) != 1 || !strings.Contains(got[0], "/var/run/xray.sock") {
+		t.Fatalf("with CAP_NET_ADMIN and /dev = %v, want only the socket path", got)
+	}
+	if UnitBlockers(nil, UnitCaps{}) != nil {
 		t.Fatal("nil config")
 	}
 }
