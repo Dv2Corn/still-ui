@@ -11,8 +11,8 @@ import (
 	"slices"
 	"strings"
 	"sync"
-	"time"
 	"testing"
+	"time"
 
 	"github.com/xtls/xray-core/infra/conf"
 
@@ -388,11 +388,11 @@ func TestEgressFilterService_ServerPortsFollowXUIPort(t *testing.T) {
 // applies only to addresses given without one.
 func TestSshdPortsReadListenAddress(t *testing.T) {
 	tests := map[string][]int{
-		"ListenAddress 0.0.0.0:2222\n":                                      {2222},
-		"ListenAddress [::]:2200\nListenAddress 0.0.0.0\n":                  {22, 2200},
+		"ListenAddress 0.0.0.0:2222\n":                                     {2222},
+		"ListenAddress [::]:2200\nListenAddress 0.0.0.0\n":                 {22, 2200},
 		"Port 2022\nListenAddress 10.0.0.1:2222\nListenAddress 10.0.0.2\n": {2022, 2222},
-		"ListenAddress ::\n":                                                {22},
-		"Port 2022\nListenAddress 10.0.0.1:2222\n":                          {2222},
+		"ListenAddress ::\n":                                               {22},
+		"Port 2022\nListenAddress 10.0.0.1:2222\n":                         {2222},
 	}
 	for config, want := range tests {
 		path := filepath.Join(t.TempDir(), "sshd_config")
