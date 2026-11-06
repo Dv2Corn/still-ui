@@ -973,6 +973,9 @@ program_gone() {
     called "userdel still-xray"
     called "systemctl daemon-reload"
     called "nft delete table inet still_egress_filter"
+    called "nft delete table inet still_torrent_block"
+    has "$R/out" "releases/latest/download/install.sh"
+    hasnt "$R/out" "raw.githubusercontent.com"
     local p
     for p in "$xui_service/still-ui.service" "$xui_service/still-ui.service.d" "$xui_service/still-xray.service" \
         "$xui_service/still-xray.service.d" "$R/etc/still-xray" "$R/var/log/still-xray" "$xui_folder" "$R/usr/bin/still-ui"; do

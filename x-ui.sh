@@ -242,7 +242,7 @@ still_migrate() {
         script=$(ls -1d /root/still-ui-migrate-*/migrate.sh 2> /dev/null | sort -r | head -n 1)
     fi
     if [[ -z "$script" || ! -f "$script" ]]; then
-        LOGE "No migrate.sh in ${xui_folder}. Update still-ui first, or run: bash <(curl -Ls https://raw.githubusercontent.com/${still_release_repo}/main/install.sh) $1"
+        LOGE "No migrate.sh in ${xui_folder}. Update still-ui first, or run: bash <(curl -Ls https://github.com/${still_release_repo}/releases/latest/download/install.sh) $1"
         return 1
     fi
     bash "$script" "$@"
@@ -408,8 +408,11 @@ uninstall() {
         systemctl daemon-reload
         systemctl reset-failed
     fi
-    # The egress filter's nftables table (AmneziaWG kernel clients) goes with the panel.
-    if command -v nft > /dev/null 2>&1; then nft delete table inet still_egress_filter > /dev/null 2>&1; fi
+    # The nftables tables of the egress filter and the torrent block go with the panel.
+    if command -v nft > /dev/null 2>&1; then
+        nft delete table inet still_egress_filter > /dev/null 2>&1
+        nft delete table inet still_torrent_block > /dev/null 2>&1
+    fi
 
     local panel_used_postgres="false"
     local db_env_file
@@ -457,7 +460,7 @@ uninstall() {
         echo -e "To delete it: ${yellow}rm -rf /etc/still-ui ${db_env_file}${plain}"
     fi
     echo "If you need to install this panel again, you can use below command:"
-    echo -e "${green}bash <(curl -Ls https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh)${plain}"
+    echo -e "${green}bash <(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh)${plain}"
     echo ""
     # Trap the SIGTERM signal
     trap 'delete_script "$rc"' SIGTERM

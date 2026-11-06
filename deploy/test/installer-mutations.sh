@@ -193,6 +193,10 @@ mutate "install: 3x-ui import leaves x-ui's unit in place" install.sh _still_imp
     'install.sh: the 3x-ui import retires x-ui'"'"'s unit and points acme.sh renewals at still-ui'
 mutate "install: 3x-ui import leaves acme.sh restarting x-ui" install.sh _still_import_3xui '&& retarget_acme_hooks "${retired}/acme-hooks.tsv"' '&& :' \
     'install.sh: the 3x-ui import retires x-ui'"'"'s unit and points acme.sh renewals at still-ui'
+mutate "menu: uninstall keeps the torrent block" x-ui.sh uninstall '        nft delete table inet still_torrent_block > /dev/null 2>&1' '        :' \
+    'x-ui.sh: uninstall removes the program and, by default, keeps the data (exit 0)'
+mutate "menu: reinstall hint from a branch" x-ui.sh uninstall 'https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh' 'https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh' \
+    'x-ui.sh: uninstall removes the program and, by default, keeps the data (exit 0)'
 mutate "install: install-result.env not shell-escaped" install.sh write_install_result "printf 'XUI_PASSWORD=%q\n'" "printf 'XUI_PASSWORD=%s\n'" \
     'install.sh: install-result.env is 0600 and safely source-able with any password'
 mutate "install: install-result.env readable by all" install.sh write_install_result 'chmod 600 "$result_file"' 'chmod 644 "$result_file"' \
