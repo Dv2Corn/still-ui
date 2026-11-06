@@ -61,9 +61,16 @@ func TestNormalizeMasterURL(t *testing.T) {
 			t.Errorf("%q: %q %v, want %q", in, got, err, want)
 		}
 	}
-	for _, in := range []string{"http://m.example.com/", "https://user:pw@m.example.com/", "https://m.example.com:99999/", "ftp://x/", "https:///p"} {
-		if _, err := NormalizeMasterURL(in); err == nil {
-			t.Errorf("%q accepted", in)
+	refused := map[string]string{
+		"http://m.example.com/":          "must be https://",
+		"https://user:pw@m.example.com/": "must be https://",
+		"https://m.example.com:99999/":   "invalid port",
+		"ftp://x/":                       "must be https://",
+		"https:///p":                     "must be https://",
+	}
+	for in, want := range refused {
+		if _, err := NormalizeMasterURL(in); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%q: %v, want the error %q", in, err, want)
 		}
 	}
 }
