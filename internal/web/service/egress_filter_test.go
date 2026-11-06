@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 	"testing"
 
 	"github.com/xtls/xray-core/infra/conf"
@@ -545,6 +546,53 @@ func TestEgressFilterService_SyncNodes(t *testing.T) {
 	svc.SyncNodes(true)
 	if got := pushes(); len(got) != 1 || got[0].node != a {
 		t.Fatalf("forced retry = %+v, want node a", got)
+	}
+}
+
+// A sync that read the old filter must finish before one for the new filter starts: otherwise
+// the node can take the old push last while the master marks the new one synced.
+func TestEgressFilterService_SyncNodesNeverOvertakesAnEarlierSync(t *testing.T) {
+	setupConflictDB(t)
+	useFakeEgress(t)
+	svc := &EgressFilterService{}
+	a := addEgressNode(t, "a", "online")
+	recordPushes(t, map[int]error{a: errors.New("refused")})
+	oldFilter := egressfilter.Filter{SMTP: true}
+	if _, err := svc.SetLocal(EgressFilterSettings{Filter: oldFilter, NodeScope: EgressNodeScopeSelected, NodeIds: []int{a}}); err != nil {
+		t.Fatal(err)
+	}
+
+	var mu sync.Mutex
+	var delivered []egressfilter.Filter
+	entered, release := make(chan struct{}), make(chan struct{})
+	egressFilterPush = func(_ context.Context, _ *model.Node, req ManagedEgressFilterRequest) error {
+		if !req.Filter.Private {
+			close(entered)
+			<-release
+		}
+		mu.Lock()
+		delivered = append(delivered, *req.Filter)
+		mu.Unlock()
+		return nil
+	}
+	cron := make(chan struct{})
+	go func() { svc.SyncNodes(true); close(cron) }() // the minute cron once the retry delay is over
+	<-entered
+	apply := make(chan error, 1)
+	go func() {
+		_, err := svc.SetLocal(EgressFilterSettings{Filter: egressfilter.Filter{SMTP: true, Private: true}, NodeScope: EgressNodeScopeSelected, NodeIds: []int{a}})
+		apply <- err
+	}()
+	time.Sleep(200 * time.Millisecond)
+	close(release)
+	<-cron
+	if err := <-apply; err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(delivered) != 2 || !delivered[1].Private {
+		t.Fatalf("pushes reached the node as %+v, want the old filter first and the new one last", delivered)
 	}
 }
 

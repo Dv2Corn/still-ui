@@ -462,6 +462,10 @@ var egressNodeSync = struct {
 	m map[int]*egressNodeSyncState
 }{m: map[int]*egressNodeSyncState{}}
 
+// egressSyncRun lets one SyncNodes run at a time, from reading the settings to recording the
+// results, so a push of an older filter can never reach a node after a newer one.
+var egressSyncRun sync.Mutex
+
 func egressNodeStates() []EgressFilterNodeState {
 	egressNodeSync.Lock()
 	defer egressNodeSync.Unlock()
@@ -503,6 +507,8 @@ func pushEgressFilterToNode(ctx context.Context, n *model.Node, req ManagedEgres
 // SyncNodes hands the filter to nodes in scope and releases the rest, once per change or restart;
 // unreachable or refusing nodes are retried later (force retries refused ones now).
 func (s *EgressFilterService) SyncNodes(force bool) {
+	egressSyncRun.Lock()
+	defer egressSyncRun.Unlock()
 	nodes, err := s.nodeService.GetAll()
 	if err != nil || len(nodes) == 0 {
 		return
