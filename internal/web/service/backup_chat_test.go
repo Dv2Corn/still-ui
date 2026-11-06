@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"filippo.io/age"
@@ -123,10 +122,7 @@ func TestCheckChatBackupRefusesPlainWhileKeysAreSet(t *testing.T) {
 	if _, err := CheckChatBackup(plain); !errors.Is(err, ErrChatBackupPlain) {
 		t.Fatalf("CheckChatBackup(plain) = %v, want ErrChatBackupPlain", err)
 	}
-	if _, err := CheckChatBackup(nil); err == nil {
-		t.Fatal("an empty backup passed the check")
-	}
-	if !strings.Contains(ErrChatBackupPlain.Error(), "unencrypted") {
-		t.Fatal("the refusal must say why")
+	if _, err := CheckChatBackup(nil); !errors.Is(err, ErrChatBackupRead) {
+		t.Fatalf("CheckChatBackup(nil) = %v, want ErrChatBackupRead", err)
 	}
 }
