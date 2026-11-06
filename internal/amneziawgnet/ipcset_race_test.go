@@ -12,11 +12,8 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/util/wireguard"
 )
 
-// A peer-only edit reconfigures the live device in place while its TUN reader
-// is sending handshake initiations. amneziawg-go keeps I1-I5 in a plain array
-// that every initiation reads without a lock, and IpcSet assigns it on every
-// iN= line, so the in-place config must not carry those lines (-race caught
-// this in TestEnsureDropsFlowsOfReassignedTunnelAddress, intermittently).
+// A peer-only in-place edit runs under live handshakes, so it must not re-send iN= lines
+// (-race caught it in TestEnsureDropsFlowsOfReassignedTunnelAddress, intermittently).
 func TestInPlaceReconfigureWhileHandshakingDoesNotRewriteSignaturePackets(t *testing.T) {
 	priv, pub, err := wireguard.GenerateWireguardKeypair()
 	if err != nil {

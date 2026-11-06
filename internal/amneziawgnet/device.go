@@ -239,8 +239,6 @@ func buildUAPIConfig(inst amneziawg.Instance, opts DeviceOptions) (string, error
 // default". A field cleared in the panel therefore has to be sent as its
 // explicit default, or an in-place reconfigure keeps the stale value that a
 // freshly built device (and every newly downloaded client config) no longer has.
-// The one exception is I1-I5 on a running Device: they are dropped from
-// in-place configs, and an edit to them rebuilds (signaturePacketsFingerprint).
 func writeDeviceObfuscationLines(b *strings.Builder, o amneziawg.Obfuscation31, opts DeviceOptions) error {
 	fmt.Fprintf(b, "jc=%d\njmin=%d\njmax=%d\n", o.Jc, o.Jmin, o.Jmax)
 	fmt.Fprintf(b, "s1=%d\ns2=%d\ns3=%d\ns4=%d\n", o.S1, o.S2, o.S3, o.S4)
@@ -276,22 +274,14 @@ func writeDeviceObfuscationLines(b *strings.Builder, o amneziawg.Obfuscation31, 
 	return nil
 }
 
-// signaturePacketsFingerprint is I1-I5 as a live Device holds them. A
-// running Device never gets new values: amneziawg-go keeps them in a plain
-// array (Device.ipackets) that IpcSet assigns on every iN= line and that
-// every handshake initiation reads with no lock, from the TUN reader and the
-// timers, so an in-place IpcSet carrying those lines is a data race with
-// live traffic (-race caught it in CI). The managers fold this into their
-// rebuild fingerprint and send in-place configs through
-// withoutSignaturePackets instead.
+// signaturePacketsFingerprint is I1-I5, which handshakes read lock-free from Device.ipackets:
+// an IpcSet of them races live traffic (-race in CI), so an edit rebuilds the Device instead.
 func signaturePacketsFingerprint(o amneziawg.Obfuscation31) string {
 	return strings.Join([]string{o.I1, o.I2, o.I3, o.I4, o.I5}, "\n")
 }
 
-// withoutSignaturePackets drops the device-section iN= lines from a rendered
-// UAPI config, for an in-place IpcSet on a running Device. An omitted line
-// keeps the device's current value, which equals the new one because a
-// changed signaturePacketsFingerprint rebuilds the Device instead.
+// withoutSignaturePackets drops device-section iN= lines for an in-place IpcSet; the kept
+// values are current, since a changed signaturePacketsFingerprint rebuilds the Device.
 func withoutSignaturePackets(conf string) string {
 	var b strings.Builder
 	b.Grow(len(conf))
