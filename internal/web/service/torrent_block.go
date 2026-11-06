@@ -53,7 +53,7 @@ func (s *TorrentBlockService) protectedPorts() []uint16 {
 			ports = append(ports, uint16(p))
 		}
 	}
-	if p, err := s.settingService.GetPort(); err == nil {
+	if p, err := s.settingService.GetListenPort(); err == nil {
 		add(p)
 	}
 	if p, err := s.settingService.GetSubPort(); err == nil {

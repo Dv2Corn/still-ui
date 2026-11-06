@@ -732,11 +732,8 @@ func (r *Remote) ApplyManagedEgressFilter(ctx context.Context, body any) error {
 	return err
 }
 
-// UpdatePanel asks the node to run its own official self-updater (update.sh)
-// and restart onto the latest release. The node returns as soon as the job is
-// launched; the new version surfaces on the next heartbeat. still-ui publishes
-// no dev builds: NodeService refuses dev before calling this, and a node of
-// this release refuses dev=true too.
+// UpdatePanel has the node run its own updater onto the latest release; it returns once the job
+// starts and the version shows on the next heartbeat. dev is refused here and by the node.
 func (r *Remote) UpdatePanel(ctx context.Context, dev bool) error {
 	var body any
 	if dev {

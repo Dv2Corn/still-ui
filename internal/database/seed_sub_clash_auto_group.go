@@ -8,10 +8,8 @@ import (
 
 const subClashAutoGroupSeeder = "SubClashAutoGroupKeepOff"
 
-// seedSubClashAutoGroupKeepOff pins the Clash/Mihomo "Auto" group off on a
-// panel that existed before the group shipped: its subscribers would otherwise
-// find a new default choice in their client on the next refresh. A fresh
-// install keeps the factory default (on). A saved choice is never touched.
+// seedSubClashAutoGroupKeepOff pins the Auto group off on panels older than it, so subscribers find
+// no new default on refresh; a fresh install keeps the default (on), a saved choice is kept.
 func seedSubClashAutoGroupKeepOff(fresh bool) error {
 	var count int64
 	if err := db.Model(&model.HistoryOfSeeders{}).

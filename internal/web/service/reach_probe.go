@@ -203,9 +203,8 @@ func reachHostRune(r rune) bool {
 	return unicode.IsLetter(r) || unicode.IsDigit(r)
 }
 
-// jobHost is the address the probe's links are built for: the configured public host
-// (subscription domain, then web domain) as for subscriptions, else the address the admin saved
-// the probe from. Never the request of the agent.
+// jobHost is the address the probe's links are built for: the subscription domain, the web domain,
+// else the address the admin saved the probe from; never the agent's request.
 func (s *ReachProbeService) jobHost(row *model.ReachProbe) (string, error) {
 	settings := SettingService{}
 	if d, err := settings.GetSubDomain(); err == nil && reachPanelHost(d) != "" {
@@ -312,9 +311,8 @@ func unmarshalReachStream(raw string) map[string]any {
 	return stream
 }
 
-// Create stores a new probe and the client it connects as. panelHost is the panel address the
-// admin is using; the probe's links are built for it. The returned bool asks the caller to
-// schedule an Xray reconcile, as client creation does.
+// Create stores a probe and its client, its links built for panelHost (the address the admin uses);
+// the bool asks the caller to schedule an Xray reconcile, as client creation does.
 func (s *ReachProbeService) Create(in ReachProbeInput, panelHost string) (*ReachProbeCreated, bool, error) {
 	if err := s.validateReachInput(&in); err != nil {
 		return nil, false, err
@@ -721,9 +719,8 @@ func (s *ReachProbeService) History(id int) ([]ReachHistoryPoint, error) {
 	return out, nil
 }
 
-// BuildJob renders the probe client's share links for every chosen inbound,
-// the same links a subscription would hand out, and converts each to an
-// Xray outbound. The links are built for jobHost, never for the agent's request.
+// BuildJob turns the probe client's share links (as a subscription hands them out, for jobHost) for
+// every chosen inbound into Xray outbounds.
 func (s *ReachProbeService) BuildJob(row *model.ReachProbe) (*ReachProbeJob, error) {
 	host, err := s.jobHost(row)
 	if err != nil {
@@ -978,9 +975,8 @@ func capReachTargetsTx(tx *gorm.DB, probeID int, known map[string]ReachJobTarget
 	return q.Delete(&model.ReachProbeTarget{}).Error
 }
 
-// PruneHistory deletes results older than the seven-day history of every probe, also of probes
-// that stopped reporting (Ingest prunes only the reporting one), and the alert states of targets
-// with no result left in that window: a target nobody checks for a week is an orphan.
+// PruneHistory drops results past the seven-day history of every probe, silent ones too (Ingest prunes
+// only the reporting one), and alert states of targets with no result left: they are orphans.
 func (s *ReachProbeService) PruneHistory() error {
 	since := s.clock().Add(-reachProbeHistory).UnixMilli()
 	return database.GetDB().Transaction(func(tx *gorm.DB) error {

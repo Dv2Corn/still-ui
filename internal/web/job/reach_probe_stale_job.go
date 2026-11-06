@@ -12,9 +12,8 @@ import (
 // the seven-day history needs trimming far less often.
 const reachProbePruneEvery = time.Hour
 
-// ReachProbeStaleJob raises probe.stale once for every reachability probe that
-// has stopped reporting, so a probe that went silent is not mistaken for "all ok",
-// and once an hour drops results and orphan targets older than the history.
+// ReachProbeStaleJob raises probe.stale once per probe that stopped reporting (silence is not "all
+// ok"), and once an hour drops results and orphan targets older than the history.
 type ReachProbeStaleJob struct {
 	probeService service.ReachProbeService
 	mu           sync.Mutex

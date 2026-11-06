@@ -205,3 +205,16 @@ func TestTorrentBlockService_ProtectsOwnAndNodePorts(t *testing.T) {
 		}
 	}
 }
+
+// With XUI_PORT set the panel listens there, not on the stored webPort.
+func TestTorrentBlockService_ProtectsThePortXUIPortSets(t *testing.T) {
+	setupConflictDB(t)
+	fake := useFakeHostFilter(t)
+	t.Setenv("XUI_PORT", "8443")
+	if _, err := (&TorrentBlockService{}).SetEnabled(true); err != nil {
+		t.Fatalf("SetEnabled: %v", err)
+	}
+	if !slices.Contains(fake.protected, 8443) {
+		t.Fatalf("protected ports %v miss 8443, the port the panel listens on", fake.protected)
+	}
+}

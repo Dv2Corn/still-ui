@@ -936,10 +936,8 @@ type NodeUpdateResult struct {
 	Error string `json:"error,omitempty"`
 }
 
-// UpdatePanels triggers the official self-updater on each given node. Only
-// enabled, online nodes are eligible — an offline node can't be reached, so it
-// is reported as skipped rather than silently dropped. Nodes update to the
-// latest release; still-ui publishes no dev builds, so dev is refused.
+// UpdatePanels runs the self-updater onto the latest release on each enabled, online node (others
+// are reported skipped); dev is refused, as still-ui publishes no dev builds.
 func (s *NodeService) UpdatePanels(ids []int, dev bool) ([]NodeUpdateResult, error) {
 	if dev {
 		return nil, fmt.Errorf("still-ui publishes no dev builds; nodes update to the latest release")

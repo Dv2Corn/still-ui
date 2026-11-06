@@ -129,7 +129,11 @@ func enrollNode(ctx context.Context, inv nodeenroll.Invite, opts nodeEnrollOptio
 		return fmt.Errorf("open the panel database: %w", err)
 	}
 	settings := service.SettingService{}
-	port, err := settings.GetPort()
+	port, err := settings.GetListenPort()
+	if err != nil {
+		return err
+	}
+	panelDomain, err := settings.GetWebDomain()
 	if err != nil {
 		return err
 	}
@@ -146,13 +150,21 @@ func enrollNode(ctx context.Context, inv nodeenroll.Invite, opts nodeEnrollOptio
 		return err
 	}
 
+	keep, restarted := false, false
+	if changed {
+		defer func() {
+			if !keep {
+				takeBackNodePanelCert(ctx, &settings, restarted, deps, out)
+			}
+		}()
+	}
+
 	tokens := panel.ApiTokenService{}
 	tokenName := "master-enroll-" + time.Now().UTC().Format("20060102-150405") + "-" + random.Seq(4)
 	created, err := tokens.Create(tokenName, check.Scope, 0)
 	if err != nil {
 		return fmt.Errorf("issue the API token for the master: %w", err)
 	}
-	keep := false
 	defer func() {
 		if !keep {
 			if err := tokens.Delete(created.Id); err != nil {
@@ -166,11 +178,12 @@ func enrollNode(ctx context.Context, inv nodeenroll.Invite, opts nodeEnrollOptio
 			return errors.New("the panel got a new certificate and must restart before the master can reach it; run again without -no-restart")
 		}
 		fmt.Fprintln(out, "Restarting the panel to load its new certificate...")
+		restarted = true
 		if err := deps.restartPanel(ctx); err != nil {
 			return fmt.Errorf("restart the panel: %w", err)
 		}
 	}
-	if err := waitLocalPanel(ctx, listen, port, basePath, certSha, created.Token, deps.localTimeout); err != nil {
+	if err := waitLocalPanel(ctx, listen, panelDomain, port, basePath, certSha, created.Token, deps.localTimeout); err != nil {
 		return err
 	}
 
@@ -182,6 +195,11 @@ func enrollNode(ctx context.Context, inv nodeenroll.Invite, opts nodeEnrollOptio
 		Name: name, Address: opts.address, Port: port, BasePath: basePath,
 		CertSha256: certSha, ApiToken: created.Token, PanelVersion: config.GetPanelVersion(),
 	})
+	if err != nil && !masterRefused(err) {
+		keep = true // the master may have added the node with this token and certificate
+		return fmt.Errorf("the master did not answer the registration (%v), so it may have added this node anyway: "+
+			"look for it on the master's Nodes page; if it is not there, delete the API token %q here and run again with a new invitation", err, tokenName)
+	}
 	if err != nil {
 		return explainMasterError(err)
 	}
@@ -190,6 +208,38 @@ func enrollNode(ctx context.Context, inv nodeenroll.Invite, opts nodeEnrollOptio
 		resp.Name, resp.NodeId, resp.Address, port, resp.TlsVerifyMode)
 	fmt.Fprintf(out, "The master uses the API token %q of this panel; delete it in Settings → API tokens to cut the master off.\n", tokenName)
 	return nil
+}
+
+// masterRefused reports an answer from the master that it did not add the node; anything else
+// (a lost or garbled answer) may follow a commit on the master.
+func masterRefused(err error) bool {
+	var se *nodeenroll.StatusError
+	return errors.As(err, &se) || errors.Is(err, nodeenroll.ErrKeyPinMismatch)
+}
+
+// takeBackNodePanelCert undoes ensureNodePanelCert after a failed enrollment, so a panel that
+// served plain HTTP (behind a proxy, through a tunnel) does so again.
+func takeBackNodePanelCert(ctx context.Context, settings *service.SettingService, restarted bool, deps nodeEnrollDeps, out io.Writer) {
+	if err := settings.SetCertFile(""); err != nil {
+		fmt.Fprintln(out, "warning: could not clear the certificate this run gave the panel:", err)
+		return
+	}
+	if err := settings.SetKeyFile(""); err != nil {
+		fmt.Fprintln(out, "warning: could not clear the certificate this run gave the panel:", err)
+		return
+	}
+	dir := filepath.Join(config.GetDBFolderPath(), "node-tls")
+	_ = os.Remove(filepath.Join(dir, "cert.pem"))
+	_ = os.Remove(filepath.Join(dir, "key.pem"))
+	if !restarted {
+		fmt.Fprintln(out, "The panel's settings are as before: the certificate it was given is removed again.")
+		return
+	}
+	if err := deps.restartPanel(ctx); err != nil {
+		fmt.Fprintln(out, "warning: the certificate it was given is removed again, but the panel did not restart:", err, "- restart it yourself to serve plain HTTP again")
+		return
+	}
+	fmt.Fprintln(out, "The panel is back on plain HTTP: the certificate it was given is removed again.")
 }
 
 // certHosts lists the names a generated certificate carries: the address the
@@ -279,7 +329,7 @@ func restartPanelService(ctx context.Context) error {
 
 // waitLocalPanel waits until the panel serves the expected certificate and takes
 // the new token, so the master's check does not race the restart.
-func waitLocalPanel(ctx context.Context, listen string, port int, basePath, certSha, token string, timeout time.Duration) error {
+func waitLocalPanel(ctx context.Context, listen, panelDomain string, port int, basePath, certSha, token string, timeout time.Duration) error {
 	host := listen
 	if ip := net.ParseIP(listen); listen == "" || (ip != nil && ip.IsUnspecified()) {
 		host = "127.0.0.1"
@@ -312,6 +362,9 @@ func waitLocalPanel(ctx context.Context, listen string, port int, basePath, cert
 			return err
 		}
 		req.Header.Set("Authorization", "Bearer "+token)
+		if panelDomain != "" {
+			req.Host = panelDomain // the Panel Domain check answers 403 to any other Host
+		}
 		resp, err := client.Do(req)
 		if err == nil {
 			_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<20))

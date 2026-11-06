@@ -16,10 +16,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// newPanelUpdateTestEngine registers only the update handlers directly on the
-// controller's zero value, bypassing NewServerController's cron/metrics setup
-// (unrelated to these handlers, and unnecessary weight for a unit test).
-// Callers must set up a DB first (newHostTestDB(t)).
+// newPanelUpdateTestEngine registers only the update handlers on a zero controller, without
+// NewServerController's cron and metrics; callers set up a DB first (newHostTestDB(t)).
 func newPanelUpdateTestEngine() *gin.Engine {
 	a := &ServerController{}
 	engine := gin.New()
@@ -45,9 +43,8 @@ func postPanelUpdateForm(t *testing.T, engine *gin.Engine, path string, form url
 	return env
 }
 
-// still-ui publishes no dev builds: a dev update (the master node updater of
-// an older release sends dev=true) is refused before anything is downloaded
-// or run, on any OS.
+// still-ui publishes no dev builds: dev=true (an older master's node updater) is refused before
+// anything is downloaded or run, on any OS.
 func TestUpdatePanel_DevChannelRefused(t *testing.T) {
 	newHostTestDB(t)
 	engine := newPanelUpdateTestEngine()

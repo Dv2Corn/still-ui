@@ -44,9 +44,8 @@ func agentError(c *gin.Context, status int, msg string) {
 	c.AbortWithStatusJSON(status, gin.H{"error": msg})
 }
 
-// authenticate checks the token before the per-address limit: only failures are counted and
-// limited, so a valid token is never held back by other users of the same address (mobile CGNAT,
-// a proxy, the VPN's own exit). The token is looked up by its SHA-256 hash, never compared as text.
+// authenticate checks the token (by its SHA-256 hash) before the per-address limit, which counts only
+// failures: a valid token is never held back by others on its address (CGNAT, a proxy, the VPN exit).
 func (a *ReachProbeAgentController) authenticate(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	ip := getRemoteIp(c)

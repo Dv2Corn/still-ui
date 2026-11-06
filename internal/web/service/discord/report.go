@@ -182,9 +182,8 @@ func (s *DiscordService) BuildReport(ctx context.Context, server ServerProvider,
 	return payload, files, nil
 }
 
-// backupAttachments is the backup a Discord message carries, built by service.PrepareChatBackup
-// (encrypted when backup encryption keys are set) and checked by service.CheckChatBackup. note is
-// what to tell the channel: that the copy is not encrypted, or why none was attached.
+// backupAttachments builds a Discord message's backup through PrepareChatBackup and CheckChatBackup;
+// note tells the channel that the copy is not encrypted, or why none was attached.
 func backupAttachments(src service.ChatBackupSource, tr func(string, ...string) string) ([]FileAttachment, string, error) {
 	b, err := service.PrepareChatBackup(src)
 	if err == nil {

@@ -74,9 +74,8 @@ func onlyFrom(t *testing.T, sites map[string][]string, callee string, allowed ..
 	}
 }
 
-// STILL-BKP-1 guard: a new path that posts the database or the Xray config to Telegram or
-// Discord without service.PrepareChatBackup/CheckChatBackup fails here. The raw upload function
-// is reachable only through deliverBackup, and nothing in the bots reads the DB or config itself.
+// STILL-BKP-1: a new path posting the database or Xray config past PrepareChatBackup/CheckChatBackup
+// fails here; the raw upload is reachable only through deliverBackup, and no bot reads them itself.
 func TestBackupBytesLeaveOnlyThroughDeliverBackup(t *testing.T) {
 	tg := callSites(t, ".", "sendDocumentWithCaption", "SendDocument", "GetDb", "GetConfigPath", "FileFromBytes")
 	onlyFrom(t, tg, "sendDocumentWithCaption", "deliverBackup")
