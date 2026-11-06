@@ -6,21 +6,22 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 )
 
-// #55 review: /clients/add refused the reserved names, while /inbounds/add
-// still created exactly those records from the inbound's settings.
+// #55/#58 review: /clients/add refused these emails and subIds, while
+// /inbounds/add still created exactly those records from the inbound's settings.
 func TestAddInboundRefusesClientNamesTheClientAPIRefuses(t *testing.T) {
-	for i, tc := range []struct{ email, want string }{
-		{".", "client email must not be '.' or '..'\n"},
-		{"..", "client email must not be '.' or '..'\n"},
-		{"a/b", "client email contains an invalid character: a/b\n"},
+	for i, tc := range []struct{ email, subID, want string }{
+		{".", "", "client email must not be '.' or '..'\n"},
+		{"..", "", "client email must not be '.' or '..'\n"},
+		{"a/b", "", "client email contains an invalid character: a/b\n"},
+		{"ok@x", "sub one", "client subId contains an invalid character: sub one\n"},
 	} {
-		t.Run(tc.email, func(t *testing.T) {
+		t.Run(tc.email+"|"+tc.subID, func(t *testing.T) {
 			setupConflictDB(t)
 			ib := makeInboundWithSubSortIndex("in-reserved-email", 7101+i, 0)
-			ib.Settings = clientsSettings(t, []model.Client{{Email: tc.email, ID: "11111111-1111-1111-1111-111111111111", Enable: true}})
+			ib.Settings = clientsSettings(t, []model.Client{{Email: tc.email, SubID: tc.subID, ID: "11111111-1111-1111-1111-111111111111", Enable: true}})
 			_, _, err := (&InboundService{}).AddInbound(ib)
 			if err == nil || err.Error() != tc.want {
-				t.Fatalf("AddInbound with client %q: err = %v, want %q", tc.email, err, tc.want)
+				t.Fatalf("AddInbound with client %q subId %q: err = %v, want %q", tc.email, tc.subID, err, tc.want)
 			}
 		})
 	}

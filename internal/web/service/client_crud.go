@@ -46,9 +46,12 @@ func validateClientEmail(email string) error {
 	return nil
 }
 
-func validateClientsEmail(clients []model.Client) error {
+func validateClientsNames(clients []model.Client) error {
 	for _, client := range clients {
 		if err := validateClientEmail(client.Email); err != nil {
+			return err
+		}
+		if err := validateClientSubID(client.SubID); err != nil {
 			return err
 		}
 	}

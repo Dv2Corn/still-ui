@@ -1375,9 +1375,9 @@ func (s *InboundService) AddInbound(inbound *model.Inbound) (*model.Inbound, boo
 	if err := validateClientsKeepAlive(inbound.Protocol, clients); err != nil {
 		return inbound, false, err
 	}
-	// The same names the client API refuses; a master's push may carry a legacy one.
+	// The names the client API refuses; a master's push may carry a legacy one.
 	if !s.FromNodeSync {
-		if err := validateClientsEmail(clients); err != nil {
+		if err := validateClientsNames(clients); err != nil {
 			return inbound, false, err
 		}
 	}
