@@ -47,9 +47,8 @@ type UnitCaps struct {
 	Devices  bool // the host's /dev (PrivateDevices off): /dev/net/tun for TUN
 }
 
-// UnitBlockers lists what in cfg the still-xray service with caps cannot run: a unix socket
-// outside the folders its sandbox shares, TPROXY and socket marks without CAP_NET_ADMIN, TUN
-// without that and /dev/net/tun. install.sh and update.sh keep Xray in the panel when it is not empty.
+// UnitBlockers lists what the still-xray service with caps cannot run of cfg (sockets its sandbox
+// hides, marks/TPROXY/TUN it lacks rights for); install.sh and update.sh then keep Xray in the panel.
 func UnitBlockers(cfg *Config, caps UnitCaps) []string {
 	if cfg == nil {
 		return nil
