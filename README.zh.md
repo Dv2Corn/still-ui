@@ -26,7 +26,7 @@
 - **部分修改客户端不再把客户端改坏。** 在 3x-ui v3.11.0 中，通过 API（`/panel/api/clients/update/:email`）更新客户端时如果只提交部分字段，客户端会被禁用（`enable=false`），`limitIp`、`totalGB`、`tgId`、`comment`、`group`、`flow`、续期设置（`reset`、`resetMax`）和 `limitHwid` 会被清零。在 still-ui 中，请求里没有的字段取自已保存的客户端。显式提交 0 或空值仍然会清空对应字段。WireGuard/AmneziaWG 的密钥和对端地址在 v3.11.0 中本来就会保留，有测试保证这一点。
 - **Xray 核心重新支持 `ios` 指纹和 sing-box 客户端。** 从 Xray 26.9.9 起，官方 REALITY 服务端只接受带有 X25519MLKEM768 密钥交换的 ClientHello，因此使用 `ios`、`edge`、`qq` 指纹的 Xray 客户端、任何指纹的 sing-box 客户端（Hiddify、Karing），以及未开启 `support-x25519mlkem768` 的 mihomo 都无法连接。`ios` 指纹很短（约 517 字节，一个 TCP 分段），在会丢弃较长 ClientHello 的移动网络上只有它能用。still-ui 1.4.0 自带从源码构建的 Xray v26.10.31，只对 REALITY 打了一处补丁：没有该密钥交换的 ClientHello 重新被接受，重复的密钥交换仍被拒绝，其他不变。构建可复现：配方、补丁和 sha256 见 [scripts/xray-build](scripts/xray-build/README.md)。新建的 REALITY 入站与 3x-ui 一样默认使用 `chrome`。在面板中把 Xray 切换为官方版本（概览页 Xray 旁的 **版本** 按钮）会恢复旧行为；`still-ui update` 会装回 still-ui 的构建。
 - **安装脚本为面板设置内存上限。** 服务会获得 systemd 限制：`MemoryMax` 为内存的 35%（最少 256 MiB，最多 1 GiB），`MemoryHigh` 为其 85%，并且禁止面板使用 swap。面板内存失控时由 systemd 重启它，而不是把整台服务器拖进 swap 直至卡死。如果服务器没有 swap 且内存不超过 2 GiB，安装脚本会提议为系统其余部分创建一个 2 GiB 的 `/swapfile`。
-- **面板重启时 Xray 继续运行。** Xray 作为独立服务 `still-xray` 运行：非特权用户、只有 `CAP_NET_BIND_SERVICE`、`ProtectSystem=strict`、`Restart=always`，并有自己的内存上限。重启、升级面板或面板崩溃都不会断开客户端。面板仍通过 Xray API 增删客户端而无需重启，只有入站结构变化时才重启内核——且先用 `xray run -test` 检查配置；通过检查却无法启动的配置会被换回上一个可用配置。在所有带 systemd 的服务器上这都是默认行为；已有的安装会在下一次 `still-ui update` 时迁移过来，除非其配置需要该服务做不到的事（见下文）。Docker 镜像与 3x-ui 一样把 Xray 留在面板内部。内置的 AmneziaWG、MTProto 和 TUIC 仍运行在面板内部，面板重启时会重新连接。
+- **面板重启时 Xray 继续运行。** Xray 作为独立服务 `still-xray` 运行：非特权用户、只有 `CAP_NET_BIND_SERVICE` 和 `CAP_NET_ADMIN`（套接字标记、TPROXY）、`ProtectSystem=strict`、`Restart=always`，并有自己的内存上限。重启、升级面板或面板崩溃都不会断开客户端。面板仍通过 Xray API 增删客户端而无需重启，只有入站结构变化时才重启内核——且先用 `xray run -test` 检查配置；通过检查却无法启动的配置会被换回上一个可用配置。在所有带 systemd 的服务器上这都是默认行为；已有的安装会在下一次 `still-ui update` 时迁移过来，除非其配置需要该服务做不到的事（见下文）。Docker 镜像与 3x-ui 一样把 Xray 留在面板内部。内置的 AmneziaWG、MTProto 和 TUIC 仍运行在面板内部，面板重启时会重新连接。
 - **定时加密备份与恢复命令。** 面板可以按计划把数据库备份到 `/etc/still-ui/backups`，保留最近 N 份，用你的 [age](https://age-encryption.org) 或 SSH 公钥加密（私钥从不接触服务器），并把加密后的副本发送到 Telegram。`still-ui restore <file>` 会检查备份、停止面板、替换数据库（保留旧数据库）并重新启动面板。
 - **Telegram 健康告警。** Xray 未运行、Xray 重启过于频繁、面板或 Xray 内存接近上限、磁盘已满、证书即将过期、备份失败。问题出现时发一条消息，持续期间定期提醒，修复后再发一条。
 - **自动加载续期后的证书。** Xray 每小时（或每 `ocspStapling` 秒）会自行重新读取 TLS 和 Hysteria 入站的证书文件。面板每分钟通过握手（TLS，Hysteria 用 QUIC）检查每个入站实际提供的证书；如果续期后内核在该时间内没有加载新文件（或入站使用 `oneTimeLoading`），或者正在提供的证书将在一小时内过期，只重启 Xray：使用 `still-xray` 服务时自动重启；Xray 在面板内部运行时（Docker，或 STILL_XRAY_UNIT=off），只有在 `/etc/default/still-ui` 中设置 `STILL_CERT_RESTART=on` 才会重启，因为这种重启会断开所有客户端；未设置时标签只显示证书已续期。概览页上的“证书”标签显示每个入站提供的证书及其有效期，并提前警告（提前一周；对于 IP 上的短期证书则提前其有效期的四分之一）。
@@ -99,7 +99,9 @@ Xray 什么时候会重启？入站结构变化时（面板会提示）、点击
 
 升级时，`x-ui xray-unit-check` 会先检查当前配置。如果某个入站符合下列情况，Xray 会留在面板内部，升级过程会打印原因：
 - 监听 `/run/still-xray/` 和 `/dev/shm/` 以外的 unix 套接字（该服务有自己独立的 `/tmp`，其他路径对它都是只读的；可改用例如 `/dev/shm/xray.sock,0666`），
-- 使用 TPROXY、TUN 入站或套接字标记（socket mark），这些需要 `CAP_NET_ADMIN`：请在 `/etc/systemd/system/still-xray.service.d/` 中用你自己的 drop-in 授予该权限，然后重新运行升级。
+- 是 TUN 入站：它需要 `/dev/net/tun`，而服务的沙箱隐藏了它；在 `/etc/systemd/system/still-xray.service.d/` 中用你自己的 drop-in 设置 `PrivateDevices=no` 即可允许，然后重新运行升级。
+
+TPROXY 和套接字标记（策略路由、WARP）在该服务中可用：它拥有 `CAP_NET_ADMIN`。正在运行的服务做不到的更改会被面板拒绝并说明原因，例如本地 drop-in 去掉了该权限后的套接字标记。
 
 `/etc/default/still-ui` 中的设置：`STILL_XRAY_UNIT=off` 把 Xray 留在面板内部（与 3x-ui 相同），`STILL_XRAY_UNIT=on` 强制使用该服务，不设置则自动判断。`STILL_XRAY_MEMORY_MAX` 为内核设置内存上限（默认内存的一半，256M 到 4G）。修改后运行 `still-ui update`。Docker 镜像没有 systemd，始终把 Xray 留在面板内部。
 
@@ -131,8 +133,8 @@ still-ui restore /etc/still-ui/backups/still-ui-<host>-<date>-<time>.db.age
 | --- | --- | --- |
 | Xray 未运行 | Xray 连续两次检查（一分钟）都未运行，且不是你停止的 | 开启 |
 | Xray 重启 | Xray 在 M 分钟内崩溃或被 systemd 重启 N 次 | 10 分钟内 3 次 |
-| 面板或 Xray 内存 | 面板或 Xray 使用了其 systemd `MemoryMax` 的 X%（不含文件缓存），没有上限时按内存总量计算；连续三次检查 | 80% |
-| 磁盘已满 | `/`、数据库或备份所在的磁盘已用 X% | 90% |
+| 面板或 Xray 内存 | 面板或 Xray 使用了其 systemd `MemoryMax` 的 X%（不含文件缓存），没有上限时按内存总量计算；连续三次检查；低于阈值 15 个百分点连续三次后解除 | 90% |
+| 磁盘已满 | `/`、数据库或备份所在的磁盘已用 X%；低于阈值 5 个百分点连续三次后解除 | 90% |
 | 证书即将过期 | 面板或订阅的证书文件，或 TLS/Hysteria 入站实际提供的证书，将在 N 天内过期——最多为其有效期的四分之一，因此 6 天的 IP 证书只在最后一天半才会报告 | 7 天 |
 | 备份失败 | 定时备份（或其 Telegram 上传）失败 | 开启 |
 
@@ -227,11 +229,11 @@ bash <(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/ins
 1. 找到 3x-ui（`/usr/local/x-ui`、`x-ui.service`、SQLite 数据库或 `/etc/default/x-ui` 中指定的 PostgreSQL 数据库），并拒绝无法安全迁移的情况：其他 x-ui 分支、早于 2.0.0 的 3x-ui（请先用 `x-ui update` 升级）、比 still-ui 所基于的版本更新的 3x-ui、没有 systemd 的主机、Docker 安装、已经运行 still-ui 的主机。
 2. 在 3x-ui 仍在运行时，记录必须保留下来的内容：入站、客户端、面板登录信息、面板和订阅地址，以及最多五个客户端由 3x-ui 提供的订阅内容。
 3. 在做任何改动之前，把所有内容备份到 `/root/still-ui-migrate-<UTC time>/`（仅 root 可读）：数据库的一致性副本（或 `pg_dump`）、`/usr/local/x-ui`、unit 文件及其 drop-in、`/usr/bin/x-ui`、env 文件，以及带校验和的清单（manifest）。
-4. 停止 3x-ui，并用其数据库的副本安装 still-ui。still-ui 使用自己的目录（`/usr/local/still-ui`、`/etc/still-ui`、`still-ui.service`）；端口、证书、面板基础路径、订阅 URL、客户端链接和面板登录信息（含 2FA）都来自数据库，保持不变。
+4. 在 3x-ui 仍为客户端服务时安装 still-ui 所需的软件包，然后停止 3x-ui，并用其数据库的副本安装 still-ui（安装程序 10 分钟内未完成即视为失败，`STILL_UI_MIGRATE_INSTALL_TIMEOUT`）。still-ui 使用自己的目录（`/usr/local/still-ui`、`/etc/still-ui`、`still-ui.service`）；端口、证书、面板基础路径、订阅 URL、客户端链接和面板登录信息（含 2FA）都来自数据库，保持不变。
 5. 检查 still-ui：面板在原地址响应，Xray 正在运行，入站、客户端、登录和监听设置一致，抽样的订阅逐字节相同。3x-ui 2.x 写入链接的参数比 still-ui 少；此时链接原有的每个参数都必须以相同的值保留。
 6. 如果停止 3x-ui 之后的任何一步失败，它会自动恢复 3x-ui 并说明原因。
 
-完成后，`x-ui.service` 会被删除（备份中保留一份），以免 3x-ui 与 still-ui 同时启动；`x-ui` 命令会打开 still-ui 的菜单。3x-ui 自身的文件和数据库不会被修改。
+完成后，`x-ui.service` 会被删除（备份中保留一份），以免 3x-ui 与 still-ui 同时启动；`x-ui` 命令会打开 still-ui 的菜单，原本重启 `x-ui` 的 acme.sh 续期改为重启 `still-ui`（回滚会恢复原样）。3x-ui 自身的文件和数据库不会被修改。
 
 随时可以撤销——下面的命令会从最新的备份恢复 3x-ui 的文件、unit 和数据库，启动 3x-ui，卸载 still-ui，并把 still-ui 的数据库保留在备份目录中：
 
@@ -241,7 +243,9 @@ still-ui migrate-rollback
 
 迁移后在 still-ui 中做的改动（新客户端、流量计数）不会同步回 3x-ui。没有终端时，请设置 `STILL_UI_MIGRATE_YES=1`。使用 PostgreSQL 时，服务器上需要有 `pg_dump` 和 `pg_restore`。已在 Debian 12 和 Ubuntu 24.04 上测试，3x-ui 版本为 3.11.0（SQLite 和 PostgreSQL）、3.7.0、2.9.4、2.6.7、2.4.11、2.3.15、2.2.8 和 2.0.2（`scripts/test-migrate.sh`）。
 
-普通安装也会提议接管 `/etc/x-ui/x-ui.db`（非交互方式：`STILL_UI_IMPORT_3XUI=yes`），但不包含上述检查和备份。
+普通安装也会提议接管 `/etc/x-ui/x-ui.db`（非交互方式：`STILL_UI_IMPORT_3XUI=yes`），但不包含上述检查和备份。它会停止 3x-ui，把它的单元文件移到 `/etc/still-ui/3x-ui-retired/`，同样让 acme.sh 续期指向 still-ui。
+
+面板和订阅服务器会在半分钟内自动使用续期后的证书文件，无需重启。
 
 ## 从受审查网络内部检查可达性
 
@@ -255,7 +259,7 @@ STILL_PROBE_TOKEN='<token>' bash <(curl -fsSL https://raw.githubusercontent.com/
     --panel 'https://<server>:<port>/<base path>/'
 ```
 
-安装脚本会从 still-ui 最新发行版下载 `still-probe-linux-<arch>.tar.gz` 并核对其 sha256，把代理程序安装到 `/usr/local/still-probe`，把配置安装到 `/etc/still-probe/config.json`（root:still-probe 0640），并安装一个 systemd 定时器，然后执行第一次检查。面板使用自签名证书时加上 `--pin <sha256>`，要卸载全部内容则使用 `--uninstall`。
+安装脚本会从 still-ui 最新发行版下载 `still-probe-linux-<arch>.tar.gz` 并核对其 sha256，把代理程序安装到 `/usr/local/still-probe`，把配置安装到 `/etc/still-probe/config.json`（root:still-probe 0640），并安装一个 systemd 定时器，然后执行第一次检查。面板使用自签名证书时加上 `--pin <sha256>`，要卸载全部内容则使用 `--uninstall`。`http://` 面板地址会被拒绝：令牌、面板的秘密路径以及每个被测入站的密钥都会以明文穿过受审查的网络。`--insecure-http` 仍然允许这样做，并打印警告。
 
 每个间隔（默认 10 分钟），代理程序会从面板获取任务，为每个入站端点启动一个带 SOCKS 端口的 Xray（使用与订阅下发的相同的地址、SNI 和密钥），通过每个端点下载测试 URL（默认从 Cloudflare 下载 256 KiB：在最初几 KB 后切断连接的审查会表现为失败），还可以选择不经 VPN 直接访问一个 URL，例如你的网站或订阅页面。它会报告是否成功、首字节时间、总时间和字节数。如果从那里无法访问面板本身，报告会通过刚刚测试成功的入站发送。
 
