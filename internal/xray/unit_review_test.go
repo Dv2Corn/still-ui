@@ -65,6 +65,44 @@ func TestAdoptedCoreOlderThanTheInstalledBinaryAsksForARestart(t *testing.T) {
 	}
 }
 
+func fakeXrayBuild(t *testing.T, version, build string) {
+	t.Helper()
+	dir := t.TempDir()
+	t.Setenv("XUI_BIN_FOLDER", dir)
+	script := "#!/bin/sh\necho \"Xray " + version + " (Xray, Penetrates Everything.) " + build + " (go1.27.3 linux/amd64)\"\n"
+	if err := os.WriteFile(filepath.Join(dir, GetBinaryName()), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// still-ui update swaps an official core for the still-ui build of the same version but leaves
+// still-xray running the official one: the panel must say so, not show the still-ui build as running.
+func TestAdoptedOfficialCoreUnderTheStillBuildAsksForARestart(t *testing.T) {
+	f := setupFakeUnit(t)
+	fakeXrayBuild(t, "26.10.31", "Custom")
+	startGood(t) // records the official build as the one the core started with
+	fakeXrayBuild(t, "26.10.31", StillBuildName)
+
+	f.startMono = uptimeMicros(t) - 60e6
+	stale := AdoptRunningUnit()
+	if stale == nil {
+		t.Fatal("the running unit was not adopted")
+	}
+	if stale.IsStillBuild() || !strings.Contains(stale.CoreRestartNeeded(), "still-ui build") {
+		t.Fatalf("still build %v, restart note %q: want the running official core and a note naming the still-ui build",
+			stale.IsStillBuild(), stale.CoreRestartNeeded())
+	}
+
+	f.startMono = uptimeMicros(t) + 60e6
+	fresh := AdoptRunningUnit()
+	if fresh == nil {
+		t.Fatal("the running unit was not adopted")
+	}
+	if !fresh.IsStillBuild() || fresh.CoreRestartNeeded() != "" {
+		t.Fatalf("still build %v, restart note %q: want the still-ui build and no note", fresh.IsStillBuild(), fresh.CoreRestartNeeded())
+	}
+}
+
 func TestUnitStartRefusesAGeoFileTheCoreCannotRead(t *testing.T) {
 	f := setupFakeUnit(t)
 	bin := t.TempDir()

@@ -211,8 +211,9 @@ type process struct {
 	// unit is set when the core runs as its own systemd unit instead of as this child.
 	unit                  *unitControl
 	adoptedRelayPasswords map[string]string
-	// installedVersion is set when the unit's core still runs an older binary than the one installed.
-	installedVersion string
+	// installedVersion is set when the unit's core still runs another binary than the one installed.
+	installedVersion    string
+	installedStillBuild bool
 }
 
 // OnlineAPISupport describes whether the running Xray core implements the
@@ -371,9 +372,9 @@ func (p *Process) PersistConfig() error {
 	}
 	if path == "" && p.unit != nil {
 		p.mu.RLock()
-		cfg, version := p.config, p.version
+		cfg, version, stillBuild := p.config, p.version, p.stillBuild
 		p.mu.RUnlock()
-		return writeUnitConfig(cfg, data, version)
+		return writeUnitConfig(cfg, data, version, stillBuild)
 	}
 	if path == "" {
 		path = GetConfigPath()
