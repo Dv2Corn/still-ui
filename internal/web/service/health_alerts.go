@@ -1,6 +1,7 @@
 package service
 
 import (
+	"crypto/x509"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 	"github.com/shirou/gopsutil/v4/disk"
 	"github.com/shirou/gopsutil/v4/mem"
 
+	"github.com/mhsanaei/3x-ui/v3/internal/certreload"
 	"github.com/mhsanaei/3x-ui/v3/internal/certwatch"
 	"github.com/mhsanaei/3x-ui/v3/internal/config"
 	"github.com/mhsanaei/3x-ui/v3/internal/eventbus"
@@ -260,12 +262,8 @@ func (s *HealthAlertService) certChecks(now time.Time, days int) []health.Check 
 			continue
 		}
 		seen[path] = true
-		data, err := os.ReadFile(path)
-		if err != nil {
-			continue
-		}
-		cert, err := health.ParseCertificate(data)
-		if err != nil {
+		cert := listenerCert(f.where, path)
+		if cert == nil {
 			continue
 		}
 		add("cert:file:"+path, f.where+" ("+path+")", certSubject(cert.Subject.CommonName, cert.DNSNames), cert.NotBefore, cert.NotAfter)
@@ -279,6 +277,23 @@ func (s *HealthAlertService) certChecks(now time.Time, days int) []health.Check 
 		add("cert:inbound:"+st.Tag, "inbound "+st.Tag, info.Subject, time.Unix(info.NotBefore, 0), time.Unix(info.NotAfter, 0))
 	}
 	return checks
+}
+
+// listenerCert is the certificate the panel or subscription listener (role) serves from path,
+// or the file's own while that listener serves none (not started, plain HTTP).
+func listenerCert(role, path string) *x509.Certificate {
+	if served, file, ok := certreload.Served(role); ok && file == path && served != nil {
+		return served
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	cert, err := health.ParseCertificate(data)
+	if err != nil {
+		return nil
+	}
+	return cert
 }
 
 func certSubject(cn string, dns []string) string {
