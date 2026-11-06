@@ -363,10 +363,8 @@ func legacyShadowsocksCipher(value any) string {
 // mihomo rejects the whole config on a duplicate name (the empty string
 // genRemark returns for a remark-less inbound counts), vanishing the Clash
 // profile on refresh. See issue #4641.
-//
-// reserved names (proxy groups the output defines) are taken up front, so a
-// proxy called like a group is renamed instead of the config being rejected.
 func ensureUniqueProxyNames(proxies []map[string]any, reserved ...string) {
+	// The output's group names are taken first: a proxy named like a group is renamed.
 	seen := make(map[string]struct{}, len(proxies)+len(reserved))
 	for _, name := range reserved {
 		seen[name] = struct{}{}

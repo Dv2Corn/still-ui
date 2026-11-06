@@ -57,9 +57,8 @@ func backupRecipientsSet() (bool, error) {
 	return len(recipients) > 0, nil
 }
 
-// PrepareChatBackup is the one way a bot gets backup bytes to post: it reads the database and
-// the Xray config and, when backup encryption keys are set, encrypts both to them (names get
-// ".age"). A failed encryption returns ErrChatBackupEncrypt and no bytes at all.
+// PrepareChatBackup is the only source of backup bytes a bot posts: the database and Xray config,
+// encrypted (".age") when keys are set; a failed encryption gives ErrChatBackupEncrypt and no bytes.
 func PrepareChatBackup(src ChatBackupSource) (*ChatBackup, error) {
 	db, err := src.GetDb()
 	if err != nil {
@@ -101,9 +100,8 @@ func PrepareChatBackup(src ChatBackupSource) (*ChatBackup, error) {
 	return &ChatBackup{Files: files, Encrypted: true}, nil
 }
 
-// CheckChatBackup is the last check before backup bytes leave the server: while encryption keys
-// are set every file must be an age file, so a path that skipped PrepareChatBackup still cannot
-// post a plain copy. It also reports whether the backup is encrypted.
+// CheckChatBackup is the last check before backup bytes leave: while keys are set every file must be
+// age, so a path that skipped PrepareChatBackup cannot post a plain copy. It reports encryption.
 func CheckChatBackup(b *ChatBackup) (encrypted bool, err error) {
 	if b == nil || len(b.Files) == 0 {
 		return false, ErrChatBackupRead

@@ -49,10 +49,8 @@ type panel struct {
 	logOut *os.File
 }
 
-// handedOut holds every port freePort returned. An inbound that is off, or
-// whose Xray has not started yet, holds no socket, so the kernel may offer
-// its port again; a second inbound on it is then refused as a duplicate
-// (CI 04.11.2026: "port 36551 (tcp) already used by inbound #3").
+// handedOut holds every port freePort returned: an inbound that holds no socket yet may get its
+// port offered again and refused as a duplicate (CI 04.11.2026, "port 36551 already used").
 var handedOut sync.Map
 
 func freePort(t *testing.T) int {

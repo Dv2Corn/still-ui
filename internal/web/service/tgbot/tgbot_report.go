@@ -100,9 +100,8 @@ func (t *Tgbot) sendReport(chatID int64, body string) {
 // backupFileGap spaces the files of one backup: Telegram throttles bursts to one chat.
 var backupFileGap = 500 * time.Millisecond
 
-// backupBody is the text that travels with a backup: host and time, a warning when the copy is
-// not encrypted (so the admin knows what landed in the chat and how to change it), and the
-// depletion list. The warning comes before the list so a trimmed caption keeps it.
+// backupBody is a backup's text: host and time, a warning when the copy is not encrypted, then the
+// depletion list, after the warning so a trimmed caption keeps it.
 func (t *Tgbot) backupBody(encrypted bool) string {
 	body := t.I18nBot("tgbot.messages.hostname", "Hostname=="+hostname)
 	body += t.I18nBot("tgbot.messages.backupTime", "Time=="+time.Now().Format("2006-01-02 15:04:05"))
@@ -123,11 +122,8 @@ func (t *Tgbot) backupFailureText(err error) string {
 	return t.I18nBot("tgbot.messages.backupFailed")
 }
 
-// deliverBackup posts one backup to one chat; it reports whether the database file landed.
-// Every backup the bot sends goes through here, and this is the only caller of
-// sendDocumentWithCaption (TestBackupBytesLeaveOnlyThroughDeliverBackup): the chat must be a
-// configured admin chat, and service.CheckChatBackup refuses a plain file while encryption keys
-// are set, whichever path built it.
+// deliverBackup, the only caller of sendDocumentWithCaption (TestBackupBytesLeaveOnlyThroughDeliverBackup),
+// posts a backup that passes CheckChatBackup to an admin chat; it reports whether the database landed.
 func (t *Tgbot) deliverBackup(chatID int64, b *service.ChatBackup, caption string) bool {
 	if !checkAdmin(chatID) {
 		logger.Warning("Not sending a backup to chat ", chatID, ": it is not a Telegram admin chat")
@@ -150,9 +146,8 @@ func (t *Tgbot) deliverBackup(chatID int64, b *service.ChatBackup, caption strin
 	return true
 }
 
-// SendBackupToAdmins sends the database and, when it exists, the generated Xray config to the
-// admin chats, encrypted when backup encryption keys are set. A failure is reported, not
-// replaced by a plain copy.
+// SendBackupToAdmins sends the database and the generated Xray config, encrypted when keys are set,
+// to the admin chats; a failure is reported, never replaced by a plain copy.
 func (t *Tgbot) SendBackupToAdmins() {
 	if !t.IsRunning() {
 		return
