@@ -49,6 +49,9 @@ type config struct {
 	// PanelCertSHA256 pins the panel's leaf certificate (hex SHA-256) for a
 	// panel behind a self-signed certificate; empty means normal verification.
 	PanelCertSHA256 string `json:"panelCertSha256"`
+	// InsecureHTTP lets an http:// panel through: the token and every job's keys cross the
+	// network in clear text, readable by the censor the probe sits behind.
+	InsecureHTTP bool `json:"insecureHttp,omitempty"`
 }
 
 type jobTarget struct {
@@ -135,6 +138,12 @@ func loadConfig(path string) (*config, error) {
 	u, err := url.Parse(cfg.Panel)
 	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
 		return nil, fmt.Errorf("%s: panel must be the panel URL with its base path, e.g. https://panel.example.com:2053/path/", path)
+	}
+	if u.Scheme == "http" {
+		if !cfg.InsecureHTTP {
+			return nil, fmt.Errorf("%s: the panel URL is http://, which would send the probe token and the inbound keys in clear text: use the panel's https:// address (with panelCertSha256 for a self-signed certificate), or set \"insecureHttp\": true to accept that", path)
+		}
+		fmt.Fprintln(os.Stderr, "still-probe: WARNING: talking to the panel over plain http://; the token and the inbound keys cross the network unencrypted")
 	}
 	if cfg.Token == "" {
 		return nil, fmt.Errorf("%s: token is empty", path)

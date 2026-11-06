@@ -250,6 +250,16 @@ check "probe installer still takes --token, with a warning" 0 "warning: --token 
 out=$(bash -c "$read_token_cmd" test "$probe_sh" --token-file "$work/none" < /dev/null 2>&1)
 check "probe installer refuses an unreadable --token-file" 1 "cannot read --token-file" "$?" "$out"
 
+# --- scripts/still-probe-install.sh: the panel address ----------------------
+# shellcheck disable=SC2016
+check_panel_cmd='script=$1; shift; source "$script" "$@"; check_panel && echo "panel=$panel"'
+out=$(bash -c "$check_panel_cmd" test "$probe_sh" --panel 'https://panel.example.com:2053/p' < /dev/null 2>&1)
+check "probe installer takes an https:// panel" 0 "^panel=https://panel.example.com:2053/p/$" "$?" "$out"
+out=$(bash -c "$check_panel_cmd" test "$probe_sh" --panel 'http://203.0.113.5:2053/p/' < /dev/null 2>&1)
+check "probe installer refuses an http:// panel" 1 "would cross the network in clear text" "$?" "$out"
+out=$(bash -c "$check_panel_cmd" test "$probe_sh" --panel 'http://203.0.113.5:2053/p/' --insecure-http < /dev/null 2>&1)
+check "probe installer takes http:// only with --insecure-http, and warns" 0 "WARNING: --insecure-http.*panel=http://203.0.113.5:2053/p/" "$?" "$out"
+
 # --- install.sh node-enroll: the invitation ---------------------------------
 load_function "$repo_root/install.sh" _still_node_invite_read
 load_function "$repo_root/install.sh" _still_node_invite_parse

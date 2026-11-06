@@ -2695,6 +2695,7 @@
       "tokenOnce": "Hãy sao chép mã ngay: bảng điều khiển chỉ lưu giá trị băm và không thể hiển thị lại.",
       "installCommand": "Cài đặt trên máy thăm dò (Linux, quyền root):",
       "installHint": "Lệnh này cài tác tử cùng Xray và bộ hẹn giờ systemd, rồi chạy lần kiểm tra đầu tiên.",
+      "insecureHttp": "Bảng điều khiển này đang mở qua http:// không mã hóa. Trình cài đặt từ chối địa chỉ bảng điều khiển http://: token của probe, đường dẫn bí mật của bảng điều khiển và khóa của mọi inbound mà nó kiểm tra sẽ đi qua mạng dưới dạng văn bản thuần, ngay trước bộ kiểm duyệt mà probe đứng sau. Hãy mở bảng điều khiển qua https:// (chứng chỉ trong cài đặt bảng điều khiển) và tạo lệnh tại đó.",
       "token": "Mã",
       "deleteConfirm": "Xóa thăm dò \"{name}\"?",
       "deleteHint": "Mã của nó ngừng hoạt động, máy khách của nó bị gỡ khỏi các inbound và lịch sử bị xóa.",

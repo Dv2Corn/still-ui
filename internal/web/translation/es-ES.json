@@ -2695,6 +2695,7 @@
       "tokenOnce": "Copia el token ahora: el panel solo guarda su hash y no puede volver a mostrarlo.",
       "installCommand": "Instalar en el equipo de la sonda (Linux, como root):",
       "installHint": "El comando instala el agente con Xray y un temporizador de systemd, y ejecuta la primera comprobación.",
+      "insecureHttp": "Este panel está abierto por http:// sin cifrar. El instalador rechaza una dirección de panel http://: el token de la sonda, la ruta secreta del panel y las claves de cada inbound que comprueba cruzarían la red en texto claro, ante el censor tras el que está la sonda. Abra el panel por https:// (un certificado en los ajustes del panel) y cree el comando allí.",
       "token": "Token",
       "deleteConfirm": "¿Eliminar la sonda \"{name}\"?",
       "deleteHint": "Su token deja de funcionar, su cliente se quita de las entradas y se borra su historial.",

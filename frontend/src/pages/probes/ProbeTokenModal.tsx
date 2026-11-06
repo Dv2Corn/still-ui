@@ -14,6 +14,7 @@ interface Props {
 export default function ProbeTokenModal({ token, onClose }: Props) {
   const { t } = useTranslation();
   const panelUrl = window.location.origin + withBasePath('/');
+  const plainHttp = window.location.protocol === 'http:';
   return (
     <Modal
       open={token !== null}
@@ -31,6 +32,14 @@ export default function ProbeTokenModal({ token, onClose }: Props) {
         message={t('pages.probes.tokenOnce')}
         style={{ marginBottom: 12 }}
       />
+      {plainHttp && (
+        <Alert
+          type="error"
+          showIcon
+          title={t('pages.probes.insecureHttp')}
+          style={{ marginBottom: 12 }}
+        />
+      )}
       <Typography.Paragraph strong>{t('pages.probes.installCommand')}</Typography.Paragraph>
       <Typography.Paragraph type="secondary">{t('pages.probes.installHint')}</Typography.Paragraph>
       <Typography.Paragraph copyable code style={{ wordBreak: 'break-all' }}>

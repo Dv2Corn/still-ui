@@ -2695,6 +2695,7 @@
       "tokenOnce": "Copie o token agora: o painel guarda apenas o hash e não poderá mostrá-lo de novo.",
       "installCommand": "Instalar na máquina da sonda (Linux, como root):",
       "installHint": "O comando instala o agente com o Xray e um timer do systemd e executa a primeira verificação.",
+      "insecureHttp": "Este painel está aberto por http:// sem criptografia. O instalador recusa um endereço de painel http://: o token da sonda, o caminho secreto do painel e as chaves de cada inbound verificado atravessariam a rede em texto claro, diante do censor atrás do qual a sonda está. Abra o painel por https:// (um certificado nas configurações do painel) e gere o comando lá.",
       "token": "Token",
       "deleteConfirm": "Excluir a sonda \"{name}\"?",
       "deleteHint": "O token para de funcionar, o cliente é removido das entradas e o histórico é apagado.",

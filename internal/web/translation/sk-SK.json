@@ -2695,6 +2695,7 @@
       "tokenOnce": "Skopírujte token teraz: panel si uchováva len jeho hash a znova ho zobraziť nevie.",
       "installCommand": "Inštalácia na počítač sondy (Linux, ako root):",
       "installHint": "Príkaz nainštaluje agenta s Xray a časovačom systemd a spustí prvú kontrolu.",
+      "insecureHttp": "Tento panel je otvorený cez nešifrované http://. Inštalátor odmieta adresu panelu s http://: token sondy, tajná cesta panelu a kľúče každého kontrolovaného inboundu by išli sieťou ako čistý text, pred očami cenzora, za ktorým sonda stojí. Otvorte panel cez https:// (certifikát v nastaveniach panelu) a príkaz vytvorte tam.",
       "token": "Token",
       "deleteConfirm": "Odstrániť sondu „{name}“?",
       "deleteHint": "Jej token prestane fungovať, jej klient sa odoberie zo vstupov a história sa vymaže.",

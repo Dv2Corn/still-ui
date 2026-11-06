@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -203,5 +205,29 @@ func TestPanelCertificatePin(t *testing.T) {
 	}
 	if _, err := (&config{PanelCertSHA256: "xyz"}).panelClient(0); err == nil {
 		t.Fatal("a malformed pin was accepted")
+	}
+}
+
+// The probe sits in the censored network on purpose: over http:// its token, the panel's secret
+// path and every inbound's keys would be readable on the way, so http needs an explicit opt-in.
+func TestLoadConfigRefusesAPlainHTTPPanel(t *testing.T) {
+	dir := t.TempDir()
+	load := func(body string) error {
+		t.Helper()
+		path := filepath.Join(dir, "config.json")
+		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		_, err := loadConfig(path)
+		return err
+	}
+	if err := load(`{"panel":"http://203.0.113.5:2053/p/","token":"t"}`); err == nil || !strings.Contains(err.Error(), "clear text") {
+		t.Fatalf("http panel = %v, want it refused", err)
+	}
+	if err := load(`{"panel":"http://203.0.113.5:2053/p/","token":"t","insecureHttp":true}`); err != nil {
+		t.Fatalf("http panel with insecureHttp = %v, want it accepted", err)
+	}
+	if err := load(`{"panel":"https://203.0.113.5:2053/p/","token":"t"}`); err != nil {
+		t.Fatalf("https panel = %v", err)
 	}
 }
