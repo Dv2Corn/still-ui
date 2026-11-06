@@ -2603,9 +2603,18 @@ _still_node_enroll() {
 case "${1:-}" in
     migrate | migrate-rollback) _still_migrate "$@" ;;
     node-enroll) _still_node_enroll ;;
+    # migrate.sh installs the packages while 3x-ui still serves clients.
+    install-deps)
+        install_base
+        exit $?
+        ;;
 esac
 
 echo -e "${green}Running...${plain}"
-install_base
+if [[ "${STILL_UI_MIGRATING:-}" == "1" && "${STILL_UI_DEPS_INSTALLED:-}" == "1" ]]; then
+    echo "Packages were installed before 3x-ui was stopped."
+else
+    install_base
+fi
 _still_swap_check
 install_x-ui $1
