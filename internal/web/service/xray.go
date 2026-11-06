@@ -1637,7 +1637,13 @@ func (s *XrayService) RestartXray(isForce bool) error {
 			xrayState.holdBack("config refused: " + err.Error())
 			return fmt.Errorf("xray config refused: %w", err)
 		}
-		if !isForce && !configUnchanged {
+		// A core started before its unit gained CAP_NET_ADMIN would take a socket mark through the
+		// API and fail every connection on it: such a config goes through a restart instead.
+		restartForCaps := xray.UnitRestartNeeded(xrayConfig)
+		if restartForCaps {
+			logger.Info("Xray restarts: the running core started without the capabilities this config needs")
+		}
+		if !isForce && !configUnchanged && !restartForCaps {
 			applied, err := s.tryHotApply(process, xrayConfig)
 			if err != nil {
 				return err

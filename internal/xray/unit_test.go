@@ -35,7 +35,7 @@ func (f *fakeUnit) systemctl(_ context.Context, args ...string) ([]byte, error) 
 	switch args[0] {
 	case "show":
 		if slices.Contains(args, "AmbientCapabilities") {
-			return fmt.Appendf(nil, "AmbientCapabilities=%s\nPrivateDevices=yes\n", cmp.Or(f.ambient, "cap_net_admin cap_net_bind_service")), nil
+			return fmt.Appendf(nil, "AmbientCapabilities=%s\nPrivateDevices=yes\nMainPID=%d\n", cmp.Or(f.ambient, "cap_net_admin cap_net_bind_service"), f.pid), nil
 		}
 		return fmt.Appendf(nil, "ActiveState=%s\nMainPID=%d\nNRestarts=%d\nExecMainStartTimestampMonotonic=%d\n",
 			f.active, f.pid, f.nrestarts, max(f.startMono, 1)), nil

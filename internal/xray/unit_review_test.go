@@ -142,6 +142,39 @@ func TestUnitConfigErrorFollowsTheRunningUnitsCapabilities(t *testing.T) {
 	}
 }
 
+// update.sh rewrites the unit with CAP_NET_ADMIN and daemon-reloads, but leaves the core running
+// with the old set: a socket mark hot-added to it would fail every connection until a restart.
+func TestUnitRestartNeededForACoreStartedWithoutTheUnitsCapabilities(t *testing.T) {
+	setupFakeUnit(t)
+	status := filepath.Join(t.TempDir(), "status")
+	prev := procStatusFile
+	procStatusFile = func(int) string { return status }
+	t.Cleanup(func() { procStatusFile = prev })
+	marked := unitTestConfig("warning")
+	marked.OutboundConfigs = json_util.RawMessage(`[{"tag":"warp","protocol":"freedom","streamSettings":{"sockopt":{"mark":51820}}}]`)
+
+	writeCaps := func(capEff string) {
+		t.Helper()
+		if err := os.WriteFile(status, []byte("Name:\txray\nCapInh:\t0000000000000000\nCapEff:\t"+capEff+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeCaps("0000000000000400") // CAP_NET_BIND_SERVICE only: started under the old unit
+	if !UnitRestartNeeded(marked) {
+		t.Fatal("a core without CAP_NET_ADMIN would get the socket mark through the API")
+	}
+	if err := UnitConfigError(marked); err != nil {
+		t.Fatalf("UnitConfigError = %v: the unit grants CAP_NET_ADMIN, a restart serves the config", err)
+	}
+	if UnitRestartNeeded(unitTestConfig("warning")) {
+		t.Fatal("a config without marks restarts the core")
+	}
+	writeCaps("0000000000001400")
+	if UnitRestartNeeded(marked) {
+		t.Fatal("a core that has CAP_NET_ADMIN is restarted for a socket mark")
+	}
+}
+
 func TestUnitStartRefusesASocketInThePrivateTmp(t *testing.T) {
 	f := setupFakeUnit(t)
 	cfg := unitTestConfig("warning")
