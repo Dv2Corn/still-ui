@@ -144,16 +144,11 @@ func (s *EgressFilterService) save(v EgressFilterSettings) error {
 // and any port that also serves an inbound stay open.
 func (s *EgressFilterService) ServerPorts() []uint16 {
 	var ports []uint16
-	add := func(p int) {
-		if p > 0 && p <= 65535 {
-			ports = append(ports, uint16(p))
-		}
-	}
 	if p, err := s.settingService.GetListenPort(); err == nil {
-		add(p)
+		ports = appendPort(ports, p)
 	}
 	for _, p := range sshdPorts(sshdConfigPath) {
-		add(p)
+		ports = appendPort(ports, p)
 	}
 	inboundPorts := map[uint16]bool{}
 	if inbounds, err := s.inboundService.GetAllInbounds(); err == nil {
@@ -411,9 +406,9 @@ func (s *EgressFilterService) applyHost(f egressfilter.Filter) {
 	egressFilterMu.Lock()
 	defer egressFilterMu.Unlock()
 	if spec.Needed() {
-		recordEgressFilterErr(egressFilterHost.Apply(spec))
+		recordHostErr(&egressFilterErr, "egress filter", egressFilterHost.Apply(spec))
 	} else {
-		recordEgressFilterErr(egressFilterHost.Remove())
+		recordHostErr(&egressFilterErr, "egress filter", egressFilterHost.Remove())
 	}
 }
 
@@ -428,19 +423,28 @@ func (s *EgressFilterService) EnsureHostFilter() {
 	spec = s.hostSpec(settings.Filter)
 	egressFilterMu.Lock()
 	defer egressFilterMu.Unlock()
-	recordEgressFilterErr(egressFilterHost.Ensure(spec))
+	recordHostErr(&egressFilterErr, "egress filter", egressFilterHost.Ensure(spec))
 }
 
-// recordEgressFilterErr keeps the last host error for the UI; caller holds egressFilterMu.
-func recordEgressFilterErr(err error) {
-	prev := egressFilterErr
-	egressFilterErr = ""
+// recordHostErr keeps the last nftables error of a host filter for the UI in *last and logs
+// each new one; the caller holds that filter's lock.
+func recordHostErr(last *string, filter string, err error) {
+	prev := *last
+	*last = ""
 	if err != nil {
-		egressFilterErr = err.Error()
-		if egressFilterErr != prev {
-			logger.Warning("egress filter: nftables filter not applied: ", err)
+		*last = err.Error()
+		if *last != prev {
+			logger.Warning(filter+": nftables filter not applied: ", err)
 		}
 	}
+}
+
+// appendPort adds p to ports when it is a valid port number.
+func appendPort(ports []uint16, p int) []uint16 {
+	if p > 0 && p <= 65535 {
+		return append(ports, uint16(p))
+	}
+	return ports
 }
 
 // Node sync -----------------------------------------------------------------
