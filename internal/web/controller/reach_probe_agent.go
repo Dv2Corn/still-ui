@@ -29,11 +29,11 @@ const (
 // A probe token reaches only these two routes and nothing under /panel/api.
 type ReachProbeAgentController struct {
 	probeService service.ReachProbeService
-	limiter      *reachAgentLimiter
+	limiter      *agentLimiter
 }
 
 func NewReachProbeAgentController(g *gin.RouterGroup) *ReachProbeAgentController {
-	a := &ReachProbeAgentController{limiter: newReachAgentLimiter(time.Now)}
+	a := &ReachProbeAgentController{limiter: newAgentLimiter(time.Now, reachAgentFailuresPerIP, reachAgentRequestsPerProbe)}
 	g.Use(a.authenticate)
 	g.GET("/job", a.job)
 	g.POST("/report", a.report)
@@ -69,7 +69,7 @@ func (a *ReachProbeAgentController) authenticate(c *gin.Context) {
 		agentError(c, http.StatusUnauthorized, "unauthorized")
 		return
 	}
-	if !a.limiter.allowProbe(probe.Id) {
+	if !a.limiter.allowKey(probe.Id) {
 		agentError(c, http.StatusTooManyRequests, "too many requests")
 		return
 	}
@@ -127,13 +127,15 @@ func (a *ReachProbeAgentController) report(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"stored": stored})
 }
 
-// reachAgentLimiter counts in fixed windows: failed authentications per
-// address, and requests per probe. Both maps are bounded.
-type reachAgentLimiter struct {
-	mu       sync.Mutex
-	now      func() time.Time
-	ipFails  map[string]*reachWindow
-	probeReq map[int]*reachWindow
+// agentLimiter counts in fixed windows: failed authentications per address,
+// and requests per key (a probe, an invitation). Both maps are bounded.
+type agentLimiter struct {
+	mu         sync.Mutex
+	now        func() time.Time
+	failsPerIP int
+	perKey     int
+	ipFails    map[string]*reachWindow
+	keyReq     map[int]*reachWindow
 }
 
 type reachWindow struct {
@@ -141,8 +143,11 @@ type reachWindow struct {
 	count int
 }
 
-func newReachAgentLimiter(now func() time.Time) *reachAgentLimiter {
-	return &reachAgentLimiter{now: now, ipFails: map[string]*reachWindow{}, probeReq: map[int]*reachWindow{}}
+func newAgentLimiter(now func() time.Time, failsPerIP, perKey int) *agentLimiter {
+	return &agentLimiter{
+		now: now, failsPerIP: failsPerIP, perKey: perKey,
+		ipFails: map[string]*reachWindow{}, keyReq: map[int]*reachWindow{},
+	}
 }
 
 func windowFor[K comparable](m map[K]*reachWindow, key K, now time.Time) *reachWindow {
@@ -164,14 +169,14 @@ func windowFor[K comparable](m map[K]*reachWindow, key K, now time.Time) *reachW
 	return w
 }
 
-func (l *reachAgentLimiter) allowIP(ip string) bool {
+func (l *agentLimiter) allowIP(ip string) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	w := l.ipFails[ip]
-	return w == nil || l.now().Sub(w.start) >= reachAgentWindow || w.count < reachAgentFailuresPerIP
+	return w == nil || l.now().Sub(w.start) >= reachAgentWindow || w.count < l.failsPerIP
 }
 
-func (l *reachAgentLimiter) failIP(ip string) {
+func (l *agentLimiter) failIP(ip string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if w := windowFor(l.ipFails, ip, l.now()); w != nil {
@@ -179,13 +184,13 @@ func (l *reachAgentLimiter) failIP(ip string) {
 	}
 }
 
-func (l *reachAgentLimiter) allowProbe(id int) bool {
+func (l *agentLimiter) allowKey(id int) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	w := windowFor(l.probeReq, id, l.now())
+	w := windowFor(l.keyReq, id, l.now())
 	if w == nil {
 		return false
 	}
 	w.count++
-	return w.count <= reachAgentRequestsPerProbe
+	return w.count <= l.perKey
 }
