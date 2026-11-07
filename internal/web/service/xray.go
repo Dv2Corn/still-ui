@@ -69,6 +69,8 @@ func (s *xrayLifecycle) replace(process *xray.Process) {
 	s.process = process
 	s.result = ""
 	s.heldBack = ""
+	// A refusal only stands while the core it was held back for keeps serving.
+	s.refused, s.refusedErr = nil, nil
 	s.mu.Unlock()
 }
 

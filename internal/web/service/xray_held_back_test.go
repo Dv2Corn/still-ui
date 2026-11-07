@@ -53,3 +53,15 @@ func TestRestartXrayClearsTheRefusalOnceTheCoreRunsTheDesiredConfig(t *testing.T
 		t.Fatalf("status still says %q while the core runs the desired config", reason)
 	}
 }
+
+// Config A was refused, then B started; going back to A skipped the retry and
+// returned A's old refusal while the core served B.
+func TestStartingACoreForgetsTheLastRefusal(t *testing.T) {
+	var state xrayLifecycle
+	refusedCfg := &xray.Config{LogConfig: []byte(`{"loglevel":"warning"}`)}
+	state.refuse(refusedCfg, xray.ErrConfigRejected)
+	state.replace(xray.NewProcess(&xray.Config{}))
+	if cfg, err := state.lastRefused(); cfg != nil || err != nil {
+		t.Fatalf("after another core started, lastRefused = %v, %v; want nil, nil", cfg, err)
+	}
+}
