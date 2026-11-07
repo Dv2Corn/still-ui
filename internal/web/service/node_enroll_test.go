@@ -9,6 +9,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/database"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
@@ -155,6 +156,25 @@ func TestNodeEnrollAddsThePinnedNodeAndSpendsTheToken(t *testing.T) {
 	views, _ := f.svc.ListInvites()
 	if views[0].Status != "used" || views[0].UsedFromIp != "203.0.113.7" || views[0].NodeId != resp.NodeId {
 		t.Fatalf("audit row %+v", views[0])
+	}
+}
+
+// The version a node reports is cut to 32 characters, never inside one.
+func TestNodeEnrollRemarkKeepsAWholeVersion(t *testing.T) {
+	f := newEnrollFixture(t)
+	_, inv := f.invite(t, NodeInviteInput{})
+	req := goodRequest()
+	req.PanelVersion = strings.Repeat("в", 40)
+	resp, err := f.svc.Enroll(context.Background(), inv.Token, req, "203.0.113.7")
+	if err != nil {
+		t.Fatalf("Enroll: %v", err)
+	}
+	n, err := (&NodeService{}).GetById(resp.NodeId)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !utf8.ValidString(n.Remark) || !strings.HasSuffix(n.Remark, ", still-ui "+strings.Repeat("в", 32)) {
+		t.Fatalf("remark %q: want the first 32 characters of the version", n.Remark)
 	}
 }
 

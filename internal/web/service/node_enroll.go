@@ -3,8 +3,6 @@ package service
 import (
 	"context"
 	"crypto/tls"
-	"crypto/x509"
-	"encoding/pem"
 	"errors"
 	"fmt"
 	"net"
@@ -20,6 +18,7 @@ import (
 
 	"github.com/mhsanaei/3x-ui/v3/internal/database"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
+	"github.com/mhsanaei/3x-ui/v3/internal/health"
 	"github.com/mhsanaei/3x-ui/v3/internal/logger"
 	"github.com/mhsanaei/3x-ui/v3/internal/nodeenroll"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/common"
@@ -442,7 +441,7 @@ func (s *NodeEnrollService) enrollClaimed(ctx context.Context, row *model.NodeIn
 		TlsVerifyMode: "verify", InboundSyncMode: "all",
 	}
 	if t.panelVersion != "" {
-		mreq.Remark = "enrolled " + time.Unix(s.clock(), 0).UTC().Format("2006-01-02") + ", still-ui " + truncate(t.panelVersion, 32)
+		mreq.Remark = "enrolled " + time.Unix(s.clock(), 0).UTC().Format("2006-01-02") + ", still-ui " + truncateRunes(t.panelVersion, 32)
 	}
 	// A certificate the system trusts survives its renewals; otherwise pin
 	// the one the node reported over this authenticated request.
@@ -464,13 +463,6 @@ func (s *NodeEnrollService) enrollClaimed(ctx context.Context, row *model.NodeIn
 		return nil, refuse(http.StatusBadRequest, "adding the node: %v", err)
 	}
 	return &nodeenroll.RegisterResponse{NodeId: view.Id, Name: view.Name, Address: view.Address, TlsVerifyMode: view.TlsVerifyMode}, nil
-}
-
-func truncate(s string, n int) string {
-	if len(s) > n {
-		return s[:n]
-	}
-	return s
 }
 
 // freeNodeName picks the admin's name, else the node's, and adds -2, -3, …
@@ -549,13 +541,9 @@ func readMasterKeyPin(ctx context.Context, masterURL string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	block, _ := pem.Decode(raw)
-	if block == nil || block.Type != "CERTIFICATE" {
-		return nil, errors.New("the panel certificate file holds no certificate")
-	}
-	cert, err := x509.ParseCertificate(block.Bytes)
+	cert, err := health.ParseCertificate(raw)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("the panel certificate file: %w", err)
 	}
 	return nodeenroll.KeyPin(cert), nil
 }
