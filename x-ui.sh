@@ -315,11 +315,6 @@ legacy_version() {
         exit 1
     fi
 
-    # A release without still-xray would start a second Xray next to the unit; one that has it
-    # sets the unit up again during the install.
-    if systemctl cat still-xray > /dev/null 2>&1; then
-        systemctl disable --now still-xray > /dev/null 2>&1
-    fi
     echo "Downloading and installing panel version $tag_version..."
     # The installer of the latest release installs the requested version from
     # that version's checksum-verified archive.

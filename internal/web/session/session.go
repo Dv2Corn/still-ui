@@ -2,6 +2,7 @@ package session
 
 import (
 	"encoding/gob"
+	"errors"
 	"net/http"
 	"time"
 
@@ -189,12 +190,13 @@ func dropLogin(s sessions.Session) {
 	s.Delete(loginAtKey)
 }
 
+// ClearSession always tells the browser to drop the cookie; a failed revocation is
+// returned, since a copy of the cookie taken earlier then stays valid.
 func ClearSession(c *gin.Context) error {
 	s := sessions.Default(c)
+	var revokeErr error
 	if sid, ok := s.Get(loginSessionKey).(string); ok {
-		if err := revokeSession(sid, s.Get(loginAtKey)); err != nil {
-			return err
-		}
+		revokeErr = revokeSession(sid, s.Get(loginAtKey))
 	}
 	s.Clear()
 	cookiePath := c.GetString("base_path")
@@ -210,7 +212,7 @@ func ClearSession(c *gin.Context) error {
 		SameSite: http.SameSiteLaxMode,
 	})
 	if err := s.Save(); err != nil {
-		return err
+		return errors.Join(revokeErr, err)
 	}
 	if cookiePath != "/" {
 		http.SetCookie(c.Writer, &http.Cookie{
@@ -224,5 +226,5 @@ func ClearSession(c *gin.Context) error {
 			SameSite: http.SameSiteLaxMode,
 		})
 	}
-	return nil
+	return revokeErr
 }

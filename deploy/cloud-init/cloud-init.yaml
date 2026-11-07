@@ -10,9 +10,9 @@
 # serial console (owner-only); /etc/motd (world-readable) shows just the access
 # URL + username. Nothing is baked in advance — every instance is unique.
 #
-# The installer is still-ui's install.sh (Dv2Corn/still-ui, main branch, which
-# changes only through reviewed pull requests). It downloads the latest release
-# archive and refuses it unless its published .sha256 matches.
+# The installer is the install.sh published with the latest still-ui release
+# (Dv2Corn/still-ui), not a branch copy. It downloads that release's archive and
+# refuses it unless its published .sha256 matches.
 # Edit the exported XUI_* knobs in /opt/xui-bootstrap.sh below to customise.
 # ---------------------------------------------------------------------------
 
@@ -49,7 +49,7 @@ write_files:
       # Download the installer completely before running it, so a cut download
       # never runs half a script.
       installer=$(mktemp /root/still-ui-install.XXXXXX)
-      curl -fsSL --retry 5 --retry-delay 3 -o "$installer" https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh
+      curl -fsSL --retry 5 --retry-delay 3 -o "$installer" https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh
       bash "$installer" < /dev/null
       rm -f "$installer"
 

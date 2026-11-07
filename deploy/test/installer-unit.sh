@@ -510,12 +510,12 @@ for script in "$INSTALL_SH" "$UPDATE_SH"; do
         local dest="$xui_service/still-ui.service"
         echo old > "$dest"
         : > "$R/empty"
-        _install_xui_service_unit "$R/empty" false && { echo "an empty unit was installed"; return 1; }
-        _install_xui_service_unit "$R/missing" false && { echo "a missing unit was installed"; return 1; }
+        _install_xui_service_unit "$R/empty" && { echo "an empty unit was installed"; return 1; }
+        _install_xui_service_unit "$R/missing" && { echo "a missing unit was installed"; return 1; }
         eq "$(cat "$dest")" old "(unit replaced by a failed copy)"
         not_called paths-dropin
         cp "$UNIT_DIR/x-ui.service.debian" "$R/new.service"
-        _install_xui_service_unit "$R/new.service" false || return 1
+        _install_xui_service_unit "$R/new.service" || return 1
         cmp "$UNIT_DIR/x-ui.service.debian" "$dest" || return 1
         called paths-dropin
         called memory-dropin
@@ -1202,7 +1202,9 @@ legacy_tags() {
     done
     not_called release-script
     (legacy_version <<< "1.4.0") > /dev/null 2>&1 || return 1
-    called "release-script  install.sh v1.4.0"
+    called "release-script  install.sh v1.4.0" || return 1
+    # The installer keeps or retires still-xray itself; stopping it first cut every client off.
+    not_called "systemctl disable --now still-xray"
 }
 t "x-ui.sh: legacy accepts only a version number and runs the latest installer with it" legacy_tags
 update_dev_refused() {

@@ -838,24 +838,18 @@ EOF
 }
 
 # Lands a systemd unit file at ${xui_service}/still-ui.service via a temp file +
-# atomic mv, so a failed cp/curl or an interrupted mv never leaves a
+# atomic mv, so a failed cp or an interrupted mv never leaves a
 # truncated unit file at the live path -- systemd would then fail to parse
 # it on the next daemon-reload/start. Same pattern already used for
-# /usr/bin/still-ui elsewhere in this script. source_is_url picks cp (from a
-# file already extracted from the release tarball) vs curl (GitHub fallback).
+# /usr/bin/still-ui elsewhere in this script. source is a unit file already
+# extracted from the release tarball.
 _install_xui_service_unit() {
     local source="$1"
-    local source_is_url="$2"
     local dest="${xui_service}/still-ui.service"
     local temp_file="${dest}.tmp.$$"
 
     rm -f "$temp_file"
-    if [[ "$source_is_url" == "true" ]]; then
-        ${curl_bin} -fLRo "$temp_file" "$source" > /dev/null 2>&1
-    else
-        cp -f "$source" "$temp_file" > /dev/null 2>&1
-    fi
-    if [[ $? -ne 0 ]]; then
+    if ! cp -f "$source" "$temp_file" > /dev/null 2>&1; then
         rm -f "$temp_file"
         return 1
     fi
@@ -1071,7 +1065,7 @@ update_x-ui() {
     else
         if [ -f "still-ui.service" ]; then
             echo -e "${green}Installing systemd unit...${plain}"
-            if ! _install_xui_service_unit "still-ui.service" "false"; then
+            if ! _install_xui_service_unit "still-ui.service"; then
                 echo -e "${red}Failed to copy still-ui.service${plain}"
                 exit 1
             fi
@@ -1081,7 +1075,7 @@ update_x-ui() {
                 ubuntu | debian | armbian)
                     if [ -f "x-ui.service.debian" ]; then
                         echo -e "${green}Installing debian-like systemd unit...${plain}"
-                        if _install_xui_service_unit "x-ui.service.debian" "false"; then
+                        if _install_xui_service_unit "x-ui.service.debian"; then
                             service_installed=true
                         fi
                     fi
@@ -1089,7 +1083,7 @@ update_x-ui() {
                 arch | manjaro | parch)
                     if [ -f "x-ui.service.arch" ]; then
                         echo -e "${green}Installing arch-like systemd unit...${plain}"
-                        if _install_xui_service_unit "x-ui.service.arch" "false"; then
+                        if _install_xui_service_unit "x-ui.service.arch"; then
                             service_installed=true
                         fi
                     fi
@@ -1097,7 +1091,7 @@ update_x-ui() {
                 *)
                     if [ -f "x-ui.service.rhel" ]; then
                         echo -e "${green}Installing rhel-like systemd unit...${plain}"
-                        if _install_xui_service_unit "x-ui.service.rhel" "false"; then
+                        if _install_xui_service_unit "x-ui.service.rhel"; then
                             service_installed=true
                         fi
                     fi

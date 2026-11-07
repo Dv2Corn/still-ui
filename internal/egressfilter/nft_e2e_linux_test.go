@@ -13,19 +13,20 @@ import (
 // A throwaway host plays the VPN server: netns "sueg-out" is the internet and a private LAN,
 // "sueg-cli"/"sueg-cli2" are AmneziaWG kernel clients behind xui-awg7/xui-awg6.
 const (
-	egOutNS  = "sueg-out"
-	egCliNS  = "sueg-cli"
-	egCli2NS = "sueg-cli2"
-	egNet    = "192.0.2.10"     // internet
-	egLAN    = "192.168.250.10" // a private network behind the server
-	egCustom = "203.0.113.10"   // in the operator's custom list
-	egNet6   = "2001:db8:7::10" // internet, IPv6
-	egULA    = "fd00:7::10"     // unique-local, IPv6
-	egHost   = "10.97.0.1"      // the server's tunnel address
-	egHostUp = "192.0.2.1"      // the server's uplink address
-	egCli2   = "10.97.1.2"      // the other tunnel client
-	egServer = 2053             // a management port of the server
-	egOther  = 2054             // another service of the server
+	egOutNS   = "sueg-out"
+	egCliNS   = "sueg-cli"
+	egCli2NS  = "sueg-cli2"
+	egNet     = "192.0.2.10"     // internet
+	egLAN     = "192.168.250.10" // a private network behind the server
+	egCustom  = "203.0.113.10"   // in the operator's custom list
+	egNet6    = "2001:db8:7::10" // internet, IPv6
+	egULA     = "fd00:7::10"     // unique-local, IPv6
+	egHost    = "10.97.0.1"      // the server's tunnel address
+	egHostUp  = "192.0.2.1"      // the server's uplink address
+	egHostLAN = "172.31.250.1"   // the server's own address on a private network
+	egCli2    = "10.97.1.2"      // the other tunnel client
+	egServer  = 2053             // a management port of the server
+	egOther   = 2054             // another service of the server
 )
 
 const egListenScript = `
@@ -93,7 +94,7 @@ func egTopology(t *testing.T) {
 sysctl -qw net.ipv4.ip_forward=1 net.ipv6.conf.all.forwarding=1
 ip netns add `+egOutNS+`
 ip link add wan7 type veth peer name eth0 netns `+egOutNS+`
-ip addr add `+egHostUp+`/24 dev wan7 && ip -6 addr add 2001:db8:7::1/64 dev wan7 nodad && ip link set wan7 up
+ip addr add `+egHostUp+`/24 dev wan7 && ip addr add `+egHostLAN+`/24 dev wan7 && ip -6 addr add 2001:db8:7::1/64 dev wan7 nodad && ip link set wan7 up
 for a in `+egNet+`/24 `+egLAN+`/24 `+egCustom+`/24; do ip -n `+egOutNS+` addr add $a dev eth0; done
 for a in `+egNet6+`/64 `+egULA+`/64; do ip -n `+egOutNS+` -6 addr add $a dev eth0 nodad; done
 ip -n `+egOutNS+` link set eth0 up && ip -n `+egOutNS+` link set lo up
@@ -159,6 +160,7 @@ func TestNftE2E(t *testing.T) {
 		{"submission", egCliNS, "tcp", egNet, 587, "ok"},
 		{"LAN", egCliNS, "tcp", egLAN, 443, "ok"},
 		{"server port", egCliNS, "tcp", egHost, egServer, "ok"},
+		{"the server's private address", egCliNS, "tcp", egHostLAN, egOther, "ok"},
 		{"custom address", egCliNS, "tcp", egCustom, 443, "ok"},
 		{"ULA", egCliNS, "tcp", egULA, 443, "ok"},
 	}
@@ -188,6 +190,7 @@ func TestNftE2E(t *testing.T) {
 			{"custom address", egCliNS, "tcp", egCustom, 443, "refused"},
 			{"private LAN", egCliNS, "tcp", egLAN, 443, "refused"},
 			{"unique-local IPv6", egCliNS, "tcp", egULA, 443, "refused"},
+			{"the server's own private address", egCliNS, "tcp", egHostLAN, egOther, "refused"},
 			{"panel port on the tunnel address", egCliNS, "tcp", egHost, egServer, "refused"},
 			{"panel port on the uplink address", egCliNS, "tcp", egHostUp, egServer, "refused"},
 		})
@@ -226,6 +229,7 @@ func TestNftE2E(t *testing.T) {
 			{"submission", egCliNS, "tcp", egNet, 587, "ok"},
 			{"LAN", egCliNS, "tcp", egLAN, 443, "ok"},
 			{"server port", egCliNS, "tcp", egHost, egServer, "ok"},
+			{"the server's private address", egCliNS, "tcp", egHostLAN, egOther, "ok"},
 		})
 	})
 

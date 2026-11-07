@@ -72,6 +72,14 @@ func (s *xrayLifecycle) replace(process *xray.Process) {
 	s.mu.Unlock()
 }
 
+// forgetRefusal follows a start of a config the panel asked for; a core systemd restarted
+// with the last good config is only re-adopted and keeps the refusal standing.
+func (s *xrayLifecycle) forgetRefusal() {
+	s.mu.Lock()
+	s.refused, s.refusedErr = nil, nil
+	s.mu.Unlock()
+}
+
 func (s *xrayLifecycle) holdBack(reason string) {
 	s.mu.Lock()
 	s.heldBack = reason
@@ -1680,6 +1688,7 @@ func (s *XrayService) RestartXray(isForce bool) error {
 	if err != nil {
 		return err
 	}
+	xrayState.forgetRefusal()
 
 	if err := publishTuicRelayReadiness(xrayConfig); err != nil {
 		return err
@@ -1712,6 +1721,9 @@ func (s *XrayService) restartXrayUnit(previous *xray.Process, newCfg *xray.Confi
 	}
 	xrayState.replace(process)
 	s.xrayAPI.StatsLastValues = nil
+	if err == nil {
+		xrayState.forgetRefusal()
+	}
 	return err
 }
 
@@ -1789,12 +1801,15 @@ func (s *XrayService) CheckCertificates() {
 	}
 }
 
+// readoptRestartedUnit is a seam: tests stand in for the core systemd restarted.
+var readoptRestartedUnit = xray.ReadoptRestartedUnit
+
 // readoptXrayUnit takes the config a core restarted by systemd actually runs as the diff base;
 // false while that core is not up yet.
 func (s *XrayService) readoptXrayUnit() bool {
 	lock.Lock()
 	defer lock.Unlock()
-	process := xray.ReadoptRestartedUnit()
+	process := readoptRestartedUnit()
 	if process == nil {
 		return false
 	}

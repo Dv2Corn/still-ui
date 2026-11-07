@@ -1,6 +1,7 @@
 package sub
 
 import (
+	"regexp"
 	"strings"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/web/service"
@@ -116,6 +117,9 @@ func (g ClashAutoGroup) clashAutoGroupMayAppear(templateMentionsAuto bool) bool 
 	return g.Enabled || templateMentionsAuto
 }
 
+// clashAutoGroupMention matches Auto as a whole name in a rule or a group list, not inside Autodesk.
+var clashAutoGroupMention = regexp.MustCompile(`(^|[\s,'"\[{])` + clashAutoGroupName + `($|[\s,'"\]}])`)
+
 func clashTemplateMentionsAuto(template string) bool {
-	return strings.Contains(template, clashAutoGroupName)
+	return clashAutoGroupMention.MatchString(template)
 }
