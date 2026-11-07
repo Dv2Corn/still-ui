@@ -177,6 +177,20 @@ func TestRunReportsDirectCheckAndFallsBackToTheCachedJob(t *testing.T) {
 	}
 }
 
+// A local Xray that did not come up reported every target as failed next to a
+// working direct check, and the panel took that for every inbound being blocked.
+func TestCheckAllLeavesTargetsOutWhenLocalXrayIsDown(t *testing.T) {
+	site := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("hello"))
+	}))
+	defer site.Close()
+	j := &job{DirectURL: site.URL, Targets: []jobTarget{{Key: "1@198.51.100.7:443"}, {Key: "2@198.51.100.8:443"}}}
+	results := checkAll(j, &xrayRun{ports: []int{1, 2}})
+	if len(results) != 1 || results[0].Key != "direct" || !results[0].Ok {
+		t.Fatalf("results %+v, want only the direct check", results)
+	}
+}
+
 func TestPanelCertificatePin(t *testing.T) {
 	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	defer srv.Close()

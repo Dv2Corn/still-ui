@@ -278,6 +278,12 @@ func run(cfg *config, force bool, now func() time.Time) error {
 		defer xr.stop()
 	}
 	results := checkAll(j, xr)
+	if len(j.Targets) > 0 && !xr.ready {
+		fmt.Println("local xray did not start: the targets are not reported this run")
+		if len(results) == 0 {
+			return errors.New("local xray did not start and the job has no direct check")
+		}
+	}
 	for _, r := range results {
 		status := "ok  "
 		if !r.Ok {
@@ -288,26 +294,25 @@ func run(cfg *config, force bool, now func() time.Time) error {
 	return cfg.sendReport(results, xr)
 }
 
+// checkAll leaves the targets out when the local Xray is not up: the panel would
+// read this agent's own failure as every inbound blocked.
 func checkAll(j *job, xr *xrayRun) []result {
-	results := make([]result, len(j.Targets))
-	sem := make(chan struct{}, checkConcurrency)
-	var wg sync.WaitGroup
-	for i, t := range j.Targets {
-		wg.Add(1)
-		go func(i int, t jobTarget) {
-			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
-			r := result{Key: t.Key}
-			if xr == nil || !xr.ready {
-				r.Error = "local xray did not start"
-			} else {
-				r = fetch(t.Key, j.TestURL, xr.ports[i])
-			}
-			results[i] = r
-		}(i, t)
+	var results []result
+	if xr != nil && xr.ready {
+		results = make([]result, len(j.Targets))
+		sem := make(chan struct{}, checkConcurrency)
+		var wg sync.WaitGroup
+		for i, t := range j.Targets {
+			wg.Add(1)
+			go func(i int, t jobTarget) {
+				defer wg.Done()
+				sem <- struct{}{}
+				defer func() { <-sem }()
+				results[i] = fetch(t.Key, j.TestURL, xr.ports[i])
+			}(i, t)
+		}
+		wg.Wait()
 	}
-	wg.Wait()
 	if j.DirectURL != "" {
 		results = append(results, fetch("direct", j.DirectURL, 0))
 	}
