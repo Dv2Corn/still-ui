@@ -1202,7 +1202,9 @@ legacy_tags() {
     done
     not_called release-script
     (legacy_version <<< "1.4.0") > /dev/null 2>&1 || return 1
-    called "release-script  install.sh v1.4.0"
+    called "release-script  install.sh v1.4.0" || return 1
+    # The installer keeps or retires still-xray itself; stopping it first cut every client off.
+    not_called "systemctl disable --now still-xray"
 }
 t "x-ui.sh: legacy accepts only a version number and runs the latest installer with it" legacy_tags
 update_dev_refused() {
