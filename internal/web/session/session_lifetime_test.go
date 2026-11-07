@@ -115,6 +115,41 @@ func TestLogoutInvalidatesTheSessionButNotOtherLogins(t *testing.T) {
 	}
 }
 
+// A failed revocation returned before the cookie was cleared, so the browser kept
+// a live session while logout reported success.
+func TestLogoutClearsTheCookieWhenRevocationFails(t *testing.T) {
+	sessionTestDB(t)
+	router := sessionTestPanel(t, 3600)
+	var logoutErr error
+	router.POST("/logout-broken-db", func(c *gin.Context) {
+		logoutErr = ClearSession(c)
+		c.Status(http.StatusOK)
+	})
+	cookies := sessionLogin(t, router)
+	if err := database.GetDB().Migrator().DropTable(&model.RevokedSession{}); err != nil {
+		t.Fatalf("drop revoked_sessions: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/logout-broken-db", nil)
+	for _, cookie := range cookies {
+		req.AddCookie(cookie)
+	}
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if logoutErr == nil {
+		t.Fatal("ClearSession hid the failed revocation")
+	}
+	cleared := false
+	for _, cookie := range rec.Result().Cookies() {
+		if cookie.Name == sessionCookieName && cookie.MaxAge < 0 {
+			cleared = true
+		}
+	}
+	if !cleared {
+		t.Fatalf("logout left the session cookie in the browser; Set-Cookie: %q", rec.Header().Values("Set-Cookie"))
+	}
+}
+
 // The configured session lifetime only reached the browser's cookie expiry; the
 // server accepted the same cookie for gorilla's default 30 days.
 func TestSessionLifetimeIsEnforcedByTheServer(t *testing.T) {

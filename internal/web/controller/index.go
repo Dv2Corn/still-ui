@@ -148,10 +148,12 @@ func (a *IndexController) logout(c *gin.Context) {
 	if user != nil {
 		logger.Infof("logged out successfully: username=%q", user.Username)
 	}
-	if err := session.ClearSession(c); err != nil {
-		logger.Warning("Unable to clear session on logout:", err)
-	}
 	c.Header("Cache-Control", "no-store")
+	if err := session.ClearSession(c); err != nil {
+		// The cookie is gone from this browser, but a copy of it may still be accepted.
+		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
