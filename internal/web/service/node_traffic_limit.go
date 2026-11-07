@@ -103,17 +103,6 @@ func scaleNodeTraffic(v int64, m float64) int64 {
 	return int64(scaled)
 }
 
-// addTrafficClamped adds a non-negative delta without overflowing past TrafficMax.
-func addTrafficClamped(total, delta int64) int64 {
-	if delta <= 0 {
-		return total
-	}
-	if delta >= database.TrafficMax-total {
-		return database.TrafficMax
-	}
-	return total + delta
-}
-
 // nodeTrafficPeriodStart is the midnight the current period began: the reset day of this
 // month, or of the last one, clamped to the month's last day (31 → 30 April, 28 February).
 func nodeTrafficPeriodStart(now time.Time, day int, loc *time.Location) time.Time {
