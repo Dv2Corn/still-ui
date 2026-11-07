@@ -11,7 +11,7 @@
 #
 #   bash deploy/test/installer-unit.sh
 #
-# INSTALL_SH, UPDATE_SH, XUI_SH and UNIT_DIR point the tests at other copies
+# INSTALL_SH, UPDATE_SH, SETUP_SH, XUI_SH and UNIT_DIR point the tests at other copies
 # (deploy/test/installer-mutations.sh uses that to check that every test fails
 # when the behaviour it guards is broken).
 #
@@ -25,6 +25,7 @@ set -uo pipefail
 repo_root=$(cd "$(dirname "$0")/../.." && pwd)
 INSTALL_SH=${INSTALL_SH:-$repo_root/install.sh}
 UPDATE_SH=${UPDATE_SH:-$repo_root/update.sh}
+SETUP_SH=${SETUP_SH:-$repo_root/still-setup.sh}
 XUI_SH=${XUI_SH:-$repo_root/x-ui.sh}
 UNIT_DIR=${UNIT_DIR:-$repo_root}
 work=$(mktemp -d)
@@ -174,10 +175,9 @@ EOF
 # install.sh / update.sh: helpers that both scripts carry
 # ==============================================================================
 
-# The shared helpers are copied into both scripts; they must stay identical,
-# so the tests below exercise each copy.
-for f in _still_env_set _still_size_mib _still_xray_unit _still_memory_dropin \
-    _xui_systemd_major_version _xui_warn_unsupported_hardening gen_random_string setup_fail2ban; do
+# These helpers are copied into both scripts; they must stay identical.
+# still-ui's own setup helpers live once, in still-setup.sh.
+for f in _xui_systemd_major_version _xui_warn_unsupported_hardening gen_random_string setup_fail2ban; do
     a=$(awk -v n="$f" '$0 == n "() {" {c = 1} c {print} c && /^}$/ {exit}' "$INSTALL_SH")
     b=$(awk -v n="$f" '$0 == n "() {" {c = 1} c {print} c && /^}$/ {exit}' "$UPDATE_SH")
     if [[ -n "$a" && "$a" == "$b" ]]; then
@@ -187,277 +187,282 @@ for f in _still_env_set _still_size_mib _still_xray_unit _still_memory_dropin \
     fi
 done
 
+script="$SETUP_SH"
+s=$(basename "$script")
+
+# --- _still_size_mib ---------------------------------------------------
+size_cases() {
+    fresh_root
+    load "$script" _still_size_mib || return 1
+    eq "$(_still_size_mib 800M)" 800
+    eq "$(_still_size_mib 2G)" 2048
+    eq "$(_still_size_mib 1T)" 1048576
+    eq "$(_still_size_mib 524288K)" 512
+    eq "$(_still_size_mib 1048576)" 1
+    local bad
+    for bad in '' 1.5G 1g -1M 'lots' '800 M' 1GiB; do eq "$(_still_size_mib "$bad")" "" "for '$bad'"; done
+}
+t "$s: _still_size_mib reads K/M/G/T and bytes, nothing else" size_cases
+
+# --- _still_env_set ----------------------------------------------------
+env_set_new() {
+    fresh_root
+    load "$script" _still_env_set || return 1
+    _still_env_set "$R/etc/default/still-ui" XUI_XRAY_UNIT still-xray || return 1
+    eq "$(cat "$R/etc/default/still-ui")" "XUI_XRAY_UNIT=still-xray"
+    eq "$(stat -c %a "$R/etc/default/still-ui")" 600
+}
+t "$s: _still_env_set creates a missing env file 0600" env_set_new
+env_set_edit() {
+    fresh_root
+    load "$script" _still_env_set || return 1
+    local f="$R/etc/default/still-ui"
+    printf '# kept comment\nXUI_DB_TYPE=postgres\nexport XUI_XRAY_UNIT=old\n  XUI_XRAY_UNIT=older\nXUI_XRAY_UNIT_EXTRA=keep\n' > "$f"
+    chmod 640 "$f"
+    _still_env_set "$f" XUI_XRAY_UNIT still-xray || return 1
+    _still_env_set "$f" XUI_XRAY_UNIT still-xray || return 1
+    count "$f" XUI_XRAY_UNIT=still-xray 1
+    hasnt "$f" =old
+    hasnt "$f" =older
+    has "$f" '# kept comment'
+    has "$f" XUI_DB_TYPE=postgres
+    has "$f" XUI_XRAY_UNIT_EXTRA=keep
+    eq "$(stat -c %a "$f")" 640 "(mode kept)"
+    _still_env_set "$f" XUI_XRAY_UNIT "" || return 1
+    hasnt "$f" XUI_XRAY_UNIT=
+    has "$f" XUI_XRAY_UNIT_EXTRA=keep
+    [[ -z "$(find "$R/etc/default" -name '*.tmp.*')" ]] || { echo "temp file left"; return 1; }
+}
+t "$s: _still_env_set replaces the key (also with export/indent), keeps the rest, idempotent, empty drops it" env_set_edit
+
+# --- _still_memory_dropin: the panel's memory ceiling --------------------
+# mem_case RAM_KB WANT_MAX WANT_HIGH
+mem_case() {
+    fresh_root
+    load "$script" _still_memory_dropin || return 1
+    meminfo "$1" 0
+    _still_memory_dropin "$R/etc/default/still-ui" > /dev/null || return 1
+    local d="$xui_service/still-ui.service.d/15-still-memory.conf"
+    has "$d" "MemoryMax=$2"
+    has "$d" "MemoryHigh=$3"
+    has "$d" "MemorySwapMax=0"
+    count "$d" '[Service]' 1
+    called "systemctl daemon-reload"
+}
+t "$s: panel MemoryMax floors at 256 MiB (512 MiB RAM)" mem_case 524288 256M 217M
+t "$s: panel MemoryMax is 35% of RAM (2 GiB RAM -> 716M, high 85%)" mem_case 2097152 716M 608M
+t "$s: panel MemoryMax is 35% of RAM (1 GiB RAM -> 358M)" mem_case 1048576 358M 304M
+t "$s: panel MemoryMax caps at 1 GiB (4 GiB RAM)" mem_case 4194304 1024M 870M
+t "$s: panel MemoryMax caps at 1 GiB (64 GiB RAM)" mem_case 67108864 1024M 870M
+mem_override() {
+    fresh_root
+    load "$script" _still_memory_dropin || return 1
+    local d="$xui_service/still-ui.service.d/15-still-memory.conf" env="$R/etc/default/still-ui"
+    echo 'STILL_UI_MEMORY_MAX="800M"' > "$env"
+    _still_memory_dropin "$env" > /dev/null || return 1
+    has "$d" "MemoryMax=800M"
+    hasnt "$d" "MemoryHigh="
+    STILL_UI_MEMORY_MAX=2G _still_memory_dropin "$env" > /dev/null || return 1
+    has "$d" "MemoryMax=2G"
+    STILL_UI_MEMORY_MAX=lots _still_memory_dropin "$env" > "$R/out" || return 1
+    has "$R/out" "Ignoring STILL_UI_MEMORY_MAX=lots"
+    has "$d" "MemoryMax=716M"
+    STILL_UI_MEMORY_MAX=off _still_memory_dropin "$env" > /dev/null || return 1
+    [[ ! -e "$d" ]] || { echo "drop-in kept with off"; return 1; }
+}
+t "$s: STILL_UI_MEMORY_MAX from env file or environment, invalid ignored, off removes the drop-in" mem_override
+mem_idempotent() {
+    fresh_root
+    load "$script" _still_memory_dropin || return 1
+    local d="$xui_service/still-ui.service.d/15-still-memory.conf"
+    _still_memory_dropin "$R/etc/default/still-ui" > /dev/null || return 1
+    cp "$d" "$R/first"
+    _still_memory_dropin "$R/etc/default/still-ui" > /dev/null || return 1
+    cmp "$R/first" "$d" || return 1
+    eq "$(find "$xui_service/still-ui.service.d" -type f | wc -l)" 1 "(files in the drop-in folder)"
+}
+t "$s: panel memory drop-in is rewritten identically on a second run" mem_idempotent
+mem_no_meminfo() {
+    fresh_root
+    load "$script" _still_memory_dropin || return 1
+    echo garbage > "$R/proc/meminfo"
+    _still_memory_dropin "$R/etc/default/still-ui" > /dev/null || return 1
+    [[ ! -e "$xui_service/still-ui.service.d/15-still-memory.conf" ]] || { echo "drop-in written without MemTotal"; return 1; }
+}
+t "$s: no memory drop-in when MemTotal cannot be read" mem_no_meminfo
+
+# --- _still_xray_unit: Xray in its own unit --------------------------------
+xray_setup() {
+    fresh_root
+    load "$script" _still_xray_unit || return 1
+    load "$script" _still_env_set || return 1
+    load "$script" _still_size_mib || return 1
+    mkdir -p "$R/run/systemd/system"
+    cp "$UNIT_DIR/still-xray.service" "$xui_folder/still-xray.service"
+    printf '#!/bin/sh\n' > "$xui_folder/bin/xray-linux-amd64"
+    chmod +x "$xui_folder/bin/xray-linux-amd64"
+    printf 'geo' > "$xui_folder/bin/geoip.dat"
+    chmod 600 "$xui_folder/bin/geoip.dat"
+    panel_stub
+}
+xray_on() {
+    xray_setup || return 1
+    meminfo 1048576 0
+    _still_xray_unit > "$R/out" || { cat "$R/out"; return 1; }
+    local u="$xui_service/still-xray.service" d="$xui_service/still-xray.service.d/15-still-memory.conf"
+    has "$u" "ExecStart=$xui_folder/bin/xray-linux-amd64 run -c "
+    has "$u" "Environment=XRAY_LOCATION_ASSET=$xui_folder/bin"
+    hasnt "$u" "@XRAY_"
+    has "$u" "User=still-xray"
+    eq "$(stat -c %a "$u")" 644
+    has "$d" "MemoryMax=512M"
+    has "$d" "MemorySwapMax=0"
+    has "$d" "Environment=GOMEMLIMIT=435MiB"
+    has "$R/etc/default/still-ui" "XUI_XRAY_UNIT=still-xray"
+    called "systemctl enable still-xray"
+    called "useradd "
+    called "x-ui xray-unit-check"
+    [[ -d "$R/etc/still-xray/certs" ]] || { echo "no /etc/still-xray/certs"; return 1; }
+    eq "$(stat -c %a "$R/etc/still-xray")" 2750
+    eq "$(stat -c %a "$xui_folder/bin/geoip.dat")" 644 "(geo files readable by the core)"
+}
+t "$s: auto mode moves Xray to still-xray when xray-unit-check passes" xray_on
+# xray_mem RAM_KB WANT_MAX_MB WANT_GOMEM_MIB [STILL_XRAY_MEMORY_MAX]
+xray_mem() {
+    xray_setup || return 1
+    meminfo "$1" 0
+    STILL_XRAY_MEMORY_MAX="${4:-}" _still_xray_unit > /dev/null || return 1
+    local d="$xui_service/still-xray.service.d/15-still-memory.conf"
+    has "$d" "MemoryMax=${2}M"
+    has "$d" "GOMEMLIMIT=${3}MiB"
+}
+t "$s: still-xray MemoryMax is half the RAM (4 GiB -> 2048M)" xray_mem 4194304 2048 1740
+t "$s: still-xray MemoryMax floors at 256 MiB" xray_mem 262144 256 217
+t "$s: still-xray MemoryMax caps at 4 GiB" xray_mem 33554432 4096 3481
+t "$s: STILL_XRAY_MEMORY_MAX=1G sets 1024M" xray_mem 4194304 1024 870 1G
+t "$s: invalid STILL_XRAY_MEMORY_MAX falls back to half the RAM" xray_mem 4194304 2048 1740 huge
+xray_mem_off() {
+    xray_setup || return 1
+    STILL_XRAY_MEMORY_MAX=off _still_xray_unit > /dev/null || return 1
+    [[ ! -e "$xui_service/still-xray.service.d/15-still-memory.conf" ]] || { echo "memory drop-in kept with off"; return 1; }
+    [[ -e "$xui_service/still-xray.service" ]]
+}
+t "$s: STILL_XRAY_MEMORY_MAX=off writes no still-xray memory drop-in" xray_mem_off
+xray_refused() {
+    xray_setup || return 1
+    echo 'XUI_XRAY_UNIT=still-xray' > "$R/etc/default/still-ui"
+    SYSTEMCTL_ENABLED=yes STUB_UNIT_CHECK_RC=3 _still_xray_unit > "$R/out" || return 1
+    has "$R/out" "Xray stays inside the panel process"
+    has "$R/out" "inbound 3 needs TPROXY"
+    [[ ! -e "$xui_service/still-xray.service" ]] || { echo "unit written although the check refused"; return 1; }
+    hasnt "$R/etc/default/still-ui" XUI_XRAY_UNIT=
+    called "systemctl disable --now still-xray"
+}
+t "$s: a config the unit cannot run keeps Xray in the panel and disables still-xray" xray_refused
+# xray_check_error CURRENT_MODE WANT(on|off): the check itself fails.
+xray_check_error() {
+    xray_setup || return 1
+    [[ "$1" == on ]] && echo 'XUI_XRAY_UNIT=still-xray' > "$R/etc/default/still-ui"
+    STUB_UNIT_CHECK_RC=1 _still_xray_unit > "$R/out" || return 1
+    has "$R/out" "keeping the current mode"
+    if [[ "$2" == on ]]; then
+        [[ -e "$xui_service/still-xray.service" ]] || { echo "still-xray dropped"; return 1; }
+        has "$R/etc/default/still-ui" XUI_XRAY_UNIT=still-xray
+    else
+        [[ ! -e "$xui_service/still-xray.service" ]] || { echo "still-xray turned on"; return 1; }
+    fi
+}
+t "$s: a failing xray-unit-check keeps still-xray on where it ran" xray_check_error on on
+t "$s: a failing xray-unit-check keeps Xray in the panel where it ran" xray_check_error off off
+xray_old_release() {
+    xray_setup || return 1
+    STUB_UNIT_CHECK=old _still_xray_unit > /dev/null || return 1
+    [[ ! -e "$xui_service/still-xray.service" ]] || { echo "unit written for a release without the check"; return 1; }
+}
+t "$s: a release without xray-unit-check keeps Xray in the panel" xray_old_release
+xray_forced() {
+    xray_setup || return 1
+    STILL_XRAY_UNIT=off _still_xray_unit > /dev/null || return 1
+    [[ ! -e "$xui_service/still-xray.service" ]] || { echo "STILL_XRAY_UNIT=off ignored"; return 1; }
+    not_called "xray-unit-check"
+    echo 'STILL_XRAY_UNIT="on"' > "$R/etc/default/still-ui"
+    STUB_UNIT_CHECK_RC=3 _still_xray_unit > /dev/null || return 1
+    [[ -e "$xui_service/still-xray.service" ]] || { echo "STILL_XRAY_UNIT=on from the env file ignored"; return 1; }
+}
+t "$s: STILL_XRAY_UNIT=off/on (environment or env file) override the check" xray_forced
+xray_bogus() {
+    xray_setup || return 1
+    STILL_XRAY_UNIT=maybe _still_xray_unit > "$R/out" || return 1
+    has "$R/out" "Ignoring STILL_XRAY_UNIT=maybe"
+    [[ -e "$xui_service/still-xray.service" ]] || { echo "bogus value did not fall back to auto"; return 1; }
+}
+t "$s: an unknown STILL_XRAY_UNIT value is treated as auto" xray_bogus
+xray_net_admin() {
+    xray_setup || return 1
+    _still_xray_unit > /dev/null || return 1
+    count "$R/calls" "x-ui xray-unit-check -net-admin" 1
+    # A template without the capability is checked without it.
+    sed -i 's/ CAP_NET_ADMIN$//' "$xui_folder/still-xray.service"
+    : > "$R/calls"
+    _still_xray_unit > /dev/null || return 1
+    called "x-ui xray-unit-check"
+    not_called "-net-admin"
+    mkdir -p "$xui_service/still-xray.service.d"
+    printf '[Service]\nAmbientCapabilities=CAP_NET_ADMIN\n' > "$xui_service/still-xray.service.d/30-local.conf"
+    _still_xray_unit > /dev/null || return 1
+    called "x-ui xray-unit-check -net-admin"
+}
+t "$s: the CAP_NET_ADMIN of the unit or a local drop-in is passed to xray-unit-check" xray_net_admin
+xray_devices() {
+    xray_setup || return 1
+    mkdir -p "$xui_service/still-xray.service.d"
+    printf '[Service]\nPrivateDevices=no\n' > "$xui_service/still-xray.service.d/30-tun.conf"
+    _still_xray_unit > /dev/null || return 1
+    called "x-ui xray-unit-check -net-admin -devices"
+    : > "$R/calls"
+    STUB_UNIT_CHECK=no-devices _still_xray_unit > /dev/null || return 1
+    called "x-ui xray-unit-check -net-admin"
+    not_called "-devices"
+}
+t "$s: a PrivateDevices=no drop-in is passed as -devices when the check knows it" xray_devices
+xray_no_systemd() {
+    xray_setup || return 1
+    rmdir "$R/run/systemd/system"
+    _still_xray_unit > /dev/null || return 1
+    [[ ! -e "$xui_service/still-xray.service" ]] || { echo "unit written without systemd"; return 1; }
+    not_called "systemctl"
+    [[ ! -e "$R/etc/default/still-ui" ]] || { echo "env file touched without systemd"; return 1; }
+}
+t "$s: without systemd as PID 1 nothing is written" xray_no_systemd
+xray_idempotent() {
+    xray_setup || return 1
+    _still_xray_unit > /dev/null || return 1
+    cp "$xui_service/still-xray.service" "$R/u1"
+    cp "$xui_service/still-xray.service.d/15-still-memory.conf" "$R/m1"
+    _still_xray_unit > /dev/null || return 1
+    cmp "$R/u1" "$xui_service/still-xray.service" || return 1
+    cmp "$R/m1" "$xui_service/still-xray.service.d/15-still-memory.conf" || return 1
+    count "$R/etc/default/still-ui" XUI_XRAY_UNIT= 1
+    count "$R/calls" "useradd " 1
+    [[ -z "$(find "$xui_service" -name '*.tmp.*')" ]] || { echo "temp files left"; return 1; }
+}
+t "$s: a second run leaves the unit, its drop-in and the env file the same" xray_idempotent
+xray_env_paths() {
+    xray_setup || return 1
+    release=rocky
+    _still_xray_unit > /dev/null || return 1
+    has "$R/etc/sysconfig/still-ui" XUI_XRAY_UNIT=still-xray
+    release=arch
+    _still_xray_unit > /dev/null || return 1
+    has "$R/etc/conf.d/still-ui" XUI_XRAY_UNIT=still-xray
+}
+t "$s: the env file is /etc/sysconfig on RHEL and /etc/conf.d on Arch" xray_env_paths
+
+
+# --- _xui_service_write_paths_dropin (install.sh and update.sh resolve the env
+# file differently, the behaviour is the same) ---------------------------------
 for script in "$INSTALL_SH" "$UPDATE_SH"; do
     s=$(basename "$script")
-
-    # --- _still_size_mib ---------------------------------------------------
-    size_cases() {
-        fresh_root
-        load "$script" _still_size_mib || return 1
-        eq "$(_still_size_mib 800M)" 800
-        eq "$(_still_size_mib 2G)" 2048
-        eq "$(_still_size_mib 1T)" 1048576
-        eq "$(_still_size_mib 524288K)" 512
-        eq "$(_still_size_mib 1048576)" 1
-        local bad
-        for bad in '' 1.5G 1g -1M 'lots' '800 M' 1GiB; do eq "$(_still_size_mib "$bad")" "" "for '$bad'"; done
-    }
-    t "$s: _still_size_mib reads K/M/G/T and bytes, nothing else" size_cases
-
-    # --- _still_env_set ----------------------------------------------------
-    env_set_new() {
-        fresh_root
-        load "$script" _still_env_set || return 1
-        _still_env_set "$R/etc/default/still-ui" XUI_XRAY_UNIT still-xray || return 1
-        eq "$(cat "$R/etc/default/still-ui")" "XUI_XRAY_UNIT=still-xray"
-        eq "$(stat -c %a "$R/etc/default/still-ui")" 600
-    }
-    t "$s: _still_env_set creates a missing env file 0600" env_set_new
-    env_set_edit() {
-        fresh_root
-        load "$script" _still_env_set || return 1
-        local f="$R/etc/default/still-ui"
-        printf '# kept comment\nXUI_DB_TYPE=postgres\nexport XUI_XRAY_UNIT=old\n  XUI_XRAY_UNIT=older\nXUI_XRAY_UNIT_EXTRA=keep\n' > "$f"
-        chmod 640 "$f"
-        _still_env_set "$f" XUI_XRAY_UNIT still-xray || return 1
-        _still_env_set "$f" XUI_XRAY_UNIT still-xray || return 1
-        count "$f" XUI_XRAY_UNIT=still-xray 1
-        hasnt "$f" =old
-        hasnt "$f" =older
-        has "$f" '# kept comment'
-        has "$f" XUI_DB_TYPE=postgres
-        has "$f" XUI_XRAY_UNIT_EXTRA=keep
-        eq "$(stat -c %a "$f")" 640 "(mode kept)"
-        _still_env_set "$f" XUI_XRAY_UNIT "" || return 1
-        hasnt "$f" XUI_XRAY_UNIT=
-        has "$f" XUI_XRAY_UNIT_EXTRA=keep
-        [[ -z "$(find "$R/etc/default" -name '*.tmp.*')" ]] || { echo "temp file left"; return 1; }
-    }
-    t "$s: _still_env_set replaces the key (also with export/indent), keeps the rest, idempotent, empty drops it" env_set_edit
-
-    # --- _still_memory_dropin: the panel's memory ceiling --------------------
-    # mem_case RAM_KB WANT_MAX WANT_HIGH
-    mem_case() {
-        fresh_root
-        load "$script" _still_memory_dropin || return 1
-        meminfo "$1" 0
-        _still_memory_dropin "$R/etc/default/still-ui" > /dev/null || return 1
-        local d="$xui_service/still-ui.service.d/15-still-memory.conf"
-        has "$d" "MemoryMax=$2"
-        has "$d" "MemoryHigh=$3"
-        has "$d" "MemorySwapMax=0"
-        count "$d" '[Service]' 1
-        called "systemctl daemon-reload"
-    }
-    t "$s: panel MemoryMax floors at 256 MiB (512 MiB RAM)" mem_case 524288 256M 217M
-    t "$s: panel MemoryMax is 35% of RAM (2 GiB RAM -> 716M, high 85%)" mem_case 2097152 716M 608M
-    t "$s: panel MemoryMax is 35% of RAM (1 GiB RAM -> 358M)" mem_case 1048576 358M 304M
-    t "$s: panel MemoryMax caps at 1 GiB (4 GiB RAM)" mem_case 4194304 1024M 870M
-    t "$s: panel MemoryMax caps at 1 GiB (64 GiB RAM)" mem_case 67108864 1024M 870M
-    mem_override() {
-        fresh_root
-        load "$script" _still_memory_dropin || return 1
-        local d="$xui_service/still-ui.service.d/15-still-memory.conf" env="$R/etc/default/still-ui"
-        echo 'STILL_UI_MEMORY_MAX="800M"' > "$env"
-        _still_memory_dropin "$env" > /dev/null || return 1
-        has "$d" "MemoryMax=800M"
-        hasnt "$d" "MemoryHigh="
-        STILL_UI_MEMORY_MAX=2G _still_memory_dropin "$env" > /dev/null || return 1
-        has "$d" "MemoryMax=2G"
-        STILL_UI_MEMORY_MAX=lots _still_memory_dropin "$env" > "$R/out" || return 1
-        has "$R/out" "Ignoring STILL_UI_MEMORY_MAX=lots"
-        has "$d" "MemoryMax=716M"
-        STILL_UI_MEMORY_MAX=off _still_memory_dropin "$env" > /dev/null || return 1
-        [[ ! -e "$d" ]] || { echo "drop-in kept with off"; return 1; }
-    }
-    t "$s: STILL_UI_MEMORY_MAX from env file or environment, invalid ignored, off removes the drop-in" mem_override
-    mem_idempotent() {
-        fresh_root
-        load "$script" _still_memory_dropin || return 1
-        local d="$xui_service/still-ui.service.d/15-still-memory.conf"
-        _still_memory_dropin "$R/etc/default/still-ui" > /dev/null || return 1
-        cp "$d" "$R/first"
-        _still_memory_dropin "$R/etc/default/still-ui" > /dev/null || return 1
-        cmp "$R/first" "$d" || return 1
-        eq "$(find "$xui_service/still-ui.service.d" -type f | wc -l)" 1 "(files in the drop-in folder)"
-    }
-    t "$s: panel memory drop-in is rewritten identically on a second run" mem_idempotent
-    mem_no_meminfo() {
-        fresh_root
-        load "$script" _still_memory_dropin || return 1
-        echo garbage > "$R/proc/meminfo"
-        _still_memory_dropin "$R/etc/default/still-ui" > /dev/null || return 1
-        [[ ! -e "$xui_service/still-ui.service.d/15-still-memory.conf" ]] || { echo "drop-in written without MemTotal"; return 1; }
-    }
-    t "$s: no memory drop-in when MemTotal cannot be read" mem_no_meminfo
-
-    # --- _still_xray_unit: Xray in its own unit --------------------------------
-    xray_setup() {
-        fresh_root
-        load "$script" _still_xray_unit || return 1
-        load "$script" _still_env_set || return 1
-        load "$script" _still_size_mib || return 1
-        mkdir -p "$R/run/systemd/system"
-        cp "$UNIT_DIR/still-xray.service" "$xui_folder/still-xray.service"
-        printf '#!/bin/sh\n' > "$xui_folder/bin/xray-linux-amd64"
-        chmod +x "$xui_folder/bin/xray-linux-amd64"
-        printf 'geo' > "$xui_folder/bin/geoip.dat"
-        chmod 600 "$xui_folder/bin/geoip.dat"
-        panel_stub
-    }
-    xray_on() {
-        xray_setup || return 1
-        meminfo 1048576 0
-        _still_xray_unit > "$R/out" || { cat "$R/out"; return 1; }
-        local u="$xui_service/still-xray.service" d="$xui_service/still-xray.service.d/15-still-memory.conf"
-        has "$u" "ExecStart=$xui_folder/bin/xray-linux-amd64 run -c "
-        has "$u" "Environment=XRAY_LOCATION_ASSET=$xui_folder/bin"
-        hasnt "$u" "@XRAY_"
-        has "$u" "User=still-xray"
-        eq "$(stat -c %a "$u")" 644
-        has "$d" "MemoryMax=512M"
-        has "$d" "MemorySwapMax=0"
-        has "$d" "Environment=GOMEMLIMIT=435MiB"
-        has "$R/etc/default/still-ui" "XUI_XRAY_UNIT=still-xray"
-        called "systemctl enable still-xray"
-        called "useradd "
-        called "x-ui xray-unit-check"
-        [[ -d "$R/etc/still-xray/certs" ]] || { echo "no /etc/still-xray/certs"; return 1; }
-        eq "$(stat -c %a "$R/etc/still-xray")" 2750
-        eq "$(stat -c %a "$xui_folder/bin/geoip.dat")" 644 "(geo files readable by the core)"
-    }
-    t "$s: auto mode moves Xray to still-xray when xray-unit-check passes" xray_on
-    # xray_mem RAM_KB WANT_MAX_MB WANT_GOMEM_MIB [STILL_XRAY_MEMORY_MAX]
-    xray_mem() {
-        xray_setup || return 1
-        meminfo "$1" 0
-        STILL_XRAY_MEMORY_MAX="${4:-}" _still_xray_unit > /dev/null || return 1
-        local d="$xui_service/still-xray.service.d/15-still-memory.conf"
-        has "$d" "MemoryMax=${2}M"
-        has "$d" "GOMEMLIMIT=${3}MiB"
-    }
-    t "$s: still-xray MemoryMax is half the RAM (4 GiB -> 2048M)" xray_mem 4194304 2048 1740
-    t "$s: still-xray MemoryMax floors at 256 MiB" xray_mem 262144 256 217
-    t "$s: still-xray MemoryMax caps at 4 GiB" xray_mem 33554432 4096 3481
-    t "$s: STILL_XRAY_MEMORY_MAX=1G sets 1024M" xray_mem 4194304 1024 870 1G
-    t "$s: invalid STILL_XRAY_MEMORY_MAX falls back to half the RAM" xray_mem 4194304 2048 1740 huge
-    xray_mem_off() {
-        xray_setup || return 1
-        STILL_XRAY_MEMORY_MAX=off _still_xray_unit > /dev/null || return 1
-        [[ ! -e "$xui_service/still-xray.service.d/15-still-memory.conf" ]] || { echo "memory drop-in kept with off"; return 1; }
-        [[ -e "$xui_service/still-xray.service" ]]
-    }
-    t "$s: STILL_XRAY_MEMORY_MAX=off writes no still-xray memory drop-in" xray_mem_off
-    xray_refused() {
-        xray_setup || return 1
-        echo 'XUI_XRAY_UNIT=still-xray' > "$R/etc/default/still-ui"
-        SYSTEMCTL_ENABLED=yes STUB_UNIT_CHECK_RC=3 _still_xray_unit > "$R/out" || return 1
-        has "$R/out" "Xray stays inside the panel process"
-        has "$R/out" "inbound 3 needs TPROXY"
-        [[ ! -e "$xui_service/still-xray.service" ]] || { echo "unit written although the check refused"; return 1; }
-        hasnt "$R/etc/default/still-ui" XUI_XRAY_UNIT=
-        called "systemctl disable --now still-xray"
-    }
-    t "$s: a config the unit cannot run keeps Xray in the panel and disables still-xray" xray_refused
-    # xray_check_error CURRENT_MODE WANT(on|off): the check itself fails.
-    xray_check_error() {
-        xray_setup || return 1
-        [[ "$1" == on ]] && echo 'XUI_XRAY_UNIT=still-xray' > "$R/etc/default/still-ui"
-        STUB_UNIT_CHECK_RC=1 _still_xray_unit > "$R/out" || return 1
-        has "$R/out" "keeping the current mode"
-        if [[ "$2" == on ]]; then
-            [[ -e "$xui_service/still-xray.service" ]] || { echo "still-xray dropped"; return 1; }
-            has "$R/etc/default/still-ui" XUI_XRAY_UNIT=still-xray
-        else
-            [[ ! -e "$xui_service/still-xray.service" ]] || { echo "still-xray turned on"; return 1; }
-        fi
-    }
-    t "$s: a failing xray-unit-check keeps still-xray on where it ran" xray_check_error on on
-    t "$s: a failing xray-unit-check keeps Xray in the panel where it ran" xray_check_error off off
-    xray_old_release() {
-        xray_setup || return 1
-        STUB_UNIT_CHECK=old _still_xray_unit > /dev/null || return 1
-        [[ ! -e "$xui_service/still-xray.service" ]] || { echo "unit written for a release without the check"; return 1; }
-    }
-    t "$s: a release without xray-unit-check keeps Xray in the panel" xray_old_release
-    xray_forced() {
-        xray_setup || return 1
-        STILL_XRAY_UNIT=off _still_xray_unit > /dev/null || return 1
-        [[ ! -e "$xui_service/still-xray.service" ]] || { echo "STILL_XRAY_UNIT=off ignored"; return 1; }
-        not_called "xray-unit-check"
-        echo 'STILL_XRAY_UNIT="on"' > "$R/etc/default/still-ui"
-        STUB_UNIT_CHECK_RC=3 _still_xray_unit > /dev/null || return 1
-        [[ -e "$xui_service/still-xray.service" ]] || { echo "STILL_XRAY_UNIT=on from the env file ignored"; return 1; }
-    }
-    t "$s: STILL_XRAY_UNIT=off/on (environment or env file) override the check" xray_forced
-    xray_bogus() {
-        xray_setup || return 1
-        STILL_XRAY_UNIT=maybe _still_xray_unit > "$R/out" || return 1
-        has "$R/out" "Ignoring STILL_XRAY_UNIT=maybe"
-        [[ -e "$xui_service/still-xray.service" ]] || { echo "bogus value did not fall back to auto"; return 1; }
-    }
-    t "$s: an unknown STILL_XRAY_UNIT value is treated as auto" xray_bogus
-    xray_net_admin() {
-        xray_setup || return 1
-        _still_xray_unit > /dev/null || return 1
-        count "$R/calls" "x-ui xray-unit-check -net-admin" 1
-        # A template without the capability is checked without it.
-        sed -i 's/ CAP_NET_ADMIN$//' "$xui_folder/still-xray.service"
-        : > "$R/calls"
-        _still_xray_unit > /dev/null || return 1
-        called "x-ui xray-unit-check"
-        not_called "-net-admin"
-        mkdir -p "$xui_service/still-xray.service.d"
-        printf '[Service]\nAmbientCapabilities=CAP_NET_ADMIN\n' > "$xui_service/still-xray.service.d/30-local.conf"
-        _still_xray_unit > /dev/null || return 1
-        called "x-ui xray-unit-check -net-admin"
-    }
-    t "$s: the CAP_NET_ADMIN of the unit or a local drop-in is passed to xray-unit-check" xray_net_admin
-    xray_devices() {
-        xray_setup || return 1
-        mkdir -p "$xui_service/still-xray.service.d"
-        printf '[Service]\nPrivateDevices=no\n' > "$xui_service/still-xray.service.d/30-tun.conf"
-        _still_xray_unit > /dev/null || return 1
-        called "x-ui xray-unit-check -net-admin -devices"
-        : > "$R/calls"
-        STUB_UNIT_CHECK=no-devices _still_xray_unit > /dev/null || return 1
-        called "x-ui xray-unit-check -net-admin"
-        not_called "-devices"
-    }
-    t "$s: a PrivateDevices=no drop-in is passed as -devices when the check knows it" xray_devices
-    xray_no_systemd() {
-        xray_setup || return 1
-        rmdir "$R/run/systemd/system"
-        _still_xray_unit > /dev/null || return 1
-        [[ ! -e "$xui_service/still-xray.service" ]] || { echo "unit written without systemd"; return 1; }
-        not_called "systemctl"
-        [[ ! -e "$R/etc/default/still-ui" ]] || { echo "env file touched without systemd"; return 1; }
-    }
-    t "$s: without systemd as PID 1 nothing is written" xray_no_systemd
-    xray_idempotent() {
-        xray_setup || return 1
-        _still_xray_unit > /dev/null || return 1
-        cp "$xui_service/still-xray.service" "$R/u1"
-        cp "$xui_service/still-xray.service.d/15-still-memory.conf" "$R/m1"
-        _still_xray_unit > /dev/null || return 1
-        cmp "$R/u1" "$xui_service/still-xray.service" || return 1
-        cmp "$R/m1" "$xui_service/still-xray.service.d/15-still-memory.conf" || return 1
-        count "$R/etc/default/still-ui" XUI_XRAY_UNIT= 1
-        count "$R/calls" "useradd " 1
-        [[ -z "$(find "$xui_service" -name '*.tmp.*')" ]] || { echo "temp files left"; return 1; }
-    }
-    t "$s: a second run leaves the unit, its drop-in and the env file the same" xray_idempotent
-    xray_env_paths() {
-        xray_setup || return 1
-        release=rocky
-        _still_xray_unit > /dev/null || return 1
-        has "$R/etc/sysconfig/still-ui" XUI_XRAY_UNIT=still-xray
-        release=arch
-        _still_xray_unit > /dev/null || return 1
-        has "$R/etc/conf.d/still-ui" XUI_XRAY_UNIT=still-xray
-    }
-    t "$s: the env file is /etc/sysconfig on RHEL and /etc/conf.d on Arch" xray_env_paths
-
     # --- systemd hardening helpers --------------------------------------------
     hardening_warn() {
         fresh_root
@@ -474,12 +479,6 @@ for script in "$INSTALL_SH" "$UPDATE_SH"; do
         eq "$(SYSTEMD_VERSION=garbage _xui_systemd_major_version)" 0
     }
     t "$s: older systemd versions are named with the hardening they ignore" hardening_warn
-done
-
-# --- _xui_service_write_paths_dropin (install.sh and update.sh resolve the env
-# file differently, the behaviour is the same) ---------------------------------
-for script in "$INSTALL_SH" "$UPDATE_SH"; do
-    s=$(basename "$script")
     write_paths() {
         fresh_root
         load "$script" _xui_service_write_paths_dropin || return 1
@@ -728,6 +727,7 @@ make_archive() { # DIR [omit-file]
     printf 'menu new\n' > "$pkg/x-ui.sh"
     printf 'xray new\n' > "$pkg/bin/xray-linux-amd64"
     cp "$UNIT_DIR/x-ui.service.debian" "$pkg/"
+    printf '_still_xray_unit() { log_call xray-unit; }\n' > "$pkg/still-setup.sh"
     [[ -z "${2:-}" ]] || rm -f "$pkg/$2"
     tar -C "$1/pkg" -czf "$1/still-ui-linux-amd64.tar.gz" still-ui
 }
@@ -741,7 +741,6 @@ install_setup() {
     _still_import_3xui() { log_call import; }
     config_after_install() { log_call config_after_install; }
     _install_xui_service_unit() { log_call install-unit; }
-    _still_xray_unit() { log_call xray-unit; }
     setup_fail2ban() { :; }
     # The existing installation that must survive a refused install.
     echo "old panel" > "$xui_folder/x-ui"
@@ -844,6 +843,16 @@ install_ok() {
     [[ -z "$(find "$R/usr/local" -maxdepth 1 -name 'x-ui-bin-backup.*')" ]] || { echo "bin backup left"; return 1; }
 }
 t "install.sh: a verified install replaces binary, menu and xray, keeps custom bin/ files" install_ok
+install_old_archive() {
+    OMIT=still-setup.sh install_setup || return 1
+    printf 'A=1\nexport XUI_XRAY_UNIT=still-xray\n' > "$R/etc/default/still-ui"
+    (install_x-ui v9.9.9) > "$R/out" 2>&1 || { cat "$R/out"; return 1; }
+    eq "$(cat "$R/etc/default/still-ui")" "A=1"
+    called "systemctl disable --now still-xray"
+    not_called xray-unit
+    has "$R/out" "Xray stays inside the panel process"
+}
+t "install.sh: an archive without still-setup.sh keeps Xray inside the panel" install_old_archive
 
 # ==============================================================================
 # update.sh

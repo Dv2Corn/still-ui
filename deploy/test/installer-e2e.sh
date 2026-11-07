@@ -94,7 +94,7 @@ if [[ $AS_IS == 1 ]]; then
     cp "$ARCHIVE" "$dl/$NEW/still-ui-linux-amd64.tar.gz"
 else
     tar -xzf "$ARCHIVE" -C "$W/pkg" || die "cannot extract $ARCHIVE"
-    for f in install.sh update.sh x-ui.sh migrate.sh still-xray.service x-ui.service.debian x-ui.service.rhel x-ui.service.arch x-ui.rc; do
+    for f in install.sh update.sh still-setup.sh x-ui.sh migrate.sh still-xray.service x-ui.service.debian x-ui.service.rhel x-ui.service.arch x-ui.rc; do
         [[ -f "$SRC/$f" ]] && cp "$SRC/$f" "$W/pkg/still-ui/$f"
     done
     chmod 755 "$W/pkg/still-ui/"*.sh
