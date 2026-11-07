@@ -138,6 +138,38 @@ func TestRulesetOnlyJudgesTunnelClients(t *testing.T) {
 	}
 }
 
+// A kernel client reached the server's own LAN or container-bridge address: the
+// private block judged only forwarded traffic, and that one is delivered locally.
+func TestRulesetBlocksTheServersOwnPrivateAddresses(t *testing.T) {
+	tx, err := Ruleset(Spec{Filter: Filter{Private: true}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	start := strings.Index(tx, "chain local {")
+	if start < 0 {
+		t.Fatalf("private block has no input chain:\n%s", tx)
+	}
+	local := tx[start:]
+	local = local[:strings.Index(local, "\n\t}")]
+	want := []string{
+		"type filter hook input priority 0; policy accept;",
+		`iifname "xui-awg*" ct direction original meta l4proto { tcp, udp } th dport 53 return`,
+		`iifname "xui-awg*" ct direction original fib daddr . iif type != local ip daddr @private4 counter name private goto deny`,
+		`iifname "xui-awg*" ct direction original fib daddr . iif type != local ip6 daddr @private6 counter name private goto deny`,
+	}
+	at := -1
+	for _, line := range want {
+		i := strings.Index(local, line)
+		if i <= at {
+			t.Fatalf("input chain lacks %q after the previous rule:\n%s", line, local)
+		}
+		at = i
+	}
+	if strings.Contains(local, "server_ports") {
+		t.Fatalf("private block alone judged server ports:\n%s", local)
+	}
+}
+
 func TestRulesetBlocksPublicServerAddresses(t *testing.T) {
 	spec := Spec{Filter: Filter{Server: true}, ServerPorts: []uint16{2053}, ServerAddrs: []string{"198.51.100.7", "bad", "2001:db8::7", "198.51.100.7", "::ffff:203.0.113.5"}}
 	tx, err := Ruleset(spec)

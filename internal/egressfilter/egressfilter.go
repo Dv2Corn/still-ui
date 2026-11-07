@@ -425,11 +425,21 @@ func Ruleset(spec Spec) (string, error) {
 	// connections forwarded to a client (port forwarding) are never judged.
 	w("\tchain routed {\n\t\ttype filter hook forward priority 0; policy accept;")
 	w("\t\tiifname %q ct direction original jump client\n\t}", clientInterfaces)
-	if f.Server && len(server) > 0 {
-		// A client reaching the server itself: only the listed TCP ports, so DNS on the
-		// tunnel address and every other service keep working.
+	if f.Private || (f.Server && len(server) > 0) {
 		w("\tchain local {\n\t\ttype filter hook input priority 0; policy accept;")
-		w("\t\tiifname %q ct direction original meta l4proto tcp tcp dport @server_ports counter name server goto deny\n\t}", clientInterfaces)
+		if f.Server && len(server) > 0 {
+			// A client reaching the server itself: only the listed TCP ports, so DNS on the
+			// tunnel address and every other service keep working.
+			w("\t\tiifname %q ct direction original meta l4proto tcp tcp dport @server_ports counter name server goto deny", clientInterfaces)
+		}
+		if f.Private {
+			// The server's other private addresses (LAN, container bridges) are private networks
+			// too; its address on the client's own tunnel is not, as peers are in routed.
+			w("\t\tiifname %q ct direction original meta l4proto { tcp, udp } th dport %d return", clientInterfaces, DNSPort)
+			w("\t\tiifname %q ct direction original fib daddr . iif type != local ip daddr @private4 counter name private goto deny", clientInterfaces)
+			w("\t\tiifname %q ct direction original fib daddr . iif type != local ip6 daddr @private6 counter name private goto deny", clientInterfaces)
+		}
+		w("\t}")
 	}
 	w("}")
 	return b.String(), nil
