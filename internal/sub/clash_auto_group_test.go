@@ -284,6 +284,15 @@ func TestClashAutoGroupLocalTemplates(t *testing.T) {
 			},
 		},
 		{
+			name: "a name that only contains Auto adds nothing", proxies: 1,
+			rules: "DOMAIN-KEYWORD,Autodesk,DIRECT",
+			check: func(t *testing.T, out string, doc clashDoc) {
+				if len(doc.Groups) != 1 {
+					t.Fatalf("Autodesk made the template route to Auto:\n%s", out)
+				}
+			},
+		},
+		{
 			name: "own proxy-groups are left exactly as written", proxies: 2, auto: autoGroupOn(),
 			rules: "proxy-groups:\n  - name: PROXY\n    type: select\n    proxies: [DIRECT]\nrules:\n  - MATCH,PROXY\n",
 			check: func(t *testing.T, out string, doc clashDoc) {
