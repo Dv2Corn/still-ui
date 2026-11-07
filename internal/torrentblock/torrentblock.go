@@ -3,18 +3,14 @@
 package torrentblock
 
 import (
-	"context"
 	"encoding/hex"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"os/exec"
-	"runtime"
 	"slices"
 	"strconv"
 	"strings"
 	"sync"
-	"time"
+
+	"github.com/mhsanaei/3x-ui/v3/internal/nfttable"
 )
 
 // TableName is the inet table the panel owns; nothing else is ever touched.
@@ -34,13 +30,6 @@ const learnRate = "30/minute"
 
 // defaultProtected is always in the protected set (SSH), whatever the caller passes.
 var defaultProtected = []uint16{22}
-
-const commandTimeout = 10 * time.Second
-
-var (
-	ErrUnsupported = errors.New("nftables filtering needs Linux")
-	ErrNftMissing  = errors.New("nft is not installed")
-)
 
 var (
 	btHandshake    = []byte("\x13BitTorrent prot")
@@ -157,11 +146,6 @@ func protectedRefresh(protected []uint16) string {
 		TableName, TableName, portElements(protected))
 }
 
-// removal deletes the table and succeeds when it is already gone.
-func removal() string {
-	return fmt.Sprintf("add table inet %s\ndelete table inet %s\n", TableName, TableName)
-}
-
 var counterNames = []string{"sig_bt", "sig_dht", "sig_tracker", "sig_utp", "learned", "peer_hit", "ban_hit"}
 
 // Counters are packet counts since the table was last loaded.
@@ -183,51 +167,20 @@ type Status struct {
 	Counters     Counters `json:"counters"`
 }
 
-// runner abstracts the host so the manager is testable off Linux.
-type runner interface {
-	lookPath(name string) error
-	run(stdin string, args ...string) (string, error)
-}
-
-type osRunner struct{}
-
-func (osRunner) lookPath(name string) error {
-	_, err := exec.LookPath(name)
-	return err
-}
-
-func (osRunner) run(stdin string, args ...string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), commandTimeout)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, "nft", args...)
-	if stdin != "" {
-		cmd.Stdin = strings.NewReader(stdin)
-	}
-	out, err := cmd.CombinedOutput()
-	return strings.TrimSpace(string(out)), err
-}
-
 // Manager applies and removes the table; safe for concurrent use.
 type Manager struct {
-	mu   sync.Mutex
-	r    runner
-	goos string
+	mu sync.Mutex
+	t  *nfttable.Table
 }
 
-var defaultManager = &Manager{r: osRunner{}, goos: runtime.GOOS}
+func newManager(r nfttable.Runner, goos string) *Manager {
+	return &Manager{t: &nfttable.Table{Name: TableName, R: r, GOOS: goos}}
+}
+
+var defaultManager = &Manager{t: nfttable.New(TableName)}
 
 // Default is the manager for the real host.
 func Default() *Manager { return defaultManager }
-
-func (m *Manager) usable() error {
-	if m.goos != "linux" {
-		return ErrUnsupported
-	}
-	if m.r.lookPath("nft") != nil {
-		return ErrNftMissing
-	}
-	return nil
-}
 
 // Apply loads the table, replacing any previous copy (its counters and sets restart).
 // protected are the server's own service ports: never learned as a peer endpoint.
@@ -238,17 +191,10 @@ func (m *Manager) Apply(protected []uint16) error {
 }
 
 func (m *Manager) applyLocked(protected []uint16) error {
-	if err := m.usable(); err != nil {
+	if err := m.t.Usable(); err != nil {
 		return err
 	}
-	return m.nft(Ruleset(protected))
-}
-
-func (m *Manager) nft(tx string) error {
-	if out, err := m.r.run(tx, "-f", "-"); err != nil {
-		return fmt.Errorf("nft: %w: %s", err, out)
-	}
-	return nil
+	return m.t.Load(Ruleset(protected))
 }
 
 // Ensure loads a missing table, or only refreshes the protected ports of a loaded one
@@ -256,11 +202,11 @@ func (m *Manager) nft(tx string) error {
 func (m *Manager) Ensure(protected []uint16) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if err := m.usable(); err != nil {
+	if err := m.t.Usable(); err != nil {
 		return err
 	}
-	if m.present() {
-		return m.nft(protectedRefresh(protected))
+	if m.t.Present() {
+		return m.t.Load(protectedRefresh(protected))
 	}
 	return m.applyLocked(protected)
 }
@@ -269,72 +215,17 @@ func (m *Manager) Ensure(protected []uint16) error {
 func (m *Manager) Remove() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.usable() != nil {
-		return nil
-	}
-	return m.nft(removal())
-}
-
-func (m *Manager) present() bool {
-	_, err := m.r.run("", "list", "table", "inet", TableName)
-	return err == nil
+	return m.t.Remove()
 }
 
 // Status reports whether the table is loaded and what it has caught.
 func (m *Manager) Status() Status {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	st := Status{Supported: m.goos == "linux"}
-	if !st.Supported {
-		return st
-	}
-	st.NftInstalled = m.r.lookPath("nft") == nil
-	if !st.NftInstalled {
-		return st
-	}
-	out, err := m.r.run("", "-j", "list", "counters", "table", "inet", TableName)
-	if err != nil {
-		return st
-	}
-	st.Active = true
-	st.Counters = parseCounters(out)
-	return st
-}
-
-func parseCounters(out string) Counters {
-	var doc struct {
-		Nftables []struct {
-			Counter *struct {
-				Name    string `json:"name"`
-				Table   string `json:"table"`
-				Packets uint64 `json:"packets"`
-			} `json:"counter"`
-		} `json:"nftables"`
-	}
-	var c Counters
-	if json.Unmarshal([]byte(out), &doc) != nil {
-		return c
-	}
-	for _, item := range doc.Nftables {
-		if item.Counter == nil || item.Counter.Table != TableName {
-			continue
-		}
-		switch item.Counter.Name {
-		case "sig_bt":
-			c.Handshakes = item.Counter.Packets
-		case "sig_dht":
-			c.DHT = item.Counter.Packets
-		case "sig_tracker":
-			c.Trackers = item.Counter.Packets
-		case "sig_utp":
-			c.UTP = item.Counter.Packets
-		case "learned":
-			c.Learned = item.Counter.Packets
-		case "peer_hit":
-			c.PeerDrops = item.Counter.Packets
-		case "ban_hit":
-			c.TunnelBans = item.Counter.Packets
-		}
-	}
-	return c
+	st := m.t.State()
+	p := st.Packets
+	return Status{Supported: st.Supported, NftInstalled: st.NftInstalled, Active: st.Active, Counters: Counters{
+		Handshakes: p["sig_bt"], DHT: p["sig_dht"], Trackers: p["sig_tracker"], UTP: p["sig_utp"],
+		Learned: p["learned"], PeerDrops: p["peer_hit"], TunnelBans: p["ban_hit"],
+	}}
 }

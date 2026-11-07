@@ -4,20 +4,17 @@ package egressfilter
 
 import (
 	"cmp"
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/netip"
-	"os/exec"
-	"runtime"
 	"slices"
 	"strconv"
 	"strings"
 	"sync"
-	"time"
+
+	"github.com/mhsanaei/3x-ui/v3/internal/nfttable"
 )
 
 // TableName is the inet table the panel owns; nothing else is ever touched.
@@ -31,13 +28,6 @@ const DNSPort = 53
 
 // MaxCustomEntries caps the custom list so a pasted blocklist cannot bloat every config.
 const MaxCustomEntries = 256
-
-const commandTimeout = 10 * time.Second
-
-var (
-	ErrUnsupported = errors.New("nftables filtering needs Linux")
-	ErrNftMissing  = errors.New("nft is not installed")
-)
 
 // SMTPPorts is server-to-server mail: what spam from a VPN client uses.
 var SMTPPorts = []PortRange{{25, 25}}
@@ -445,11 +435,6 @@ func Ruleset(spec Spec) (string, error) {
 	return b.String(), nil
 }
 
-// removal deletes the table and succeeds when it is already gone.
-func removal() string {
-	return fmt.Sprintf("add table inet %s\ndelete table inet %s\n", TableName, TableName)
-}
-
 // Counters are packet counts since the table was last loaded.
 type Counters struct {
 	Mail    uint64 `json:"mail"`
@@ -466,60 +451,22 @@ type Status struct {
 	Counters     Counters `json:"counters"`
 }
 
-// runner abstracts the host so the manager is testable off Linux.
-type runner interface {
-	lookPath(name string) error
-	run(stdin string, args ...string) (string, error)
-}
-
-type osRunner struct{}
-
-func (osRunner) lookPath(name string) error {
-	_, err := exec.LookPath(name)
-	return err
-}
-
-func (osRunner) run(stdin string, args ...string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), commandTimeout)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, "nft", args...)
-	if stdin != "" {
-		cmd.Stdin = strings.NewReader(stdin)
-	}
-	out, err := cmd.CombinedOutput()
-	return strings.TrimSpace(string(out)), err
-}
-
 // Manager applies and removes the table; safe for concurrent use.
 type Manager struct {
-	mu   sync.Mutex
-	r    runner
-	goos string
+	mu sync.Mutex
+	t  *nfttable.Table
 	// loaded is the ruleset this process last loaded, so Ensure only reloads on change.
 	loaded string
 }
 
-var defaultManager = &Manager{r: osRunner{}, goos: runtime.GOOS}
+func newManager(r nfttable.Runner, goos string) *Manager {
+	return &Manager{t: &nfttable.Table{Name: TableName, R: r, GOOS: goos}}
+}
+
+var defaultManager = &Manager{t: nfttable.New(TableName)}
 
 // Default is the manager for the real host.
 func Default() *Manager { return defaultManager }
-
-func (m *Manager) usable() error {
-	if m.goos != "linux" {
-		return ErrUnsupported
-	}
-	if m.r.lookPath("nft") != nil {
-		return ErrNftMissing
-	}
-	return nil
-}
-
-func (m *Manager) nft(tx string) error {
-	if out, err := m.r.run(tx, "-f", "-"); err != nil {
-		return fmt.Errorf("nft: %w: %s", err, out)
-	}
-	return nil
-}
 
 // Apply loads the table for spec, replacing any previous copy, or removes it when the
 // spec blocks nothing for kernel-forwarded clients.
@@ -530,18 +477,18 @@ func (m *Manager) Apply(spec Spec) error {
 }
 
 func (m *Manager) applyLocked(spec Spec) error {
-	if err := m.usable(); err != nil {
+	if err := m.t.Usable(); err != nil {
 		return err
 	}
 	if !spec.Needed() {
 		m.loaded = ""
-		return m.nft(removal())
+		return m.t.Remove()
 	}
 	tx, err := Ruleset(spec)
 	if err != nil {
 		return err
 	}
-	if err := m.nft(tx); err != nil {
+	if err := m.t.Load(tx); err != nil {
 		return err
 	}
 	m.loaded = tx
@@ -553,7 +500,7 @@ func (m *Manager) applyLocked(spec Spec) error {
 func (m *Manager) Ensure(spec Spec) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if err := m.usable(); err != nil {
+	if err := m.t.Usable(); err != nil {
 		return err
 	}
 	if spec.Needed() {
@@ -561,7 +508,7 @@ func (m *Manager) Ensure(spec Spec) error {
 		if err != nil {
 			return err
 		}
-		if tx == m.loaded && m.present() {
+		if tx == m.loaded && m.t.Present() {
 			return nil
 		}
 	}
@@ -573,66 +520,15 @@ func (m *Manager) Remove() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.loaded = ""
-	if m.usable() != nil {
-		return nil
-	}
-	return m.nft(removal())
-}
-
-func (m *Manager) present() bool {
-	_, err := m.r.run("", "list", "table", "inet", TableName)
-	return err == nil
+	return m.t.Remove()
 }
 
 // Status reports whether the table is loaded and what it has refused.
 func (m *Manager) Status() Status {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	st := Status{Supported: m.goos == "linux"}
-	if !st.Supported {
-		return st
-	}
-	st.NftInstalled = m.r.lookPath("nft") == nil
-	if !st.NftInstalled {
-		return st
-	}
-	out, err := m.r.run("", "-j", "list", "counters", "table", "inet", TableName)
-	if err != nil {
-		return st
-	}
-	st.Active = true
-	st.Counters = parseCounters(out)
-	return st
-}
-
-func parseCounters(out string) Counters {
-	var doc struct {
-		Nftables []struct {
-			Counter *struct {
-				Name    string `json:"name"`
-				Table   string `json:"table"`
-				Packets uint64 `json:"packets"`
-			} `json:"counter"`
-		} `json:"nftables"`
-	}
-	var c Counters
-	if json.Unmarshal([]byte(out), &doc) != nil {
-		return c
-	}
-	for _, item := range doc.Nftables {
-		if item.Counter == nil || item.Counter.Table != TableName {
-			continue
-		}
-		switch item.Counter.Name {
-		case "mail":
-			c.Mail = item.Counter.Packets
-		case "private":
-			c.Private = item.Counter.Packets
-		case "server":
-			c.Server = item.Counter.Packets
-		case "custom":
-			c.Custom = item.Counter.Packets
-		}
-	}
-	return c
+	st := m.t.State()
+	return Status{Supported: st.Supported, NftInstalled: st.NftInstalled, Active: st.Active, Counters: Counters{
+		Mail: st.Packets["mail"], Private: st.Packets["private"], Server: st.Packets["server"], Custom: st.Packets["custom"],
+	}}
 }
