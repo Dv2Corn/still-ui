@@ -510,12 +510,12 @@ for script in "$INSTALL_SH" "$UPDATE_SH"; do
         local dest="$xui_service/still-ui.service"
         echo old > "$dest"
         : > "$R/empty"
-        _install_xui_service_unit "$R/empty" false && { echo "an empty unit was installed"; return 1; }
-        _install_xui_service_unit "$R/missing" false && { echo "a missing unit was installed"; return 1; }
+        _install_xui_service_unit "$R/empty" && { echo "an empty unit was installed"; return 1; }
+        _install_xui_service_unit "$R/missing" && { echo "a missing unit was installed"; return 1; }
         eq "$(cat "$dest")" old "(unit replaced by a failed copy)"
         not_called paths-dropin
         cp "$UNIT_DIR/x-ui.service.debian" "$R/new.service"
-        _install_xui_service_unit "$R/new.service" false || return 1
+        _install_xui_service_unit "$R/new.service" || return 1
         cmp "$UNIT_DIR/x-ui.service.debian" "$dest" || return 1
         called paths-dropin
         called memory-dropin
