@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -54,14 +55,62 @@ func TestRestartXrayClearsTheRefusalOnceTheCoreRunsTheDesiredConfig(t *testing.T
 	}
 }
 
+// saveXrayState puts the package's core state back after a test that changes it.
+func saveXrayState(t *testing.T) {
+	t.Helper()
+	xrayState.mu.Lock()
+	process, result, heldBack, refused, refusedErr := xrayState.process, xrayState.result, xrayState.heldBack, xrayState.refused, xrayState.refusedErr
+	xrayState.mu.Unlock()
+	t.Cleanup(func() {
+		xrayState.mu.Lock()
+		xrayState.process, xrayState.result, xrayState.heldBack, xrayState.refused, xrayState.refusedErr = process, result, heldBack, refused, refusedErr
+		xrayState.mu.Unlock()
+	})
+}
+
 // Config A was refused, then B started; going back to A skipped the retry and
 // returned A's old refusal while the core served B.
 func TestStartingACoreForgetsTheLastRefusal(t *testing.T) {
-	var state xrayLifecycle
+	setupConflictDB(t)
+	bin := t.TempDir()
+	t.Setenv("XUI_BIN_FOLDER", bin)
+	t.Setenv("XUI_LOG_FOLDER", t.TempDir())
+	script := "#!/bin/sh\n[ \"$1\" = -version ] && { echo 'Xray 26.1.1 x'; exit 0; }\nexec sleep 120\n"
+	if err := os.WriteFile(filepath.Join(bin, xray.GetBinaryName()), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	saveXrayState(t)
+	previousStopped := isManuallyStopped.Load()
+	t.Cleanup(func() {
+		if process := currentXrayProcess(); process != nil {
+			_ = process.Stop()
+		}
+		isManuallyStopped.Store(previousStopped)
+	})
+
+	xrayState.refuse(&xray.Config{LogConfig: []byte(`{"loglevel":"warning"}`)}, xray.ErrConfigRejected)
+	if err := (&XrayService{}).RestartXray(true); err != nil {
+		t.Fatalf("RestartXray: %v", err)
+	}
+	if cfg, err := xrayState.lastRefused(); cfg != nil || err != nil {
+		t.Fatalf("after a requested config started, lastRefused = %v, %v; want nil, nil", cfg, err)
+	}
+}
+
+// Re-adopting the core systemd restarted with the last good config dropped the
+// refusal, so the next reconcile retried the refused config and cut clients off again.
+func TestReadoptAfterACrashKeepsTheRefusal(t *testing.T) {
+	saveXrayState(t)
+	previousReadopt := readoptRestartedUnit
+	readoptRestartedUnit = func() *xray.Process { return xray.NewProcess(&xray.Config{}) }
+	t.Cleanup(func() { readoptRestartedUnit = previousReadopt })
+
 	refusedCfg := &xray.Config{LogConfig: []byte(`{"loglevel":"warning"}`)}
-	state.refuse(refusedCfg, xray.ErrConfigRejected)
-	state.replace(xray.NewProcess(&xray.Config{}))
-	if cfg, err := state.lastRefused(); cfg != nil || err != nil {
-		t.Fatalf("after another core started, lastRefused = %v, %v; want nil, nil", cfg, err)
+	xrayState.refuse(refusedCfg, xray.ErrConfigRejected)
+	if !(&XrayService{}).readoptXrayUnit() {
+		t.Fatal("readoptXrayUnit did not take the restarted core")
+	}
+	if cfg, err := xrayState.lastRefused(); cfg != refusedCfg || !errors.Is(err, xray.ErrConfigRejected) {
+		t.Fatalf("after re-adopting a restarted core, lastRefused = %v, %v; want the refused config", cfg, err)
 	}
 }
