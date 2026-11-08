@@ -19,6 +19,28 @@ The name says what we are after: a server you set up once and then leave alone.
 > [!IMPORTANT]
 > still-ui is an independent fork. It is not affiliated with or endorsed by the 3x-ui authors. Please report still-ui problems here, not upstream.
 
+## Why switch
+
+| In 3x-ui 3.11.0 | In still-ui |
+| --- | --- |
+| Since Xray 26.9 the server refuses the `ios` fingerprint and every sing-box client (Hiddify, Karing) ([3x-ui#6596](https://github.com/MHSanaei/3x-ui/issues/6596), [3x-ui#6727](https://github.com/MHSanaei/3x-ui/issues/6727), [Xray-core#7259](https://github.com/XTLS/Xray-core/issues/7259)) | a patched Xray build accepts them again ([details](#what-is-different)) |
+| Restarting or updating the panel drops every client | Xray runs as its own service, so a panel restart does not drop Xray clients (AmneziaWG, MTProto and TUIC clients still reconnect; Docker keeps Xray inside the panel) |
+| Panel memory grows under AmneziaWG traffic; a runaway panel can push a small server into swap | buffers are reused (403 → 176 MiB under load) and the panel has a memory cap |
+| The Telegram bot sends the database unencrypted | backups are encrypted to your key (the private key never touches the server), kept on a schedule, `still-ui restore` puts one back |
+| The Telegram bot reports an Xray crash, high CPU and high memory | it also warns when Xray keeps restarting, the disk is full, a certificate is about to expire or a backup failed |
+
+Try it on a running 3x-ui — one command moves it over and checks that panel, inbounds, clients and subscriptions are the same ([what it does](#moving-from-3x-ui)):
+
+```bash
+bash <(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh) migrate
+```
+
+and one command brings 3x-ui back:
+
+```bash
+still-ui migrate-rollback
+```
+
 ## What is different
 
 ### Already done
@@ -75,7 +97,7 @@ STILL_UI_ARCHIVE=/path/still-ui-linux-amd64.tar.gz bash install.sh
 
 The installer generates a random username, password and panel path and prints them at the end — save them. After that, run `still-ui` to open the management menu: start and stop the service, show or reset the login, change the port, manage certificates and so on. The subcommands are the same as in 3x-ui's `x-ui` script (`still-ui start`, `stop`, `restart`, `status`, `log`, `update`, `legacy`, `uninstall` and others).
 
-Release builds exist for **Linux amd64 and arm64** only. The current release is still-ui **1.4.0**, based on 3x-ui 3.11.0 and the fixes merged after it, with **Xray v26.10.31** in still-ui's own build ([what differs](scripts/xray-build/README.md)).
+Release builds exist for **Linux amd64 and arm64** only. The current release is still-ui **1.6.0**, based on 3x-ui 3.11.0 and the fixes merged after it, with **Xray v26.10.31** in still-ui's own build ([what differs](scripts/xray-build/README.md)).
 
 ### Where things live
 
