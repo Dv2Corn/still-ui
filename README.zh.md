@@ -19,6 +19,28 @@
 > [!IMPORTANT]
 > still-ui 是一个独立分支，与 3x-ui 的作者没有任何关联，也未获得其背书。still-ui 的问题请在本仓库反馈，不要提交到 3x-ui。
 
+## 为什么选择 still-ui
+
+| 在 3x-ui 3.11.0 中 | 在 still-ui 中 |
+| --- | --- |
+| 自 Xray 26.9 起，服务端拒绝 `ios` 指纹和所有 sing-box 客户端（Hiddify、Karing）([3x-ui#6596](https://github.com/MHSanaei/3x-ui/issues/6596)、[3x-ui#6727](https://github.com/MHSanaei/3x-ui/issues/6727)、[Xray-core#7259](https://github.com/XTLS/Xray-core/issues/7259)) | 打过补丁的 Xray 构建重新接受它们（[详情](#有什么不同)） |
+| 重启或升级面板会断开所有客户端 | Xray 作为独立服务运行，重启面板不会断开 Xray 客户端（AmneziaWG、MTProto 和 TUIC 客户端仍会重连；Docker 中 Xray 仍在面板内部） |
+| 面板内存随 AmneziaWG 流量增长，失控的面板可能把小服务器拖进 swap | 缓冲区被复用（负载下 403 → 176 MiB），面板有内存上限 |
+| Telegram 机器人发送未加密的数据库 | 备份用你的密钥加密（私钥从不放在服务器上），按计划保留，`still-ui restore` 可恢复任意一份 |
+| Telegram 机器人会报告 Xray 崩溃、CPU 高负载和内存过高 | 还会在 Xray 反复重启、磁盘已满、证书即将过期或备份失败时告警 |
+
+在正在运行的 3x-ui 上试试：一条命令完成迁移，并检查面板、入站、客户端和订阅是否保持不变（[具体做了什么](#从-3x-ui-迁移)）：
+
+```bash
+bash <(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh) migrate
+```
+
+一条命令即可回到 3x-ui：
+
+```bash
+still-ui migrate-rollback
+```
+
 ## 有什么不同
 
 ### 已完成
