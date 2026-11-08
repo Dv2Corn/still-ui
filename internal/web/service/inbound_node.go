@@ -1077,7 +1077,8 @@ func (s *InboundService) setRemoteTrafficLocked(nodeID int, snap *runtime.Traffi
 		// usage grows exactly by what the stored baseline moves past.
 		advanceBaseline := func(email string, canon nodeTrafficCounter) error {
 			if base, seen := nodeBaselines[email]; seen && ownInbound {
-				nodeOwnUsed = addTrafficClamped(addTrafficClamped(nodeOwnUsed, canon.Up-base.Up), canon.Down-base.Down)
+				// A counter reset moves it back; that never subtracts.
+				nodeOwnUsed = clampedTrafficAdd(clampedTrafficAdd(nodeOwnUsed, max(canon.Up-base.Up, 0)), max(canon.Down-base.Down, 0))
 			}
 			if err := s.upsertNodeBaseline(tx, nodeID, email, canon.Up, canon.Down); err != nil {
 				return err

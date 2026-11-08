@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -62,11 +61,11 @@ const (
 // invitation token opens only this route and nothing under /panel/api.
 type NodeEnrollAgentController struct {
 	enrollService service.NodeEnrollService
-	limiter       *nodeEnrollLimiter
+	limiter       *agentLimiter
 }
 
 func NewNodeEnrollAgentController(g *gin.RouterGroup) *NodeEnrollAgentController {
-	a := &NodeEnrollAgentController{limiter: newNodeEnrollLimiter(time.Now)}
+	a := &NodeEnrollAgentController{limiter: newAgentLimiter(time.Now, nodeEnrollFailuresPerIP, nodeEnrollRequestsPerInvite)}
 	g.GET("/node", a.check)
 	g.POST("/node", a.enroll)
 	return a
@@ -78,28 +77,29 @@ func enrollError(c *gin.Context, status int, msg string) {
 
 // authorize checks the token before the per-address limit, as the probe agents
 // do: only failures count, so others behind one address never block a valid one.
-func (a *NodeEnrollAgentController) authorize(c *gin.Context) (string, bool) {
+// It returns the token and the invitation check that check answers with.
+func (a *NodeEnrollAgentController) authorize(c *gin.Context) (string, *nodeenroll.CheckResponse, bool) {
 	c.Header("Cache-Control", "no-store")
 	ip := getRemoteIp(c)
 	token, _ := strings.CutPrefix(c.GetHeader("Authorization"), "Bearer ")
-	_, row, err := a.enrollService.CheckInvite(token)
+	resp, row, err := a.enrollService.CheckInvite(token)
 	if err != nil {
 		if service.NodeEnrollHTTPStatus(err) == http.StatusUnauthorized {
 			blocked := !a.limiter.allowIP(ip)
 			a.limiter.failIP(ip)
 			if blocked {
 				enrollError(c, http.StatusTooManyRequests, "too many failed attempts")
-				return "", false
+				return "", nil, false
 			}
 		}
 		a.fail(c, err)
-		return "", false
+		return "", nil, false
 	}
-	if !a.limiter.allowInvite(row.Id) {
+	if !a.limiter.allowKey(row.Id) {
 		enrollError(c, http.StatusTooManyRequests, "too many requests")
-		return "", false
+		return "", nil, false
 	}
-	return token, true
+	return token, resp, true
 }
 
 func (a *NodeEnrollAgentController) fail(c *gin.Context, err error) {
@@ -113,20 +113,15 @@ func (a *NodeEnrollAgentController) fail(c *gin.Context, err error) {
 }
 
 func (a *NodeEnrollAgentController) check(c *gin.Context) {
-	token, ok := a.authorize(c)
+	_, resp, ok := a.authorize(c)
 	if !ok {
-		return
-	}
-	resp, _, err := a.enrollService.CheckInvite(token)
-	if err != nil {
-		a.fail(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, resp)
 }
 
 func (a *NodeEnrollAgentController) enroll(c *gin.Context) {
-	token, ok := a.authorize(c)
+	token, _, ok := a.authorize(c)
 	if !ok {
 		return
 	}
@@ -151,43 +146,4 @@ func (a *NodeEnrollAgentController) enroll(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, resp)
-}
-
-// nodeEnrollLimiter counts failed token checks per address and requests per
-// invitation in fixed windows; both maps are bounded.
-type nodeEnrollLimiter struct {
-	mu        sync.Mutex
-	now       func() time.Time
-	ipFails   map[string]*reachWindow
-	inviteReq map[int]*reachWindow
-}
-
-func newNodeEnrollLimiter(now func() time.Time) *nodeEnrollLimiter {
-	return &nodeEnrollLimiter{now: now, ipFails: map[string]*reachWindow{}, inviteReq: map[int]*reachWindow{}}
-}
-
-func (l *nodeEnrollLimiter) allowIP(ip string) bool {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	w := l.ipFails[ip]
-	return w == nil || l.now().Sub(w.start) >= reachAgentWindow || w.count < nodeEnrollFailuresPerIP
-}
-
-func (l *nodeEnrollLimiter) failIP(ip string) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	if w := windowFor(l.ipFails, ip, l.now()); w != nil {
-		w.count++
-	}
-}
-
-func (l *nodeEnrollLimiter) allowInvite(id int) bool {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	w := windowFor(l.inviteReq, id, l.now())
-	if w == nil {
-		return false
-	}
-	w.count++
-	return w.count <= nodeEnrollRequestsPerInvite
 }

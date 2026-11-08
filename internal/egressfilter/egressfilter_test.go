@@ -5,45 +5,10 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/mhsanaei/3x-ui/v3/internal/nfttable"
+	"github.com/mhsanaei/3x-ui/v3/internal/nfttable/nfttest"
 )
-
-type fakeRunner struct {
-	noNft    bool
-	tableUp  bool
-	counters string
-	applyErr error
-	loads    []string
-	removed  int
-}
-
-func (f *fakeRunner) lookPath(string) error {
-	if f.noNft {
-		return errors.New("not found")
-	}
-	return nil
-}
-
-func (f *fakeRunner) run(stdin string, args ...string) (string, error) {
-	switch {
-	case strings.Join(args, " ") == "-f -" && strings.Contains(stdin, "table inet "+TableName+" {"):
-		if f.applyErr != nil {
-			return "Error: syntax error", f.applyErr
-		}
-		f.loads = append(f.loads, stdin)
-		f.tableUp = true
-	case strings.Join(args, " ") == "-f -":
-		f.removed++
-		f.tableUp = false
-	case args[0] == "list" || args[0] == "-j":
-		if !f.tableUp {
-			return "Error: No such file or directory", errors.New("exit status 1")
-		}
-		if args[0] == "-j" {
-			return f.counters, nil
-		}
-	}
-	return "", nil
-}
 
 func TestParseCustomCanonicalizes(t *testing.T) {
 	c, err := ParseCustom([]string{
@@ -223,36 +188,36 @@ func TestRulesetLeavesOutWhatIsOff(t *testing.T) {
 
 func TestManagerRefusesWhereNftCannotRun(t *testing.T) {
 	spec := Spec{Filter: Filter{SMTP: true}}
-	if err := (&Manager{r: &fakeRunner{}, goos: "darwin"}).Apply(spec); !errors.Is(err, ErrUnsupported) {
+	if err := newManager(&nfttest.Runner{}, "darwin").Apply(spec); !errors.Is(err, nfttable.ErrUnsupported) {
 		t.Fatalf("darwin: %v", err)
 	}
-	if err := (&Manager{r: &fakeRunner{noNft: true}, goos: "linux"}).Apply(spec); !errors.Is(err, ErrNftMissing) {
+	if err := newManager(&nfttest.Runner{NoNft: true}, "linux").Apply(spec); !errors.Is(err, nfttable.ErrNftMissing) {
 		t.Fatalf("no nft: %v", err)
 	}
-	if err := (&Manager{r: &fakeRunner{noNft: true}, goos: "linux"}).Remove(); err != nil {
+	if err := newManager(&nfttest.Runner{NoNft: true}, "linux").Remove(); err != nil {
 		t.Fatalf("Remove without nft: %v", err)
 	}
 }
 
 func TestManagerEnsureReloadsOnlyWhenNeeded(t *testing.T) {
-	r := &fakeRunner{}
-	m := &Manager{r: r, goos: "linux"}
+	r := &nfttest.Runner{}
+	m := newManager(r, "linux")
 	spec := Spec{Filter: Filter{SMTP: true}}
-	if err := m.Ensure(spec); err != nil || len(r.loads) != 1 {
-		t.Fatalf("first Ensure: loads %d, %v", len(r.loads), err)
+	if err := m.Ensure(spec); err != nil || len(r.Loads) != 1 {
+		t.Fatalf("first Ensure: loads %d, %v", len(r.Loads), err)
 	}
-	if err := m.Ensure(spec); err != nil || len(r.loads) != 1 {
-		t.Fatalf("unchanged Ensure reloaded: loads %d, %v", len(r.loads), err)
+	if err := m.Ensure(spec); err != nil || len(r.Loads) != 1 {
+		t.Fatalf("unchanged Ensure reloaded: loads %d, %v", len(r.Loads), err)
 	}
-	r.tableUp = false // a foreign "nft flush ruleset"
-	if err := m.Ensure(spec); err != nil || len(r.loads) != 2 {
-		t.Fatalf("Ensure after a flush: loads %d, %v", len(r.loads), err)
+	r.TableUp = false // a foreign "nft flush ruleset"
+	if err := m.Ensure(spec); err != nil || len(r.Loads) != 2 {
+		t.Fatalf("Ensure after a flush: loads %d, %v", len(r.Loads), err)
 	}
 	spec.Filter.MailSubmission = true
-	if err := m.Ensure(spec); err != nil || len(r.loads) != 3 || !strings.Contains(r.loads[2], "587") {
-		t.Fatalf("Ensure after a change: loads %d, %v", len(r.loads), err)
+	if err := m.Ensure(spec); err != nil || len(r.Loads) != 3 || !strings.Contains(r.Loads[2], "587") {
+		t.Fatalf("Ensure after a change: loads %d, %v", len(r.Loads), err)
 	}
-	if err := m.Ensure(Spec{}); err != nil || r.tableUp {
+	if err := m.Ensure(Spec{}); err != nil || r.TableUp {
 		t.Fatalf("Ensure with nothing to block kept the table: %v", err)
 	}
 	if err := m.Apply(Spec{}); err != nil {
@@ -261,32 +226,32 @@ func TestManagerEnsureReloadsOnlyWhenNeeded(t *testing.T) {
 }
 
 func TestManagerApplyFailureIsReported(t *testing.T) {
-	r := &fakeRunner{applyErr: errors.New("exit status 1")}
-	m := &Manager{r: r, goos: "linux"}
+	r := &nfttest.Runner{ApplyErr: errors.New("exit status 1")}
+	m := newManager(r, "linux")
 	err := m.Apply(Spec{Filter: Filter{Private: true}})
 	if err == nil || !strings.Contains(err.Error(), "syntax error") {
 		t.Fatalf("Apply error = %v", err)
 	}
-	r.applyErr = nil
-	if err := m.Ensure(Spec{Filter: Filter{Private: true}}); err != nil || len(r.loads) != 1 {
+	r.ApplyErr = nil
+	if err := m.Ensure(Spec{Filter: Filter{Private: true}}); err != nil || len(r.Loads) != 1 {
 		t.Fatalf("Ensure after a failed Apply did not retry: %v", err)
 	}
 }
 
 func TestStatusCounters(t *testing.T) {
-	r := &fakeRunner{tableUp: true, counters: `{"nftables":[{"metainfo":{}},
+	r := &nfttest.Runner{TableUp: true, Counters: `{"nftables":[{"metainfo":{}},
 		{"counter":{"family":"inet","name":"mail","table":"` + TableName + `","packets":7,"bytes":420}},
 		{"counter":{"family":"inet","name":"private","table":"` + TableName + `","packets":3}},
 		{"counter":{"family":"inet","name":"server","table":"` + TableName + `","packets":2}},
 		{"counter":{"family":"inet","name":"custom","table":"` + TableName + `","packets":1}},
 		{"counter":{"family":"inet","name":"mail","table":"other","packets":99}}]}`}
-	st := (&Manager{r: r, goos: "linux"}).Status()
+	st := newManager(r, "linux").Status()
 	want := Status{Supported: true, NftInstalled: true, Active: true, Counters: Counters{Mail: 7, Private: 3, Server: 2, Custom: 1}}
 	if st != want {
 		t.Fatalf("Status = %+v, want %+v", st, want)
 	}
-	r.tableUp = false
-	if st := (&Manager{r: r, goos: "linux"}).Status(); st.Active {
+	r.TableUp = false
+	if st := newManager(r, "linux").Status(); st.Active {
 		t.Fatal("Active without a table")
 	}
 }

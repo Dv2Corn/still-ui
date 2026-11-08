@@ -3,12 +3,22 @@ package service
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
+	"math/big"
+	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/database"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
@@ -155,6 +165,67 @@ func TestNodeEnrollAddsThePinnedNodeAndSpendsTheToken(t *testing.T) {
 	views, _ := f.svc.ListInvites()
 	if views[0].Status != "used" || views[0].UsedFromIp != "203.0.113.7" || views[0].NodeId != resp.NodeId {
 		t.Fatalf("audit row %+v", views[0])
+	}
+}
+
+// The version a node reports is cut to 32 characters, never inside one.
+func TestNodeEnrollRemarkKeepsAWholeVersion(t *testing.T) {
+	f := newEnrollFixture(t)
+	_, inv := f.invite(t, NodeInviteInput{})
+	req := goodRequest()
+	req.PanelVersion = strings.Repeat("в", 40)
+	resp, err := f.svc.Enroll(context.Background(), inv.Token, req, "203.0.113.7")
+	if err != nil {
+		t.Fatalf("Enroll: %v", err)
+	}
+	n, err := (&NodeService{}).GetById(resp.NodeId)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !utf8.ValidString(n.Remark) || !strings.HasSuffix(n.Remark, ", still-ui "+strings.Repeat("в", 32)) {
+		t.Fatalf("remark %q: want the first 32 characters of the version", n.Remark)
+	}
+}
+
+// The panel's certificate file may hold the key first; the pin comes from the certificate after it.
+func TestReadMasterKeyPinSkipsAKeyBeforeTheCertificate(t *testing.T) {
+	setupBulkDB(t)
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmpl := &x509.Certificate{SerialNumber: big.NewInt(1), NotBefore: time.Now(), NotAfter: time.Now().Add(time.Hour)}
+	certDER, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyDER, err := x509.MarshalPKCS8PrivateKey(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pemData := append(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyDER}),
+		pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})...)
+	path := filepath.Join(t.TempDir(), "panel.pem")
+	if err := os.WriteFile(path, pemData, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := (&SettingService{}).SetCertFile(path); err != nil {
+		t.Fatal(err)
+	}
+	// Nothing listens at the master URL, so the pin is read from the file.
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := ln.Addr().String()
+	_ = ln.Close()
+	leaf, err := x509.ParseCertificate(certDER)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pin, err := readMasterKeyPin(context.Background(), "https://"+addr+"/")
+	if err != nil || !bytes.Equal(pin, nodeenroll.KeyPin(leaf)) {
+		t.Fatalf("pin %x, %v: want the key pin of the certificate after the key", pin, err)
 	}
 }
 

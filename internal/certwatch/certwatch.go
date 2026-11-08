@@ -11,7 +11,6 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
-	"encoding/pem"
 	"errors"
 	"fmt"
 	"net"
@@ -24,6 +23,7 @@ import (
 
 	"github.com/quic-go/quic-go"
 
+	"github.com/mhsanaei/3x-ui/v3/internal/health"
 	"github.com/mhsanaei/3x-ui/v3/internal/xray"
 )
 
@@ -175,16 +175,11 @@ func readLeaf(path string) (*x509.Certificate, error) {
 	if err != nil {
 		return nil, err
 	}
-	for {
-		var block *pem.Block
-		block, data = pem.Decode(data)
-		if block == nil {
-			return nil, errors.New("no certificate in " + path)
-		}
-		if block.Type == "CERTIFICATE" {
-			return x509.ParseCertificate(block.Bytes)
-		}
+	cert, err := health.ParseCertificate(data)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", path, err)
 	}
+	return cert, nil
 }
 
 // probe completes a handshake with the inbound and returns the leaf it answered with; the
@@ -290,7 +285,7 @@ func (w *Watcher) Check(ctx context.Context, targets []Target, now time.Time) (s
 			}
 		case !now.Before(served.NotAfter):
 			st.State = StateExpired
-		case served.NotAfter.Sub(now) < expiringWithin(served):
+		case served.NotAfter.Sub(now) < health.CertWarnWithin(served.NotBefore, served.NotAfter, 7):
 			st.State = StateExpiring
 		default:
 			st.State = StateOK
@@ -373,13 +368,6 @@ func sameNames(a, b *x509.Certificate) bool {
 		return slices.Compact(out)
 	}
 	return slices.Equal(names(a), names(b))
-}
-
-// expiringWithin warns a week ahead, or at a quarter of the lifetime for short-lived
-// certificates (6-day ones on an IP are renewed with about two days left).
-func expiringWithin(cert *x509.Certificate) time.Duration {
-	quarter := cert.NotAfter.Sub(cert.NotBefore) / 4
-	return min(7*24*time.Hour, quarter)
 }
 
 // Statuses returns the latest check results.

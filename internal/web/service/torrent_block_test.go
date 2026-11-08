@@ -8,6 +8,7 @@ import (
 
 	"github.com/mhsanaei/3x-ui/v3/internal/database"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
+	"github.com/mhsanaei/3x-ui/v3/internal/nfttable"
 	"github.com/mhsanaei/3x-ui/v3/internal/torrentblock"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/json_util"
 	"github.com/mhsanaei/3x-ui/v3/internal/xray"
@@ -163,12 +164,12 @@ func TestTorrentBlockService_HostErrorsDoNotBlockTheToggle(t *testing.T) {
 		t.Fatal("EnsureHostFilter touched nftables while the toggle is off")
 	}
 
-	fake.applyErr = torrentblock.ErrNftMissing
+	fake.applyErr = nfttable.ErrNftMissing
 	st, err := svc.SetEnabled(true)
 	if err != nil {
 		t.Fatalf("SetEnabled(true) = %v", err)
 	}
-	if !st.Enabled || !svc.Enabled() || st.Error != torrentblock.ErrNftMissing.Error() {
+	if !st.Enabled || !svc.Enabled() || st.Error != nfttable.ErrNftMissing.Error() {
 		t.Fatalf("status = %+v, want enabled with the nft error", st)
 	}
 

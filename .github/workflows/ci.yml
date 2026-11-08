@@ -365,7 +365,7 @@ jobs:
             scripts/still-release.sh scripts/still-sbom.sh scripts/xray-build/build.sh
           shellcheck --severity=style migrate.sh deploy/test/migrate-unit.sh scripts/test-migrate.sh
           shellcheck --severity=style scripts/still-probe-install.sh deploy/test/release-scripts.sh
-          shellcheck --severity=style deploy/test/installer-unit.sh deploy/test/installer-mutations.sh deploy/test/installer-e2e.sh
+          shellcheck --severity=style still-setup.sh deploy/test/installer-unit.sh deploy/test/installer-mutations.sh deploy/test/installer-e2e.sh
           shellcheck --severity=error install.sh update.sh x-ui.sh
       - name: Installer panel port regression tests
         run: bash deploy/test/installer-panel-port.sh

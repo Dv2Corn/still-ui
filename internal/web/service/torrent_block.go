@@ -48,25 +48,20 @@ type TorrentBlockService struct {
 // BitTorrent-looking answer from one of them is never learned as a peer.
 func (s *TorrentBlockService) protectedPorts() []uint16 {
 	var ports []uint16
-	add := func(p int) {
-		if p > 0 && p <= 65535 {
-			ports = append(ports, uint16(p))
-		}
-	}
 	if p, err := s.settingService.GetListenPort(); err == nil {
-		add(p)
+		ports = appendPort(ports, p)
 	}
 	if p, err := s.settingService.GetSubPort(); err == nil {
-		add(p)
+		ports = appendPort(ports, p)
 	}
 	if inbounds, err := s.inboundService.GetAllInbounds(); err == nil {
 		for _, in := range inbounds {
-			add(in.Port)
+			ports = appendPort(ports, in.Port)
 		}
 	}
 	if nodes, err := s.nodeService.GetAll(); err == nil {
 		for _, n := range nodes {
-			add(n.Port)
+			ports = appendPort(ports, n.Port)
 		}
 	}
 	return ports
@@ -102,7 +97,7 @@ func (s *TorrentBlockService) SetEnabled(on bool) (TorrentBlockStatus, error) {
 	} else {
 		err = torrentBlockHost.Remove()
 	}
-	recordTorrentBlockErr(err)
+	recordHostErr(&torrentBlockErr, "torrent block", err)
 	torrentBlockMu.Unlock()
 	return s.Status(), nil
 }
@@ -116,19 +111,7 @@ func (s *TorrentBlockService) EnsureHostFilter() {
 	protected := s.protectedPorts()
 	torrentBlockMu.Lock()
 	defer torrentBlockMu.Unlock()
-	recordTorrentBlockErr(torrentBlockHost.Ensure(protected))
-}
-
-// recordTorrentBlockErr keeps the last host error for the UI; caller holds torrentBlockMu.
-func recordTorrentBlockErr(err error) {
-	prev := torrentBlockErr
-	torrentBlockErr = ""
-	if err != nil {
-		torrentBlockErr = err.Error()
-		if torrentBlockErr != prev {
-			logger.Warning("torrent block: nftables filter not applied: ", err)
-		}
-	}
+	recordHostErr(&torrentBlockErr, "torrent block", torrentBlockHost.Ensure(protected))
 }
 
 // injectTorrentBlock routes sniffed BitTorrent to a blackhole ahead of every other rule
@@ -147,22 +130,9 @@ func injectTorrentBlock(cfg *xray.Config, clientInbounds map[string]struct{}) {
 		logger.Warning("torrent block: outbounds unreadable, skipping the Xray rule")
 		return
 	}
-	blackhole := ""
-	tags := map[string]bool{}
-	for _, o := range outbounds {
-		tag, _ := o["tag"].(string)
-		tags[tag] = true
-		if p, _ := o["protocol"].(string); p == "blackhole" && blackhole == "" && tag != "" {
-			blackhole = tag
-		}
-	}
-	if blackhole == "" {
-		blackhole = torrentBlockOutboundTag
-		for i := 2; tags[blackhole]; i++ {
-			blackhole = torrentBlockOutboundTag + "-" + strconv.Itoa(i)
-		}
-		outbounds = append(outbounds, map[string]any{"tag": blackhole, "protocol": "blackhole"})
-		raw, err := json.Marshal(outbounds)
+	blackhole, withBlackhole := ensureBlackholeOutbound(outbounds, torrentBlockOutboundTag)
+	if len(withBlackhole) != len(outbounds) {
+		raw, err := json.Marshal(withBlackhole)
 		if err != nil {
 			return
 		}

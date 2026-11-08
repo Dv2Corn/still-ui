@@ -43,7 +43,7 @@ mutate() {
 mutate_one() {
     local name="$1" files="$2" func="$3" from="$4" to="$5" expect="${6:-}" m out file failed
     m=$(mktemp -d "$work/m.XXXXXX")
-    cp "$repo_root"/{install.sh,update.sh,x-ui.sh,still-xray.service,x-ui.service.debian,x-ui.service.rhel,x-ui.service.arch} "$m/"
+    cp "$repo_root"/{install.sh,update.sh,still-setup.sh,x-ui.sh,still-xray.service,x-ui.service.debian,x-ui.service.rhel,x-ui.service.arch} "$m/"
     IFS=+ read -ra files <<< "$files"
     for file in "${files[@]}"; do
         if ! F="$func" A="$from" B="$to" perl -0777 -i -pe '
@@ -59,7 +59,7 @@ mutate_one() {
             return
         fi
     done
-    out=$(INSTALL_SH="$m/install.sh" UPDATE_SH="$m/update.sh" XUI_SH="$m/x-ui.sh" UNIT_DIR="$m" \
+    out=$(INSTALL_SH="$m/install.sh" UPDATE_SH="$m/update.sh" SETUP_SH="$m/still-setup.sh" XUI_SH="$m/x-ui.sh" UNIT_DIR="$m" \
         bash "$repo_root/deploy/test/installer-unit.sh" 2>&1)
     failed=$(grep '^FAIL ' <<< "$out" | sed 's/^FAIL //')
     if [[ -z "$expect" ]]; then
@@ -112,63 +112,61 @@ mutate "install: accept a foreign STILL_UI_ARCHIVE" install.sh install_x-ui \
     'install.sh: a STILL_UI_ARCHIVE that is not a still-ui archive is refused'
 
 # --- memory ceilings ------------------------------------------------------------
-mutate "install: panel MemoryMax 40% of RAM" install.sh+update.sh _still_memory_dropin 'mem_kb * 35 / 100' 'mem_kb * 40 / 100' \
-    'install.sh: panel MemoryMax is 35% of RAM (2 GiB RAM -> 716M, high 85%)'
-mutate "install: panel MemoryMax floor 128 MiB" install.sh+update.sh _still_memory_dropin \
+mutate "install: panel MemoryMax 40% of RAM" still-setup.sh _still_memory_dropin 'mem_kb * 35 / 100' 'mem_kb * 40 / 100' \
+    'still-setup.sh: panel MemoryMax is 35% of RAM (2 GiB RAM -> 716M, high 85%)'
+mutate "install: panel MemoryMax floor 128 MiB" still-setup.sh _still_memory_dropin \
     '((max_mb < 256)) && max_mb=256' '((max_mb < 128)) && max_mb=128' \
-    'install.sh: panel MemoryMax floors at 256 MiB (512 MiB RAM)'
-mutate "install: panel MemoryMax cap 2 GiB" install.sh+update.sh _still_memory_dropin \
+    'still-setup.sh: panel MemoryMax floors at 256 MiB (512 MiB RAM)'
+mutate "install: panel MemoryMax cap 2 GiB" still-setup.sh _still_memory_dropin \
     '((max_mb > 1024)) && max_mb=1024' '((max_mb > 2048)) && max_mb=2048' \
-    'install.sh: panel MemoryMax caps at 1 GiB (4 GiB RAM)'
-mutate "install: panel MemoryHigh 90%" install.sh+update.sh _still_memory_dropin 'max_mb * 85 / 100' 'max_mb * 90 / 100' \
+    'still-setup.sh: panel MemoryMax caps at 1 GiB (4 GiB RAM)'
+mutate "install: panel MemoryHigh 90%" still-setup.sh _still_memory_dropin 'max_mb * 85 / 100' 'max_mb * 90 / 100' \
     'panel MemoryMax is 35% of RAM (2 GiB RAM -> 716M, high 85%)'
-mutate "install: panel may swap" install.sh+update.sh _still_memory_dropin 'echo "MemorySwapMax=0"' ':' \
+mutate "install: panel may swap" still-setup.sh _still_memory_dropin 'echo "MemorySwapMax=0"' ':' \
     'panel MemoryMax is 35% of RAM (2 GiB RAM -> 716M, high 85%)'
-mutate "install: panel override ignored" install.sh+update.sh _still_memory_dropin 'max="$setting"' 'max="${max_mb}M"' \
-    'install.sh: STILL_UI_MEMORY_MAX from env file or environment, invalid ignored, off removes the drop-in'
-mutate "install: panel off keeps the drop-in" install.sh+update.sh _still_memory_dropin '        rm -f "$dropin"' '        :' \
-    'install.sh: STILL_UI_MEMORY_MAX from env file or environment, invalid ignored, off removes the drop-in'
-mutate "update: panel MemoryMax 40% of RAM (copy drifts)" update.sh _still_memory_dropin 'mem_kb * 35 / 100' 'mem_kb * 40 / 100' \
-    'install.sh and update.sh carry the same _still_memory_dropin'
-mutate "install: still-xray MemoryMax a third of RAM" install.sh+update.sh _still_xray_unit 'mem_kb / 2 / 1024' 'mem_kb / 3 / 1024' \
+mutate "install: panel override ignored" still-setup.sh _still_memory_dropin 'max="$setting"' 'max="${max_mb}M"' \
+    'still-setup.sh: STILL_UI_MEMORY_MAX from env file or environment, invalid ignored, off removes the drop-in'
+mutate "install: panel off keeps the drop-in" still-setup.sh _still_memory_dropin '        rm -f "$dropin"' '        :' \
+    'still-setup.sh: STILL_UI_MEMORY_MAX from env file or environment, invalid ignored, off removes the drop-in'
+mutate "install: still-xray MemoryMax a third of RAM" still-setup.sh _still_xray_unit 'mem_kb / 2 / 1024' 'mem_kb / 3 / 1024' \
     'still-xray MemoryMax is half the RAM (4 GiB -> 2048M)'
-mutate "install: still-xray MemoryMax cap 8 GiB" install.sh+update.sh _still_xray_unit \
+mutate "install: still-xray MemoryMax cap 8 GiB" still-setup.sh _still_xray_unit \
     '((max_mb > 4096)) && max_mb=4096' '((max_mb > 8192)) && max_mb=8192' \
-    'install.sh: still-xray MemoryMax caps at 4 GiB'
-mutate "install: still-xray GOMEMLIMIT 90%" install.sh+update.sh _still_xray_unit 'max_mb * 85 / 100' 'max_mb * 90 / 100' \
+    'still-setup.sh: still-xray MemoryMax caps at 4 GiB'
+mutate "install: still-xray GOMEMLIMIT 90%" still-setup.sh _still_xray_unit 'max_mb * 85 / 100' 'max_mb * 90 / 100' \
     'STILL_XRAY_MEMORY_MAX=1G sets 1024M'
 
 # --- still-xray unit decisions ----------------------------------------------------
-mutate "install: still-xray despite a refusing check" install.sh+update.sh _still_xray_unit '                setting=off
+mutate "install: still-xray despite a refusing check" still-setup.sh _still_xray_unit '                setting=off
                 ;;' '                setting=on
                 ;;' \
-    'install.sh: a config the unit cannot run keeps Xray in the panel and disables still-xray'
-mutate "install: still-xray without systemd" install.sh+update.sh _still_xray_unit \
+    'still-setup.sh: a config the unit cannot run keeps Xray in the panel and disables still-xray'
+mutate "install: still-xray without systemd" still-setup.sh _still_xray_unit \
     '[[ -d /run/systemd/system ]] || return 0' ':' \
-    'install.sh: without systemd as PID 1 nothing is written'
-mutate "install: CAP_NET_ADMIN not passed to the check" install.sh+update.sh _still_xray_unit '&& check_flags+=(-net-admin)' '&& :' \
-    'install.sh: the CAP_NET_ADMIN of the unit or a local drop-in is passed to xray-unit-check'
-mutate "install: the template's CAP_NET_ADMIN ignored" install.sh+update.sh _still_xray_unit \
+    'still-setup.sh: without systemd as PID 1 nothing is written'
+mutate "install: CAP_NET_ADMIN not passed to the check" still-setup.sh _still_xray_unit '&& check_flags+=(-net-admin)' '&& :' \
+    'still-setup.sh: the CAP_NET_ADMIN of the unit or a local drop-in is passed to xray-unit-check'
+mutate "install: the template's CAP_NET_ADMIN ignored" still-setup.sh _still_xray_unit \
     'grep -qs '"'"'^AmbientCapabilities=.*CAP_NET_ADMIN'"'"' "$template" "${xui_service}"' 'grep -qs '"'"'^AmbientCapabilities=.*CAP_NET_ADMIN'"'"' "${xui_service}"' \
-    'install.sh: the CAP_NET_ADMIN of the unit or a local drop-in is passed to xray-unit-check'
-mutate "install: PrivateDevices=no not passed to the check" install.sh+update.sh _still_xray_unit '            check_flags+=(-devices)' '            :' \
-    'install.sh: a PrivateDevices=no drop-in is passed as -devices when the check knows it'
-mutate "install: still-xray assets placeholder left" install.sh+update.sh _still_xray_unit '-e "s#@XRAY_ASSETS@#${bin_dir}#g"' '' \
-    'install.sh: auto mode moves Xray to still-xray when xray-unit-check passes'
-mutate "install: still-xray not disabled when refused" install.sh+update.sh _still_xray_unit \
+    'still-setup.sh: the CAP_NET_ADMIN of the unit or a local drop-in is passed to xray-unit-check'
+mutate "install: PrivateDevices=no not passed to the check" still-setup.sh _still_xray_unit '            check_flags+=(-devices)' '            :' \
+    'still-setup.sh: a PrivateDevices=no drop-in is passed as -devices when the check knows it'
+mutate "install: still-xray assets placeholder left" still-setup.sh _still_xray_unit '-e "s#@XRAY_ASSETS@#${bin_dir}#g"' '' \
+    'still-setup.sh: auto mode moves Xray to still-xray when xray-unit-check passes'
+mutate "install: still-xray not disabled when refused" still-setup.sh _still_xray_unit \
     'systemctl disable --now still-xray > /dev/null 2>&1' ':' \
-    'install.sh: a config the unit cannot run keeps Xray in the panel and disables still-xray'
-mutate "install: STILL_XRAY_UNIT=off ignored" install.sh+update.sh _still_xray_unit 'on | off | auto) ;;' 'on | auto) ;;
+    'still-setup.sh: a config the unit cannot run keeps Xray in the panel and disables still-xray'
+mutate "install: STILL_XRAY_UNIT=off ignored" still-setup.sh _still_xray_unit 'on | off | auto) ;;' 'on | auto) ;;
         off) setting=auto ;;' \
-    'install.sh: STILL_XRAY_UNIT=off/on (environment or env file) override the check'
+    'still-setup.sh: STILL_XRAY_UNIT=off/on (environment or env file) override the check'
 
 # --- env file, swap, import, result file ------------------------------------------
-mutate "install: env file edit misses 'export KEY='" install.sh+update.sh _still_env_set '\(export[[:space:]]\+\)\?' '' \
-    'install.sh: _still_env_set replaces the key (also with export/indent), keeps the rest, idempotent, empty drops it'
-mutate "install: new env file world-readable" install.sh+update.sh _still_env_set 'chmod 600 "$file"' 'chmod 644 "$file"' \
-    'install.sh: _still_env_set creates a missing env file 0600'
-mutate "install: empty value keeps the key" install.sh+update.sh _still_env_set '[[ -n "$value" ]] && printf' 'printf' \
-    'install.sh: _still_env_set replaces the key (also with export/indent), keeps the rest, idempotent, empty drops it'
+mutate "install: env file edit misses 'export KEY='" still-setup.sh _still_env_set '\(export[[:space:]]\+\)\?' '' \
+    'still-setup.sh: _still_env_set replaces the key (also with export/indent), keeps the rest, idempotent, empty drops it'
+mutate "install: new env file world-readable" still-setup.sh _still_env_set 'chmod 600 "$file"' 'chmod 644 "$file"' \
+    'still-setup.sh: _still_env_set creates a missing env file 0600'
+mutate "install: empty value keeps the key" still-setup.sh _still_env_set '[[ -n "$value" ]] && printf' 'printf' \
+    'still-setup.sh: _still_env_set replaces the key (also with export/indent), keeps the rest, idempotent, empty drops it'
 mutate "install: swap offered up to 4 GiB RAM" install.sh _still_swap_check '2 * 1024 * 1024 + 262144' '4 * 1024 * 1024' \
     'install.sh: no swap offer above 2 GiB RAM (+256 MiB slack)'
 mutate "install: swap created by default" install.sh _still_swap_check 'STILL_UI_CREATE_SWAP:-no' 'STILL_UI_CREATE_SWAP:-yes' \
