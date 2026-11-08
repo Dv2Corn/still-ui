@@ -728,6 +728,7 @@ make_archive() { # DIR [omit-file]
     printf 'xray new\n' > "$pkg/bin/xray-linux-amd64"
     cp "$UNIT_DIR/x-ui.service.debian" "$pkg/"
     printf '_still_xray_unit() { log_call xray-unit; }\n' > "$pkg/still-setup.sh"
+    [[ -z "${WITH_XRAY_UNIT:-}" ]] || cp "$UNIT_DIR/still-xray.service" "$pkg/"
     [[ -z "${2:-}" ]] || rm -f "$pkg/$2"
     tar -C "$1/pkg" -czf "$1/still-ui-linux-amd64.tar.gz" still-ui
 }
@@ -843,16 +844,24 @@ install_ok() {
     [[ -z "$(find "$R/usr/local" -maxdepth 1 -name 'x-ui-bin-backup.*')" ]] || { echo "bin backup left"; return 1; }
 }
 t "install.sh: a verified install replaces binary, menu and xray, keeps custom bin/ files" install_ok
-install_old_archive() {
+install_old_archive() { # still-xray.service in the archive: yes or no
+    [[ "$1" == yes ]] && export WITH_XRAY_UNIT=1
     OMIT=still-setup.sh install_setup || return 1
+    unset WITH_XRAY_UNIT
     printf 'A=1\nexport XUI_XRAY_UNIT=still-xray\n' > "$R/etc/default/still-ui"
     (install_x-ui v9.9.9) > "$R/out" 2>&1 || { cat "$R/out"; return 1; }
-    eq "$(cat "$R/etc/default/still-ui")" "A=1"
-    called "systemctl disable --now still-xray"
     not_called xray-unit
-    has "$R/out" "Xray stays inside the panel process"
+    if [[ "$1" == yes ]]; then
+        eq "$(cat "$R/etc/default/still-ui")" "$(printf 'A=1\nexport XUI_XRAY_UNIT=still-xray')"
+        not_called "still-xray"
+    else
+        eq "$(cat "$R/etc/default/still-ui")" "A=1"
+        called "systemctl disable --now still-xray"
+        has "$R/out" "Xray stays inside the panel process"
+    fi
 }
-t "install.sh: an archive without still-setup.sh keeps Xray inside the panel" install_old_archive
+t "install.sh: an older archive with still-xray.service keeps the Xray mode in use" install_old_archive yes
+t "install.sh: an archive without still-xray.service keeps Xray inside the panel" install_old_archive no
 
 # ==============================================================================
 # update.sh

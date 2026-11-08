@@ -2068,7 +2068,8 @@ install_x-ui() {
     chmod +x x-ui.sh
 
     # The setup helpers ship in the archive. An archive older than still-setup.sh
-    # has none: Xray then stays inside the panel and the memory drop-in is kept.
+    # has none: the memory drop-in and the Xray mode in use are kept, except that
+    # a release without still-xray.service gets Xray back inside the panel.
     if [[ -s "${xui_folder}/still-setup.sh" ]]; then
         # shellcheck source=still-setup.sh
         source "${xui_folder}/still-setup.sh"
@@ -2076,6 +2077,7 @@ install_x-ui() {
         _still_memory_dropin() { return 1; }
         _still_xray_unit() {
             local f
+            [[ -s "${xui_folder}/still-xray.service" ]] && return 0
             for f in /etc/default/still-ui /etc/conf.d/still-ui /etc/sysconfig/still-ui; do
                 [[ -f "$f" ]] && sed -i '/^[[:space:]]*\(export[[:space:]]\+\)\?XUI_XRAY_UNIT=/d' "$f"
             done
