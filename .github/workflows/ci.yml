@@ -402,8 +402,23 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
         working-directory: frontend
+      # Without a limit this step sat for up to two hours when the runner's
+      # Ubuntu mirror was down; a slow mirror gets three bounded attempts.
       - name: Install Playwright Chromium (Storybook story tests)
-        run: npx playwright install --with-deps chromium
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          for i in 1 2 3; do
+            if timeout 240 npx playwright install --with-deps chromium; then
+              break
+            fi
+            if [ "$i" = 3 ]; then
+              echo "::error::Could not install Playwright Chromium after three attempts."
+              exit 1
+            fi
+            echo "playwright install attempt ${i} failed; retrying."
+            sleep 10
+          done
         working-directory: frontend
       - name: Test
         run: npm test
