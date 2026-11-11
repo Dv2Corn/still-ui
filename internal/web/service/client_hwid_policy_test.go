@@ -228,9 +228,8 @@ func TestHwidGatePanelDefaultLimit(t *testing.T) {
 	}
 }
 
-// A panel default takes effect when it is saved, as a client's own limit does when it is set: a
-// subscription over it keeps its most recently seen devices. Left alone, the default enforced
-// nothing there until an unrelated edit of the client deleted the extra devices.
+// A saved panel default trims a subscription over it to its most recently seen devices. Left
+// alone, it enforced nothing there until an unrelated client edit deleted the extra devices.
 func TestHwidPanelDefaultAppliesWhenSaved(t *testing.T) {
 	initClientHwidTestDB(t)
 	db := database.GetDB()

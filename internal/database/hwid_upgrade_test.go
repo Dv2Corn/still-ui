@@ -7,9 +7,8 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 )
 
-// An upgraded panel keeps how it treated apps without a device id (refused where devices were
-// limited, served elsewhere) and keeps every registered device: expiry stays off until the
-// admin sets it. A value the admin already saved is not overwritten.
+// An upgraded panel keeps how it treated apps without a device id and keeps every registered
+// device (no expiry); a value the admin already saved is not overwritten.
 func TestHwidBehaviourKeptOnUpgrade(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
