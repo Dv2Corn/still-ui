@@ -67,6 +67,10 @@ func TestInboundTransports(t *testing.T) {
 		{"vless ws (still tcp)", model.VLESS, `{"network":"ws"}`, ``, transportTCP},
 		{"vless kcp is udp", model.VLESS, `{"network":"kcp"}`, ``, transportUDP},
 		{"vless empty stream defaults to tcp", model.VLESS, ``, ``, transportTCP},
+		{"vless xhttp with only h3 is udp", model.VLESS, `{"network":"xhttp","security":"tls","tlsSettings":{"alpn":["h3"]}}`, ``, transportUDP},
+		{"vless xhttp with h3 and h2 is tcp", model.VLESS, `{"network":"xhttp","security":"tls","tlsSettings":{"alpn":["h3","h2"]}}`, ``, transportTCP},
+		{"vless xhttp without tls ignores the alpn", model.VLESS, `{"network":"xhttp","security":"none","tlsSettings":{"alpn":["h3"]}}`, ``, transportTCP},
+		{"vless ws with only h3 is tcp", model.VLESS, `{"network":"ws","security":"tls","tlsSettings":{"alpn":["h3"]}}`, ``, transportTCP},
 		{"vless garbage stream stays tcp", model.VLESS, `not json`, ``, transportTCP},
 
 		{"vmess default tcp", model.VMESS, `{"network":"tcp"}`, ``, transportTCP},

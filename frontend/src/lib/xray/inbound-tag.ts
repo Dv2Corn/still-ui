@@ -25,7 +25,7 @@ function inboundTransports(
 
   let bits: TransportBits = 0;
   const network = asString(streamSettings?.network);
-  if (network === 'kcp' || network === 'quic') bits |= UDP;
+  if (network === 'kcp' || network === 'quic' || xhttpOverH3(network, streamSettings)) bits |= UDP;
   else bits |= TCP;
 
   if (settings) {
@@ -47,6 +47,17 @@ function inboundTransports(
 
   if (bits === 0) bits = TCP;
   return bits;
+}
+
+// xray-core serves XHTTP over QUIC, on UDP alone, when the TLS ALPN is exactly h3.
+function xhttpOverH3(
+  network: string,
+  streamSettings: Record<string, unknown> | undefined,
+): boolean {
+  if (network !== 'xhttp' && network !== 'splithttp') return false;
+  const tls = streamSettings?.tlsSettings as { alpn?: unknown } | undefined;
+  const alpn = Array.isArray(tls?.alpn) ? (tls.alpn as unknown[]) : [];
+  return streamSettings?.security === 'tls' && alpn.length === 1 && alpn[0] === 'h3';
 }
 
 // MASQUE listens HTTP/2 on TCP when the ALPN offers h2, HTTP/3 on UDP when it offers

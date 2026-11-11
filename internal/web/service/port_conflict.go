@@ -41,16 +41,23 @@ func inboundTransports(protocol model.Protocol, streamSettings, settings string)
 	// parse errors are non-fatal: missing or weird streamSettings just
 	// keeps the default tcp bit below.
 	network := ""
+	h3Only := false
 	if streamSettings != "" {
 		var ss map[string]any
 		if json.Unmarshal([]byte(streamSettings), &ss) == nil {
 			if n, _ := ss["network"].(string); n != "" {
 				network = n
 			}
+			tlsSettings, _ := ss["tlsSettings"].(map[string]any)
+			alpn, _ := tlsSettings["alpn"].([]any)
+			h3Only = ss["security"] == "tls" && len(alpn) == 1 && alpn[0] == "h3"
 		}
 	}
-	switch network {
-	case "kcp", "quic":
+	switch {
+	case network == "kcp", network == "quic":
+		bits |= transportUDP
+	// xray-core serves XHTTP over QUIC, on UDP alone, when the TLS ALPN is exactly h3.
+	case h3Only && (network == "xhttp" || network == "splithttp"):
 		bits |= transportUDP
 	default:
 		bits |= transportTCP

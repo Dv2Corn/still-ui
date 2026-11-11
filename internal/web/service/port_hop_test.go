@@ -166,6 +166,9 @@ func TestPortHopRangesAndUDPPortsOfOneHostStayApart(t *testing.T) {
 	mustAdd(tcp(26000))
 	wantRefused(hopInbound(443, "20000-30000", true), "the range 20000-30000 contains UDP port 25000 of inbound #1")
 
+	seedInboundConflict(t, "xhttp-h3", "", 25600, model.VLESS, `{"network":"xhttp","security":"tls","tlsSettings":{"alpn":["h3"]}}`, `{"clients":[]}`)
+	wantRefused(hopInbound(443, "25500-25700", true), "the range 25500-25700 contains UDP port 25600")
+
 	// A TCP listener is out of a UDP redirect's reach, so it does not block the range.
 	first := mustAdd(hopInbound(443, "26000-30000", true))
 	wantRefused(hopInbound(8443, "30000-31000", true), "the range 30000-31000 overlaps the range 26000-30000 of inbound #"+strconv.Itoa(first.Id))
