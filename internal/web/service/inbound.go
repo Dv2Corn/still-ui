@@ -1364,7 +1364,7 @@ func (s *InboundService) prepareInboundAdd(inbound *model.Inbound) ([]model.Clie
 		return nil, "", err
 	}
 	if err := validatePortHop(inbound); err != nil {
-		return inbound, false, err
+		return nil, "", err
 	}
 	if err := validateXDriveStorage(inbound.StreamSettings); err != nil {
 		return nil, "", err
