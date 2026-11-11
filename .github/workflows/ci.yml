@@ -1,6 +1,9 @@
 name: CI
 
 on:
+  # Manual start: push runs lost in a GitHub Actions incident (11.11.2026, the 1.7.0
+  # merge) stay queued and can be neither cancelled nor re-run.
+  workflow_dispatch:
   pull_request:
     paths:
       - "**.go"
