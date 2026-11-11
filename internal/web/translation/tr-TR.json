@@ -107,6 +107,10 @@
     "support": "Destek",
     "qrTitle": "Tara. İçe aktar. Bağlan.",
     "qrHint": "İstemci uygulamanızla tarayın. Bu kodu kimseyle paylaşmayın.",
+    "localDirectTitle": "{country}: yerel siteler doğrudan açılır",
+    "localDirectDesc": "Geri kalan her şey VPN üzerinden gider. Happ, INCY, Clash/Mihomo ve JSON abonelikleri bunu kendileri ayarlar.",
+    "localDirectShadowrocket": "Shadowrocket kural dosyası",
+    "localDirectShadowrocketHint": "Shadowrocket'te dosyayı Config sekmesinden ekleyin ve Global Routing'i Config yapın.",
     "saveQr": "QR'ı kaydet"
   },
   "menu": {
@@ -1971,6 +1975,11 @@
       "subHostSortInbound": "Gelen bağlantı sırası (varsayılan)",
       "subHostSortHosts": "Ana bilgisayar sırası",
       "subHostSortModeDesc": "Farklı gelen bağlantılarda Ana Bilgisayarlar sayfasının sırasını izler. Sunucunun çıktı sırasını belirler; istemci uygulamaları kendi sıralamalarını uygulayabilir.",
+      "subLocalDirect": "Yerel siteler doğrudan",
+      "subLocalDirectDesc": "Abonelik istemcileri seçilen ülkenin sitelerini doğrudan açar, geri kalan her şeyi VPN üzerinden gönderir. JSON, Clash/Mihomo ve Happ/INCY aboneliklerinde çalışır ve abonelik sayfasına bir Shadowrocket kural dosyası ekler; düz bağlantı listesi kural taşıyamaz. Bir biçim için kendi yönlendirme profilinizi ayarladıysanız o biçimde o profil önceliklidir.",
+      "subLocalDirectOff": "Kapalı",
+      "subLocalDirectProxy": "Her zaman VPN üzerinden",
+      "subLocalDirectProxyDesc": "Yerel görünseler bile VPN üzerinden giden alan adları ve IP aralıkları, her satıra bir tane; ülke kuralından önce denetlenir. Yerleşik listeyi geri getirmek için alanı boşaltın.",
       "subProbeOrder": "Yoklayıcı sonuçlarını kullan",
       "subProbeOrderDesc": "Erişilebilirlik yoklayıcılarının erişilemez bildirdiği bağlantılar (art arda 2 başarısız kontrol) aboneliğin sonuna taşınır veya gizlenir; tüm biçimlerde: bağlantılar, JSON ve Clash. Kullanıcıda her zaman en az bir bağlantı kalır ve güncel yoklayıcı sonucu yoksa hiçbir şey değişmez. Yoklayıcılar sayfası her uç noktaya ne olduğunu gösterir.",
       "subProbeOrderOff": "Kapalı (varsayılan)",

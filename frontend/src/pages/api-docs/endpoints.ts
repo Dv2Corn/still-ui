@@ -2994,6 +2994,33 @@ export const sections: readonly Section[] = [
       },
       {
         method: 'GET',
+        path: '/{subPath}:subid/shadowrocket.conf',
+        summary:
+          'Return the Shadowrocket rules file of the "Local sites direct" setting: private networks and the chosen country (its domain zones and GEOIP) go direct, the always-VPN list and everything else go through the proxy. Registered only while the setting names a country. The path prefix is configured by subPath.',
+        description:
+          'A plain-text, ASCII-only Shadowrocket config with <code>[General]</code> and <code>[Rule]</code> sections and no <code>[Proxy]</code> section: the servers stay in the subscription. It carries no credentials and does not register a device, so it takes no HWID slot.',
+        params: [{ name: 'subid', in: 'path', type: 'string', desc: 'Client subscription ID.' }],
+        responses: {
+          '200': {
+            description: 'The rules file, sent as an attachment named shadowrocket.conf.',
+            content: { 'text/plain': { schema: { type: 'string' } } },
+          },
+          ...hwidStatusErrorResponses,
+        },
+      },
+      {
+        method: 'HEAD',
+        path: '/{subPath}:subid/shadowrocket.conf',
+        summary:
+          'Return the Shadowrocket rules file status code and headers as GET without a body.',
+        params: [{ name: 'subid', in: 'path', type: 'string', desc: 'Client subscription ID.' }],
+        responses: {
+          '200': { description: 'Headers match GET; no response body.' },
+          ...hwidStatusErrorResponses,
+        },
+      },
+      {
+        method: 'GET',
         path: '/{jsonPath}:subid',
         summary:
           'Return subscription as a JSON array of proxy configs (one per enabled client). Only when JSON subscription is enabled in settings. The path prefix is configured by subJsonPath.',

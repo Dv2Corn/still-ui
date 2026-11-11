@@ -559,6 +559,12 @@
           "subListen": {
             "type": "string"
           },
+          "subLocalDirect": {
+            "type": "string"
+          },
+          "subLocalDirectProxy": {
+            "type": "string"
+          },
           "subPath": {
             "type": "string"
           },
@@ -856,6 +862,8 @@
           "subJsonUserAgentRegex",
           "subKeyFile",
           "subListen",
+          "subLocalDirect",
+          "subLocalDirectProxy",
           "subPath",
           "subPort",
           "subProbeMinAgents",
@@ -1454,6 +1462,12 @@
           "subListen": {
             "type": "string"
           },
+          "subLocalDirect": {
+            "type": "string"
+          },
+          "subLocalDirectProxy": {
+            "type": "string"
+          },
           "subPath": {
             "type": "string"
           },
@@ -1759,6 +1773,8 @@
           "subJsonUserAgentRegex",
           "subKeyFile",
           "subListen",
+          "subLocalDirect",
+          "subLocalDirectProxy",
           "subPath",
           "subPort",
           "subProbeMinAgents",
@@ -17736,6 +17752,92 @@
         ],
         "summary": "Return the HWID device-slot status code and headers as GET without a response body.",
         "operationId": "head_subPath_subid_hwid_status",
+        "parameters": [
+          {
+            "name": "subid",
+            "in": "path",
+            "required": true,
+            "description": "Client subscription ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "subPath",
+            "in": "path",
+            "required": true,
+            "description": "",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Headers match GET; no response body."
+          },
+          "404": {
+            "description": "No enabled client matches the subscription ID. Empty body."
+          },
+          "500": {
+            "description": "Database lookup failed. Empty body."
+          }
+        }
+      }
+    },
+    "/{subPath}{subid}/shadowrocket.conf": {
+      "get": {
+        "tags": [
+          "Subscription Server"
+        ],
+        "summary": "Return the Shadowrocket rules file of the \"Local sites direct\" setting: private networks and the chosen country (its domain zones and GEOIP) go direct, the always-VPN list and everything else go through the proxy. Registered only while the setting names a country. The path prefix is configured by subPath.",
+        "operationId": "get_subPath_subid_shadowrocket_conf",
+        "description": "A plain-text, ASCII-only Shadowrocket config with <code>[General]</code> and <code>[Rule]</code> sections and no <code>[Proxy]</code> section: the servers stay in the subscription. It carries no credentials and does not register a device, so it takes no HWID slot.",
+        "parameters": [
+          {
+            "name": "subid",
+            "in": "path",
+            "required": true,
+            "description": "Client subscription ID.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "subPath",
+            "in": "path",
+            "required": true,
+            "description": "",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The rules file, sent as an attachment named shadowrocket.conf.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No enabled client matches the subscription ID. Empty body."
+          },
+          "500": {
+            "description": "Database lookup failed. Empty body."
+          }
+        }
+      },
+      "head": {
+        "tags": [
+          "Subscription Server"
+        ],
+        "summary": "Return the Shadowrocket rules file status code and headers as GET without a body.",
+        "operationId": "head_subPath_subid_shadowrocket_conf",
         "parameters": [
           {
             "name": "subid",

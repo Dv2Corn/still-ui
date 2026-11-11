@@ -107,6 +107,10 @@
     "support": "支持",
     "qrTitle": "扫码。导入。连接。",
     "qrHint": "使用客户端应用扫描。请勿泄露此二维码。",
+    "localDirectTitle": "{country}：本地网站直连",
+    "localDirectDesc": "其余流量走 VPN。Happ、INCY、Clash/Mihomo 和 JSON 订阅会自动应用。",
+    "localDirectShadowrocket": "Shadowrocket 规则文件",
+    "localDirectShadowrocketHint": "在 Shadowrocket 的“配置”页添加该文件，并将全局路由设为“配置”。",
     "saveQr": "保存二维码"
   },
   "menu": {
@@ -1971,6 +1975,11 @@
       "subHostSortInbound": "入站顺序（默认）",
       "subHostSortHosts": "主机顺序",
       "subHostSortModeDesc": "跨入站使用主机页面中的排序。此设置决定服务器输出顺序；客户端应用仍可能自行排序。",
+      "subLocalDirect": "本地网站直连",
+      "subLocalDirectDesc": "订阅客户端直接访问所选国家的网站，其余流量全部走 VPN。适用于 JSON、Clash/Mihomo 和 Happ/INCY 订阅，并在订阅页面提供 Shadowrocket 规则文件；普通链接列表无法携带规则。如果你为某种格式单独设置了路由配置，该格式以你的配置为准。",
+      "subLocalDirectOff": "关闭",
+      "subLocalDirectProxy": "始终走 VPN",
+      "subLocalDirectProxyDesc": "即使看起来是本地地址也要走 VPN 的域名和 IP 段，每行一个；在国家规则之前匹配。清空此框可恢复内置列表。",
       "subProbeOrder": "使用探针结果",
       "subProbeOrderDesc": "可达性探针报告不通的链接（连续 2 次失败）会移到订阅末尾或被隐藏，适用于所有格式：链接、JSON 和 Clash。用户始终至少保留一个链接；没有新的探针结果时不做任何改动。探针页面会显示每个端点的处理情况。",
       "subProbeOrderOff": "关闭（默认）",

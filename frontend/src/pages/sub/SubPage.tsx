@@ -18,6 +18,7 @@ import SubConfigsTab from './SubConfigsTab';
 import SubHeader from './SubHeader';
 import SubHero from './SubHero';
 import SubLinksTab from './SubLinksTab';
+import SubLocalDirect from './SubLocalDirect';
 import { buildSubApps, daysUntil, detectPlatform, resolveSubStatus } from './subPageModel';
 import './SubPage.css';
 
@@ -31,6 +32,8 @@ const subTitle = subData.subTitle || '';
 const subSupportUrl = subData.subSupportUrl || '';
 const updateHours = Number(subData.subUpdates || 0);
 const announce = subData.announce || '';
+const localDirect = subData.localDirect || '';
+const shadowrocketConfUrl = subData.shadowrocketConfUrl || '';
 const links: string[] = Array.isArray(subData.links) ? subData.links : [];
 const linkEmails: string[] = Array.isArray(subData.emails) ? subData.emails : [];
 const totalByte = Number(subData.totalByte || 0);
@@ -147,6 +150,14 @@ export default function SubPage() {
               onLangChange={onLangChange}
             />
             {announce && <Alert type="info" showIcon title={announce} className="sub-announce" />}
+            {localDirect && (
+              <SubLocalDirect
+                country={localDirect}
+                shadowrocketConfUrl={shadowrocketConfUrl}
+                lang={lang}
+                onCopy={copy}
+              />
+            )}
             <SubHero {...heroData} lang={lang} />
             {tabs.length > 0 && <Tabs className="sub-tabs" tabBarGutter={24} items={tabs} />}
             {(updateHours > 0 || subSupportUrl) && (

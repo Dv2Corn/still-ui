@@ -107,6 +107,10 @@
     "support": "Soporte",
     "qrTitle": "Escanea. Importa. Conéctate.",
     "qrHint": "Escanéalo con tu aplicación cliente. Mantén este código en privado.",
+    "localDirectTitle": "{country}: los sitios locales se abren directamente",
+    "localDirectDesc": "Todo lo demás va por la VPN. Las suscripciones de Happ, INCY, Clash/Mihomo y JSON lo configuran solas.",
+    "localDirectShadowrocket": "Archivo de reglas para Shadowrocket",
+    "localDirectShadowrocketHint": "En Shadowrocket añade el archivo en la pestaña Config y pon Global Routing en Config.",
     "saveQr": "Guardar QR"
   },
   "menu": {
@@ -1971,6 +1975,11 @@
       "subHostSortInbound": "Orden de entradas (predeterminado)",
       "subHostSortHosts": "Orden de hosts",
       "subHostSortModeDesc": "Sigue el orden de la página de hosts entre distintas entradas. Determina el orden emitido por el servidor; las aplicaciones cliente pueden aplicar su propio orden.",
+      "subLocalDirect": "Sitios locales en directo",
+      "subLocalDirectDesc": "Los clientes de la suscripción abren los sitios del país elegido directamente y envían todo lo demás por la VPN. Funciona en las suscripciones JSON, Clash/Mihomo y Happ/INCY, y añade un archivo de reglas para Shadowrocket a la página de suscripción; una lista simple de enlaces no puede llevar reglas. Si configuras tu propio perfil de enrutamiento para un formato, ese perfil tiene prioridad en ese formato.",
+      "subLocalDirectOff": "Desactivado",
+      "subLocalDirectProxy": "Siempre por la VPN",
+      "subLocalDirectProxyDesc": "Dominios y rangos de IP que van por la VPN aunque parezcan locales, uno por línea; se comprueban antes que la regla del país. Vacía el campo para recuperar la lista integrada.",
       "subProbeOrder": "Usar los resultados de las sondas",
       "subProbeOrderDesc": "Los enlaces que las sondas de accesibilidad marcan como caídos (2 fallos seguidos) pasan al final de la suscripción o se ocultan, en todos los formatos: enlaces, JSON y Clash. El usuario conserva siempre al menos un enlace y, sin resultados recientes de las sondas, nada cambia. La página de sondas muestra qué pasa con cada punto de acceso.",
       "subProbeOrderOff": "Desactivado (predeterminado)",

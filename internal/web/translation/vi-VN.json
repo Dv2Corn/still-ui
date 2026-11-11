@@ -107,6 +107,10 @@
     "support": "Hỗ trợ",
     "qrTitle": "Quét. Nhập. Kết nối.",
     "qrHint": "Quét bằng ứng dụng khách. Không chia sẻ mã này cho người khác.",
+    "localDirectTitle": "{country}: trang trong nước mở trực tiếp",
+    "localDirectDesc": "Mọi thứ còn lại đi qua VPN. Gói đăng ký Happ, INCY, Clash/Mihomo và JSON tự thiết lập việc này.",
+    "localDirectShadowrocket": "Tệp quy tắc Shadowrocket",
+    "localDirectShadowrocketHint": "Trong Shadowrocket, thêm tệp ở thẻ Config rồi đặt Global Routing thành Config.",
     "saveQr": "Lưu QR"
   },
   "menu": {
@@ -1971,6 +1975,11 @@
       "subHostSortInbound": "Thứ tự kết nối vào (mặc định)",
       "subHostSortHosts": "Thứ tự máy chủ",
       "subHostSortModeDesc": "Theo thứ tự trên trang Máy chủ giữa các kết nối vào. Thiết lập này quyết định thứ tự do máy chủ xuất ra; ứng dụng khách có thể tự sắp xếp lại.",
+      "subLocalDirect": "Trang trong nước đi trực tiếp",
+      "subLocalDirectDesc": "Ứng dụng dùng gói đăng ký mở các trang của quốc gia đã chọn trực tiếp và gửi mọi thứ còn lại qua VPN. Áp dụng cho gói đăng ký JSON, Clash/Mihomo và Happ/INCY, đồng thời thêm tệp quy tắc Shadowrocket vào trang đăng ký; danh sách liên kết thông thường không thể mang quy tắc. Nếu bạn tự đặt hồ sơ định tuyến cho một định dạng thì hồ sơ đó được ưu tiên trong định dạng ấy.",
+      "subLocalDirectOff": "Tắt",
+      "subLocalDirectProxy": "Luôn qua VPN",
+      "subLocalDirectProxyDesc": "Tên miền và dải IP luôn đi qua VPN dù trông giống trong nước, mỗi dòng một mục; được kiểm tra trước quy tắc quốc gia. Xóa trống ô này để khôi phục danh sách có sẵn.",
       "subProbeOrder": "Dùng kết quả thăm dò",
       "subProbeOrderDesc": "Các liên kết mà bộ thăm dò báo là không truy cập được (thất bại 2 lần liên tiếp) sẽ được chuyển xuống cuối gói đăng ký hoặc bị ẩn, ở mọi định dạng: liên kết, JSON và Clash. Người dùng luôn còn ít nhất một liên kết, và nếu không có kết quả thăm dò mới thì không có gì thay đổi. Trang Thăm dò cho biết điều gì xảy ra với từng điểm kết nối.",
       "subProbeOrderOff": "Tắt (mặc định)",

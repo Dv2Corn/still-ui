@@ -89,6 +89,8 @@ export class AllSetting {
   subClashAutoGroupUrl = 'http://www.gstatic.com/generate_204';
   subClashAutoGroupInterval = 300;
   subClashAutoGroupTolerance = 50;
+  subLocalDirect = '';
+  subLocalDirectProxy = '';
   subJsonMux = '';
   subJsonRules = '';
   subJsonRoutingRules = '';

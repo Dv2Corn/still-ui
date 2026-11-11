@@ -152,6 +152,8 @@ type AllSetting struct {
 	SubClashAutoGroupUrl        string `json:"subClashAutoGroupUrl" form:"subClashAutoGroupUrl"`
 	SubClashAutoGroupInterval   int    `json:"subClashAutoGroupInterval" form:"subClashAutoGroupInterval" validate:"gte=0,lte=86400"`
 	SubClashAutoGroupTolerance  int    `json:"subClashAutoGroupTolerance" form:"subClashAutoGroupTolerance" validate:"gte=0,lte=10000"`
+	SubLocalDirect              string `json:"subLocalDirect" form:"subLocalDirect"`
+	SubLocalDirectProxy         string `json:"subLocalDirectProxy" form:"subLocalDirectProxy"`
 	SubJsonMux                  string `json:"subJsonMux" form:"subJsonMux"`
 	SubJsonRules                string `json:"subJsonRules" form:"subJsonRules"`
 	SubJsonRoutingRules         string `json:"subJsonRoutingRules" form:"subJsonRoutingRules"`

@@ -21,6 +21,7 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/database"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 	"github.com/mhsanaei/3x-ui/v3/internal/logger"
+	"github.com/mhsanaei/3x-ui/v3/internal/sub/localdirect"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/common"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/netproxy"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/random"
@@ -196,6 +197,8 @@ var defaultValueMap = map[string]string{
 	"subClashAutoGroupUrl":        DefaultSubClashAutoGroupURL,
 	"subClashAutoGroupInterval":   "300",
 	"subClashAutoGroupTolerance":  "50",
+	"subLocalDirect":              "",
+	"subLocalDirectProxy":         localdirect.DefaultProxyList,
 	"subJsonMux":                  "",
 	"subJsonRules":                "",
 	"subJsonRoutingRules":         "",
@@ -1781,6 +1784,9 @@ func (s *SettingService) UpdateAllSetting(allSetting *entity.AllSetting, clears 
 		return err
 	}
 	if err := validateSubClashAutoGroup(allSetting); err != nil {
+		return err
+	}
+	if err := validateSubLocalDirect(allSetting); err != nil {
 		return err
 	}
 	if err := validateFinalMaskJSONSalamander(allSetting.SubJsonFinalMask); err != nil {

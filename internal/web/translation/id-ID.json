@@ -107,6 +107,10 @@
     "support": "Dukungan",
     "qrTitle": "Pindai. Impor. Terhubung.",
     "qrHint": "Pindai dengan aplikasi klien Anda. Jaga kerahasiaan kode ini.",
+    "localDirectTitle": "{country}: situs lokal dibuka langsung",
+    "localDirectDesc": "Sisanya lewat VPN. Langganan Happ, INCY, Clash/Mihomo, dan JSON mengaturnya sendiri.",
+    "localDirectShadowrocket": "Berkas aturan Shadowrocket",
+    "localDirectShadowrocketHint": "Di Shadowrocket tambahkan berkas di tab Config lalu atur Global Routing ke Config.",
     "saveQr": "Simpan QR"
   },
   "menu": {
@@ -1971,6 +1975,11 @@
       "subHostSortInbound": "Urutan inbound (bawaan)",
       "subHostSortHosts": "Urutan host",
       "subHostSortModeDesc": "Mengikuti urutan di halaman Host untuk semua inbound. Ini menentukan urutan keluaran server; aplikasi klien dapat menerapkan urutan sendiri.",
+      "subLocalDirect": "Situs lokal langsung",
+      "subLocalDirectDesc": "Klien langganan membuka situs negara yang dipilih secara langsung dan mengirim sisanya lewat VPN. Berlaku untuk langganan JSON, Clash/Mihomo, dan Happ/INCY, serta menambahkan berkas aturan Shadowrocket ke halaman langganan; daftar tautan biasa tidak dapat membawa aturan. Profil perutean yang Anda atur sendiri untuk suatu format lebih diutamakan di format itu.",
+      "subLocalDirectOff": "Mati",
+      "subLocalDirectProxy": "Selalu lewat VPN",
+      "subLocalDirectProxyDesc": "Domain dan rentang IP yang tetap lewat VPN meski tampak lokal, satu per baris; diperiksa sebelum aturan negara. Kosongkan kolom untuk mengembalikan daftar bawaan.",
       "subProbeOrder": "Gunakan hasil probe",
       "subProbeOrderDesc": "Tautan yang dilaporkan mati oleh probe keterjangkauan (2 kali gagal berturut-turut) dipindah ke akhir langganan atau disembunyikan, di semua format: tautan, JSON, dan Clash. Pengguna selalu menyisakan setidaknya satu tautan, dan tanpa hasil probe terbaru tidak ada yang berubah. Halaman Probe menampilkan apa yang terjadi pada setiap endpoint.",
       "subProbeOrderOff": "Mati (bawaan)",

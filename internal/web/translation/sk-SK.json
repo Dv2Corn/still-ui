@@ -107,6 +107,10 @@
     "support": "Podpora",
     "qrTitle": "Naskenovať. Importovať. Pripojiť sa.",
     "qrHint": "Naskenujte kód v klientskej aplikácii. Nikomu ho nesprístupňujte.",
+    "localDirectTitle": "{country}: miestne stránky sa otvárajú priamo",
+    "localDirectDesc": "Všetko ostatné ide cez VPN. Odbery Happ, INCY, Clash/Mihomo a JSON si to nastavia samy.",
+    "localDirectShadowrocket": "Súbor pravidiel pre Shadowrocket",
+    "localDirectShadowrocketHint": "V Shadowrocket pridajte súbor na karte Config a nastavte Global Routing na Config.",
     "saveQr": "Uložiť QR kód"
   },
   "menu": {
@@ -2092,6 +2096,11 @@
       "subHostSortInbound": "Poradie inboundov (predvolené)",
       "subHostSortHosts": "Poradie hostiteľov",
       "subHostSortModeDesc": "Poradie hostiteľov sa riadi stránkou Hostitelia naprieč inboundmi. Určuje poradie, ktoré odosiela server; klientske aplikácie môžu použiť vlastné triedenie.",
+      "subLocalDirect": "Miestne stránky priamo",
+      "subLocalDirectDesc": "Klienti odberu otvárajú stránky vybranej krajiny priamo a všetko ostatné posielajú cez VPN. Funguje v odberoch JSON, Clash/Mihomo a Happ/INCY a na stránku odberu pridá súbor pravidiel pre Shadowrocket; obyčajný zoznam odkazov pravidlá preniesť nedokáže. Ak pre niektorý formát nastavíte vlastný profil smerovania, v tom formáte má prednosť on.",
+      "subLocalDirectOff": "Vypnuté",
+      "subLocalDirectProxy": "Vždy cez VPN",
+      "subLocalDirectProxyDesc": "Domény a rozsahy IP, ktoré idú cez VPN, aj keď vyzerajú ako miestne, jeden na riadok; kontrolujú sa pred pravidlom krajiny. Vyprázdnite pole, ak chcete obnoviť vstavaný zoznam.",
       "subProbeOrder": "Používať výsledky sond",
       "subProbeOrderDesc": "Odkazy, ktoré sondy dostupnosti hlásia ako nedostupné (2 zlyhania za sebou), sa presunú na koniec predplatného alebo sa skryjú, vo všetkých formátoch: odkazy, JSON aj Clash. Používateľovi vždy ostane aspoň jeden odkaz a bez čerstvých výsledkov sond sa nič nemení. Stránka sond ukazuje, čo sa deje s každým koncovým bodom.",
       "subProbeOrderOff": "Vypnuté (predvolené)",

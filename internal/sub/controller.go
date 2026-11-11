@@ -22,6 +22,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/logger"
+	"github.com/mhsanaei/3x-ui/v3/internal/sub/localdirect"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/service"
 )
 
@@ -66,6 +67,9 @@ type SUBController struct {
 
 	subIncyEnableRouting bool
 	subIncyRoutingRules  string
+
+	localDirect     localdirect.Plan
+	localDirectHapp string
 
 	subPath            string
 	subJsonPath        string
@@ -133,6 +137,8 @@ type subControllerConfig struct {
 
 	subIncyEnableRouting bool
 	subIncyRoutingRules  string
+
+	localDirect localdirect.Plan
 }
 
 type SUBControllerOption func(*subControllerConfig)
@@ -306,6 +312,7 @@ func NewSUBController(g *gin.RouterGroup, options ...SUBControllerOption) *SUBCo
 	subJsonSvc := NewSubJsonService(config.subJsonMux, config.subJsonRules, config.subJsonFinalMask, config.subJsonRoutingRules, sub)
 	subJsonSvc.SetObservatoryConfig(config.subJsonObservatory)
 	subJsonSvc.SetDnsConfig(config.subJsonDns)
+	subJsonSvc.SetLocalDirect(config.localDirect)
 	a := &SUBController{
 		subTitle:            config.subTitle,
 		subSupportUrl:       config.subSupportURL,
@@ -321,6 +328,9 @@ func NewSUBController(g *gin.RouterGroup, options ...SUBControllerOption) *SUBCo
 
 		subIncyEnableRouting: config.subIncyEnableRouting,
 		subIncyRoutingRules:  config.subIncyRoutingRules,
+
+		localDirect:     config.localDirect,
+		localDirectHapp: localDirectHappRouting(config.localDirect),
 
 		subPath:            config.subPath,
 		subJsonPath:        config.subJsonPath,
@@ -343,6 +353,7 @@ func NewSUBController(g *gin.RouterGroup, options ...SUBControllerOption) *SUBCo
 		releaseSettingsCache: releaseSettingsCache,
 	}
 	a.subClashService.autoGroup = config.subClashAutoGroup.normalized()
+	a.subClashService.localDirect = config.localDirect
 	a.initRouter(g)
 	return a
 }
@@ -355,6 +366,10 @@ func (a *SUBController) initRouter(g *gin.RouterGroup) {
 	gLink.HEAD(":subid", a.subs)
 	gLink.GET(":subid/hwid-status", a.hwidStatus)
 	gLink.HEAD(":subid/hwid-status", a.hwidStatus)
+	if a.localDirect.Enabled() {
+		gLink.GET(":subid/"+shadowrocketConfName, a.shadowrocketConf)
+		gLink.HEAD(":subid/"+shadowrocketConfName, a.shadowrocketConf)
+	}
 	if a.jsonEnabled {
 		gJson := g.Group(a.subJsonPath, setNoCacheHeaders)
 		gJson.GET(":subid", a.subJsons)
@@ -692,7 +707,7 @@ func (a *SUBController) subPageContext(page PageData) map[string]any {
 	subUpdates, _ := a.settingService.GetSubUpdates()
 	updateHours, _ := strconv.Atoi(subUpdates)
 
-	return map[string]any{
+	data := map[string]any{
 		"sId":           page.SId,
 		"enabled":       page.Enabled,
 		"isOnline":      page.IsOnline,
@@ -717,6 +732,11 @@ func (a *SUBController) subPageContext(page PageData) map[string]any {
 		"datepicker":    datepicker,
 		"announce":      page.SubAnnounce,
 	}
+	if a.localDirect.Enabled() {
+		data["localDirect"] = a.localDirect.Country
+		data["shadowrocketConfUrl"] = strings.TrimSuffix(page.SubUrl, "/") + "/" + shadowrocketConfName
+	}
+	return data
 }
 
 func (a *SUBController) enforceHwid(c *gin.Context) bool {
@@ -988,6 +1008,10 @@ func (a *SUBController) ApplyCommonHeaders(
 		// Happ/INCY fetch the geo files the baked rules reference through this
 		// header; unlike the documents, it keeps the profile's own DNS servers.
 		rules, remote, routingErr = jsonRoutingHeaderSource(a.subJsonRoutingRules), false, nil
+		if strings.TrimSpace(a.subJsonRoutingRules) == "" && a.localDirectHapp != "" {
+			// Raw links carry no rules of their own, so Happ has to switch this profile on.
+			rules, profileEnableRouting = a.localDirectHapp, !incyClient
+		}
 	}
 	// The off values undo a previously pushed setting, so they ride the same
 	// opt-in as every other Happ header rather than reaching every Happ client.
