@@ -69,7 +69,7 @@ func Scan(ctx context.Context, dir string, f ConnFilter, limit int, fn func(rec 
 	if err != nil {
 		return err
 	}
-	// A batch is filed under the day of its last line, so a day's first rows can sit in the next file.
+	// A row is never filed in an earlier day than the one written last: after a clock set back it sits in the next file.
 	lastDay := ""
 	if f.To > 0 {
 		lastDay = time.UnixMilli(f.To).UTC().AddDate(0, 0, 1).Format(dayLayout)

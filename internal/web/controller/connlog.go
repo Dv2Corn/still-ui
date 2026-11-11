@@ -1,8 +1,10 @@
 package controller
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -55,8 +57,11 @@ func (a *ConnLogController) filter(c *gin.Context, action string) (connlog.ConnF
 		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
 		return f, false
 	}
-	who := "api token"
-	if user := session.GetLoginUser(c); user != nil {
+	// A token request carries the first admin as its user: name the token's scope instead.
+	who := ""
+	if scope, _ := c.Get("api_token_scope"); scope != nil {
+		who = fmt.Sprintf("an API token (%v)", scope)
+	} else if user := session.GetLoginUser(c); user != nil {
 		who = user.Username
 	}
 	asked, _ := json.Marshal(f)
@@ -87,12 +92,13 @@ func (a *ConnLogController) export(c *gin.Context) {
 	}
 	ctx, cancel := context.WithTimeout(c.Request.Context(), connLogQueryTimeout)
 	defer cancel()
-	c.Header("Cache-Control", "no-store")
-	c.Header("Content-Type", "text/csv; charset=utf-8")
-	c.Header("Content-Disposition", `attachment; filename="connections.csv"`)
-	c.Status(http.StatusOK)
-	// Rows already sent cannot be taken back: a failure ends the file short and is logged.
-	if err := a.connLogService.Export(ctx, c.Writer, f); err != nil {
-		logger.Warning("connection log: export failed:", err)
+	// Written whole or not at all: a file cut short by an error would pass for the full answer.
+	var csv bytes.Buffer
+	if err := a.connLogService.Export(ctx, &csv, f); err != nil {
+		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
+		return
 	}
+	c.Header("Cache-Control", "no-store")
+	c.Header("Content-Disposition", `attachment; filename="connections.csv"`)
+	c.Data(http.StatusOK, "text/csv; charset=utf-8", csv.Bytes())
 }

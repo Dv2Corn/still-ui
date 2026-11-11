@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -36,6 +37,8 @@ var (
 	connLogPathStamp   os.FileInfo
 	connLogPath        string
 	connLogLastFailure string
+	// The policy of the last settings read that worked, for a truncation during one that does not.
+	connLogPolicy connlog.Policy
 )
 
 func connLogAccessLogPath() string {
@@ -55,32 +58,52 @@ func connLogAccessLogPath() string {
 	return connLogPath
 }
 
-func (s *ConnLogService) config() (connlog.Config, bool) {
-	settings := s.settingService.GetConnLogSettings()
+func (s *ConnLogService) config() (connlog.Config, bool, error) {
+	settings, err := s.settingService.GetConnLogSettings()
+	if err != nil {
+		return connlog.Config{}, false, err
+	}
+	policy := connlog.Policy{Destination: settings.Destination, Source: settings.Source}
+	connLogPathMu.Lock()
+	connLogPolicy = policy
+	connLogPathMu.Unlock()
 	return connlog.Config{
-		Dir:  config.GetConnLogFolderPath(),
-		Open: func(path string) (*os.File, error) { return xray.OpenLogFile(path, os.O_RDONLY) },
-		Policy: connlog.Policy{
-			Destination: settings.Destination,
-			Source:      settings.Source,
-		},
+		Dir:           config.GetConnLogFolderPath(),
+		Open:          func(path string) (*os.File, error) { return xray.OpenLogFile(path, os.O_RDONLY) },
+		Policy:        policy,
 		RetentionDays: settings.RetentionDays,
 		MaxBytes:      int64(settings.MaxSizeMB) << 20,
-	}, settings.Enable
+	}, settings.Enable, nil
+}
+
+// emptyOwnAccessLog cuts the access log the panel turned on for itself: it holds whole
+// lines, whatever the storage policy, and nothing reads it once the connection log is off.
+func emptyOwnAccessLog() {
+	path := filepath.Join(xrayLogFolder(), connLogAccessLogName)
+	if info, err := os.Stat(path); err != nil || info.Size() == 0 {
+		return
+	}
+	if f, err := xray.OpenLogFile(path, os.O_WRONLY); err == nil {
+		_ = f.Truncate(0)
+		_ = f.Close()
+	}
 }
 
 // Tick is the cron step: read the access log's new lines while the log is on, stop
 // reading while it is off, and delete what the retention and the size cap no longer allow.
 func (s *ConnLogService) Tick() {
-	cfg, enabled := s.config()
+	// Settings that cannot be read are neither "off" nor the defaults: the step waits for them.
+	cfg, enabled, err := s.config()
 	ctx, cancel := context.WithTimeout(context.Background(), connLogStepTimeout)
 	defer cancel()
-	var err error
-	if enabled {
+	switch {
+	case err != nil:
+	case enabled:
 		cfg.LogPath = connLogAccessLogPath()
 		err = connLogCollector.Step(ctx, cfg, time.Now())
-	} else {
+	default:
 		err = connLogCollector.Halt(ctx, cfg, time.Now())
+		emptyOwnAccessLog()
 	}
 	// A full disk fails every step the same way; one line per distinct failure is enough.
 	failure := ""
@@ -96,13 +119,16 @@ func (s *ConnLogService) Tick() {
 	}
 }
 
-// TruncateAccessLog empties the access log through truncate. With the connection log on,
-// the lines not read yet are stored first.
-func TruncateAccessLog(truncate func() error) error {
+// TruncateAccessLog empties the access log at path through truncate. With the connection
+// log on, the lines not read yet are stored first.
+func TruncateAccessLog(path string, truncate func() error) error {
 	ctx, cancel := context.WithTimeout(context.Background(), connLogStepTimeout)
 	defer cancel()
-	cfg, _ := (&ConnLogService{}).config()
-	return connLogCollector.TruncateLog(ctx, cfg.Policy, truncate)
+	_, _, _ = (&ConnLogService{}).config()
+	connLogPathMu.Lock()
+	policy := connLogPolicy
+	connLogPathMu.Unlock()
+	return connLogCollector.TruncateLog(ctx, path, policy, truncate)
 }
 
 // Query returns one page of the log, with whether it is being recorded and its size on disk.

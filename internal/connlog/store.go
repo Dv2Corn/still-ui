@@ -270,11 +270,19 @@ func (w *writer) trim(ctx context.Context, target int64) error {
 
 var errNoLog = errors.New("connection log is empty")
 
-// openNewest opens the latest day file for writing; errNoLog when there is none.
-func openNewest(ctx context.Context, dir string) (*writer, error) {
+// openPositioned opens the latest day file that holds a read position, with that position;
+// errNoLog when none does. A newer file without one was created and never written.
+func openPositioned(ctx context.Context, dir string) (*writer, tailState, error) {
 	list := days(dir)
-	if len(list) == 0 {
-		return nil, errNoLog
+	for i := len(list) - 1; i >= 0; i-- {
+		w, err := openWriter(ctx, dir, list[i], false)
+		if err != nil {
+			return nil, tailState{}, err
+		}
+		if state, ok := w.state(ctx); ok {
+			return w, state, nil
+		}
+		w.close()
 	}
-	return openWriter(ctx, dir, list[len(list)-1], false)
+	return nil, tailState{}, errNoLog
 }

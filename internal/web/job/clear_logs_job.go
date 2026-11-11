@@ -103,11 +103,11 @@ func wipeXrayLogs() {
 	truncateXrayLog(xray.GetErrorLogPath, 0, runTruncate)
 }
 
-func runTruncate(truncate func() error) error { return truncate() }
+func runTruncate(_ string, truncate func() error) error { return truncate() }
 
 // truncateXrayLog empties a log through cut, which lets the connection log store the
 // access log's unread lines before they go.
-func truncateXrayLog(pathFn func() (string, error), maxBytes int64, cut func(truncate func() error) error) {
+func truncateXrayLog(pathFn func() (string, error), maxBytes int64, cut func(path string, truncate func() error) error) {
 	logPath, err := pathFn()
 	if err != nil || disabledLogPath(logPath) {
 		return
@@ -131,7 +131,7 @@ func truncateXrayLog(pathFn func() (string, error), maxBytes int64, cut func(tru
 			return
 		}
 	}
-	if err := cut(func() error { return f.Truncate(0) }); err != nil {
+	if err := cut(logPath, func() error { return f.Truncate(0) }); err != nil {
 		logger.Warning("Failed to truncate Xray log:", logPath, "-", err)
 	}
 }

@@ -722,29 +722,30 @@ func (s *SettingService) GetConnLogEnable() bool {
 	return enable
 }
 
-// GetConnLogSettings reads the connection log settings. An unreadable or empty one keeps
-// its default; an unreadable switch reads as off.
-func (s *SettingService) GetConnLogSettings() ConnLogSettings {
+// GetConnLogSettings reads the connection log settings; an empty or malformed one keeps its
+// default. A database that cannot be read is an error: defaults then would delete stored days.
+func (s *SettingService) GetConnLogSettings() (ConnLogSettings, error) {
+	var readErr error
+	text := func(key string) string {
+		v, err := s.getString(key)
+		readErr = errors.Join(readErr, err)
+		return effectiveSettingValue(key, v)
+	}
 	number := func(key string) int {
-		if v, err := s.getInt(key); err == nil && v > 0 {
-			return v
+		v, err := strconv.Atoi(text(key))
+		if err != nil || v <= 0 {
+			v, _ = strconv.Atoi(defaultValueMap[key])
 		}
-		v, _ := strconv.Atoi(defaultValueMap[key])
 		return v
 	}
-	text := func(key string) string {
-		if v, err := s.getString(key); err == nil && v != "" {
-			return v
-		}
-		return defaultValueMap[key]
-	}
+	enable, _ := strconv.ParseBool(text("connLogEnable"))
 	return ConnLogSettings{
-		Enable:        s.GetConnLogEnable(),
+		Enable:        enable,
 		RetentionDays: number("connLogRetentionDays"),
 		MaxSizeMB:     number("connLogMaxSizeMB"),
 		Destination:   text("connLogDestination"),
 		Source:        text("connLogSource"),
-	}
+	}, readErr
 }
 
 // HealthAlertThresholds are the limits the health alerts compare against.
@@ -1806,20 +1807,23 @@ func (s *SettingService) UpdateAllSetting(allSetting *entity.AllSetting, clears 
 	if err := normalizeSubProbeSettings(allSetting); err != nil {
 		return err
 	}
-	// A form saved by an older page or script has no connection log fields: keep the defaults.
-	for _, field := range []struct {
-		value *int
-		key   string
-	}{{&allSetting.ConnLogRetentionDays, "connLogRetentionDays"}, {&allSetting.ConnLogMaxSizeMB, "connLogMaxSizeMB"}} {
-		if *field.value == 0 {
-			*field.value, _ = strconv.Atoi(defaultValueMap[field.key])
-		}
+	// A form saved by an older page or script has no connection log fields: what is stored
+	// stays, or a shorter retention would delete days the operator meant to keep.
+	connLog, err := s.GetConnLogSettings()
+	if err != nil {
+		return err
+	}
+	if allSetting.ConnLogRetentionDays == 0 {
+		allSetting.ConnLogRetentionDays = connLog.RetentionDays
+	}
+	if allSetting.ConnLogMaxSizeMB == 0 {
+		allSetting.ConnLogMaxSizeMB = connLog.MaxSizeMB
 	}
 	if allSetting.ConnLogDestination == "" {
-		allSetting.ConnLogDestination = defaultValueMap["connLogDestination"]
+		allSetting.ConnLogDestination = connLog.Destination
 	}
 	if allSetting.ConnLogSource == "" {
-		allSetting.ConnLogSource = defaultValueMap["connLogSource"]
+		allSetting.ConnLogSource = connLog.Source
 	}
 	switch allSetting.SubProfileMode {
 	case "", SubProfileModeNone, SubProfileModeBuiltin, SubProfileModeCustom:

@@ -101,6 +101,10 @@ func destination(to string) (network, host string, port int) {
 			}
 			return "tcp", clip(strings.ToLower(u.Hostname())), port
 		}
+		// A URL that does not parse still must not leave its path and query in the host.
+		_, to, _ = strings.Cut(to, "://")
+		to, _, _ = strings.Cut(to, "/")
+		to, _, _ = strings.Cut(to, "?")
 	}
 	network, rest := cutNetwork(to)
 	host = rest

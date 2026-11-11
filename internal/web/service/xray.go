@@ -1401,8 +1401,9 @@ func resolveXrayLogPaths(logCfg json_util.RawMessage) json_util.RawMessage {
 	return out
 }
 
-// connLogAccessLogName is the access log the connection log turns on when the operator has none.
-const connLogAccessLogName = "access.log"
+// connLogAccessLogName is the access log the connection log turns on when the operator has
+// none. The name is the panel's own, so the file can be emptied once the log is off.
+const connLogAccessLogName = "access-connlog.log"
 
 // ensureAccessLog gives the generated config an access log for the connection log to read.
 // A log the operator already set is left alone; the stored template is never modified.

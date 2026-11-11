@@ -8,6 +8,7 @@ import (
 
 	"github.com/mhsanaei/3x-ui/v3/internal/database"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
+	"github.com/mhsanaei/3x-ui/v3/internal/logger"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/crypto"
 )
 
@@ -51,6 +52,14 @@ func TestConnLogIsForAdminsOnly(t *testing.T) {
 	engine.ServeHTTP(w, req)
 	if w.Code != http.StatusNotFound {
 		t.Errorf("without a login: %d, want 404", w.Code)
+	}
+
+	// A token request runs as the first admin; the record of who read the log must say it was a token.
+	logged := strings.Join(logger.GetLogs(50, "INFO"), "\n")
+	for _, want := range []string{"connection log: query by an API token (admin) from ", "connection log: export by an API token (admin) from "} {
+		if !strings.Contains(logged, want) {
+			t.Errorf("the panel log has no %q:\n%s", want, logged)
+		}
 	}
 }
 

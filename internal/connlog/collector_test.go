@@ -154,7 +154,7 @@ func TestCollectorLosesNoLineWhenThePanelTruncatesTheLog(t *testing.T) {
 	f.write(f.line("a"))
 	f.step()
 	f.write(f.line("b") + f.line("c"))
-	err := f.c.TruncateLog(context.Background(), f.cfg.Policy, func() error { return os.Truncate(f.cfg.LogPath, 0) })
+	err := f.c.TruncateLog(context.Background(), f.cfg.LogPath, f.cfg.Policy, func() error { return os.Truncate(f.cfg.LogPath, 0) })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -236,7 +236,7 @@ func TestCollectorWritesNothingWhileOff(t *testing.T) {
 	if err := f.c.Halt(context.Background(), f.cfg, time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.c.TruncateLog(context.Background(), f.cfg.Policy, func() error { return nil }); err != nil {
+	if err := f.c.TruncateLog(context.Background(), f.cfg.LogPath, f.cfg.Policy, func() error { return nil }); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(f.cfg.Dir); !os.IsNotExist(err) {
@@ -288,6 +288,72 @@ func TestCollectorLeavesOutLinesOlderThanTheRetention(t *testing.T) {
 	f.write(f.line("a") + old)
 	f.step()
 	f.expect("a")
+	f.write(f.line("b"))
+	f.step()
+	f.expect("a b")
+}
+
+// The panel was down for days while Xray kept writing. Each day's lines belong in that
+// day's file: a query for a day opens that file and the one after it, no further.
+func TestCollectorFilesABacklogOfSeveralDaysByDay(t *testing.T) {
+	f := newFixture(t)
+	f.write("")
+	if err := f.c.Step(context.Background(), f.cfg, time.Now().AddDate(0, 0, -3)); err != nil {
+		t.Fatal(err)
+	}
+	var backlog strings.Builder
+	for age := 3; age >= 0; age-- {
+		fmt.Fprintf(&backlog, "%s from 198.51.100.7:4000%d accepted tcp:day-%d.test:443 [in-1 >> direct] email: alice\n",
+			time.Now().AddDate(0, 0, -age).Format("2006/01/02 15:04:05.000000"), age, age)
+	}
+	f.write(backlog.String())
+	f.step()
+	f.expect("day-3 day-2 day-1 day-0")
+	if got := days(f.cfg.Dir); len(got) != 4 {
+		t.Errorf("day files %v, want one for each day of the backlog", got)
+	}
+	then := time.Now().AddDate(0, 0, -3)
+	var found []string
+	err := Scan(context.Background(), f.cfg.Dir, ConnFilter{From: then.Add(-time.Hour).UnixMilli(), To: then.Add(time.Hour).UnixMilli()}, 10,
+		func(rec ConnRecord, _ string) error {
+			found = append(found, rec.Host)
+			return nil
+		})
+	if err != nil || strings.Join(found, " ") != "day-3.test" {
+		t.Errorf("a query for the first day of the backlog found %q (err %v), want day-3.test", found, err)
+	}
+}
+
+// A day file created and never written (a full disk, a kill) holds no position; the file
+// before it does, and a restart must continue from there instead of from the end of the log.
+func TestCollectorFindsItsPlaceBehindADayFileNeverWritten(t *testing.T) {
+	f := newFixture(t)
+	f.write("")
+	f.step()
+	f.write(f.line("a"))
+	f.step()
+	f.restart()
+	w, err := openWriter(context.Background(), f.cfg.Dir, time.Now().UTC().AddDate(0, 0, 1).Format(dayLayout), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.close()
+	f.write(f.line("while-down"))
+	f.step()
+	f.expect("a while-down")
+}
+
+// The panel's truncation names the file it cuts. After the access-log path changed, that
+// is not yet the file being followed, whose position must stay.
+func TestCollectorKeepsItsPlaceWhenAnotherLogIsTruncated(t *testing.T) {
+	f := newFixture(t)
+	f.write("")
+	f.step()
+	f.write(f.line("a"))
+	f.step()
+	if err := f.c.TruncateLog(context.Background(), f.cfg.LogPath+".new", f.cfg.Policy, func() error { return nil }); err != nil {
+		t.Fatal(err)
+	}
 	f.write(f.line("b"))
 	f.step()
 	f.expect("a b")

@@ -66,6 +66,19 @@ describe('Connections page', () => {
     await waitFor(() => expect(listCalls()[2]).toMatchObject({ before: '' }));
   });
 
+  it('asks the server again when Search is pressed with the same filter', async () => {
+    renderWithProviders(
+      <MemoryRouter initialEntries={['/connections']}>
+        <ConnectionsPage />
+      </MemoryRouter>,
+    );
+    await screen.findByText('first.example.com:443');
+    expect(listCalls()).toHaveLength(1);
+    await userEvent.click(screen.getByRole('button', { name: /Search/ }));
+    await waitFor(() => expect(listCalls()).toHaveLength(2));
+    expect(listCalls()[1]).toMatchObject({ client: '', before: '' });
+  });
+
   it('says that nothing is being recorded while the log is off', async () => {
     vi.mocked(HttpUtil.post).mockImplementation(
       async (url) =>

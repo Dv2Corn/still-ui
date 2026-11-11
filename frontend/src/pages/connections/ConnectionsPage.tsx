@@ -61,7 +61,7 @@ export default function ConnectionsPage() {
   const [exporting, setExporting] = useState(false);
 
   const filter = useMemo(() => connLogFilter(applied, cursors.at(-1) ?? ''), [applied, cursors]);
-  const { data: page, isFetching, isError, error } = useConnLogQuery(filter);
+  const { data: page, isFetching, isError, error, refetch } = useConnLogQuery(filter);
   const { data: inboundOptions = [] } = useInboundOptions();
 
   const patch = useCallback((next: Partial<ConnLogFormValues>) => {
@@ -69,9 +69,14 @@ export default function ConnectionsPage() {
   }, []);
 
   const search = useCallback(() => {
+    // The same filter is the same query, which would not run again: Search always asks the server.
+    if (cursors.length === 0 && JSON.stringify(form) === JSON.stringify(applied)) {
+      void refetch();
+      return;
+    }
     setCursors([]);
     setApplied({ ...form });
-  }, [form]);
+  }, [form, applied, cursors, refetch]);
 
   const reset = useCallback(() => {
     setCursors([]);

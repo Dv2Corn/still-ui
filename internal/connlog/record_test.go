@@ -36,6 +36,7 @@ func TestRecordFromAppliesTheStoragePolicy(t *testing.T) {
 		{"an IP destination has no domain to reduce", v4, "tcp:198.51.100.7:22", Policy{DestinationDomain, SourceFull}, "203.0.113.77", 54321, "tcp", "198.51.100.7", 22},
 		{"no destination", v4, "tcp:example.com:443", Policy{DestinationNone, SourceFull}, "203.0.113.77", 54321, "tcp", "", 0},
 		{"URL of the http inbound keeps host and port only", v4, "http://Example.com/private/path?token=1", Policy{DestinationFull, SourceFull}, "203.0.113.77", 54321, "tcp", "example.com", 80},
+		{"a URL that does not parse still loses its path", v4, "http://Example.com:8080/private%zz?token=1", Policy{DestinationFull, SourceFull}, "203.0.113.77", 54321, "tcp", "example.com", 8080},
 		{"an unknown policy value stores nothing", v4, "tcp:example.com:443", Policy{"everything", "everything"}, "", 0, "tcp", "", 0},
 	}
 	for _, tt := range tests {

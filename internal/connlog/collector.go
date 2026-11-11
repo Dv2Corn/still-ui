@@ -23,6 +23,7 @@ const (
 	pruneEvery = time.Minute
 	// clockSlack is how far ahead of the panel's clock a line's time may be.
 	clockSlack = time.Minute
+	dayMillis  = 24 * 60 * 60 * 1000
 )
 
 // ErrLineAheadOfClock reports a line that was left out for its time. Xray stamps a line as
@@ -88,37 +89,39 @@ func (c *Collector) Halt(ctx context.Context, cfg Config, now time.Time) error {
 		c.halted = true
 		c.closeLog()
 		c.resumed = false
-		if c.w == nil {
-			c.w, err = openNewest(ctx, cfg.Dir)
-		}
-		if c.w != nil {
-			if state, ok := c.w.state(ctx); ok && state.Offset >= 0 {
-				err = c.w.append(ctx, nil, tailState{Offset: -1})
+		c.w.close()
+		c.w = nil
+		w, state, openErr := openPositioned(ctx, cfg.Dir)
+		if openErr == nil {
+			if state.Offset >= 0 {
+				err = w.append(ctx, nil, tailState{Offset: -1})
 			}
-			c.w.close()
-			c.w = nil
-		}
-		if errors.Is(err, errNoLog) {
-			err = nil
+			w.close()
+		} else if !errors.Is(openErr, errNoLog) {
+			err = openErr
 		}
 	}
 	return errors.Join(err, c.pruneDue(ctx, cfg, now))
 }
 
-// TruncateLog runs truncate, which empties the access log, right after reading the log to
-// its end: a line is lost only if Xray writes it between that last read and the cut.
-func (c *Collector) TruncateLog(ctx context.Context, policy Policy, truncate func() error) error {
+// TruncateLog runs truncate, which empties the access log at path, right after reading the
+// log to its end: a line is lost only if Xray writes it between that last read and the cut.
+func (c *Collector) TruncateLog(ctx context.Context, path string, policy Policy, truncate func() error) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.log == nil {
+	if c.log == nil || path != c.cfg.LogPath {
 		return truncate()
 	}
 	c.cfg.Policy, c.now = policy, time.Now()
+	// A log renamed away since the last step is not the file being cut: its position stays.
+	replaced, _ := c.logChanged()
 	readErr := c.readAll(ctx)
 	if err := truncate(); err != nil {
 		return errors.Join(readErr, err)
 	}
-	c.startOfLog()
+	if !replaced {
+		c.startOfLog()
+	}
 	return readErr
 }
 
@@ -178,16 +181,14 @@ func (c *Collector) resume(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if c.w == nil {
-		if c.w, err = openNewest(ctx, c.cfg.Dir); err != nil && !errors.Is(err, errNoLog) {
-			return err
-		}
+	c.w.close()
+	c.w = nil
+	w, state, err := openPositioned(ctx, c.cfg.Dir)
+	if err != nil && !errors.Is(err, errNoLog) {
+		return err
 	}
-	state, ok := tailState{}, false
-	if c.w != nil {
-		state, ok = c.w.state(ctx)
-	}
-	if ok && state.Offset >= 0 {
+	c.w = w
+	if err == nil && state.Offset >= 0 {
 		if info.Size() >= state.Offset && c.headIs(state.Head) {
 			c.off, c.head, c.saved = state.Offset, state.Head, state
 		}
@@ -231,30 +232,42 @@ func (c *Collector) readAll(ctx context.Context) error {
 	}
 	batch := c.batch[:0]
 	defer func() { c.batch = batch[:0] }()
+	flush := func() error {
+		err := c.commit(ctx, batch, false)
+		if err != nil {
+			// back to the last stored position: these lines are read again next time
+			c.off = c.saved.Offset
+		}
+		batch = batch[:0]
+		return err
+	}
 	// A day the retention deletes at once is not written at all: it would only be filed and removed.
-	oldest := c.now.UTC().AddDate(0, 0, -c.cfg.RetentionDays).Format(dayLayout)
+	oldest := c.now.UTC().AddDate(0, 0, -c.cfg.RetentionDays).Truncate(24 * time.Hour).UnixMilli()
 	latest := c.now.Add(clockSlack).UnixMilli()
 	for {
 		line, size, terminated, err := xray.ReadAccessLogLine(c.reader)
 		more := err == nil && terminated
 		if more {
-			c.off += int64(size)
-			if rec, ok := recordFrom(xray.ParseAccessLogLine(line), c.cfg.Policy); ok {
-				switch {
-				case rec.Time > latest:
-					c.ahead = true
-				case dayOf(rec.Time) >= oldest:
-					batch = append(batch, rec)
+			rec, ok := recordFrom(xray.ParseAccessLogLine(line), c.cfg.Policy)
+			if ok && rec.Time > latest {
+				c.ahead, ok = true, false
+			}
+			ok = ok && rec.Time >= oldest
+			// One batch is one day, so a backlog of several days lands in each day's own file.
+			if ok && len(batch) > 0 && rec.Time/dayMillis != batch[0].Time/dayMillis {
+				if err := flush(); err != nil {
+					return err
 				}
+			}
+			c.off += int64(size)
+			if ok {
+				batch = append(batch, rec)
 			}
 		}
 		if !more || len(batch) == batchRows {
-			if commitErr := c.commit(ctx, batch, false); commitErr != nil {
-				// back to the last stored position: these lines are read again next time
-				c.off = c.saved.Offset
-				return commitErr
+			if err := flush(); err != nil {
+				return err
 			}
-			batch = batch[:0]
 		}
 		if !more {
 			if errors.Is(err, io.EOF) {
@@ -265,8 +278,8 @@ func (c *Collector) readAll(ctx context.Context) error {
 	}
 }
 
-// commit stores a batch with the position after it. The file is the day of the batch's last
-// line, never an earlier day than the newest file, so the newest file always has the position.
+// commit stores a batch with the position after it. The file is the day of the batch's
+// lines, never an earlier day than the one written last, which keeps the position in it.
 func (c *Collector) commit(ctx context.Context, batch []ConnRecord, force bool) error {
 	// Lines that left no record need no write: after a restart they are read again and skipped again.
 	if len(batch) == 0 && !force {
@@ -279,7 +292,7 @@ func (c *Collector) commit(ctx context.Context, batch []ConnRecord, force bool) 
 		}
 	}
 	state := tailState{Offset: c.off, Head: c.head}
-	day := time.Now().UTC().Format(dayLayout)
+	day := c.now.UTC().Format(dayLayout)
 	if len(batch) > 0 {
 		day = dayOf(batch[len(batch)-1].Time)
 	}

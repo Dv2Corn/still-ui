@@ -12,6 +12,7 @@ import (
 
 	"github.com/mhsanaei/3x-ui/v3/internal/config"
 	"github.com/mhsanaei/3x-ui/v3/internal/connlog"
+	"github.com/mhsanaei/3x-ui/v3/internal/database"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/dbtest"
 	xuilogger "github.com/mhsanaei/3x-ui/v3/internal/logger"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/json_util"
@@ -172,7 +173,7 @@ func TestConnLogCollectsQueriesAndExports(t *testing.T) {
 	// A stricter policy applies to what comes next and leaves what is stored alone.
 	setConnLog(t, true, connlog.DestinationDomain, connlog.SourceMasked)
 	appendAccessLog(t, accessLog, stamp+" from 203.0.113.77:1234 accepted tcp:=cmd.maps.example.co.uk:443 [in-vless >> direct] email: bob\n")
-	if err := TruncateAccessLog(func() error { return os.Truncate(accessLog, 0) }); err != nil {
+	if err := TruncateAccessLog(accessLog, func() error { return os.Truncate(accessLog, 0) }); err != nil {
 		t.Fatal(err)
 	}
 	page, err = svc.Query(context.Background(), connlog.ConnFilter{Client: "bob"})
@@ -212,7 +213,9 @@ func TestConnLogExportDefusesFormulaCells(t *testing.T) {
 	}
 }
 
-// A settings form from before the connection log has none of its fields.
+// A settings form from before the connection log (a page left open across the upgrade, a
+// script) has none of its fields. Saving it must not shorten the retention, which would
+// delete stored days, nor store more than the operator chose.
 func TestConnLogSettingsSurviveAFormWithoutThem(t *testing.T) {
 	connLogPanel(t)
 	s := &SettingService{}
@@ -220,12 +223,68 @@ func TestConnLogSettingsSurviveAFormWithoutThem(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	want := ConnLogSettings{Enable: true, RetentionDays: 30, MaxSizeMB: 2048, Destination: "full", Source: "full"}
+	all.ConnLogEnable = true
+	if err := s.UpdateAllSetting(all, SecretClears{}); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := s.GetConnLogSettings(); err != nil || got != want {
+		t.Fatalf("a form with only the switch: %+v (err %v), want the defaults %+v", got, err, want)
+	}
+
+	all.ConnLogRetentionDays, all.ConnLogMaxSizeMB, all.ConnLogDestination, all.ConnLogSource = 365, 4096, "domain", "masked"
+	if err := s.UpdateAllSetting(all, SecretClears{}); err != nil {
+		t.Fatal(err)
+	}
 	all.ConnLogRetentionDays, all.ConnLogMaxSizeMB, all.ConnLogDestination, all.ConnLogSource = 0, 0, "", ""
 	if err := s.UpdateAllSetting(all, SecretClears{}); err != nil {
 		t.Fatal(err)
 	}
-	want := ConnLogSettings{Enable: false, RetentionDays: 30, MaxSizeMB: 2048, Destination: "full", Source: "full"}
-	if got := s.GetConnLogSettings(); got != want {
-		t.Errorf("settings after an old form: %+v, want the defaults %+v", got, want)
+	want = ConnLogSettings{Enable: true, RetentionDays: 365, MaxSizeMB: 4096, Destination: "domain", Source: "masked"}
+	if got, err := s.GetConnLogSettings(); err != nil || got != want {
+		t.Errorf("settings after an old form: %+v (err %v), want what was stored %+v", got, err, want)
+	}
+}
+
+// A database that cannot be read says nothing about the settings. Taking that for "off"
+// would drop the read position, and for the default retention would delete stored days.
+func TestConnLogTickWaitsForSettingsItCannotRead(t *testing.T) {
+	accessLog := connLogPanel(t)
+	setConnLog(t, true, connlog.DestinationFull, connlog.SourceFull)
+	svc := &ConnLogService{}
+	appendAccessLog(t, accessLog, "")
+	svc.Tick()
+
+	if err := database.CloseDB(); err != nil {
+		t.Fatal(err)
+	}
+	stamp := time.Now().Format("2006/01/02 15:04:05.000000")
+	appendAccessLog(t, accessLog, stamp+" from 203.0.113.77:1234 accepted tcp:during.test:443 [in-1 >> direct] email: alice\n")
+	svc.Tick()
+	if err := database.InitDB(config.GetDBPath()); err != nil {
+		t.Fatal(err)
+	}
+	svc.Tick()
+
+	page, err := svc.Query(context.Background(), connlog.ConnFilter{})
+	if err != nil || len(page.Rows) != 1 || page.Rows[0].Host != "during.test" {
+		t.Errorf("after the database came back: %+v, err %v; want the line logged meanwhile", page, err)
+	}
+}
+
+// The access log the panel turned on for itself holds whole lines, whatever the storage
+// policy says; once the connection log is off nothing reads it and it must not stay.
+func TestConnLogOffEmptiesTheAccessLogItTurnedOn(t *testing.T) {
+	accessLog := connLogPanel(t)
+	ours := filepath.Join(config.GetLogFolder(), connLogAccessLogName)
+	line := "2024/01/02 15:04:05.000000 from 1.2.3.4:5 accepted tcp:example.com:443 [in-1 >> direct] email: alice\n"
+	appendAccessLog(t, ours, line)
+	appendAccessLog(t, accessLog, line)
+	(&ConnLogService{}).Tick()
+	if info, err := os.Stat(ours); err != nil || info.Size() != 0 {
+		t.Errorf("the panel's own access log after a step with the log off: %v, err %v; want it empty", info, err)
+	}
+	if info, err := os.Stat(accessLog); err != nil || info.Size() == 0 {
+		t.Errorf("the operator's access log was touched: %v, err %v", info, err)
 	}
 }
