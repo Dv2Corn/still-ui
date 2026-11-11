@@ -354,6 +354,9 @@ func (s *PanelImportService) legacySubUsers(plan *panelimport.Plan, subIDs map[s
 			users = append(users, u)
 		}
 	}
+	if len(users) > 0 {
+		report.Notes = append(report.Notes, "Marzban's subscription links keep working where their address points at this panel's subscription server; its signing secret is kept here for that, and whoever has it can open these subscriptions until you run: still-ui import forget-links")
+	}
 	return users, nil
 }
 
@@ -363,6 +366,7 @@ func ResolveLegacySubID(token string) (subID string, ok bool) {
 	if len(token) < 15 {
 		return token, false
 	}
+	// Read each time, not cached: the command line forgets the links from another process.
 	secret, err := (&SettingService{}).GetMarzbanSubSecret()
 	if err != nil || secret == "" {
 		return token, false

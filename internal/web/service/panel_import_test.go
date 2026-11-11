@@ -129,7 +129,7 @@ func TestPanelImport_Apply(t *testing.T) {
 	}
 	if alice.UUID != marzbantest.AliceVless || alice.Password != marzbantest.AliceTrojan || len(alice.SubID) != 16 ||
 		alice.TotalGB != 10*marzbantest.GiB || alice.ExpiryTime != marzbantest.AliceExpire*1000 || !alice.Enable ||
-		alice.Comment != "paid until 2100" || alice.TrafficReset != "monthly" {
+		alice.Comment != "paid until 2100" || alice.TrafficReset != "monthly" || alice.TrafficResetDay != 4 {
 		t.Errorf("alice = %+v", alice)
 	}
 	if alice.SubID == marzbantest.DerivableAliceSubID {

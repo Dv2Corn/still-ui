@@ -350,6 +350,17 @@ func readMarzbanUsers(gdb *gorm.DB, plan *Plan, inbounds []*marzbanInbound) ([]*
 		excludedByProxy[id][asString(e["inbound_tag"])] = true
 	}
 
+	logRows, err := rows(gdb, "user_usage_logs")
+	if err != nil {
+		return nil, err
+	}
+	// Marzban counts a cycle from the user's last reset, the last log row, else from creation.
+	lastReset := map[int64]time.Time{}
+	for _, l := range logRows {
+		lastReset[asInt(l["user_id"])] = asTime(l["reset_at"])
+	}
+
+	cycles := false
 	byID := map[int64]*marzbanUser{}
 	users := make([]*marzbanUser, 0, len(userRows))
 	for _, r := range userRows {
@@ -368,9 +379,19 @@ func readMarzbanUsers(gdb *gorm.DB, plan *Plan, inbounds []*marzbanInbound) ([]*
 			Comment:      asString(r["note"]),
 			TrafficReset: marzbanResets[asString(r["data_limit_reset_strategy"])],
 		}
-		if created := asTime(r["created_at"]); !created.IsZero() {
+		created := asTime(r["created_at"])
+		if !created.IsZero() {
 			u.client.CreatedAt = created.UnixMilli()
 			u.notBefore = ceilUnix(created)
+		}
+		cycles = cycles || (u.client.TrafficReset != "" && u.client.TrafficReset != "never")
+		last := lastReset[u.id]
+		if last.IsZero() {
+			last = created
+		}
+		if u.client.TrafficReset == "monthly" && !last.IsZero() {
+			// The day Marzban's 30-day cycle would next reset on becomes the day of every month here.
+			u.client.TrafficResetDay = last.AddDate(0, 0, 30).Day()
 		}
 		if revoked := asTime(r["sub_revoked_at"]); !revoked.IsZero() {
 			u.notBefore = max(u.notBefore, ceilUnix(revoked))
@@ -388,6 +409,9 @@ func readMarzbanUsers(gdb *gorm.DB, plan *Plan, inbounds []*marzbanInbound) ([]*
 		}
 		byID[u.id] = u
 		users = append(users, u)
+	}
+	if cycles {
+		plan.note("traffic resets follow this panel's calendar: daily at midnight, weekly on Sunday, monthly on the day each user's next Marzban reset was due; Marzban counted 1, 7 and 30 days from each user's own last reset")
 	}
 	for _, p := range proxyRows {
 		u := byID[asInt(p["user_id"])]

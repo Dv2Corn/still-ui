@@ -72,6 +72,7 @@ func TestReadMarzbanInbounds(t *testing.T) {
 	wantNotes := []string{
 		`inbound "VLESS FALLBACK WS": no single numeric port`,
 		`user "erin": the yearly traffic reset has no equivalent`,
+		`traffic resets follow this panel's calendar: daily at midnight, weekly on Sunday, monthly on the day each user's next Marzban reset was due`,
 		`user "alice": its vless and vmess credentials differ, so vmess is the separate client "alice.vmess"`,
 		`user "alice": its trojan and shadowsocks credentials differ, so shadowsocks is the separate client "alice.ss"`,
 		`host "{USERNAME} cdn" of inbound "VLESS WS TLS": only its first address "cdn.example.com" is kept`,
@@ -118,7 +119,7 @@ func TestReadMarzbanClients(t *testing.T) {
 		"alice": {
 			ID: marzbantest.AliceVless, Flow: "xtls-rprx-vision", Email: "alice", Enable: true,
 			TotalGB: 10 * marzbantest.GiB, ExpiryTime: marzbantest.AliceExpire * 1000, Comment: "paid until 2100",
-			TrafficReset: "monthly", CreatedAt: 1735725600500,
+			TrafficReset: "monthly", TrafficResetDay: 4, CreatedAt: 1735725600500,
 		},
 		"bob":   {ID: marzbantest.BobVless, Email: "bob", Enable: false, TrafficReset: "never", CreatedAt: 1735725600500},
 		"carol": {ID: marzbantest.CarolVless, Flow: "xtls-rprx-vision", Email: "carol", Enable: true, TotalGB: 5 * marzbantest.GiB, TrafficReset: "weekly", CreatedAt: 1735725600500},

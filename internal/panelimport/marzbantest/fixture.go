@@ -43,6 +43,8 @@ CREATE TABLE hosts (id INTEGER NOT NULL PRIMARY KEY, remark VARCHAR(256) NOT NUL
   mux_enable BOOLEAN NOT NULL DEFAULT '0', fragment_setting VARCHAR(100), noise_setting VARCHAR(2000),
   random_user_agent BOOLEAN NOT NULL DEFAULT '0', use_sni_as_host BOOLEAN NOT NULL DEFAULT '0');
 CREATE TABLE jwt (id INTEGER NOT NULL PRIMARY KEY, secret_key VARCHAR(64) NOT NULL);
+CREATE TABLE user_usage_logs (id INTEGER NOT NULL PRIMARY KEY, user_id INTEGER,
+  used_traffic_at_reset BIGINT NOT NULL, reset_at DATETIME);
 `
 
 const (
@@ -125,6 +127,10 @@ func Build(t testing.TB, basePort int) (string, []byte) {
 	user(4, "dave", "expired", 100, nil, "day", DaveExpire, nil, nil, nil)
 	user(5, "erin", "on_hold", 0, 3*GiB, "year", nil, nil, nil, ErinHoldSecs)
 	user(6, "frank", "active", 42, nil, "no_reset", nil, nil, "2025-06-01 00:00:00.000000", nil)
+
+	// alice's cycle last restarted on 5 October, so Marzban would reset her next on 4 November.
+	exec(`INSERT INTO user_usage_logs (user_id, used_traffic_at_reset, reset_at) VALUES
+		(1, 7, '2026-09-05 08:00:00.000000'), (1, 9, '2026-10-05 08:00:00.000000')`)
 
 	proxy := func(id, userID int, kind string, settings map[string]any) {
 		raw, _ := json.Marshal(settings)
