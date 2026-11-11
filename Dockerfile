@@ -44,7 +44,7 @@ COPY --from=frontend /src/internal/web/dist ./internal/web/dist
 
 ENV CGO_ENABLED=1
 ENV CGO_CFLAGS="-D_LARGEFILE64_SOURCE"
-RUN go build -ldflags "-w -s" -o build/x-ui main.go
+RUN go build -ldflags "-w -s" -o build/x-ui .
 COPY --from=xray /out/xray /tmp/xray-still
 RUN ./DockerInit.sh "$TARGETARCH" "$TARGETVARIANT" /tmp/xray-still && rm -f /tmp/xray-still
 
