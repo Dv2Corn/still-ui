@@ -251,6 +251,19 @@ func TestRealityBulkScanIsPaced(t *testing.T) {
 	}
 }
 
+func TestRealityScanStopsStartingProbesWhenTimeRunsOut(t *testing.T) {
+	prev := realityScanBudget
+	realityScanBudget = -time.Second
+	t.Cleanup(func() { realityScanBudget = prev })
+	got, err := (&ServerService{}).ScanRealityTargets("192.0.2.1,192.0.2.2,192.0.2.0/30", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].Reachable || !strings.HasPrefix(got[0].Reason, "6 targets were not checked") {
+		t.Fatalf("results = %+v, want one row saying 6 targets were not checked", got)
+	}
+}
+
 func TestNeighbourScanRunsOneAtATime(t *testing.T) {
 	realityNeighbourScan.Lock()
 	defer realityNeighbourScan.Unlock()

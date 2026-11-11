@@ -111,10 +111,8 @@ func hopE2EStartXray(t *testing.T, bin, dir, name string, config any) {
 	})
 }
 
-// TestPortHopE2E drives the whole feature with real parts: the inbound is saved through the
-// panel's own service, the redirect is loaded by nft, the server runs the inbound exactly as
-// the panel hands it to Xray, and a second Xray in another network namespace connects with
-// the JSON subscription the panel serves for it.
+// TestPortHopE2E saves the inbound through the panel, loads the redirect with real nft, and
+// connects an Xray in another network namespace with the JSON subscription the panel serves.
 func TestPortHopE2E(t *testing.T) {
 	shared, peer, self, bin := os.Getenv("XUI_PORTHOP_E2E_DIR"), os.Getenv("XUI_PORTHOP_E2E_PEER"), os.Getenv("XUI_PORTHOP_E2E_SELF"), os.Getenv("XRAY_E2E_BINARY")
 	if shared == "" || peer == "" || self == "" || bin == "" {

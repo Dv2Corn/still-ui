@@ -6,6 +6,7 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/mhsanaei/3x-ui/v3/internal/amneziawg"
 	"github.com/mhsanaei/3x-ui/v3/internal/database"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 	"github.com/mhsanaei/3x-ui/v3/internal/porthop"
@@ -105,6 +106,28 @@ func inboundDisplayName(ib *model.Inbound) string {
 	return fmt.Sprintf("#%d", ib.Id)
 }
 
+func inRanges(ranges []porthop.Range, port int) bool {
+	return slices.ContainsFunc(ranges, func(r porthop.Range) bool { return r.Contains(port) })
+}
+
+// forwardedPortsIn lists the client forwards of a userspace AmneziaWG inbound inside the
+// ranges: a forward binds its UDP port itself, outside the port column.
+func forwardedPortsIn(row *model.Inbound, ranges []porthop.Range) []int {
+	inst, ok := amneziawg.InstanceFromInbound(row)
+	if !ok || amneziawgKernelMode(row) {
+		return nil
+	}
+	var out []int
+	for _, peer := range inst.Peers {
+		for _, port := range amneziawg.ExpandForwardedPorts(peer.ForwardedPorts) {
+			if inRanges(ranges, port) {
+				out = append(out, port)
+			}
+		}
+	}
+	return out
+}
+
 // checkPortHopConflict keeps a redirected range and the UDP ports of the same host apart:
 // a UDP inbound inside another inbound's range would lose its traffic or leave dead hop ports.
 func checkPortHopConflict(db *gorm.DB, inbound *model.Inbound, ignoreId int) error {
@@ -141,6 +164,17 @@ func checkPortHopConflict(db *gorm.DB, inbound *model.Inbound, ignoreId int) err
 				if r.Overlaps(o) {
 					return common.NewError(fmt.Sprintf("Port hopping: the range %s overlaps the range %s of inbound %s.", r, o, inboundDisplayName(other)))
 				}
+			}
+		}
+	}
+	if ranges != nil {
+		forwarding, err := others("protocol = ?", model.AmneziaWG)
+		if err != nil {
+			return err
+		}
+		for _, other := range forwarding {
+			if ports := forwardedPortsIn(other, ranges); len(ports) > 0 {
+				return common.NewError(fmt.Sprintf("Port hopping: the range contains port %d, which inbound %s forwards to a client.", ports[0], inboundDisplayName(other)))
 			}
 		}
 	}
@@ -189,6 +223,20 @@ func (s *PortHopService) desired() ([]porthop.Redirect, []PortHopRule, []uint16,
 				if inboundTransports(other.Protocol, other.StreamSettings, other.Settings)&transportUDP != 0 {
 					protected = appendPort(protected, other.Port)
 				}
+			}
+		}
+	}
+	if len(redirects) == 0 {
+		return nil, nil, nil, nil
+	}
+	var forwarding []*model.Inbound
+	if err := db.Model(model.Inbound{}).Where("protocol = ? AND node_id IS NULL AND enable = ?", model.AmneziaWG, true).Find(&forwarding).Error; err != nil {
+		return nil, nil, nil, err
+	}
+	for _, ib := range forwarding {
+		for _, r := range redirects {
+			for _, port := range forwardedPortsIn(ib, r.Ranges) {
+				protected = appendPort(protected, port)
 			}
 		}
 	}

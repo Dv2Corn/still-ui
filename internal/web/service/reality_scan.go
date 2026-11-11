@@ -24,6 +24,8 @@ const (
 	realityScanConcurrency = 32
 	realityDiscoverMaxIPs  = 256
 	realityScanMaxTotal    = 512
+	// A host of the server's own /24 answers in milliseconds; dark addresses are the common case.
+	realityNeighbourTimeout = 2 * time.Second
 	// A certificate this close to its end makes a poor target: it may be replaced or abandoned.
 	realityCertMinValidity = 14 * 24 * time.Hour
 )
@@ -31,6 +33,10 @@ const (
 // realityBulkInterval spaces the connections of an address-range scan, so a hoster's
 // port-scan detection sees a slow trickle instead of a burst.
 var realityBulkInterval = 40 * time.Millisecond
+
+// realityScanBudget is how long a scan keeps starting probes: the last one may take
+// realityScanTimeout more, and the panel cuts a response off after 30 seconds.
+var realityScanBudget = 17 * time.Second
 
 // realityScanRoots replaces the system trust store in tests.
 var realityScanRoots *x509.CertPool
@@ -463,13 +469,6 @@ func (s *ServerService) ScanRealityTargets(targetsCSV string, neighbours bool) (
 			return nil, common.NewError("a neighbour scan is already running")
 		}
 		defer realityNeighbourScan.Unlock()
-		ips := neighbourScanIPs(s.ownPublicIPv4s())
-		if len(ips) == 0 {
-			invalid = append(invalid, &RealityScanResult{Target: "neighbours", Reason: "this server has no public IPv4 address"})
-		}
-		for _, ip := range ips[:min(len(ips), realityScanMaxTotal)] {
-			tasks = append(tasks, realityProbeTask{dialHost: ip, port: 443, timeout: realityDiscoverTimeout, bulk: true})
-		}
 	}
 	for _, token := range tokens {
 		if len(tasks) >= realityScanMaxTotal {
@@ -501,15 +500,35 @@ func (s *ServerService) ScanRealityTargets(targetsCSV string, neighbours bool) (
 		}
 	}
 
+	// The neighbours come last, so what the operator typed is checked first.
+	if neighbours {
+		ips := neighbourScanIPs(s.ownPublicIPv4s())
+		if len(ips) == 0 {
+			invalid = append(invalid, &RealityScanResult{Target: "neighbours", Reason: "this server has no public IPv4 address"})
+		}
+		for _, ip := range ips[:min(len(ips), max(realityScanMaxTotal-len(tasks), 0))] {
+			tasks = append(tasks, realityProbeTask{dialHost: ip, port: 443, timeout: realityNeighbourTimeout, bulk: true})
+		}
+	}
+
 	probed := make([]*RealityScanResult, len(tasks))
 	sem := make(chan struct{}, realityScanConcurrency)
 	var wg sync.WaitGroup
+	start := time.Now()
 	for i, task := range tasks {
 		if task.bulk {
 			time.Sleep(realityBulkInterval)
 		}
-		wg.Add(1)
 		sem <- struct{}{}
+		if time.Since(start) > realityScanBudget {
+			<-sem
+			invalid = append(invalid, &RealityScanResult{
+				Target: "scan",
+				Reason: fmt.Sprintf("%d targets were not checked: the scan ran out of time, scan a smaller range", len(tasks)-i),
+			})
+			break
+		}
+		wg.Add(1)
 		go func(idx int, tk realityProbeTask) {
 			defer wg.Done()
 			defer func() { <-sem }()

@@ -189,6 +189,41 @@ func TestPortHopRangesAndUDPPortsOfOneHostStayApart(t *testing.T) {
 	}
 }
 
+func TestPortHopRangesAndAmneziaWGForwardsStayApart(t *testing.T) {
+	setupConflictDB(t)
+	host := useFakePortHopHost(t)
+	svc := &InboundService{}
+	seedInboundConflict(t, "awg-fwd", "", 51820, model.AmneziaWG, "", awgRelayWindowSettingsWithForward(t, "awg-fwd", "28000"))
+
+	if _, _, err := svc.AddInbound(hopInbound(443, "27000-29000", true)); err == nil || !strings.Contains(err.Error(), "the range contains port 28000") {
+		t.Fatalf("AddInbound of a range over a forwarded port: err = %v", err)
+	}
+	hop, _, err := svc.AddInbound(hopInbound(443, "30000-31000", true))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, err := svc.loadPortConflictContext(database.GetDB(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hit := svc.checkForwardedPortsConflict(ctx, "30400-30450"); !strings.Contains(hit, "the port hopping range of inbound #"+strconv.Itoa(hop.Id)+" (port 30400)") {
+		t.Fatalf("a forward inside a hop range: hit = %q", hit)
+	}
+	if hit := svc.checkForwardedPortsConflict(ctx, "28001"); hit != "" {
+		t.Fatalf("a forward outside every hop range: hit = %q", hit)
+	}
+
+	// A restored backup can still hold a forward inside the range: it keeps its own listener.
+	moved := awgRelayWindowSettingsWithForward(t, "awg-fwd", "30500")
+	if err := database.GetDB().Model(&model.Inbound{}).Where("tag = ?", "awg-fwd").Update("settings", moved).Error; err != nil {
+		t.Fatal(err)
+	}
+	(&PortHopService{}).EnsureHost()
+	if !slices.Equal(host.protected, []uint16{443, 30500}) {
+		t.Fatalf("protected = %v, want the inbound's own port and the forwarded port [443 30500]", host.protected)
+	}
+}
+
 func TestEnsureHostFollowsTheInbounds(t *testing.T) {
 	setupConflictDB(t)
 	host := useFakePortHopHost(t)

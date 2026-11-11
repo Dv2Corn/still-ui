@@ -190,6 +190,26 @@ func TestEnsureRefusesHostsThatCannotRedirect(t *testing.T) {
 	}
 }
 
+func TestEnsureRemovesTheTableAFailedReloadLeftLoaded(t *testing.T) {
+	r := &nfttest.Runner{}
+	m, _ := testManager(r, "linux")
+	// The start-up pass with no redirect uses up the one look for a leftover table.
+	if err := m.Ensure(nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Ensure(oneRedirect, nil); err != nil {
+		t.Fatal(err)
+	}
+	r.ApplyErr = errors.New("exit status 1")
+	if err := m.Ensure(oneRedirect, []uint16{22}); err == nil {
+		t.Fatal("a refused transaction must surface")
+	}
+	r.ApplyErr = nil
+	if err := m.Ensure(nil, nil); err != nil || r.TableUp || r.Removed != 2 {
+		t.Fatalf("err %v, table up %v after %d removal(s), want the old table removed", err, r.TableUp, r.Removed)
+	}
+}
+
 func TestEnsureRetriesAFailedLoad(t *testing.T) {
 	r := &nfttest.Runner{ApplyErr: errors.New("exit status 1")}
 	m, _ := testManager(r, "linux")

@@ -113,7 +113,7 @@ func Ruleset(redirects []Redirect, protected []uint16) string {
 	}
 	// Ahead of other dstnat chains, so a range never depends on the order tables were loaded in.
 	w("\tchain prerouting {\n\t\ttype nat hook prerouting priority dstnat - 10; policy accept;")
-	// Forwarded traffic (containers, AmneziaWG kernel-mode clients) is not this host's to redirect.
+	// Only traffic addressed to this host: what it routes onward (kernel-mode AmneziaWG clients) is left alone.
 	w("\t\tfib daddr type != local return")
 	w("\t\tudp dport @protected return")
 	redirects = slices.Clone(redirects)
@@ -211,8 +211,8 @@ func (m *Manager) Ensure(redirects []Redirect, protected []uint16) error {
 		return err
 	}
 	if err := m.t.Load(rules); err != nil {
-		// The transaction is atomic: nothing of it is left behind.
-		m.applied = ""
+		// The transaction is atomic, so an earlier table may still be loaded: look for it again.
+		m.applied, m.cleaned = "", false
 		return err
 	}
 	m.applied, m.checked = rules, m.now()
