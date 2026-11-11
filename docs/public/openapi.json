@@ -4925,6 +4925,110 @@
         ],
         "type": "object"
       },
+      "PanelImportInbound": {
+        "description": "PanelImportInbound is one source inbound and what the import does with it.",
+        "properties": {
+          "clients": {
+            "example": 12,
+            "type": "integer"
+          },
+          "hosts": {
+            "example": 1,
+            "type": "integer"
+          },
+          "port": {
+            "example": 443,
+            "type": "integer"
+          },
+          "protocol": {
+            "example": "vless",
+            "type": "string"
+          },
+          "skipped": {
+            "description": "Skipped is why the inbound is left out; empty when it is imported.",
+            "type": "string"
+          },
+          "tag": {
+            "example": "VLESS TCP REALITY",
+            "type": "string"
+          }
+        },
+        "required": [
+          "clients",
+          "hosts",
+          "port",
+          "protocol",
+          "skipped",
+          "tag"
+        ],
+        "type": "object"
+      },
+      "PanelImportReport": {
+        "description": "PanelImportReport is the dry-run answer and, with Applied, the record of a real import.",
+        "properties": {
+          "admins": {
+            "example": [
+              "admin"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "applied": {
+            "example": false,
+            "type": "boolean"
+          },
+          "backup": {
+            "example": "/etc/still-ui/backups/still-ui-host-20261111T101500Z.db",
+            "type": "string"
+          },
+          "clients": {
+            "example": 12,
+            "type": "integer"
+          },
+          "inbounds": {
+            "items": {
+              "$ref": "#/components/schemas/PanelImportInbound"
+            },
+            "type": "array"
+          },
+          "legacySubLinks": {
+            "description": "LegacySubLinks counts the users whose subscription links from the source keep working.",
+            "example": 12,
+            "type": "integer"
+          },
+          "notEmpty": {
+            "example": false,
+            "type": "boolean"
+          },
+          "notes": {
+            "example": [
+              "user bob: the yearly traffic reset has no equivalent, set to never"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "source": {
+            "example": "marzban",
+            "type": "string"
+          }
+        },
+        "required": [
+          "admins",
+          "applied",
+          "backup",
+          "clients",
+          "inbounds",
+          "legacySubLinks",
+          "notEmpty",
+          "notes",
+          "source"
+        ],
+        "type": "object"
+      },
       "PanelUpdateStatus": {
         "description": "PanelUpdateStatus reports the outcome of the most recently launched panel\nself-update. RunID lets the caller confirm this status belongs to the\nupdate it started rather than a stale result left over from an earlier\nrun; State is one of \"pending\", \"success\", or \"failed\". RunID is a decimal\nstring, not a JSON number: it's a formatted UnixNano timestamp, and\nJavaScript's number type can't represent that precisely (it exceeds\nNumber.MAX_SAFE_INTEGER), which would let two different runs round to the\nsame value on the wire and defeat the whole point of this field.",
         "properties": {
@@ -9133,6 +9237,105 @@
                       "type": "string"
                     },
                     "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/server/importPanel": {
+      "post": {
+        "tags": [
+          "Server"
+        ],
+        "summary": "Import inbounds and users from another panel: a Marzban SQLite database with its xray_config.json, or the database of x-ui / 3x-ui before v3 (multipart form). Without apply=true it only reports what would be created and what cannot be, and writes nothing. A real import takes a local backup first and writes all or nothing; the upload is only read. A panel that already has inbounds needs merge=true, which skips what conflicts.",
+        "operationId": "post_panel_api_server_importPanel",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "source": {
+                    "type": "string",
+                    "description": "marzban or x-ui."
+                  },
+                  "db": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "The source SQLite database (Marzban: db.sqlite3; x-ui: x-ui.db)."
+                  },
+                  "config": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Marzban's xray_config.json, where its inbounds are. Required for marzban."
+                  },
+                  "apply": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "true writes the import; anything else is a dry run."
+                  },
+                  "merge": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Allow importing into a panel that already has inbounds."
+                  }
+                },
+                "required": [
+                  "source",
+                  "db"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "$ref": "#/components/schemas/PanelImportReport"
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": {
+                    "admins": [
+                      "admin"
+                    ],
+                    "applied": false,
+                    "backup": "/etc/still-ui/backups/still-ui-host-20261111T101500Z.db",
+                    "clients": 12,
+                    "inbounds": [
+                      {
+                        "clients": 12,
+                        "hosts": 1,
+                        "port": 443,
+                        "protocol": "vless",
+                        "skipped": "",
+                        "tag": "VLESS TCP REALITY"
+                      }
+                    ],
+                    "legacySubLinks": 12,
+                    "notEmpty": false,
+                    "notes": [
+                      "user bob: the yearly traffic reset has no equivalent, set to never"
+                    ],
+                    "source": "marzban"
                   }
                 }
               }

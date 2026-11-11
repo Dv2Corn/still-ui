@@ -886,6 +886,50 @@ export const sections: readonly Section[] = [
       },
       {
         method: 'POST',
+        path: '/panel/api/server/importPanel',
+        summary:
+          'Import inbounds and users from another panel: a Marzban SQLite database with its xray_config.json, or the database of x-ui / 3x-ui before v3 (multipart form). Without apply=true it only reports what would be created and what cannot be, and writes nothing. A real import takes a local backup first and writes all or nothing; the upload is only read. A panel that already has inbounds needs merge=true, which skips what conflicts.',
+        params: [
+          {
+            name: 'source',
+            in: 'body (multipart)',
+            type: 'string',
+            desc: 'marzban or x-ui.',
+          },
+          {
+            name: 'db',
+            in: 'body (multipart)',
+            type: 'file',
+            desc: 'The source SQLite database (Marzban: db.sqlite3; x-ui: x-ui.db).',
+          },
+          {
+            name: 'config',
+            in: 'body (multipart)',
+            type: 'file',
+            desc: "Marzban's xray_config.json, where its inbounds are. Required for marzban.",
+            optional: true,
+          },
+          {
+            name: 'apply',
+            in: 'body (multipart)',
+            type: 'boolean',
+            desc: 'true writes the import; anything else is a dry run.',
+            optional: true,
+            defaultValue: false,
+          },
+          {
+            name: 'merge',
+            in: 'body (multipart)',
+            type: 'boolean',
+            desc: 'Allow importing into a panel that already has inbounds.',
+            optional: true,
+            defaultValue: false,
+          },
+        ],
+        responseSchema: 'PanelImportReport',
+      },
+      {
+        method: 'POST',
         path: '/panel/api/server/localBackup',
         summary:
           'Take a local backup now with the saved backup settings: a consistent database snapshot, encrypted to the configured age/SSH keys, rotated, and sent to Telegram when that is on. Returns the file written.',

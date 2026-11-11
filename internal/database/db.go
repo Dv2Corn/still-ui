@@ -80,6 +80,7 @@ func allModels() []any {
 		&model.InboundFallback{},
 		&model.Host{},
 		&model.HostTombstone{},
+		&model.LegacySubUser{},
 		&model.NodeClientTraffic{},
 		&model.NodeClientIp{},
 		&model.ClientGlobalTraffic{},

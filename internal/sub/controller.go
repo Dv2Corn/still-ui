@@ -363,7 +363,7 @@ func NewSUBController(g *gin.RouterGroup, options ...SUBControllerOption) *SUBCo
 // initRouter registers HTTP routes for subscription links and JSON endpoints
 // on the provided router group.
 func (a *SUBController) initRouter(g *gin.RouterGroup) {
-	gLink := g.Group(a.subPath, setNoCacheHeaders)
+	gLink := g.Group(a.subPath, setNoCacheHeaders, resolveLegacySubID)
 	gLink.GET(":subid", a.subs)
 	gLink.HEAD(":subid", a.subs)
 	gLink.GET(":subid/hwid-status", a.hwidStatus)
@@ -371,6 +371,11 @@ func (a *SUBController) initRouter(g *gin.RouterGroup) {
 	if a.localDirect.Enabled() {
 		gLink.GET(":subid/"+shadowrocketConfName, a.shadowrocketConf)
 		gLink.HEAD(":subid/"+shadowrocketConfName, a.shadowrocketConf)
+	}
+	if a.configuredSubscriptionPathOwner(subMarzbanPath) == "" {
+		gMarzban := g.Group(subMarzbanPath, setNoCacheHeaders, onlyLegacySubID)
+		gMarzban.GET(":subid", a.subs)
+		gMarzban.HEAD(":subid", a.subs)
 	}
 	if a.jsonEnabled {
 		gJson := g.Group(a.subJsonPath, setNoCacheHeaders)
@@ -450,6 +455,35 @@ func (a *SUBController) maybeServeSubInfo(c *gin.Context) bool {
 	info["emails"] = dedupeEmails(page.Emails)
 	c.JSON(http.StatusOK, info)
 	return true
+}
+
+// subMarzbanPath is where Marzban serves subscriptions unless told otherwise.
+const subMarzbanPath = "/sub/"
+
+// resolveLegacySubID lets a subscription link issued by an imported Marzban reach the
+// subscription its user has here, before any handler reads the id.
+func resolveLegacySubID(c *gin.Context) {
+	for i := range c.Params {
+		if c.Params[i].Key == "subid" {
+			c.Params[i].Value, _ = service.ResolveLegacySubID(c.Params[i].Value)
+		}
+	}
+}
+
+// onlyLegacySubID serves Marzban's path to Marzban's links alone: a plain subscription
+// id stays reachable only on the panel's own, usually unguessable, path.
+func onlyLegacySubID(c *gin.Context) {
+	for i := range c.Params {
+		if c.Params[i].Key != "subid" {
+			continue
+		}
+		subID, ok := service.ResolveLegacySubID(c.Params[i].Value)
+		if !ok {
+			c.AbortWithStatus(http.StatusNotFound)
+			return
+		}
+		c.Params[i].Value = subID
+	}
 }
 
 func (a *SUBController) buildSubPageData(c *gin.Context) (PageData, bool) {

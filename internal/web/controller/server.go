@@ -3,6 +3,7 @@ package controller
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"regexp"
 	"slices"
@@ -16,6 +17,7 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/web/global"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/service"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/service/panel"
+	"github.com/mhsanaei/3x-ui/v3/internal/web/session"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/websocket"
 
 	"github.com/gin-gonic/gin"
@@ -87,6 +89,7 @@ func (a *ServerController) initRouter(g *gin.RouterGroup) {
 	g.POST("/xraylogs/:count", a.getXrayLogs)
 	g.POST("/amneziawglogs/:count", a.getAmneziaWGLogs)
 	g.POST("/importDB", a.importDB)
+	g.POST("/importPanel", a.importPanel)
 	g.POST("/localBackup", a.runLocalBackup)
 	g.POST("/getNewEchCert", a.getNewEchCert)
 	g.POST("/getCertHash", a.getCertHash)
@@ -496,6 +499,44 @@ func (a *ServerController) importDB(c *gin.Context) {
 	// browser's restartPanel follow-up can 401 once the imported users land (#6446).
 	_ = a.panelService.RestartPanel(3 * time.Second)
 	jsonObj(c, I18nWeb(c, "pages.index.importDatabaseSuccess"), nil)
+}
+
+// maxPanelImportBytes bounds the uploaded source database and Xray config together.
+const maxPanelImportBytes = 512 << 20
+
+// importPanel reports what an uploaded Marzban or x-ui database would bring into this
+// panel and, with apply=true, imports it; the upload itself is only read.
+func (a *ServerController) importPanel(c *gin.Context) {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxPanelImportBytes)
+	file, _, err := c.Request.FormFile("db")
+	if err != nil {
+		jsonMsg(c, I18nWeb(c, "pages.index.readDatabaseError"), err)
+		return
+	}
+	defer file.Close()
+	var xrayConfig []byte
+	if cfg, _, err := c.Request.FormFile("config"); err == nil {
+		xrayConfig, err = io.ReadAll(cfg)
+		cfg.Close()
+		if err != nil {
+			jsonMsg(c, I18nWeb(c, "pages.index.readDatabaseError"), err)
+			return
+		}
+	}
+	apply := c.Request.FormValue("apply") == "true"
+	opts := service.PanelImportOptions{
+		DryRun: !apply, Merge: c.Request.FormValue("merge") == "true", UserId: session.GetLoginUser(c).Id,
+	}
+	report, err := (&service.PanelImportService{}).RunUpload(c.Request.FormValue("source"), file, xrayConfig, opts)
+	if err != nil {
+		jsonMsg(c, I18nWeb(c, "pages.settings.importFailed"), err)
+		return
+	}
+	if report.Applied {
+		a.xrayService.SetToNeedRestart()
+		notifyClientsChanged()
+	}
+	jsonObj(c, report, nil)
 }
 
 // descendants publishes read-only summaries of the nodes this panel manages so

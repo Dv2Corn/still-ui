@@ -445,6 +445,13 @@ export default function CommandPalette() {
         icon: <HistoryOutlined aria-hidden />,
       },
       {
+        path: '/settings#import',
+        title: `${t('menu.settings')} · ${t('pages.settings.importSettings')}`,
+        subtitle: t('pages.settings.importSettings'),
+        keywords: ['import', 'marzban', 'x-ui', '3x-ui', 'migrate'],
+        icon: <ImportOutlined aria-hidden />,
+      },
+      {
         path: '/settings#subscription',
         title: `${t('menu.settings')} · ${t('pages.settings.subSettings')}`,
         subtitle: t('pages.settings.subSettings'),
