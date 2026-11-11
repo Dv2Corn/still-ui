@@ -1045,7 +1045,7 @@ func (s *Server) sendUDPPacketFragments(
 				stream.CancelWrite(0)
 				return err
 			}
-			if err := stream.Close(); err != nil {
+			if err := closeResponseStream(stream); err != nil {
 				return err
 			}
 			continue
@@ -1055,6 +1055,17 @@ func (s *Server) sendUDPPacketFragments(
 		}
 	}
 	return nil
+}
+
+// closeResponseStream sends the FIN of a written response. A client stops reading once it holds the
+// packet, and a STOP_SENDING that beats the FIN is that packet's end, not a failure of the relay.
+func closeResponseStream(stream *quic.SendStream) error {
+	err := stream.Close()
+	var stopped *quic.StreamError
+	if err != nil && errors.As(context.Cause(stream.Context()), &stopped) && stopped.Remote {
+		return nil
+	}
+	return err
 }
 
 // Close gracefully stops the server and releases all network resources.

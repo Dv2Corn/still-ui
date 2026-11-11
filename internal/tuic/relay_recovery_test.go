@@ -7,11 +7,8 @@ import (
 	"io"
 	"net"
 	"runtime"
-	"strings"
 	"testing"
 	"time"
-
-	"github.com/mhsanaei/3x-ui/v3/internal/logger"
 
 	clientquic "github.com/quic-go/quic-go"
 )
@@ -151,21 +148,11 @@ func TestAudit3UDPAssociationMustRecoverAfterBridgeReadFailure(t *testing.T) {
 				t.Fatalf("initial echo %q %v", p, err)
 			}
 
-			s.UpdateRuntimeSettings("recovery-"+name, "bbr", "warn")
 			_ = u.Close()
 			audit3SendPacket(t, c, mode, 42131, 2, "while-down")
+			// The reader hands its relay back on the way out; the shared log cannot say whose reader ended.
 			deadline := time.Now().Add(2 * time.Second)
-			for {
-				found := false
-				for _, line := range logger.GetLogs(10000, "DEBUG") {
-					if strings.Contains(line, "recovery-"+name) && strings.Contains(line, "UDP relay receive failed") {
-						found = true
-						break
-					}
-				}
-				if found {
-					break
-				}
+			for user.udpRelays.Load() != 0 {
 				if time.Now().After(deadline) {
 					t.Fatal("closed UDP bridge did not terminate the response reader")
 				}
@@ -195,6 +182,35 @@ func TestAudit3UDPAssociationMustRecoverAfterBridgeReadFailure(t *testing.T) {
 				t.Fatalf("retained association became receive blackhole after read failure: response %q err=%v; fresh association works; user up=%d down=%d", payload, oldErr, user.Traffic.BytesUp.Load(), user.Traffic.BytesDown.Load())
 			}
 		})
+	}
+}
+
+// A client cancels a response stream's read once it holds the packet, and that STOP_SENDING can beat the
+// server's FIN; reporting it as a relay failure tore the whole UDP association down (stream-mode CI flake).
+func TestResponseStreamThePeerStoppedReadingIsNotARelayFailure(t *testing.T) {
+	s, c, id, _ := startLifecycleTestServer(t, "127.0.0.1:1", "response-stop@x")
+	conn, _ := authenticatedServerConnection(t, s, id)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	stream, err := conn.OpenUniStreamSync(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := stream.Write([]byte("response")); err != nil {
+		t.Fatal(err)
+	}
+	received, err := c.AcceptUniStream(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	received.CancelRead(0)
+	select {
+	case <-stream.Context().Done():
+	case <-ctx.Done():
+		t.Fatal("the client's STOP_SENDING never reached the server")
+	}
+	if err := closeResponseStream(stream); err != nil {
+		t.Fatalf("closing a response the peer stopped reading = %v, want nil", err)
 	}
 }
 
