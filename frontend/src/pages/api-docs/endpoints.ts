@@ -963,7 +963,7 @@ export const sections: readonly Section[] = [
         method: 'POST',
         path: '/panel/api/server/scanRealityTarget',
         summary:
-          'Run a live TLS 1.3 probe against a candidate REALITY target and return a feasibility verdict (TLS 1.3 + h2 + X25519 + trusted certificate) plus the certificate SAN DNS names. A target on a private/loopback address is reported with privateTarget=true and probed only when allowPrivate is set.',
+          'Run a live TLS 1.3 probe against a candidate REALITY target and return a feasibility verdict (TLS 1.3 + h2 + X25519 + trusted certificate) plus the certificate SAN DNS names. certExpiresSoon marks a certificate with under 14 days left and mlkem768 a target that also accepts X25519MLKEM768; neither changes the verdict. A target on a private/loopback address is reported with privateTarget=true and probed only when allowPrivate is set.',
         params: [
           {
             name: 'target',
@@ -1000,7 +1000,7 @@ export const sections: readonly Section[] = [
         method: 'POST',
         path: '/panel/api/server/scanRealityTargets',
         summary:
-          'Probe/discover REALITY targets and return each verdict ranked by feasibility then latency. Each comma-separated token may be a domain (validated with SNI), a bare IP, or a CIDR range (discovered without SNI by reading the certificate domain). When empty, the realityScanCandidates setting is probed (the built-in seed list if that setting is empty).',
+          'Probe/discover REALITY targets and return each verdict ranked by feasibility, then certificates with 14 days or more left, then latency. Each comma-separated token may be a domain (validated with SNI), a bare IP, or a CIDR range (discovered without SNI by reading the certificate domain). When empty, the realityScanCandidates setting is probed (the built-in seed list if that setting is empty). Address ranges are probed on port 443 only, about 25 addresses a second, and never on private addresses.',
         params: [
           {
             name: 'targets',
@@ -1008,6 +1008,13 @@ export const sections: readonly Section[] = [
             type: 'string',
             optional: true,
             desc: 'Optional comma-separated tokens: domain[:port], IP[:port], or CIDR (e.g. 104.16.0.0/24). When omitted, the realityScanCandidates setting is probed (the built-in seed list if that setting is empty).',
+          },
+          {
+            name: 'neighbours',
+            in: 'body (form)',
+            type: 'boolean',
+            optional: true,
+            desc: 'true also probes port 443 of the other addresses in the /24 around each public IPv4 address of this server and reads the names in their certificates. One such scan runs at a time. Some hosting providers treat this as a port scan.',
           },
         ],
         body: 'targets=104.16.0.0/24,www.apple.com:443',

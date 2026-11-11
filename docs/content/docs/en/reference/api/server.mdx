@@ -219,18 +219,22 @@ _openapi:
     - depth: 2
       title: Run a live TLS 1.3 probe against a candidate REALITY target and return a
         feasibility verdict (TLS 1.3 + h2 + X25519 + trusted certificate) plus
-        the certificate SAN DNS names. A target on a private/loopback address is
-        reported with privateTarget=true and probed only when allowPrivate is
-        set.
-      url: '#run-a-live-tls-13-probe-against-a-candidate-reality-target-and-return-a-feasibility-verdict-tls-13--h2--x25519--trusted-certificate-plus-the-certificate-san-dns-names-a-target-on-a-privateloopback-address-is-reported-with-privatetargettrue-and-probed-only-when-allowprivate-is-set'
+        the certificate SAN DNS names. certExpiresSoon marks a certificate with
+        under 14 days left and mlkem768 a target that also accepts
+        X25519MLKEM768; neither changes the verdict. A target on a
+        private/loopback address is reported with privateTarget=true and probed
+        only when allowPrivate is set.
+      url: '#run-a-live-tls-13-probe-against-a-candidate-reality-target-and-return-a-feasibility-verdict-tls-13--h2--x25519--trusted-certificate-plus-the-certificate-san-dns-names-certexpiressoon-marks-a-certificate-with-under-14-days-left-and-mlkem768-a-target-that-also-accepts-x25519mlkem768-neither-changes-the-verdict-a-target-on-a-privateloopback-address-is-reported-with-privatetargettrue-and-probed-only-when-allowprivate-is-set'
     - depth: 2
       title: Probe/discover REALITY targets and return each verdict ranked by
-        feasibility then latency. Each comma-separated token may be a domain
-        (validated with SNI), a bare IP, or a CIDR range (discovered without SNI
-        by reading the certificate domain). When empty, the
-        realityScanCandidates setting is probed (the built-in seed list if that
-        setting is empty).
-      url: '#probediscover-reality-targets-and-return-each-verdict-ranked-by-feasibility-then-latency-each-comma-separated-token-may-be-a-domain-validated-with-sni-a-bare-ip-or-a-cidr-range-discovered-without-sni-by-reading-the-certificate-domain-when-empty-the-realityscancandidates-setting-is-probed-the-built-in-seed-list-if-that-setting-is-empty'
+        feasibility, then certificates with 14 days or more left, then latency.
+        Each comma-separated token may be a domain (validated with SNI), a bare
+        IP, or a CIDR range (discovered without SNI by reading the certificate
+        domain). When empty, the realityScanCandidates setting is probed (the
+        built-in seed list if that setting is empty). Address ranges are probed
+        on port 443 only, about 25 addresses a second, and never on private
+        addresses.
+      url: '#probediscover-reality-targets-and-return-each-verdict-ranked-by-feasibility-then-certificates-with-14-days-or-more-left-then-latency-each-comma-separated-token-may-be-a-domain-validated-with-sni-a-bare-ip-or-a-cidr-range-discovered-without-sni-by-reading-the-certificate-domain-when-empty-the-realityscancandidates-setting-is-probed-the-built-in-seed-list-if-that-setting-is-empty-address-ranges-are-probed-on-port-443-only-about-25-addresses-a-second-and-never-on-private-addresses'
     - depth: 2
       title: Fetch the fully aggregated inbound_client_ips database table. Used by
         nodes to sync recently active IPs across the cluster.
@@ -410,17 +414,21 @@ _openapi:
         id: run-xray-tls-ping-against-a-remote-server-and-return-its-live-leaf-certificate-sha-256-hashes-for-pinning-pinnedpeercertsha256
       - content: Run a live TLS 1.3 probe against a candidate REALITY target and return
           a feasibility verdict (TLS 1.3 + h2 + X25519 + trusted certificate)
-          plus the certificate SAN DNS names. A target on a private/loopback
-          address is reported with privateTarget=true and probed only when
-          allowPrivate is set.
-        id: run-a-live-tls-13-probe-against-a-candidate-reality-target-and-return-a-feasibility-verdict-tls-13--h2--x25519--trusted-certificate-plus-the-certificate-san-dns-names-a-target-on-a-privateloopback-address-is-reported-with-privatetargettrue-and-probed-only-when-allowprivate-is-set
+          plus the certificate SAN DNS names. certExpiresSoon marks a
+          certificate with under 14 days left and mlkem768 a target that also
+          accepts X25519MLKEM768; neither changes the verdict. A target on a
+          private/loopback address is reported with privateTarget=true and
+          probed only when allowPrivate is set.
+        id: run-a-live-tls-13-probe-against-a-candidate-reality-target-and-return-a-feasibility-verdict-tls-13--h2--x25519--trusted-certificate-plus-the-certificate-san-dns-names-certexpiressoon-marks-a-certificate-with-under-14-days-left-and-mlkem768-a-target-that-also-accepts-x25519mlkem768-neither-changes-the-verdict-a-target-on-a-privateloopback-address-is-reported-with-privatetargettrue-and-probed-only-when-allowprivate-is-set
       - content: Probe/discover REALITY targets and return each verdict ranked by
-          feasibility then latency. Each comma-separated token may be a domain
-          (validated with SNI), a bare IP, or a CIDR range (discovered without
-          SNI by reading the certificate domain). When empty, the
-          realityScanCandidates setting is probed (the built-in seed list if
-          that setting is empty).
-        id: probediscover-reality-targets-and-return-each-verdict-ranked-by-feasibility-then-latency-each-comma-separated-token-may-be-a-domain-validated-with-sni-a-bare-ip-or-a-cidr-range-discovered-without-sni-by-reading-the-certificate-domain-when-empty-the-realityscancandidates-setting-is-probed-the-built-in-seed-list-if-that-setting-is-empty
+          feasibility, then certificates with 14 days or more left, then
+          latency. Each comma-separated token may be a domain (validated with
+          SNI), a bare IP, or a CIDR range (discovered without SNI by reading
+          the certificate domain). When empty, the realityScanCandidates setting
+          is probed (the built-in seed list if that setting is empty). Address
+          ranges are probed on port 443 only, about 25 addresses a second, and
+          never on private addresses.
+        id: probediscover-reality-targets-and-return-each-verdict-ranked-by-feasibility-then-certificates-with-14-days-or-more-left-then-latency-each-comma-separated-token-may-be-a-domain-validated-with-sni-a-bare-ip-or-a-cidr-range-discovered-without-sni-by-reading-the-certificate-domain-when-empty-the-realityscancandidates-setting-is-probed-the-built-in-seed-list-if-that-setting-is-empty-address-ranges-are-probed-on-port-443-only-about-25-addresses-a-second-and-never-on-private-addresses
       - content: Fetch the fully aggregated inbound_client_ips database table. Used by
           nodes to sync recently active IPs across the cluster.
         id: fetch-the-fully-aggregated-inbound_client_ips-database-table-used-by-nodes-to-sync-recently-active-ips-across-the-cluster

@@ -5085,6 +5085,15 @@ export const SCHEMAS: Record<string, unknown> = {
         "example": true,
         "type": "boolean"
       },
+      "certDaysLeft": {
+        "example": 61,
+        "type": "integer"
+      },
+      "certExpiresSoon": {
+        "description": "CertExpiresSoon marks a certificate with under 14 days left; it does not change Feasible.",
+        "example": false,
+        "type": "boolean"
+      },
       "certIssuer": {
         "example": "Google Trust Services",
         "type": "string"
@@ -5121,6 +5130,11 @@ export const SCHEMAS: Record<string, unknown> = {
         "example": 180,
         "type": "integer"
       },
+      "mlkem768": {
+        "description": "MLKEM768 reports that a second handshake offering only X25519MLKEM768 succeeded.",
+        "example": true,
+        "type": "boolean"
+      },
       "notAfter": {
         "example": "2026-08-01T00:00:00Z",
         "type": "string"
@@ -5132,6 +5146,11 @@ export const SCHEMAS: Record<string, unknown> = {
       "privateTarget": {
         "description": "PrivateTarget marks a target that resolves to a loopback/private/link-local\naddress: blocked before the probe unless the caller opted in, then flagged.",
         "example": false,
+        "type": "boolean"
+      },
+      "reachable": {
+        "description": "Reachable is false when the name did not resolve or TCP did not connect.",
+        "example": true,
         "type": "boolean"
       },
       "reason": {
@@ -5164,6 +5183,8 @@ export const SCHEMAS: Record<string, unknown> = {
       "alpn",
       "certChainBytes",
       "certChainValid",
+      "certDaysLeft",
+      "certExpiresSoon",
       "certIssuer",
       "certSubject",
       "certValid",
@@ -5173,9 +5194,11 @@ export const SCHEMAS: Record<string, unknown> = {
       "host",
       "ip",
       "latencyMs",
+      "mlkem768",
       "notAfter",
       "port",
       "privateTarget",
+      "reachable",
       "reason",
       "serverNames",
       "target",

@@ -5111,6 +5111,15 @@
             "example": true,
             "type": "boolean"
           },
+          "certDaysLeft": {
+            "example": 61,
+            "type": "integer"
+          },
+          "certExpiresSoon": {
+            "description": "CertExpiresSoon marks a certificate with under 14 days left; it does not change Feasible.",
+            "example": false,
+            "type": "boolean"
+          },
           "certIssuer": {
             "example": "Google Trust Services",
             "type": "string"
@@ -5147,6 +5156,11 @@
             "example": 180,
             "type": "integer"
           },
+          "mlkem768": {
+            "description": "MLKEM768 reports that a second handshake offering only X25519MLKEM768 succeeded.",
+            "example": true,
+            "type": "boolean"
+          },
           "notAfter": {
             "example": "2026-08-01T00:00:00Z",
             "type": "string"
@@ -5158,6 +5172,11 @@
           "privateTarget": {
             "description": "PrivateTarget marks a target that resolves to a loopback/private/link-local\naddress: blocked before the probe unless the caller opted in, then flagged.",
             "example": false,
+            "type": "boolean"
+          },
+          "reachable": {
+            "description": "Reachable is false when the name did not resolve or TCP did not connect.",
+            "example": true,
             "type": "boolean"
           },
           "reason": {
@@ -5190,6 +5209,8 @@
           "alpn",
           "certChainBytes",
           "certChainValid",
+          "certDaysLeft",
+          "certExpiresSoon",
           "certIssuer",
           "certSubject",
           "certValid",
@@ -5199,9 +5220,11 @@
           "host",
           "ip",
           "latencyMs",
+          "mlkem768",
           "notAfter",
           "port",
           "privateTarget",
+          "reachable",
           "reason",
           "serverNames",
           "target",
@@ -9081,7 +9104,7 @@
         "tags": [
           "Server"
         ],
-        "summary": "Run a live TLS 1.3 probe against a candidate REALITY target and return a feasibility verdict (TLS 1.3 + h2 + X25519 + trusted certificate) plus the certificate SAN DNS names. A target on a private/loopback address is reported with privateTarget=true and probed only when allowPrivate is set.",
+        "summary": "Run a live TLS 1.3 probe against a candidate REALITY target and return a feasibility verdict (TLS 1.3 + h2 + X25519 + trusted certificate) plus the certificate SAN DNS names. certExpiresSoon marks a certificate with under 14 days left and mlkem768 a target that also accepts X25519MLKEM768; neither changes the verdict. A target on a private/loopback address is reported with privateTarget=true and probed only when allowPrivate is set.",
         "operationId": "post_panel_api_server_scanRealityTarget",
         "requestBody": {
           "required": true,
@@ -9139,6 +9162,8 @@
                     "alpn": "h2",
                     "certChainBytes": 3427,
                     "certChainValid": true,
+                    "certDaysLeft": 61,
+                    "certExpiresSoon": false,
                     "certIssuer": "Google Trust Services",
                     "certSubject": "cloudflare.com",
                     "certValid": true,
@@ -9148,9 +9173,11 @@
                     "host": "www.cloudflare.com",
                     "ip": "104.16.124.96",
                     "latencyMs": 180,
+                    "mlkem768": true,
                     "notAfter": "2026-08-01T00:00:00Z",
                     "port": 443,
                     "privateTarget": false,
+                    "reachable": true,
                     "reason": "",
                     "serverNames": [
                       ""
@@ -9172,7 +9199,7 @@
         "tags": [
           "Server"
         ],
-        "summary": "Probe/discover REALITY targets and return each verdict ranked by feasibility then latency. Each comma-separated token may be a domain (validated with SNI), a bare IP, or a CIDR range (discovered without SNI by reading the certificate domain). When empty, the realityScanCandidates setting is probed (the built-in seed list if that setting is empty).",
+        "summary": "Probe/discover REALITY targets and return each verdict ranked by feasibility, then certificates with 14 days or more left, then latency. Each comma-separated token may be a domain (validated with SNI), a bare IP, or a CIDR range (discovered without SNI by reading the certificate domain). When empty, the realityScanCandidates setting is probed (the built-in seed list if that setting is empty). Address ranges are probed on port 443 only, about 25 addresses a second, and never on private addresses.",
         "operationId": "post_panel_api_server_scanRealityTargets",
         "requestBody": {
           "required": false,
@@ -9184,6 +9211,10 @@
                   "targets": {
                     "type": "string",
                     "description": "Optional comma-separated tokens: domain[:port], IP[:port], or CIDR (e.g. 104.16.0.0/24). When omitted, the realityScanCandidates setting is probed (the built-in seed list if that setting is empty)."
+                  },
+                  "neighbours": {
+                    "type": "boolean",
+                    "description": "true also probes port 443 of the other addresses in the /24 around each public IPv4 address of this server and reads the names in their certificates. One such scan runs at a time. Some hosting providers treat this as a port scan."
                   }
                 }
               }
@@ -9219,6 +9250,8 @@
                       "alpn": "h2",
                       "certChainBytes": 3427,
                       "certChainValid": true,
+                      "certDaysLeft": 61,
+                      "certExpiresSoon": false,
                       "certIssuer": "Google Trust Services",
                       "certSubject": "cloudflare.com",
                       "certValid": true,
@@ -9228,9 +9261,11 @@
                       "host": "www.cloudflare.com",
                       "ip": "104.16.124.96",
                       "latencyMs": 180,
+                      "mlkem768": true,
                       "notAfter": "2026-08-01T00:00:00Z",
                       "port": 443,
                       "privateTarget": false,
+                      "reachable": true,
                       "reason": "",
                       "serverNames": [
                         ""

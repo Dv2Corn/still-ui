@@ -1136,6 +1136,8 @@ export interface RealityScanResult {
   alpn: string;
   certChainBytes: number;
   certChainValid: boolean;
+  certDaysLeft: number;
+  certExpiresSoon: boolean;
   certIssuer: string;
   certSubject: string;
   certValid: boolean;
@@ -1145,9 +1147,11 @@ export interface RealityScanResult {
   host: string;
   ip: string;
   latencyMs: number;
+  mlkem768: boolean;
   notAfter: string;
   port: number;
   privateTarget: boolean;
+  reachable: boolean;
   reason: string;
   serverNames: string[];
   target: string;

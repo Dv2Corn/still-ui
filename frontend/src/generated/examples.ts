@@ -1305,6 +1305,8 @@ export const EXAMPLES: Record<string, unknown> = {
     "alpn": "h2",
     "certChainBytes": 3427,
     "certChainValid": true,
+    "certDaysLeft": 61,
+    "certExpiresSoon": false,
     "certIssuer": "Google Trust Services",
     "certSubject": "cloudflare.com",
     "certValid": true,
@@ -1314,9 +1316,11 @@ export const EXAMPLES: Record<string, unknown> = {
     "host": "www.cloudflare.com",
     "ip": "104.16.124.96",
     "latencyMs": 180,
+    "mlkem768": true,
     "notAfter": "2026-08-01T00:00:00Z",
     "port": 443,
     "privateTarget": false,
+    "reachable": true,
     "reason": "",
     "serverNames": [
       ""

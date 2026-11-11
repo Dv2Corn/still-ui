@@ -595,9 +595,9 @@ func (a *ServerController) scanRealityTarget(c *gin.Context) {
 }
 
 // scanRealityTargets probes the supplied comma-separated targets, or the
-// realityScanCandidates setting when empty, ranked by feasibility then latency.
+// realityScanCandidates setting when empty; neighbours adds the server's own /24.
 func (a *ServerController) scanRealityTargets(c *gin.Context) {
-	res, err := a.serverService.ScanRealityTargets(c.PostForm("targets"))
+	res, err := a.serverService.ScanRealityTargets(c.PostForm("targets"), c.PostForm("neighbours") == "true")
 	if err != nil {
 		jsonMsg(c, I18nWeb(c, "pages.inbounds.toasts.scanRealityTargetError"), err)
 		return

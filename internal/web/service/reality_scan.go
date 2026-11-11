@@ -24,7 +24,19 @@ const (
 	realityScanConcurrency = 32
 	realityDiscoverMaxIPs  = 256
 	realityScanMaxTotal    = 512
+	// A certificate this close to its end makes a poor target: it may be replaced or abandoned.
+	realityCertMinValidity = 14 * 24 * time.Hour
 )
+
+// realityBulkInterval spaces the connections of an address-range scan, so a hoster's
+// port-scan detection sees a slow trickle instead of a burst.
+var realityBulkInterval = 40 * time.Millisecond
+
+// realityScanRoots replaces the system trust store in tests.
+var realityScanRoots *x509.CertPool
+
+// realityNeighbourScan lets one neighbour scan run at a time, whoever asks.
+var realityNeighbourScan sync.Mutex
 
 var defaultRealityScanCandidates = []string{
 	"www.cloudflare.com:443",
@@ -49,6 +61,8 @@ type RealityScanResult struct {
 	IP       string `json:"ip" example:"104.16.124.96"`
 	Port     int    `json:"port" example:"443"`
 	Feasible bool   `json:"feasible" example:"true"`
+	// Reachable is false when the name did not resolve or TCP did not connect.
+	Reachable bool `json:"reachable" example:"true"`
 	// PrivateTarget marks a target that resolves to a loopback/private/link-local
 	// address: blocked before the probe unless the caller opted in, then flagged.
 	PrivateTarget bool   `json:"privateTarget" example:"false"`
@@ -58,19 +72,24 @@ type RealityScanResult struct {
 	ALPN          string `json:"alpn" example:"h2"`
 	X25519        bool   `json:"x25519" example:"true"`
 	CurveID       string `json:"curveID" example:"X25519"`
-	CertValid     bool   `json:"certValid" example:"true"`
+	// MLKEM768 reports that a second handshake offering only X25519MLKEM768 succeeded.
+	MLKEM768  bool `json:"mlkem768" example:"true"`
+	CertValid bool `json:"certValid" example:"true"`
 	// CertChainValid ignores the name: a trusted chain presented for other names
 	// still has serverNames the panel can offer instead of the failing SNI.
 	CertChainValid bool `json:"certChainValid" example:"true"`
 	// CertChainBytes is the sum of DER lengths of the presented peer chain.
 	// xray-core ML-DSA-65 REALITY needs >= 3500 bytes (constant lives in xray-core).
-	CertChainBytes int      `json:"certChainBytes" example:"3427"`
-	CertSubject    string   `json:"certSubject" example:"cloudflare.com"`
-	CertIssuer     string   `json:"certIssuer" example:"Google Trust Services"`
-	NotAfter       string   `json:"notAfter" example:"2026-08-01T00:00:00Z"`
-	ServerNames    []string `json:"serverNames"`
-	LatencyMs      int      `json:"latencyMs" example:"180"`
-	Reason         string   `json:"reason" example:""`
+	CertChainBytes int    `json:"certChainBytes" example:"3427"`
+	CertSubject    string `json:"certSubject" example:"cloudflare.com"`
+	CertIssuer     string `json:"certIssuer" example:"Google Trust Services"`
+	NotAfter       string `json:"notAfter" example:"2026-08-01T00:00:00Z"`
+	// CertExpiresSoon marks a certificate with under 14 days left; it does not change Feasible.
+	CertExpiresSoon bool     `json:"certExpiresSoon" example:"false"`
+	CertDaysLeft    int      `json:"certDaysLeft" example:"61"`
+	ServerNames     []string `json:"serverNames"`
+	LatencyMs       int      `json:"latencyMs" example:"180"`
+	Reason          string   `json:"reason" example:""`
 }
 
 type realityProbeTask struct {
@@ -215,7 +234,10 @@ func (s *ServerService) probeRealityAddr(dialHost string, port int, sni string, 
 		return res
 	}
 	defer conn.Close()
+	res.Reachable = true
+	pinnedAddr := addr
 	if remote, ok := conn.RemoteAddr().(*net.TCPAddr); ok {
+		pinnedAddr = remote.String()
 		res.PrivateTarget = netsafe.IsBlockedIP(remote.IP)
 		// The opt-in bypasses the SSRF guard, so leave an audit trail of it.
 		if res.PrivateTarget && allowPrivate {
@@ -273,6 +295,9 @@ func (s *ServerService) probeRealityAddr(dialHost string, port int, sni string, 
 			res.CertIssuer = leaf.Issuer.CommonName
 		}
 		res.NotAfter = leaf.NotAfter.UTC().Format(time.RFC3339)
+		left := time.Until(leaf.NotAfter)
+		res.CertExpiresSoon = left < realityCertMinValidity
+		res.CertDaysLeft = max(int(left/(24*time.Hour)), 0)
 		res.ServerNames = filterUsableSANs(leaf.DNSNames)
 
 		if sni == "" {
@@ -284,7 +309,7 @@ func (s *ServerService) probeRealityAddr(dialHost string, port int, sni string, 
 		}
 
 		if verifyHost != "" {
-			opts := x509.VerifyOptions{Intermediates: x509.NewCertPool()}
+			opts := x509.VerifyOptions{Roots: realityScanRoots, Intermediates: x509.NewCertPool()}
 			for _, c := range st.PeerCertificates[1:] {
 				opts.Intermediates.AddCert(c)
 			}
@@ -306,6 +331,9 @@ func (s *ServerService) probeRealityAddr(dialHost string, port int, sni string, 
 	}
 
 	res.Feasible = res.TLS13 && res.H2 && res.X25519 && res.CertValid
+	if res.Feasible {
+		res.MLKEM768 = realityAcceptsMLKEM768(ctx, pinnedAddr, sni, xver)
+	}
 	if !res.Feasible && res.Reason == "" {
 		switch {
 		case !res.TLS13:
@@ -317,6 +345,31 @@ func (s *ServerService) probeRealityAddr(dialHost string, port int, sni string, 
 		}
 	}
 	return res
+}
+
+// realityAcceptsMLKEM768 repeats the handshake offering only the hybrid group, against the
+// address the first probe already reached, so a name cannot re-resolve somewhere else.
+func realityAcceptsMLKEM768(ctx context.Context, pinnedAddr, sni string, xver int) bool {
+	conn, err := (&net.Dialer{}).DialContext(ctx, "tcp", pinnedAddr)
+	if err != nil {
+		return false
+	}
+	defer conn.Close()
+	if deadline, ok := ctx.Deadline(); ok {
+		_ = conn.SetDeadline(deadline)
+	}
+	if xver >= 1 && writeProxyProtocolHeader(conn, xver) != nil {
+		return false
+	}
+	tlsConn := tls.Client(conn, &tls.Config{
+		ServerName:         sni,
+		InsecureSkipVerify: true,
+		NextProtos:         []string{"h2", "http/1.1"},
+		CurvePreferences:   []tls.CurveID{tls.X25519MLKEM768},
+		MinVersion:         tls.VersionTLS13,
+	})
+	// Only the hybrid group is offered, so a completed handshake used it.
+	return tlsConn.HandshakeContext(ctx) == nil
 }
 
 // ScanRealityTarget probes one operator-supplied target. An empty sni falls back
@@ -357,7 +410,47 @@ func (s *ServerService) realityScanCandidateTokens() []string {
 	return append([]string(nil), defaultRealityScanCandidates...)
 }
 
-func (s *ServerService) ScanRealityTargets(targetsCSV string) ([]*RealityScanResult, error) {
+// neighbourScanIPs lists the other hosts of the /24 around each public IPv4 address in own.
+func neighbourScanIPs(own []string) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, raw := range own {
+		ip := net.ParseIP(raw).To4()
+		if ip == nil || netsafe.IsBlockedIP(ip) {
+			continue
+		}
+		for host := 1; host < 255; host++ {
+			neighbour := net.IPv4(ip[0], ip[1], ip[2], byte(host)).String()
+			if neighbour == ip.String() || slices.Contains(own, neighbour) || seen[neighbour] {
+				continue
+			}
+			seen[neighbour] = true
+			out = append(out, neighbour)
+		}
+	}
+	return out
+}
+
+// ownPublicIPv4s are the interface addresses, or behind NAT the address the internet sees.
+func (s *ServerService) ownPublicIPv4s() []string {
+	var out []string
+	for _, addr := range interfaceAddrs() {
+		if ip := net.ParseIP(addr); ip != nil && ip.To4() != nil && !netsafe.IsBlockedIP(ip) {
+			out = append(out, addr)
+		}
+	}
+	if len(out) == 0 {
+		s.resolvePublicIPs()
+		if ipv4, _ := s.publicIPs(); net.ParseIP(ipv4) != nil {
+			out = append(out, ipv4)
+		}
+	}
+	return out
+}
+
+// ScanRealityTargets probes the tokens, or the configured candidates when there are none.
+// neighbours adds the server's own /24 on port 443: the operator's explicit opt-in.
+func (s *ServerService) ScanRealityTargets(targetsCSV string, neighbours bool) ([]*RealityScanResult, error) {
 	tokens := parseRealityScanCandidateCSV(targetsCSV)
 	if len(tokens) == 0 {
 		tokens = s.realityScanCandidateTokens()
@@ -365,6 +458,19 @@ func (s *ServerService) ScanRealityTargets(targetsCSV string) ([]*RealityScanRes
 
 	var tasks []realityProbeTask
 	var invalid []*RealityScanResult
+	if neighbours {
+		if !realityNeighbourScan.TryLock() {
+			return nil, common.NewError("a neighbour scan is already running")
+		}
+		defer realityNeighbourScan.Unlock()
+		ips := neighbourScanIPs(s.ownPublicIPv4s())
+		if len(ips) == 0 {
+			invalid = append(invalid, &RealityScanResult{Target: "neighbours", Reason: "this server has no public IPv4 address"})
+		}
+		for _, ip := range ips[:min(len(ips), realityScanMaxTotal)] {
+			tasks = append(tasks, realityProbeTask{dialHost: ip, port: 443, timeout: realityDiscoverTimeout, bulk: true})
+		}
+	}
 	for _, token := range tokens {
 		if len(tasks) >= realityScanMaxTotal {
 			break
@@ -399,6 +505,9 @@ func (s *ServerService) ScanRealityTargets(targetsCSV string) ([]*RealityScanRes
 	sem := make(chan struct{}, realityScanConcurrency)
 	var wg sync.WaitGroup
 	for i, task := range tasks {
+		if task.bulk {
+			time.Sleep(realityBulkInterval)
+		}
 		wg.Add(1)
 		sem <- struct{}{}
 		go func(idx int, tk realityProbeTask) {
@@ -452,6 +561,12 @@ func sortRealityResults(results []*RealityScanResult) {
 	slices.SortStableFunc(results, func(a, b *RealityScanResult) int {
 		if a.Feasible != b.Feasible {
 			if a.Feasible {
+				return -1
+			}
+			return 1
+		}
+		if a.CertExpiresSoon != b.CertExpiresSoon {
+			if b.CertExpiresSoon {
 				return -1
 			}
 			return 1
