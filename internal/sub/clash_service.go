@@ -15,6 +15,7 @@ import (
 
 	"github.com/mhsanaei/3x-ui/v3/internal/amneziawg"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
+	"github.com/mhsanaei/3x-ui/v3/internal/sub/localdirect"
 	wgutil "github.com/mhsanaei/3x-ui/v3/internal/util/wireguard"
 )
 
@@ -23,6 +24,7 @@ type SubClashService struct {
 	clashRules     string
 	clashRemoteDNS bool
 	autoGroup      ClashAutoGroup
+	localDirect    localdirect.Plan
 	SubService     *SubService
 }
 
@@ -236,7 +238,7 @@ func (s *SubClashService) renderClash(subReq *SubService, subId string, host str
 	config := map[string]any{
 		"proxies":      proxies,
 		"proxy-groups": s.autoGroup.clashProxyGroups(proxyNames, autoMembers, templateMentionsAuto),
-		"rules":        []string{"MATCH,PROXY"},
+		"rules":        append(s.localDirect.ClashRules(!legacy), "MATCH,PROXY"),
 	}
 
 	if applyRouting {

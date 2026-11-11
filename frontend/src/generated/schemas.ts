@@ -533,6 +533,12 @@ export const SCHEMAS: Record<string, unknown> = {
       "subListen": {
         "type": "string"
       },
+      "subLocalDirect": {
+        "type": "string"
+      },
+      "subLocalDirectProxy": {
+        "type": "string"
+      },
       "subPath": {
         "type": "string"
       },
@@ -830,6 +836,8 @@ export const SCHEMAS: Record<string, unknown> = {
       "subJsonUserAgentRegex",
       "subKeyFile",
       "subListen",
+      "subLocalDirect",
+      "subLocalDirectProxy",
       "subPath",
       "subPort",
       "subProbeMinAgents",
@@ -1428,6 +1436,12 @@ export const SCHEMAS: Record<string, unknown> = {
       "subListen": {
         "type": "string"
       },
+      "subLocalDirect": {
+        "type": "string"
+      },
+      "subLocalDirectProxy": {
+        "type": "string"
+      },
       "subPath": {
         "type": "string"
       },
@@ -1733,6 +1747,8 @@ export const SCHEMAS: Record<string, unknown> = {
       "subJsonUserAgentRegex",
       "subKeyFile",
       "subListen",
+      "subLocalDirect",
+      "subLocalDirectProxy",
       "subPath",
       "subPort",
       "subProbeMinAgents",

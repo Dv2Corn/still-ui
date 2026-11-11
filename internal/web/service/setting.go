@@ -196,6 +196,8 @@ var defaultValueMap = map[string]string{
 	"subClashAutoGroupUrl":        DefaultSubClashAutoGroupURL,
 	"subClashAutoGroupInterval":   "300",
 	"subClashAutoGroupTolerance":  "50",
+	"subLocalDirect":              "",
+	"subLocalDirectProxy":         "",
 	"subJsonMux":                  "",
 	"subJsonRules":                "",
 	"subJsonRoutingRules":         "",
@@ -1781,6 +1783,9 @@ func (s *SettingService) UpdateAllSetting(allSetting *entity.AllSetting, clears 
 		return err
 	}
 	if err := validateSubClashAutoGroup(allSetting); err != nil {
+		return err
+	}
+	if err := validateSubLocalDirect(allSetting); err != nil {
 		return err
 	}
 	if err := validateFinalMaskJSONSalamander(allSetting.SubJsonFinalMask); err != nil {

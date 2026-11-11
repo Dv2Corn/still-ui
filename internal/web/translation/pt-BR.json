@@ -107,6 +107,10 @@
     "support": "Suporte",
     "qrTitle": "Escaneie. Importe. Conecte.",
     "qrHint": "Escaneie com seu aplicativo cliente. Mantenha este código em sigilo.",
+    "localDirectTitle": "{country}: os sites locais abrem diretamente",
+    "localDirectDesc": "Todo o resto vai pela VPN. As assinaturas Happ, INCY, Clash/Mihomo e JSON configuram isso sozinhas.",
+    "localDirectShadowrocket": "Arquivo de regras do Shadowrocket",
+    "localDirectShadowrocketHint": "No Shadowrocket, adicione o arquivo na aba Config e defina Global Routing como Config.",
     "saveQr": "Salvar QR"
   },
   "menu": {
@@ -1971,6 +1975,11 @@
       "subHostSortInbound": "Ordem das entradas (padrão)",
       "subHostSortHosts": "Ordem dos hosts",
       "subHostSortModeDesc": "Segue a ordem da página de hosts entre diferentes entradas. Define a ordem emitida pelo servidor; os aplicativos clientes podem aplicar sua própria ordenação.",
+      "subLocalDirect": "Sites locais direto",
+      "subLocalDirectDesc": "Os clientes da assinatura abrem os sites do país escolhido diretamente e enviam todo o resto pela VPN. Funciona nas assinaturas JSON, Clash/Mihomo e Happ/INCY e adiciona um arquivo de regras do Shadowrocket à página da assinatura; uma lista simples de links não consegue levar regras. Se você definir seu próprio perfil de roteamento para um formato, ele tem prioridade nesse formato.",
+      "subLocalDirectOff": "Desligado",
+      "subLocalDirectProxy": "Sempre pela VPN",
+      "subLocalDirectProxyDesc": "Telegram, YouTube, Instagram, Facebook, WhatsApp, Discord, ChatGPT e Claude sempre vão pela VPN, mesmo que pareçam locais. Adicione aqui outros domínios ou faixas de IP, um por linha; são verificados antes da regra do país.",
       "subProbeOrder": "Usar os resultados das sondas",
       "subProbeOrderDesc": "Links que as sondas de acessibilidade indicam como fora do ar (2 falhas seguidas) vão para o fim da assinatura ou são ocultados, em todos os formatos: links, JSON e Clash. O usuário sempre mantém pelo menos um link e, sem resultados recentes das sondas, nada muda. A página de sondas mostra o que acontece com cada endpoint.",
       "subProbeOrderOff": "Desligado (padrão)",

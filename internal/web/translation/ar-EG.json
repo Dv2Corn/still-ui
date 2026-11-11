@@ -107,6 +107,10 @@
     "support": "الدعم",
     "qrTitle": "امسح. استورد. اتصل.",
     "qrHint": "امسح الرمز بتطبيق العميل. لا تشارك هذا الرمز مع أحد.",
+    "localDirectTitle": "{country}: المواقع المحلية تُفتح مباشرة",
+    "localDirectDesc": "كل شيء آخر يمر عبر VPN. اشتراكات Happ و INCY و Clash/Mihomo و JSON تضبط ذلك تلقائياً.",
+    "localDirectShadowrocket": "ملف قواعد Shadowrocket",
+    "localDirectShadowrocketHint": "في Shadowrocket أضف الملف من تبويب Config واضبط Global Routing على Config.",
     "saveQr": "حفظ QR"
   },
   "menu": {
@@ -1971,6 +1975,11 @@
       "subHostSortInbound": "ترتيب الاتصالات الواردة (الافتراضي)",
       "subHostSortHosts": "ترتيب المضيفين",
       "subHostSortModeDesc": "يتبع ترتيب المضيفين صفحة المضيفين عبر جميع الاتصالات الواردة. يحدد هذا ترتيب مخرجات الخادم؛ وقد تطبق تطبيقات العميل ترتيبًا آخر.",
+      "subLocalDirect": "المواقع المحلية مباشرة",
+      "subLocalDirectDesc": "تفتح تطبيقات الاشتراك مواقع الدولة المختارة مباشرة وترسل كل شيء آخر عبر VPN. يعمل في اشتراكات JSON و Clash/Mihomo و Happ/INCY، ويضيف ملف قواعد Shadowrocket إلى صفحة الاشتراك؛ قائمة الروابط العادية لا يمكنها حمل القواعد. إذا ضبطت ملف توجيه خاصاً بتنسيق ما فله الأولوية في ذلك التنسيق.",
+      "subLocalDirectOff": "إيقاف",
+      "subLocalDirectProxy": "دائماً عبر VPN",
+      "subLocalDirectProxyDesc": "Telegram و YouTube و Instagram و Facebook و WhatsApp و Discord و ChatGPT و Claude تمر دائماً عبر VPN حتى لو بدت محلية. أضف هنا نطاقات وعناوين IP أخرى، واحد في كل سطر؛ تُفحص قبل قاعدة الدولة.",
       "subProbeOrder": "استخدام نتائج المجسّات",
       "subProbeOrderDesc": "الروابط التي تُبلغ مجسّات إمكانية الوصول بأنها لا تعمل (فشلان متتاليان) تُنقل إلى آخر الاشتراك أو تُخفى، في جميع الصيغ: الروابط وJSON وClash. يبقى لدى المستخدم دائمًا رابط واحد على الأقل، ولا يتغير شيء دون نتائج حديثة من المجسّات. تعرض صفحة المجسّات ما يحدث لكل نقطة اتصال.",
       "subProbeOrderOff": "متوقف (افتراضي)",

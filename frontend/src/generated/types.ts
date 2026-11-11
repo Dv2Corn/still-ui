@@ -172,6 +172,8 @@ export interface AllSetting {
   subJsonUserAgentRegex: string;
   subKeyFile: string;
   subListen: string;
+  subLocalDirect: string;
+  subLocalDirectProxy: string;
   subPath: string;
   subPort: number;
   subProbeMinAgents: number;
@@ -382,6 +384,8 @@ export interface AllSettingView {
   subJsonUserAgentRegex: string;
   subKeyFile: string;
   subListen: string;
+  subLocalDirect: string;
+  subLocalDirectProxy: string;
   subPath: string;
   subPort: number;
   subProbeMinAgents: number;

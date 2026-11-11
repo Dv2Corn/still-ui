@@ -107,6 +107,10 @@
     "support": "Support",
     "qrTitle": "Scan. Import. Connect.",
     "qrHint": "Scan with your client app. Keep this code private.",
+    "localDirectTitle": "{country}: local sites open directly",
+    "localDirectDesc": "Everything else goes through the VPN. Happ, INCY, Clash/Mihomo and JSON subscriptions set this up by themselves.",
+    "localDirectShadowrocket": "Shadowrocket rules file",
+    "localDirectShadowrocketHint": "In Shadowrocket add the file on the Config tab and set Global Routing to Config.",
     "saveQr": "Save QR"
   },
   "menu": {
@@ -2092,6 +2096,11 @@
       "subHostSortInbound": "Inbound order (default)",
       "subHostSortHosts": "Hosts order",
       "subHostSortModeDesc": "Hosts order follows the Hosts page across inbounds. This controls the order emitted by the server; client apps may apply their own sorting.",
+      "subLocalDirect": "Local sites direct",
+      "subLocalDirectDesc": "Subscription clients open sites of the chosen country directly and send everything else through the VPN. Applies to JSON, Clash/Mihomo and Happ/INCY subscriptions, and adds a Shadowrocket rules file to the subscription page; a plain list of links cannot carry rules. A routing profile you set for a format yourself takes priority in that format.",
+      "subLocalDirectOff": "Off",
+      "subLocalDirectProxy": "Always through the VPN",
+      "subLocalDirectProxyDesc": "Telegram, YouTube, Instagram, Facebook, WhatsApp, Discord, ChatGPT and Claude always go through the VPN, even where they look local. Add more domains or IP ranges here, one per line; they are checked before the country rule.",
       "subProbeOrder": "Use probe results",
       "subProbeOrderDesc": "Links that the reachability probes report down (2 failed checks in a row) move to the end of the subscription or are hidden, in every format: links, JSON and Clash. A user always keeps at least one link, and without fresh probe results nothing changes. The Probes page shows what happens to each endpoint.",
       "subProbeOrderOff": "Off (default)",
