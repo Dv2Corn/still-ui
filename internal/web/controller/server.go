@@ -35,6 +35,7 @@ type ServerController struct {
 	xrayMetricsService service.XrayMetricsService
 	torrentBlock       service.TorrentBlockService
 	egressFilter       service.EgressFilterService
+	portHop            service.PortHopService
 	xrayService        service.XrayService
 }
 
@@ -70,10 +71,12 @@ func (a *ServerController) initRouter(g *gin.RouterGroup) {
 	g.GET("/getNewmldsa65", a.getNewmldsa65)
 	g.GET("/getNewmlkem768", a.getNewmlkem768)
 	g.GET("/getNewVlessEnc", a.getNewVlessEnc)
+	g.GET("/getNewAwgSignaturePacket", a.getNewAwgSignaturePacket)
 	g.GET("/clientIps", a.getClientIps)
 	g.GET("/fail2banStatus", a.getFail2banStatus)
 	g.GET("/torrentBlock", a.getTorrentBlock)
 	g.GET("/egressFilter", a.getEgressFilter)
+	g.GET("/portHop", a.getPortHop)
 
 	g.POST("/stopXrayService", a.stopXrayService)
 	g.POST("/restartXrayService", a.restartXrayService)
@@ -125,6 +128,11 @@ func (a *ServerController) status(c *gin.Context) { jsonObj(c, a.serverService.C
 
 func (a *ServerController) getFail2banStatus(c *gin.Context) {
 	jsonObj(c, a.serverService.GetFail2banStatus(), nil)
+}
+
+// getPortHop reports whether this host can redirect Hysteria2 hop ranges and what it redirects now.
+func (a *ServerController) getPortHop(c *gin.Context) {
+	jsonObj(c, a.portHop.Status(), nil)
 }
 
 func (a *ServerController) getTorrentBlock(c *gin.Context) {
@@ -636,9 +644,9 @@ func (a *ServerController) scanRealityTarget(c *gin.Context) {
 }
 
 // scanRealityTargets probes the supplied comma-separated targets, or the
-// realityScanCandidates setting when empty, ranked by feasibility then latency.
+// realityScanCandidates setting when empty; neighbours adds the server's own /24.
 func (a *ServerController) scanRealityTargets(c *gin.Context) {
-	res, err := a.serverService.ScanRealityTargets(c.PostForm("targets"))
+	res, err := a.serverService.ScanRealityTargets(c.PostForm("targets"), c.PostForm("neighbours") == "true")
 	if err != nil {
 		jsonMsg(c, I18nWeb(c, "pages.inbounds.toasts.scanRealityTargetError"), err)
 		return
@@ -651,6 +659,16 @@ func (a *ServerController) getNewVlessEnc(c *gin.Context) {
 	out, err := a.serverService.GetNewVlessEnc()
 	if err != nil {
 		jsonMsg(c, I18nWeb(c, "pages.inbounds.toasts.getNewVlessEncError"), err)
+		return
+	}
+	jsonObj(c, out, nil)
+}
+
+// getNewAwgSignaturePacket builds an AmneziaWG I1 packet shaped like the preset's protocol.
+func (a *ServerController) getNewAwgSignaturePacket(c *gin.Context) {
+	out, err := a.serverService.GetNewAwgSignaturePacket(c.Query("preset"))
+	if err != nil {
+		jsonMsg(c, I18nWeb(c, "pages.inbounds.toasts.getNewAwgSignaturePacketError"), err)
 		return
 	}
 	jsonObj(c, out, nil)

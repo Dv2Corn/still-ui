@@ -165,7 +165,13 @@ TLS. Masks are configured per direction:
   the port range advertised to clients (the share link's `mport` and the JSON
   subscription's `udphop` mask); the server still listens on its own port. Since
   Xray 26.9.9 a client hops only through the `udphop` mask, so the panel converts
-  an older client `quicParams.udpHop` to it.
+  an older client `quicParams.udpHop` to it. On a Hysteria inbound, **Redirect on
+  this server** (off by default) makes the panel load the nftables table
+  `inet still_port_hop`, which redirects the range to the inbound's port and is
+  removed with the inbound; it needs Linux, `nft` and `NET_ADMIN`, a range within
+  1024-65535 that holds no other inbound's UDP port, and an inbound that listens
+  on all addresses. Without it the range is only advertised and the redirect is
+  yours to add. Clash/Mihomo subscriptions get `ports` and `hop-interval`.
 
 `filter` (Xray 26.10.21) drops an inbound's connections by source IP:
 `allowedSourceIPs` admits only the listed sources, `blockedSourceIPs` drops its

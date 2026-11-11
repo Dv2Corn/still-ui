@@ -1817,6 +1817,35 @@ func hysteriaHopPorts(stream map[string]any) string {
 	return strings.TrimSpace(ports)
 }
 
+// hysteriaHopIntervalSeconds is the low end of the hop interval, 0 when unset. One integer on
+// purpose: mihomo builds that read hop-interval as a number refuse a "5-10" string.
+func hysteriaHopIntervalSeconds(stream map[string]any) int {
+	finalmask, _ := stream["finalmask"].(map[string]any)
+	quicParams, _ := finalmask["quicParams"].(map[string]any)
+	udpHop, _ := quicParams["udpHop"].(map[string]any)
+	raw := udpHop["interval"]
+	masks, _ := finalmask["udp"].([]any)
+	for _, rawMask := range masks {
+		mask, _ := rawMask.(map[string]any)
+		settings, _ := mask["settings"].(map[string]any)
+		if maskType, _ := mask["type"].(string); maskType == "udphop" && settings["interval"] != nil {
+			raw = settings["interval"]
+			break
+		}
+	}
+	switch v := raw.(type) {
+	case float64:
+		return max(int(v), 0)
+	case string:
+		low, _, _ := strings.Cut(v, "-")
+		seconds, err := strconv.Atoi(strings.TrimSpace(low))
+		if err == nil {
+			return max(seconds, 0)
+		}
+	}
+	return 0
+}
+
 // udpHopMaskPorts reads remotePorts off the first "udphop" UDP mask. xray-core
 // 26.9.9 moved hopping here from finalmask.quicParams.udpHop, which it now ignores.
 func udpHopMaskPorts(finalmask map[string]any) string {

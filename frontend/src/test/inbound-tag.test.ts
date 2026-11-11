@@ -19,6 +19,34 @@ describe('composeInboundTag transport suffix parity', () => {
     ['vless kcp is udp', base({ streamSettings: { network: 'kcp' } }), 'in-443-udp'],
     ['vless quic is udp', base({ streamSettings: { network: 'quic' } }), 'in-443-udp'],
     ['vless empty stream defaults tcp', base({}), 'in-443-tcp'],
+    [
+      'vless xhttp with only h3 is udp',
+      base({
+        streamSettings: { network: 'xhttp', security: 'tls', tlsSettings: { alpn: ['h3'] } },
+      }),
+      'in-443-udp',
+    ],
+    [
+      'vless xhttp with h3 and h2 is tcp',
+      base({
+        streamSettings: { network: 'xhttp', security: 'tls', tlsSettings: { alpn: ['h3', 'h2'] } },
+      }),
+      'in-443-tcp',
+    ],
+    [
+      'vless xhttp without tls ignores the alpn',
+      base({
+        streamSettings: { network: 'xhttp', security: 'none', tlsSettings: { alpn: ['h3'] } },
+      }),
+      'in-443-tcp',
+    ],
+    [
+      'vless ws with only h3 is tcp',
+      base({
+        streamSettings: { network: 'ws', security: 'tls', tlsSettings: { alpn: ['h3'] } },
+      }),
+      'in-443-tcp',
+    ],
     ['vmess tcp', base({ protocol: 'vmess', streamSettings: { network: 'tcp' } }), 'in-443-tcp'],
     [
       'trojan grpc is tcp',

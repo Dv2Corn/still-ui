@@ -476,6 +476,13 @@ export const sections: readonly Section[] = [
       },
       {
         method: 'GET',
+        path: '/panel/api/server/portHop',
+        summary:
+          'State of Hysteria2 port hopping on this host. A Hysteria inbound whose streamSettings.finalmask.quicParams.udpHop has redirect=true gets its hop range (udpHop.ports, 1024-65535) redirected to its own port by the nftables table inet still_port_hop; the panel converges that table every 10 seconds and removes it when no inbound asks for a redirect. supported/nftInstalled/permitted say whether this host can do that (Linux, nft, NET_ADMIN), active whether the table is loaded, packets how many flows it has redirected since it was loaded, rules what the enabled local inbounds ask for, error the last failure.',
+        responseSchema: 'PortHopStatus',
+      },
+      {
+        method: 'GET',
         path: '/panel/api/server/egressFilter',
         summary:
           'State of the egress filter: the stored settings (managedBy is set when a central panel owns them), the TCP ports "server" blocks (panel and SSH), whether the template already blackholes geoip:private, whether this host can run the nftables half and has it loaded, its packet counters, the last apply error, and how far each node is with this panel\'s filter.',
@@ -643,6 +650,21 @@ export const sections: readonly Section[] = [
         summary: 'Generate a new X25519 keypair for Reality.',
         response:
           '{\n  "success": true,\n  "obj": {\n    "privateKey": "uN9qLfV3zH8w...",\n    "publicKey": "5v8xPqR2sM7k..."\n  }\n}',
+      },
+      {
+        method: 'GET',
+        path: '/panel/api/server/getNewAwgSignaturePacket',
+        summary:
+          'Build an AmneziaWG I1 signature packet shaped like the first datagram of another protocol: "quic" is a QUIC v1 Initial header with a random connection id and 1200-1232 bytes in total, "dns" a recursive A query for a well-known name with a random id. The random parts are <r N> tags, so every handshake sends different bytes. The value passes the inbound validator as is.',
+        params: [
+          {
+            name: 'preset',
+            in: 'query',
+            type: 'string',
+            desc: 'quic or dns.',
+          },
+        ],
+        responseSchema: 'AwgSignaturePacketResponse',
       },
       {
         method: 'GET',
@@ -1007,7 +1029,7 @@ export const sections: readonly Section[] = [
         method: 'POST',
         path: '/panel/api/server/scanRealityTarget',
         summary:
-          'Run a live TLS 1.3 probe against a candidate REALITY target and return a feasibility verdict (TLS 1.3 + h2 + X25519 + trusted certificate) plus the certificate SAN DNS names. A target on a private/loopback address is reported with privateTarget=true and probed only when allowPrivate is set.',
+          'Run a live TLS 1.3 probe against a candidate REALITY target and return a feasibility verdict (TLS 1.3 + h2 + X25519 + trusted certificate) plus the certificate SAN DNS names. certExpiresSoon marks a certificate with under 14 days left and mlkem768 a target that also accepts X25519MLKEM768; neither changes the verdict. A target on a private/loopback address is reported with privateTarget=true and probed only when allowPrivate is set.',
         params: [
           {
             name: 'target',
@@ -1044,7 +1066,7 @@ export const sections: readonly Section[] = [
         method: 'POST',
         path: '/panel/api/server/scanRealityTargets',
         summary:
-          'Probe/discover REALITY targets and return each verdict ranked by feasibility then latency. Each comma-separated token may be a domain (validated with SNI), a bare IP, or a CIDR range (discovered without SNI by reading the certificate domain). When empty, the realityScanCandidates setting is probed (the built-in seed list if that setting is empty).',
+          'Probe/discover REALITY targets and return each verdict ranked by feasibility, then certificates with 14 days or more left, then latency. Each comma-separated token may be a domain (validated with SNI), a bare IP, or a CIDR range (discovered without SNI by reading the certificate domain). When empty, the realityScanCandidates setting is probed (the built-in seed list if that setting is empty). Address ranges are probed on port 443 only, about 25 addresses a second, and never on private addresses.',
         params: [
           {
             name: 'targets',
@@ -1052,6 +1074,13 @@ export const sections: readonly Section[] = [
             type: 'string',
             optional: true,
             desc: 'Optional comma-separated tokens: domain[:port], IP[:port], or CIDR (e.g. 104.16.0.0/24). When omitted, the realityScanCandidates setting is probed (the built-in seed list if that setting is empty).',
+          },
+          {
+            name: 'neighbours',
+            in: 'body (form)',
+            type: 'boolean',
+            optional: true,
+            desc: 'true also probes port 443 of the other addresses in the /24 around each public IPv4 address of this server and reads the names in their certificates. One such scan runs at a time. Some hosting providers treat this as a port scan.',
           },
         ],
         body: 'targets=104.16.0.0/24,www.apple.com:443',

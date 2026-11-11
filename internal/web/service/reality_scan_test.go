@@ -97,7 +97,7 @@ func TestScanRealityTargetBlocksPrivate(t *testing.T) {
 }
 
 func TestScanRealityTargetsHandlesPrivateAndBadInput(t *testing.T) {
-	results, err := (&ServerService{}).ScanRealityTargets("127.0.0.1:443,10.0.0.1:443,bad host!")
+	results, err := (&ServerService{}).ScanRealityTargets("127.0.0.1:443,10.0.0.1:443,bad host!", false)
 	if err != nil {
 		t.Fatalf("ScanRealityTargets unexpected error: %v", err)
 	}

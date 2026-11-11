@@ -28,7 +28,7 @@ fingerprint gets through.
 | Field                    | What it is                                                              |
 | ------------------------ | ------------------------------------------------------------------------ |
 | **Subnet**                | The tunnel's IPv4 subnet (e.g. `10.8.1.0/24`); each client gets an address from it. |
-| **MTU**                   | Interface MTU. Leave at the default unless you have a reason to change it. |
+| **MTU**                   | Interface MTU, also written into every client config the panel generates. Leave at the default unless you have a reason to change it; on mobile networks that drop large packets, **Set 1280** can be several times faster. |
 | **DNS (primary/secondary)** | Seeded into downloadable client configs; the server's own interface doesn't need one. |
 | **External interface**    | The host NIC a peer's IPv6 address gets aliased onto when IPv6 is enabled (see below). Leave blank to auto-detect. |
 
@@ -47,7 +47,7 @@ value defeats the point, since DPI can fingerprint it over time.
 | **S3**       | Cookie-reply padding, `0`-`1636`: the reply is `64 + S3` bytes and must fit the 1700-byte receive buffer amneziawg-go uses on iOS. An outbound, as with S1/S2, takes the remote server's value up to `65535`. |
 | **S4**       | Transport (data) packet padding, `0`-`32`.                                    |
 | **H1-H4**    | Header values that replace WireGuard's message-type field. Each is a single integer or a `low-high` range, and the four must not overlap — amneziawg-go and the kernel module refuse the whole device otherwise. `1`-`4` are WireGuard's own types and the engine default for a blank field: valid, but without a HeaderProtectionKey the type field then reads like plain WireGuard. |
-| **I1-I5**    | Optional signature packets — random bytes prepended before the handshake, e.g. `<r 148>`. Generated sets fill `I1` only, matching Amnezia's own generator. |
+| **I1-I5**    | Optional signature packets — random bytes prepended before the handshake, e.g. `<r 148>`. Generated sets fill `I1` only, matching Amnezia's own generator. **QUIC-like I1** and **DNS-like I1** replace it with a packet shaped like a QUIC v1 Initial (`<b 0xc…0000000108><r 8><b 0x0000…><r N>`, 1200-1232 bytes) or a DNS A query (`<r 2><b 0x0100…>`), and clear `I2`-`I5`. |
 | **HeaderProtectionKey** | A base64 32-byte key for the 3.0 header-protection mechanism. Must match on every client config; blank disables it. |
 | **ContentPaddingAddition** | A single integer or `low-high` byte range of extra padding on content packets. Kept `<= 64` by the generator so a 1420-MTU tunnel doesn't fragment. |
 | **RekeyAfterTime / RekeyTimeout / RejectAfterTime / KeepaliveTimeout / MaxHandshakeAttempts** | Handshake-timing randomization: each is a `low-high` range (seconds; attempts for the last one) the peer samples from, so session timing stops being a WireGuard fingerprint. Every `RekeyAfterTime` value must stay below every `RejectAfterTime` value. Blank keeps the WireGuard default. |
@@ -85,7 +85,10 @@ subnet.
 
 The panel fills in a randomized, kernel-valid obfuscation set automatically.
 Use **Regenerate** if you want a fresh one; there's no need to hand-edit these
-unless you have a specific reason to.
+unless you have a specific reason to. Regenerating changes every parameter, so
+clients must import their config again. The **QUIC-like I1** and **DNS-like I1**
+buttons change only the signature packets, which the receiving side ignores:
+clients that already have a config keep connecting.
 </Step>
 
 <Step>

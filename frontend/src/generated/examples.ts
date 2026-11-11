@@ -472,6 +472,9 @@ export const EXAMPLES: Record<string, unknown> = {
     "scope": "admin",
     "token": "new-token-string"
   },
+  "AwgSignaturePacketResponse": {
+    "i1": "\u003cr 2\u003e\u003cb 0x010000010000000000000377777706676f6f676c6503636f6d0000010001\u003e"
+  },
   "Blocker": {
     "code": "tools",
     "detail": "awg"
@@ -1253,6 +1256,28 @@ export const EXAMPLES: Record<string, unknown> = {
     "tag": "inbound-51820",
     "up": 1048576
   },
+  "PortHopRule": {
+    "inboundId": 7,
+    "ports": "20000-50000",
+    "remark": "hy2",
+    "toPort": 443
+  },
+  "PortHopStatus": {
+    "active": true,
+    "error": "",
+    "nftInstalled": true,
+    "packets": 1204,
+    "permitted": true,
+    "rules": [
+      {
+        "inboundId": 7,
+        "ports": "20000-50000",
+        "remark": "hy2",
+        "toPort": 443
+      }
+    ],
+    "supported": true
+  },
   "ProbeResultUI": {
     "cpuPct": 12.5,
     "error": "",
@@ -1400,6 +1425,8 @@ export const EXAMPLES: Record<string, unknown> = {
     "alpn": "h2",
     "certChainBytes": 3427,
     "certChainValid": true,
+    "certDaysLeft": 61,
+    "certExpiresSoon": false,
     "certIssuer": "Google Trust Services",
     "certSubject": "cloudflare.com",
     "certValid": true,
@@ -1409,9 +1436,11 @@ export const EXAMPLES: Record<string, unknown> = {
     "host": "www.cloudflare.com",
     "ip": "104.16.124.96",
     "latencyMs": 180,
+    "mlkem768": true,
     "notAfter": "2026-08-01T00:00:00Z",
     "port": 443,
     "privateTarget": false,
+    "reachable": true,
     "reason": "",
     "serverNames": [
       ""

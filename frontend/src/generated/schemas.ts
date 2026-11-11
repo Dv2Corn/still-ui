@@ -2033,6 +2033,19 @@ export const SCHEMAS: Record<string, unknown> = {
     ],
     "type": "object"
   },
+  "AwgSignaturePacketResponse": {
+    "description": "AwgSignaturePacketResponse is an AmneziaWG I1 spec built from a preset.",
+    "properties": {
+      "i1": {
+        "example": "\u003cr 2\u003e\u003cb 0x010000010000000000000377777706676f6f676c6503636f6d0000010001\u003e",
+        "type": "string"
+      }
+    },
+    "required": [
+      "i1"
+    ],
+    "type": "object"
+  },
   "Blocker": {
     "description": "Blocker is one unmet requirement.",
     "properties": {
@@ -5094,6 +5107,80 @@ export const SCHEMAS: Record<string, unknown> = {
     ],
     "type": "object"
   },
+  "PortHopRule": {
+    "description": "PortHopRule is the redirect one inbound asks for.",
+    "properties": {
+      "inboundId": {
+        "example": 7,
+        "type": "integer"
+      },
+      "ports": {
+        "example": "20000-50000",
+        "type": "string"
+      },
+      "remark": {
+        "example": "hy2",
+        "type": "string"
+      },
+      "toPort": {
+        "example": 443,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "inboundId",
+      "ports",
+      "remark",
+      "toPort"
+    ],
+    "type": "object"
+  },
+  "PortHopStatus": {
+    "description": "PortHopStatus is what this host does for Hysteria2 port hopping.",
+    "properties": {
+      "active": {
+        "example": true,
+        "type": "boolean"
+      },
+      "error": {
+        "type": "string"
+      },
+      "nftInstalled": {
+        "example": true,
+        "type": "boolean"
+      },
+      "packets": {
+        "example": 1204,
+        "format": "int64",
+        "type": "integer"
+      },
+      "permitted": {
+        "description": "Permitted is false when nft runs but may not change rules (no NET_ADMIN).",
+        "example": true,
+        "type": "boolean"
+      },
+      "rules": {
+        "items": {
+          "$ref": "#/components/schemas/PortHopRule"
+        },
+        "type": "array"
+      },
+      "supported": {
+        "example": true,
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "active",
+      "error",
+      "nftInstalled",
+      "packets",
+      "permitted",
+      "rules",
+      "supported"
+    ],
+    "type": "object"
+  },
   "ProbeResultUI": {
     "properties": {
       "cpuPct": {
@@ -5478,6 +5565,15 @@ export const SCHEMAS: Record<string, unknown> = {
         "example": true,
         "type": "boolean"
       },
+      "certDaysLeft": {
+        "example": 61,
+        "type": "integer"
+      },
+      "certExpiresSoon": {
+        "description": "CertExpiresSoon marks a certificate with under 14 days left; it does not change Feasible.",
+        "example": false,
+        "type": "boolean"
+      },
       "certIssuer": {
         "example": "Google Trust Services",
         "type": "string"
@@ -5514,6 +5610,11 @@ export const SCHEMAS: Record<string, unknown> = {
         "example": 180,
         "type": "integer"
       },
+      "mlkem768": {
+        "description": "MLKEM768 reports that a second handshake offering only X25519MLKEM768 succeeded.",
+        "example": true,
+        "type": "boolean"
+      },
       "notAfter": {
         "example": "2026-08-01T00:00:00Z",
         "type": "string"
@@ -5525,6 +5626,11 @@ export const SCHEMAS: Record<string, unknown> = {
       "privateTarget": {
         "description": "PrivateTarget marks a target that resolves to a loopback/private/link-local\naddress: blocked before the probe unless the caller opted in, then flagged.",
         "example": false,
+        "type": "boolean"
+      },
+      "reachable": {
+        "description": "Reachable is false when the name did not resolve or TCP did not connect.",
+        "example": true,
         "type": "boolean"
       },
       "reason": {
@@ -5557,6 +5663,8 @@ export const SCHEMAS: Record<string, unknown> = {
       "alpn",
       "certChainBytes",
       "certChainValid",
+      "certDaysLeft",
+      "certExpiresSoon",
       "certIssuer",
       "certSubject",
       "certValid",
@@ -5566,9 +5674,11 @@ export const SCHEMAS: Record<string, unknown> = {
       "host",
       "ip",
       "latencyMs",
+      "mlkem768",
       "notAfter",
       "port",
       "privateTarget",
+      "reachable",
       "reason",
       "serverNames",
       "target",

@@ -58,6 +58,8 @@ const StringRangeSchema = z.preprocess((v) => (typeof v === 'number' ? String(v)
 export const QuicUdpHopSchema = z.object({
   ports: StringRangeSchema.default('20000-50000'),
   interval: StringRangeSchema.default('5-10'),
+  // Panel-only: the panel redirects the range to the inbound's port with nftables.
+  redirect: z.boolean().optional(),
 });
 export type QuicUdpHop = z.infer<typeof QuicUdpHopSchema>;
 

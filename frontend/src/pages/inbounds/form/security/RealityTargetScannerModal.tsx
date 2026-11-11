@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Input, Modal, Space, Table, Tag, Tooltip, Typography } from 'antd';
+import { Button, Checkbox, Input, Modal, Space, Table, Tag, Tooltip, Typography } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 
 import type { RealityScanResult } from '@/generated/types';
@@ -11,7 +11,7 @@ export const MLDSA65_MIN_CERT_CHAIN_BYTES = 3500;
 interface RealityTargetScannerModalProps {
   open: boolean;
   onClose: () => void;
-  scanRealityCandidates: (targets?: string) => Promise<RealityScanResult[]>;
+  scanRealityCandidates: (targets?: string, neighbours?: boolean) => Promise<RealityScanResult[]>;
   onPick: (result: RealityScanResult) => void;
   mldsa65Enabled?: boolean;
 }
@@ -26,15 +26,16 @@ export default function RealityTargetScannerModal({
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState('');
+  const [neighbours, setNeighbours] = useState(false);
   const [results, setResults] = useState<RealityScanResult[]>([]);
   const scanRef = useRef(scanRealityCandidates);
   useEffect(() => {
     scanRef.current = scanRealityCandidates;
   });
 
-  const applyScan = useCallback(async (targets?: string) => {
+  const applyScan = useCallback(async (targets?: string, withNeighbours?: boolean) => {
     try {
-      setResults(await scanRef.current(targets));
+      setResults(await scanRef.current(targets, withNeighbours));
     } finally {
       setLoading(false);
     }
@@ -44,9 +45,9 @@ export default function RealityTargetScannerModal({
     (targets?: string) => {
       setLoading(true);
       setResults([]);
-      void applyScan(targets);
+      void applyScan(targets, neighbours);
     },
-    [applyScan],
+    [applyScan, neighbours],
   );
 
   // Clearing the previous results is done during render so the auto-scan effect
@@ -57,12 +58,17 @@ export default function RealityTargetScannerModal({
     if (open) {
       setResults([]);
       setLoading(true);
+      setNeighbours(false);
     }
   }
 
   useEffect(() => {
     if (open) void applyScan();
   }, [open, applyScan]);
+
+  // A probe that never reached TLS has nothing to mark as failed.
+  const checkTag = (value: string, passed: boolean) =>
+    value ? <Tag color={passed ? 'success' : 'error'}>{value}</Tag> : '—';
 
   const columns: ColumnsType<RealityScanResult> = [
     {
@@ -100,21 +106,26 @@ export default function RealityTargetScannerModal({
       dataIndex: 'tlsVersion',
       key: 'tlsVersion',
       width: 60,
-      render: (v: string) => v || '—',
+      render: (v: string, row) => checkTag(v, row.tls13),
     },
     {
       title: 'ALPN',
       dataIndex: 'alpn',
       key: 'alpn',
-      width: 75,
-      render: (v: string) => v || '—',
+      width: 90,
+      render: (v: string, row) => checkTag(v, row.h2),
     },
     {
       title: t('pages.inbounds.form.scanCurve'),
       dataIndex: 'curveID',
       key: 'curveID',
-      width: 130,
-      render: (v: string) => v || '—',
+      width: 150,
+      render: (v: string, row) => (
+        <>
+          {checkTag(v, row.x25519)}
+          {row.mlkem768 ? <Tag>ML-KEM</Tag> : null}
+        </>
+      ),
     },
     {
       title: t('pages.inbounds.form.scanCert'),
@@ -123,12 +134,20 @@ export default function RealityTargetScannerModal({
       width: 160,
       ellipsis: true,
       render: (_: string, row) =>
-        row.certValid ? (
+        !row.certValid ? (
+          <Tag color={row.tlsVersion ? 'error' : undefined}>
+            {t('pages.inbounds.form.scanCertInvalid')}
+          </Tag>
+        ) : row.certExpiresSoon ? (
+          <Tooltip title={`${row.certSubject} (${row.certIssuer})`}>
+            <Tag color="warning">
+              {t('pages.inbounds.form.scanCertExpiresSoon', { days: row.certDaysLeft })}
+            </Tag>
+          </Tooltip>
+        ) : (
           <Tooltip title={`${row.certSubject} (${row.certIssuer})`}>
             <span>{row.certSubject || '—'}</span>
           </Tooltip>
-        ) : (
-          <Tag>{t('pages.inbounds.form.scanCertInvalid')}</Tag>
         ),
     },
     {
@@ -192,11 +211,11 @@ export default function RealityTargetScannerModal({
         </Button>,
       ]}
       title={t('pages.inbounds.form.scanModalTitle')}
-      width={1080}
+      width={1120}
     >
       <Space orientation="vertical" size="small" style={{ width: '100%' }}>
         <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
-          {t('pages.inbounds.form.scanModalDesc')}
+          {t('pages.inbounds.form.scanModalDesc')} {t('pages.inbounds.form.scanModalChoice')}
         </Typography.Paragraph>
         <Input.Search
           aria-label={t('pages.inbounds.form.scanDiscoverPlaceholder')}
@@ -208,6 +227,14 @@ export default function RealityTargetScannerModal({
           onSearch={() => runScan(query.trim() || undefined)}
           placeholder={t('pages.inbounds.form.scanDiscoverPlaceholder')}
         />
+        <Checkbox checked={neighbours} onChange={(e) => setNeighbours(e.target.checked)}>
+          {t('pages.inbounds.form.scanNeighbours')}
+        </Checkbox>
+        {neighbours ? (
+          <Typography.Text type="warning">
+            {t('pages.inbounds.form.scanNeighboursHint')}
+          </Typography.Text>
+        ) : null}
         <Table<RealityScanResult>
           size="small"
           rowKey="target"

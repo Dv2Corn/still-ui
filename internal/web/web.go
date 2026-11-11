@@ -318,6 +318,7 @@ const (
 	cadenceCertWatch     = "@every 1m"
 	cadenceTorrentBlock  = "@every 1m"
 	cadenceEgressFilter  = "@every 1m"
+	cadencePortHop       = "@every 10s"
 	cadenceCheckHash     = "@every 2m"
 	cadenceReachStale    = "@every 1m"
 	// cpu.Percent samples over a full minute (blocking), so a finer cadence just
@@ -351,6 +352,11 @@ func (s *Server) startTask(restartXray, forceXrayRestart bool, loc *time.Locatio
 	torrentBlock := service.TorrentBlockService{}
 	go torrentBlock.EnsureHostFilter()
 	_, _ = s.cron.AddFunc(cadenceTorrentBlock, torrentBlock.EnsureHostFilter)
+
+	// Hysteria2 port hopping: keep the nftables redirect in step with the inbounds.
+	portHop := service.PortHopService{}
+	go portHop.EnsureHost()
+	_, _ = s.cron.AddFunc(cadencePortHop, portHop.EnsureHost)
 
 	// "Egress filter": reload its nftables table after a reboot or a ruleset flush, and
 	// hand the filter to nodes that missed it (offline, restarted, refused).

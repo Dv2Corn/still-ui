@@ -497,6 +497,11 @@ export const ApiTokenViewSchema = z.object({
 });
 export type ApiTokenView = z.infer<typeof ApiTokenViewSchema>;
 
+export const AwgSignaturePacketResponseSchema = z.object({
+  i1: z.string(),
+});
+export type AwgSignaturePacketResponse = z.infer<typeof AwgSignaturePacketResponseSchema>;
+
 export const BlockerSchema = z.object({
   code: z.lazy(() => BlockerCodeSchema),
   detail: z.string().optional(),
@@ -1200,6 +1205,25 @@ export const PeerActivitySchema = z.object({
 });
 export type PeerActivity = z.infer<typeof PeerActivitySchema>;
 
+export const PortHopRuleSchema = z.object({
+  inboundId: z.number().int(),
+  ports: z.string(),
+  remark: z.string(),
+  toPort: z.number().int(),
+});
+export type PortHopRule = z.infer<typeof PortHopRuleSchema>;
+
+export const PortHopStatusSchema = z.object({
+  active: z.boolean(),
+  error: z.string(),
+  nftInstalled: z.boolean(),
+  packets: z.number().int(),
+  permitted: z.boolean(),
+  rules: z.array(z.lazy(() => PortHopRuleSchema)),
+  supported: z.boolean(),
+});
+export type PortHopStatus = z.infer<typeof PortHopStatusSchema>;
+
 export const ProbeResultUISchema = z.object({
   cpuPct: z.number(),
   error: z.string(),
@@ -1290,6 +1314,8 @@ export const RealityScanResultSchema = z.object({
   alpn: z.string(),
   certChainBytes: z.number().int(),
   certChainValid: z.boolean(),
+  certDaysLeft: z.number().int(),
+  certExpiresSoon: z.boolean(),
   certIssuer: z.string(),
   certSubject: z.string(),
   certValid: z.boolean(),
@@ -1299,9 +1325,11 @@ export const RealityScanResultSchema = z.object({
   host: z.string(),
   ip: z.string(),
   latencyMs: z.number().int(),
+  mlkem768: z.boolean(),
   notAfter: z.string(),
   port: z.number().int(),
   privateTarget: z.boolean(),
+  reachable: z.boolean(),
   reason: z.string(),
   serverNames: z.array(z.string()),
   target: z.string(),

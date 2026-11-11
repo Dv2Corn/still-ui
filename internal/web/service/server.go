@@ -407,6 +407,20 @@ type MLDSA65Response struct {
 	Verify string `json:"verify" example:"mldsa65-verify"`
 }
 
+// AwgSignaturePacketResponse is an AmneziaWG I1 spec built from a preset.
+type AwgSignaturePacketResponse struct {
+	I1 string `json:"i1" example:"<r 2><b 0x010000010000000000000377777706676f6f676c6503636f6d0000010001>"`
+}
+
+// GetNewAwgSignaturePacket builds the I1 packet of a preset ("quic" or "dns").
+func (s *ServerService) GetNewAwgSignaturePacket(preset string) (*AwgSignaturePacketResponse, error) {
+	spec, err := amneziawg.SignaturePacket(preset)
+	if err != nil {
+		return nil, err
+	}
+	return &AwgSignaturePacketResponse{I1: spec}, nil
+}
+
 type MLKEM768Response struct {
 	Seed   string `json:"seed" example:"mlkem768-seed"`
 	Client string `json:"client" example:"mlkem768-client"`

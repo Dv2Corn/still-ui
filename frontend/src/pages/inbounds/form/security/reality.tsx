@@ -36,7 +36,7 @@ interface RealityFormProps {
   scanning: boolean;
   scanResult: RealityScanResult | null;
   scanRealityTarget: (allowPrivate?: boolean) => void;
-  scanRealityCandidates: (targets?: string) => Promise<RealityScanResult[]>;
+  scanRealityCandidates: (targets?: string, neighbours?: boolean) => Promise<RealityScanResult[]>;
   applyRealityScanResult: (result: RealityScanResult, replaceServerNames?: boolean) => void;
   randomizeShortIds: () => void;
   randomizeSpiderX: () => void;
@@ -159,7 +159,10 @@ export default function RealityForm({
         <Form.Item label=" " colon={false}>
           <Alert
             type={
-              scanResult.feasible && !scanResult.privateTarget && !mldsaChainTooSmall
+              scanResult.feasible &&
+              !scanResult.privateTarget &&
+              !mldsaChainTooSmall &&
+              !scanResult.certExpiresSoon
                 ? 'success'
                 : 'warning'
             }
@@ -198,6 +201,9 @@ export default function RealityForm({
                     {scanResult.notAfter
                       ? dayjs(scanResult.notAfter).format('YYYY-MM-DD HH:mm')
                       : '—'}
+                    {scanResult.certValid && scanResult.certExpiresSoon
+                      ? ` — ${t('pages.inbounds.form.scanCertExpiresSoon', { days: scanResult.certDaysLeft })}`
+                      : null}
                   </Descriptions.Item>
                   <Descriptions.Item label={t('pages.inbounds.form.scanCertChain')}>
                     {scanResult.certChainBytes > 0 ? `${scanResult.certChainBytes} B` : '—'}
