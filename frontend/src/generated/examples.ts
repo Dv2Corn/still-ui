@@ -448,6 +448,9 @@ export const EXAMPLES: Record<string, unknown> = {
     "scope": "admin",
     "token": "new-token-string"
   },
+  "AwgSignaturePacketResponse": {
+    "i1": "\u003cr 2\u003e\u003cb 0x010000010000000000000377777706676f6f676c6503636f6d0000010001\u003e"
+  },
   "Blocker": {
     "code": "tools",
     "detail": "awg"

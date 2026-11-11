@@ -1885,6 +1885,19 @@ export const SCHEMAS: Record<string, unknown> = {
     ],
     "type": "object"
   },
+  "AwgSignaturePacketResponse": {
+    "description": "AwgSignaturePacketResponse is an AmneziaWG I1 spec built from a preset.",
+    "properties": {
+      "i1": {
+        "example": "\u003cr 2\u003e\u003cb 0x010000010000000000000377777706676f6f676c6503636f6d0000010001\u003e",
+        "type": "string"
+      }
+    },
+    "required": [
+      "i1"
+    ],
+    "type": "object"
+  },
   "Blocker": {
     "description": "Blocker is one unmet requirement.",
     "properties": {

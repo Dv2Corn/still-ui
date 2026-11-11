@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useFormContext, useWatch } from 'react-hook-form';
 import { Alert, Button, Form, Input, InputNumber, Space, Switch, Typography } from 'antd';
@@ -6,6 +6,11 @@ import { ReloadOutlined } from '@ant-design/icons';
 
 import { FormField } from '@/components/form/rhf';
 import { useAmneziawgKernelReadiness } from '@/api/queries/useAmneziawgKernelReadiness';
+import type { AwgSignaturePacketResponse } from '@/generated/types';
+import { HttpUtil } from '@/utils';
+
+// Measured on Russian mobile networks: AmneziaWG is several times faster at 1280 than at 1420.
+const MOBILE_MTU = 1280;
 
 interface AmneziawgFieldsProps {
   awgPubKey: string;
@@ -23,7 +28,25 @@ export default function AmneziawgFields({
   const kernelModeOn = useWatch({ name: 'settings.server.kernelMode' });
   const nodeId = useWatch({ name: 'nodeId' }) as number | null | undefined;
   const remoteTarget = typeof nodeId === 'number';
-  const { formState } = useFormContext();
+  const { formState, setValue } = useFormContext();
+  const [presetLoading, setPresetLoading] = useState<string | null>(null);
+  // Only I1-I5 change: the receiver discards them, so configs already handed out keep working.
+  const applySignaturePreset = async (preset: 'quic' | 'dns') => {
+    setPresetLoading(preset);
+    try {
+      const msg = await HttpUtil.get<AwgSignaturePacketResponse>(
+        '/panel/api/server/getNewAwgSignaturePacket',
+        { preset },
+      );
+      if (!msg?.success || !msg.obj?.i1) return;
+      setValue('settings.server.i1', msg.obj.i1, { shouldDirty: true });
+      for (const slot of ['i2', 'i3', 'i4', 'i5']) {
+        setValue(`settings.server.${slot}`, '', { shouldDirty: true });
+      }
+    } finally {
+      setPresetLoading(null);
+    }
+  };
   const { data: readiness } = useAmneziawgKernelReadiness(!remoteTarget);
   const hostReady = remoteTarget || readiness?.ready !== false;
   // The master can probe only its local host; a remote node checks on apply.
@@ -61,7 +84,23 @@ export default function AmneziawgFields({
       >
         <InputNumber min={1} max={32} style={{ width: '100%' }} />
       </FormField>
-      <FormField name={['settings', 'server', 'mtu']} label={t('pages.xray.amneziawg.mtu')}>
+      <FormField
+        name={['settings', 'server', 'mtu']}
+        label={t('pages.xray.amneziawg.mtu')}
+        extra={
+          <>
+            {t('pages.xray.amneziawg.mtuMobileHint')}{' '}
+            <Button
+              type="link"
+              size="small"
+              style={{ padding: 0 }}
+              onClick={() => setValue('settings.server.mtu', MOBILE_MTU, { shouldDirty: true })}
+            >
+              {t('pages.xray.amneziawg.mtuMobile', { mtu: MOBILE_MTU })}
+            </Button>
+          </>
+        }
+      >
         <InputNumber min={1} style={{ width: '100%' }} />
       </FormField>
       <FormField
@@ -104,10 +143,27 @@ export default function AmneziawgFields({
       >
         <Input placeholder="eth0" />
       </FormField>
-      <Form.Item label={t('pages.xray.amneziawg.obfuscation')}>
-        <Button icon={<ReloadOutlined aria-hidden />} onClick={regenInboundAwgObfuscation}>
-          {t('pages.xray.amneziawg.regenerateObfuscation')}
-        </Button>
+      <Form.Item
+        label={t('pages.xray.amneziawg.obfuscation')}
+        extra={t('pages.xray.amneziawg.presetHint')}
+      >
+        <Space wrap>
+          <Button icon={<ReloadOutlined aria-hidden />} onClick={regenInboundAwgObfuscation}>
+            {t('pages.xray.amneziawg.regenerateObfuscation')}
+          </Button>
+          <Button
+            loading={presetLoading === 'quic'}
+            onClick={() => void applySignaturePreset('quic')}
+          >
+            {t('pages.xray.amneziawg.presetQuic')}
+          </Button>
+          <Button
+            loading={presetLoading === 'dns'}
+            onClick={() => void applySignaturePreset('dns')}
+          >
+            {t('pages.xray.amneziawg.presetDns')}
+          </Button>
+        </Space>
       </Form.Item>
       <FormField name={['settings', 'server', 'jc']} label={t('pages.xray.amneziawg.jc')}>
         <InputNumber min={0} style={{ width: '100%' }} />

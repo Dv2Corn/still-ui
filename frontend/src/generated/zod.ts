@@ -473,6 +473,11 @@ export const ApiTokenViewSchema = z.object({
 });
 export type ApiTokenView = z.infer<typeof ApiTokenViewSchema>;
 
+export const AwgSignaturePacketResponseSchema = z.object({
+  i1: z.string(),
+});
+export type AwgSignaturePacketResponse = z.infer<typeof AwgSignaturePacketResponseSchema>;
+
 export const BlockerSchema = z.object({
   code: z.lazy(() => BlockerCodeSchema),
   detail: z.string().optional(),

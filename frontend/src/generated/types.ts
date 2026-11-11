@@ -448,6 +448,10 @@ export interface ApiTokenView {
   token?: string;
 }
 
+export interface AwgSignaturePacketResponse {
+  i1: string;
+}
+
 export interface Blocker {
   code: BlockerCode;
   detail?: string;

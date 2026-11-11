@@ -646,6 +646,21 @@ export const sections: readonly Section[] = [
       },
       {
         method: 'GET',
+        path: '/panel/api/server/getNewAwgSignaturePacket',
+        summary:
+          'Build an AmneziaWG I1 signature packet shaped like the first datagram of another protocol: "quic" is a QUIC v1 Initial header with a random connection id and 1200-1232 bytes in total, "dns" a recursive A query for a well-known name with a random id. The random parts are <r N> tags, so every handshake sends different bytes. The value passes the inbound validator as is.',
+        params: [
+          {
+            name: 'preset',
+            in: 'query',
+            type: 'string',
+            desc: 'quic or dns.',
+          },
+        ],
+        responseSchema: 'AwgSignaturePacketResponse',
+      },
+      {
+        method: 'GET',
         path: '/panel/api/server/getNewmldsa65',
         summary: 'Generate a new ML-DSA-65 keypair. Returns {seed, verify}.',
         responseSchema: 'MLDSA65Response',

@@ -1911,6 +1911,19 @@
         ],
         "type": "object"
       },
+      "AwgSignaturePacketResponse": {
+        "description": "AwgSignaturePacketResponse is an AmneziaWG I1 spec built from a preset.",
+        "properties": {
+          "i1": {
+            "example": "<r 2><b 0x010000010000000000000377777706676f6f676c6503636f6d0000010001>",
+            "type": "string"
+          }
+        },
+        "required": [
+          "i1"
+        ],
+        "type": "object"
+      },
       "Blocker": {
         "description": "Blocker is one unmet requirement.",
         "properties": {
@@ -7927,6 +7940,55 @@
                   "obj": {
                     "privateKey": "uN9qLfV3zH8w...",
                     "publicKey": "5v8xPqR2sM7k..."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/server/getNewAwgSignaturePacket": {
+      "get": {
+        "tags": [
+          "Server"
+        ],
+        "summary": "Build an AmneziaWG I1 signature packet shaped like the first datagram of another protocol: \"quic\" is a QUIC v1 Initial header with a random connection id and 1200-1232 bytes in total, \"dns\" a recursive A query for a well-known name with a random id. The random parts are <r N> tags, so every handshake sends different bytes. The value passes the inbound validator as is.",
+        "operationId": "get_panel_api_server_getNewAwgSignaturePacket",
+        "parameters": [
+          {
+            "name": "preset",
+            "in": "query",
+            "required": true,
+            "description": "quic or dns.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "$ref": "#/components/schemas/AwgSignaturePacketResponse"
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": {
+                    "i1": "<r 2><b 0x010000010000000000000377777706676f6f676c6503636f6d0000010001>"
                   }
                 }
               }

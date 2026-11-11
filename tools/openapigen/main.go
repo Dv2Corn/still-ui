@@ -105,6 +105,7 @@ func run(root, outDir string) error {
 				"LogEntry",
 				"NewUUIDResponse",
 				"MLDSA65Response",
+				"AwgSignaturePacketResponse",
 				"MLKEM768Response",
 				"NodeMutationRequest",
 				"NodeView",

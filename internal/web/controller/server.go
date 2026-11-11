@@ -68,6 +68,7 @@ func (a *ServerController) initRouter(g *gin.RouterGroup) {
 	g.GET("/getNewmldsa65", a.getNewmldsa65)
 	g.GET("/getNewmlkem768", a.getNewmlkem768)
 	g.GET("/getNewVlessEnc", a.getNewVlessEnc)
+	g.GET("/getNewAwgSignaturePacket", a.getNewAwgSignaturePacket)
 	g.GET("/clientIps", a.getClientIps)
 	g.GET("/fail2banStatus", a.getFail2banStatus)
 	g.GET("/torrentBlock", a.getTorrentBlock)
@@ -610,6 +611,16 @@ func (a *ServerController) getNewVlessEnc(c *gin.Context) {
 	out, err := a.serverService.GetNewVlessEnc()
 	if err != nil {
 		jsonMsg(c, I18nWeb(c, "pages.inbounds.toasts.getNewVlessEncError"), err)
+		return
+	}
+	jsonObj(c, out, nil)
+}
+
+// getNewAwgSignaturePacket builds an AmneziaWG I1 packet shaped like the preset's protocol.
+func (a *ServerController) getNewAwgSignaturePacket(c *gin.Context) {
+	out, err := a.serverService.GetNewAwgSignaturePacket(c.Query("preset"))
+	if err != nil {
+		jsonMsg(c, I18nWeb(c, "pages.inbounds.toasts.getNewAwgSignaturePacketError"), err)
 		return
 	}
 	jsonObj(c, out, nil)
