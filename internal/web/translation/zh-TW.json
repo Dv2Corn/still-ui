@@ -1979,7 +1979,7 @@
       "subLocalDirectDesc": "訂閱用戶端直接存取所選國家的網站，其餘流量全部走 VPN。適用於 JSON、Clash/Mihomo 與 Happ/INCY 訂閱，並在訂閱頁面提供 Shadowrocket 規則檔；一般連結清單無法攜帶規則。如果你為某種格式另外設定了路由設定檔，該格式以你的設定為準。",
       "subLocalDirectOff": "關閉",
       "subLocalDirectProxy": "一律走 VPN",
-      "subLocalDirectProxyDesc": "即使看起來是本地位址也要走 VPN 的網域與 IP 範圍，每行一個；會在國家規則之前比對。清空此欄即可還原內建清單。",
+      "subLocalDirectProxyDesc": "Telegram、YouTube、Instagram、Facebook、WhatsApp、Discord、ChatGPT 與 Claude 即使看起來是本地位址也一律走 VPN。可在此加入其他網域或 IP 範圍，每行一個；會在國家規則之前比對。",
       "subProbeOrder": "使用探針結果",
       "subProbeOrderDesc": "可達性探針回報不通的連結（連續 2 次失敗）會移到訂閱末尾或被隱藏，適用於所有格式：連結、JSON 和 Clash。使用者始終至少保留一個連結；沒有新的探針結果時不做任何變動。探針頁面會顯示每個端點的處理情況。",
       "subProbeOrderOff": "關閉（預設）",

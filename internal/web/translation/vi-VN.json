@@ -1979,7 +1979,7 @@
       "subLocalDirectDesc": "Ứng dụng dùng gói đăng ký mở các trang của quốc gia đã chọn trực tiếp và gửi mọi thứ còn lại qua VPN. Áp dụng cho gói đăng ký JSON, Clash/Mihomo và Happ/INCY, đồng thời thêm tệp quy tắc Shadowrocket vào trang đăng ký; danh sách liên kết thông thường không thể mang quy tắc. Nếu bạn tự đặt hồ sơ định tuyến cho một định dạng thì hồ sơ đó được ưu tiên trong định dạng ấy.",
       "subLocalDirectOff": "Tắt",
       "subLocalDirectProxy": "Luôn qua VPN",
-      "subLocalDirectProxyDesc": "Tên miền và dải IP luôn đi qua VPN dù trông giống trong nước, mỗi dòng một mục; được kiểm tra trước quy tắc quốc gia. Xóa trống ô này để khôi phục danh sách có sẵn.",
+      "subLocalDirectProxyDesc": "Telegram, YouTube, Instagram, Facebook, WhatsApp, Discord, ChatGPT và Claude luôn đi qua VPN dù trông giống trong nước. Thêm tên miền hoặc dải IP khác vào đây, mỗi dòng một mục; chúng được kiểm tra trước quy tắc quốc gia.",
       "subProbeOrder": "Dùng kết quả thăm dò",
       "subProbeOrderDesc": "Các liên kết mà bộ thăm dò báo là không truy cập được (thất bại 2 lần liên tiếp) sẽ được chuyển xuống cuối gói đăng ký hoặc bị ẩn, ở mọi định dạng: liên kết, JSON và Clash. Người dùng luôn còn ít nhất một liên kết, và nếu không có kết quả thăm dò mới thì không có gì thay đổi. Trang Thăm dò cho biết điều gì xảy ra với từng điểm kết nối.",
       "subProbeOrderOff": "Tắt (mặc định)",

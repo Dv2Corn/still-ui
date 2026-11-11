@@ -1979,7 +1979,7 @@
       "subLocalDirectDesc": "Klien langganan membuka situs negara yang dipilih secara langsung dan mengirim sisanya lewat VPN. Berlaku untuk langganan JSON, Clash/Mihomo, dan Happ/INCY, serta menambahkan berkas aturan Shadowrocket ke halaman langganan; daftar tautan biasa tidak dapat membawa aturan. Profil perutean yang Anda atur sendiri untuk suatu format lebih diutamakan di format itu.",
       "subLocalDirectOff": "Mati",
       "subLocalDirectProxy": "Selalu lewat VPN",
-      "subLocalDirectProxyDesc": "Domain dan rentang IP yang tetap lewat VPN meski tampak lokal, satu per baris; diperiksa sebelum aturan negara. Kosongkan kolom untuk mengembalikan daftar bawaan.",
+      "subLocalDirectProxyDesc": "Telegram, YouTube, Instagram, Facebook, WhatsApp, Discord, ChatGPT, dan Claude selalu lewat VPN meski tampak lokal. Tambahkan domain atau rentang IP lain di sini, satu per baris; diperiksa sebelum aturan negara.",
       "subProbeOrder": "Gunakan hasil probe",
       "subProbeOrderDesc": "Tautan yang dilaporkan mati oleh probe keterjangkauan (2 kali gagal berturut-turut) dipindah ke akhir langganan atau disembunyikan, di semua format: tautan, JSON, dan Clash. Pengguna selalu menyisakan setidaknya satu tautan, dan tanpa hasil probe terbaru tidak ada yang berubah. Halaman Probe menampilkan apa yang terjadi pada setiap endpoint.",
       "subProbeOrderOff": "Mati (bawaan)",

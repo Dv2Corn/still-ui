@@ -15,13 +15,14 @@ const (
 	GeositeFile = "geosite.dat"
 	GeoIPFile   = "geoip.dat"
 
-	// The list also rides Happ's Routing header, which the sub server caps at 8 KiB.
-	MaxProxyEntries = 200
+	// What the always-VPN list may take inside Happ's routing profile; with the fixed
+	// part of the profile, base64 of this stays under the sub server's 8 KiB Routing header.
+	MaxProxyBytes = 5000
 )
 
-// DefaultProxyList is the built-in always-VPN list. Telegram's ranges are registered as
+// BuiltinProxyList always goes through the VPN. Telegram's ranges are registered as
 // Russian in geoip databases, and Google serves video from caches inside local ISPs.
-const DefaultProxyList = `# Telegram
+const BuiltinProxyList = `# Telegram
 telegram.org
 t.me
 telegram.me
@@ -102,20 +103,26 @@ func NormalizeCountry(raw string) (string, error) {
 	return code, nil
 }
 
-// NormalizeProxyList validates the always-VPN list and returns the text to store;
-// a blank list becomes the built-in one, so Telegram can never silently go direct.
+// NormalizeProxyList validates the operator's additions to the built-in always-VPN
+// list and returns the text to store.
 func NormalizeProxyList(raw string) (string, error) {
 	text := strings.TrimSpace(strings.ReplaceAll(raw, "\r", ""))
-	if text == "" {
-		return DefaultProxyList, nil
-	}
-	if _, _, err := parseProxyList(text); err != nil {
+	if _, _, err := proxyList(text); err != nil {
 		return "", err
 	}
 	return text, nil
 }
 
-func parseProxyList(raw string) (domains, ips []string, err error) {
+// proxyList returns the built-in entries followed by the operator's own.
+func proxyList(extra string) (domains, ips []string, err error) {
+	domains, ips, err = parseProxyList(BuiltinProxyList, nil, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	return parseProxyList(extra, domains, ips)
+}
+
+func parseProxyList(raw string, domains, ips []string) ([]string, []string, error) {
 	for i, line := range strings.Split(strings.ReplaceAll(raw, "\r", ""), "\n") {
 		entry := strings.ToLower(strings.TrimSpace(line))
 		if entry == "" || strings.HasPrefix(entry, "#") {
@@ -132,9 +139,14 @@ func parseProxyList(raw string) (domains, ips []string, err error) {
 		} else {
 			return nil, nil, fmt.Errorf("always-VPN list line %d: %q is neither a domain nor an IP range", i+1, strings.TrimSpace(line))
 		}
-		if len(domains)+len(ips) > MaxProxyEntries {
-			return nil, nil, fmt.Errorf("always-VPN list holds at most %d entries", MaxProxyEntries)
-		}
+	}
+	// A profile entry is "domain:<name>", or "<range>", with its quotes and comma.
+	size := 10*len(domains) + 3*len(ips)
+	for _, entry := range slices.Concat(domains, ips) {
+		size += len(entry)
+	}
+	if size > MaxProxyBytes {
+		return nil, nil, fmt.Errorf("always-VPN list is too long for Happ's routing header: %d of %d bytes", size, MaxProxyBytes)
 	}
 	return domains, ips, nil
 }
@@ -151,12 +163,12 @@ func parsePrefix(entry string) (string, bool) {
 
 // NewPlan resolves the two settings into a plan; has reports whether a geo database
 // on this panel carries a category. An error means the stored settings are unusable.
-func NewPlan(country, proxyList string, has func(file, code string) bool) (Plan, error) {
+func NewPlan(country, extraProxyList string, has func(file, code string) bool) (Plan, error) {
 	code, err := NormalizeCountry(country)
 	if err != nil || code == "" {
 		return Plan{}, err
 	}
-	domains, ips, err := parseProxyList(proxyList)
+	domains, ips, err := proxyList(extraProxyList)
 	if err != nil {
 		return Plan{}, err
 	}
@@ -198,8 +210,8 @@ func (p Plan) directSites() []string {
 	return sites
 }
 
-// XrayRules returns the routing rules in match order; the caller keeps its own
-// catch-all proxy rule after them and needs domainStrategy IPIfNonMatch for the geoip rule.
+// XrayRules returns the routing rules for domainStrategy IPOnDemand, ahead of the caller's
+// catch-all. Domain rules lead so that only a name none of them knows costs a DNS lookup.
 func (p Plan) XrayRules() []any {
 	if !p.Enabled() {
 		return nil
@@ -207,14 +219,14 @@ func (p Plan) XrayRules() []any {
 	rule := func(key string, values []string, outbound string) map[string]any {
 		return map[string]any{"type": "field", key: values, "outboundTag": outbound}
 	}
-	rules := []any{rule("ip", privateCIDRs, "direct")}
+	var rules []any
 	if len(p.ProxyDomains) > 0 {
 		rules = append(rules, rule("domain", prefixed("domain:", p.ProxyDomains), "proxy"))
 	}
+	rules = append(rules, rule("domain", p.directSites(), "direct"), rule("ip", privateCIDRs, "direct"))
 	if len(p.ProxyIPs) > 0 {
 		rules = append(rules, rule("ip", p.ProxyIPs, "proxy"))
 	}
-	rules = append(rules, rule("domain", p.directSites(), "direct"))
 	if p.GeoIP {
 		rules = append(rules, rule("ip", []string{"geoip:" + p.Country}, "direct"))
 	}

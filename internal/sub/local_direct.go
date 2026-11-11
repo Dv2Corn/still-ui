@@ -65,8 +65,8 @@ func (s *SubJsonService) SetLocalDirect(plan localdirect.Plan) {
 	catchAll := len(rules) - 1
 	merged := append(slices.Clone(rules[:catchAll]), plan.XrayRules()...)
 	routing["rules"] = append(merged, rules[catchAll])
-	// The geoip rule only sees a domain once the router resolves it.
-	routing["domainStrategy"] = "IPIfNonMatch"
+	// IPIfNonMatch resolves a name only when no rule matched, which the catch-all rules out.
+	routing["domainStrategy"] = "IPOnDemand"
 }
 
 // shadowrocketConf serves the rules-only Shadowrocket config. It carries no credentials, so like

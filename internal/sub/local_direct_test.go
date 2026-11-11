@@ -23,10 +23,10 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/web/service"
 )
 
-const localDirectXrayRules = `{"ip":["10.0.0.0/8","100.64.0.0/10","127.0.0.0/8","169.254.0.0/16","172.16.0.0/12","192.168.0.0/16","::1/128","fc00::/7","fe80::/10"],"outboundTag":"direct","type":"field"},` +
-	`{"domain":["domain:telegram.org"],"outboundTag":"proxy","type":"field"},` +
-	`{"ip":["91.108.0.0/16"],"outboundTag":"proxy","type":"field"},` +
+const localDirectXrayRules = `{"domain":["domain:telegram.org"],"outboundTag":"proxy","type":"field"},` +
 	`{"domain":["domain:ru","domain:su","domain:xn--p1ai","geosite:category-ru"],"outboundTag":"direct","type":"field"},` +
+	`{"ip":["10.0.0.0/8","100.64.0.0/10","127.0.0.0/8","169.254.0.0/16","172.16.0.0/12","192.168.0.0/16","::1/128","fc00::/7","fe80::/10"],"outboundTag":"direct","type":"field"},` +
+	`{"ip":["91.108.0.0/16"],"outboundTag":"proxy","type":"field"},` +
 	`{"ip":["geoip:ru"],"outboundTag":"direct","type":"field"}`
 
 const xrayCatchAllRule = `{"network":"tcp,udp","outboundTag":"proxy","type":"field"}`
@@ -52,11 +52,14 @@ var localDirectClashRules = []any{
 
 func localDirectTestPlan(t *testing.T) localdirect.Plan {
 	t.Helper()
-	plan, err := localdirect.NewPlan("ru", "telegram.org\n91.108.0.0/16", func(string, string) bool { return true })
-	if err != nil {
-		t.Fatalf("NewPlan: %v", err)
+	return localdirect.Plan{
+		Country:      "ru",
+		ProxyDomains: []string{"telegram.org"},
+		ProxyIPs:     []string{"91.108.0.0/16"},
+		TLDs:         []string{"ru", "su", "xn--p1ai"},
+		Geosite:      "category-ru",
+		GeoIP:        true,
 	}
-	return plan
 }
 
 func seedLocalDirectSub(t *testing.T) {
@@ -135,12 +138,12 @@ func TestLocalDirectJSONSubscription(t *testing.T) {
 	}{
 		{
 			name: "rules sit ahead of the catch-all",
-			want: `{"domainStrategy":"IPIfNonMatch","rules":[` + localDirectXrayRules + `,` + xrayCatchAllRule + `]}`,
+			want: `{"domainStrategy":"IPOnDemand","rules":[` + localDirectXrayRules + `,` + xrayCatchAllRule + `]}`,
 		},
 		{
 			name:    "the operator's own rules still match first",
 			options: []SUBControllerOption{WithSUBJsonRules(`[{"type":"field","domain":["domain:example.ru"],"outboundTag":"proxy"}]`)},
-			want: `{"domainStrategy":"IPIfNonMatch","rules":[{"domain":["domain:example.ru"],"outboundTag":"proxy","type":"field"},` +
+			want: `{"domainStrategy":"IPOnDemand","rules":[{"domain":["domain:example.ru"],"outboundTag":"proxy","type":"field"},` +
 				localDirectXrayRules + `,` + xrayCatchAllRule + `]}`,
 		},
 		{

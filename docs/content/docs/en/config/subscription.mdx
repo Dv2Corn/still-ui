@@ -169,9 +169,10 @@ The rules, in match order:
    local: Telegram's address ranges are registered as Russian in geoip
    databases, and Google serves video from caches inside local providers. The
    built-in list covers Telegram (domains and its IPv4/IPv6 ranges), YouTube,
-   Instagram and Facebook, WhatsApp, Discord, OpenAI and Anthropic. Edit it one
-   domain or IP range per line (up to 200); clearing the field restores the
-   built-in list.
+   Instagram and Facebook, WhatsApp, Discord, OpenAI and Anthropic, and is
+   updated with still-ui releases. The field holds your additions to it, one
+   domain or IP range per line; the whole list is capped at what fits Happ's
+   routing header, roughly 150 additions.
 3. The country's domain zones go direct: `.ru`, `.su` and `.рф` for `ru`;
    `.by` and `.бел` for `by`; `.kz` and `.қаз` for `kz`; `.uk` for `gb`; the
    country's own two-letter zone for any other code.
@@ -183,8 +184,8 @@ The rules, in match order:
 
 | Format | What the client gets |
 | --- | --- |
-| **JSON** | The rules in `routing.rules` ahead of the catch-all rule, with `domainStrategy: IPIfNonMatch`. |
-| **Clash / Mihomo** | `IP-CIDR` (`no-resolve`), `DOMAIN-SUFFIX`, `GEOSITE` and `GEOIP` rules ahead of `MATCH,PROXY`. The Clash for Windows profile gets the same without `GEOSITE`. |
+| **JSON** | The rules in `routing.rules` ahead of the catch-all rule, with `domainStrategy: IPOnDemand`: Xray resolves a name only when no domain rule knows it. The domain rules (always-VPN, then the country) come first and the address rules (private, always-VPN, `geoip`) after them, so a local site costs no DNS lookup. |
+| **Clash / Mihomo** | `IP-CIDR` (`no-resolve`), `DOMAIN-SUFFIX`, `GEOSITE` and `GEOIP` rules ahead of `MATCH,PROXY`. The Clash for Windows profile gets the same without `GEOSITE`. The profile has no `dns` section: for the `GEOIP` rule the app resolves names with its own DNS settings, which may be the provider's resolver. To set DNS for your users, put a `dns:` block into the Clash routing rules field. |
 | **Happ, INCY** | A routing profile in the `Routing` response header, proxy rules ahead of direct ones; Happ also gets `Routing-Enable: true`. |
 | **Shadowrocket** | A rules file at `<subscription URL>/shadowrocket.conf`, offered on the subscription page: add it on the Config tab and set Global Routing to Config. Zones and `GEOIP` only, Shadowrocket has no `GEOSITE` rule. |
 | **Raw links (Base64)** | Nothing. A list of links cannot carry routing rules; apps that only take links need the JSON subscription or their own routing settings. |

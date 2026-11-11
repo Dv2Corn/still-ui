@@ -1,6 +1,7 @@
 package localdirect
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"reflect"
 	"slices"
@@ -9,7 +10,14 @@ import (
 	"testing"
 )
 
-const testProxyList = "# messengers\ntelegram.org\n91.108.0.0/16\n2001:67c:4e8::/48\n"
+var goldenPlan = Plan{
+	Country:      "ru",
+	ProxyDomains: []string{"telegram.org"},
+	ProxyIPs:     []string{"91.108.0.0/16", "2001:67c:4e8::/48"},
+	TLDs:         []string{"ru", "su", "xn--p1ai"},
+	Geosite:      "category-ru",
+	GeoIP:        true,
+}
 
 func allGeo(string, string) bool { return true }
 
@@ -56,10 +64,10 @@ func TestNormalizeCountry(t *testing.T) {
 }
 
 func TestNormalizeProxyList(t *testing.T) {
-	t.Run("blank falls back to the built-in list", func(t *testing.T) {
+	t.Run("blank stays blank", func(t *testing.T) {
 		got, err := NormalizeProxyList(" \r\n ")
-		if err != nil || got != DefaultProxyList {
-			t.Fatalf("got %q, %v; want the built-in list", got, err)
+		if err != nil || got != "" {
+			t.Fatalf("got %q, %v; want an empty list of additions", got, err)
 		}
 	})
 	t.Run("keeps comments and drops carriage returns", func(t *testing.T) {
@@ -84,19 +92,39 @@ func TestNormalizeProxyList(t *testing.T) {
 			}
 		})
 	}
-	t.Run("rejects an oversized list", func(t *testing.T) {
-		var b strings.Builder
-		for i := 0; i <= MaxProxyEntries; i++ {
-			b.WriteString("d" + strconv.Itoa(i) + ".example\n")
+}
+
+// Happ takes the profile in a response header the sub server caps at 8 KiB, so a list
+// that passes validation has to fit there for the longest country block too.
+func TestLargestAcceptedListFitsHappRoutingHeader(t *testing.T) {
+	var extra strings.Builder
+	accepted, capped := "", false
+	for i := 0; i < 1000 && !capped; i++ {
+		extra.WriteString("d" + strconv.Itoa(i) + ".example.org\n")
+		if _, err := NormalizeProxyList(extra.String()); err != nil {
+			if !strings.Contains(err.Error(), "too long for Happ's routing header") {
+				t.Fatalf("err = %v, want the size error", err)
+			}
+			capped = true
+		} else {
+			accepted = extra.String()
 		}
-		if _, err := NormalizeProxyList(b.String()); err == nil || !strings.Contains(err.Error(), "at most") {
-			t.Fatalf("err = %v, want the entry cap error", err)
-		}
-	})
+	}
+	if !capped {
+		t.Fatal("a 1000-entry list was accepted; nothing caps it")
+	}
+	plan := mustPlan(t, "cn", accepted, allGeo)
+	if len(plan.ProxyDomains) < 150 {
+		t.Fatalf("only %d entries fit; the cap is tighter than intended", len(plan.ProxyDomains))
+	}
+	const deeplinkPrefix = len("happ://routing/onadd/")
+	if size := deeplinkPrefix + base64.StdEncoding.EncodedLen(len(plan.HappProfile())); size > 8<<10 {
+		t.Fatalf("the largest accepted list makes a %d-byte Routing header, over the 8 KiB cap", size)
+	}
 }
 
 func TestNewPlanRejectsUnknownCountry(t *testing.T) {
-	plan, err := NewPlan("xx", testProxyList, allGeo)
+	plan, err := NewPlan("xx", "", allGeo)
 	if err == nil || plan.Enabled() {
 		t.Fatalf("plan = %+v, err = %v; want an error and a disabled plan", plan, err)
 	}
@@ -104,7 +132,7 @@ func TestNewPlanRejectsUnknownCountry(t *testing.T) {
 
 func TestNewPlanOff(t *testing.T) {
 	for _, country := range []string{"", "off"} {
-		plan := mustPlan(t, country, testProxyList, allGeo)
+		plan := mustPlan(t, country, "example.org", allGeo)
 		if plan.Enabled() || plan.XrayRules() != nil || plan.ClashRules(true) != nil || plan.Shadowrocket() != "" || plan.HappProfile() != nil {
 			t.Fatalf("country %q: off plan still renders rules: %+v", country, plan)
 		}
@@ -130,7 +158,7 @@ func TestNewPlanCountryTable(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.country, func(t *testing.T) {
-			plan := mustPlan(t, tt.country, testProxyList, func(file, code string) bool {
+			plan := mustPlan(t, tt.country, "", func(file, code string) bool {
 				return file == GeositeFile && tt.geosite[code]
 			})
 			if !slices.Equal(plan.TLDs, tt.wantTLDs) || plan.Geosite != tt.wantGeosite || plan.GeoIP {
@@ -141,7 +169,7 @@ func TestNewPlanCountryTable(t *testing.T) {
 }
 
 func TestNewPlanAsksGeoIPForTheCountry(t *testing.T) {
-	plan := mustPlan(t, "ru", testProxyList, func(file, code string) bool {
+	plan := mustPlan(t, "ru", "", func(file, code string) bool {
 		return file == GeoIPFile && code == "ru"
 	})
 	if !plan.GeoIP || plan.Geosite != "" {
@@ -150,15 +178,15 @@ func TestNewPlanAsksGeoIPForTheCountry(t *testing.T) {
 }
 
 func TestXrayRulesGolden(t *testing.T) {
-	got, err := json.Marshal(mustPlan(t, "ru", testProxyList, allGeo).XrayRules())
+	got, err := json.Marshal(goldenPlan.XrayRules())
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := `[` +
-		`{"ip":["10.0.0.0/8","100.64.0.0/10","127.0.0.0/8","169.254.0.0/16","172.16.0.0/12","192.168.0.0/16","::1/128","fc00::/7","fe80::/10"],"outboundTag":"direct","type":"field"},` +
 		`{"domain":["domain:telegram.org"],"outboundTag":"proxy","type":"field"},` +
-		`{"ip":["91.108.0.0/16","2001:67c:4e8::/48"],"outboundTag":"proxy","type":"field"},` +
 		`{"domain":["domain:ru","domain:su","domain:xn--p1ai","geosite:category-ru"],"outboundTag":"direct","type":"field"},` +
+		`{"ip":["10.0.0.0/8","100.64.0.0/10","127.0.0.0/8","169.254.0.0/16","172.16.0.0/12","192.168.0.0/16","::1/128","fc00::/7","fe80::/10"],"outboundTag":"direct","type":"field"},` +
+		`{"ip":["91.108.0.0/16","2001:67c:4e8::/48"],"outboundTag":"proxy","type":"field"},` +
 		`{"ip":["geoip:ru"],"outboundTag":"direct","type":"field"}` +
 		`]`
 	if string(got) != want {
@@ -167,7 +195,7 @@ func TestXrayRulesGolden(t *testing.T) {
 }
 
 func TestXrayRulesWithoutGeodataKeepOnlyTLDs(t *testing.T) {
-	got, err := json.Marshal(mustPlan(t, "ru", "telegram.org", noGeo).XrayRules())
+	got, err := json.Marshal(mustPlan(t, "ru", "", noGeo).XrayRules())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,7 +208,7 @@ func TestXrayRulesWithoutGeodataKeepOnlyTLDs(t *testing.T) {
 }
 
 func TestClashRulesGolden(t *testing.T) {
-	plan := mustPlan(t, "ru", testProxyList, allGeo)
+	plan := goldenPlan
 	want := []string{
 		"IP-CIDR,10.0.0.0/8,DIRECT,no-resolve",
 		"IP-CIDR,100.64.0.0/10,DIRECT,no-resolve",
@@ -210,7 +238,7 @@ func TestClashRulesGolden(t *testing.T) {
 }
 
 func TestShadowrocketGolden(t *testing.T) {
-	got := mustPlan(t, "ru", testProxyList, allGeo).Shadowrocket()
+	got := goldenPlan.Shadowrocket()
 	want := `# Local sites direct (RU): sites of this country open directly, everything else goes through the VPN.
 # Import it in Shadowrocket (Config tab) and switch Global Routing to "Config".
 # The servers come from your subscription; this file has no [Proxy] section.
@@ -252,7 +280,7 @@ FINAL,PROXY
 }
 
 func TestHappProfileGolden(t *testing.T) {
-	got := string(mustPlan(t, "ru", testProxyList, allGeo).HappProfile())
+	got := string(goldenPlan.HappProfile())
 	want := `{"Name":"Local direct RU","GlobalProxy":"true","RouteOrder":"block-proxy-direct","DomainStrategy":"IPIfNonMatch",` +
 		`"DirectSites":["domain:ru","domain:su","domain:xn--p1ai","geosite:category-ru"],` +
 		`"DirectIp":["10.0.0.0/8","100.64.0.0/10","127.0.0.0/8","169.254.0.0/16","172.16.0.0/12","192.168.0.0/16","::1/128","fc00::/7","fe80::/10","geoip:ru"],` +
@@ -264,26 +292,33 @@ func TestHappProfileGolden(t *testing.T) {
 
 // Telegram's ranges are registered as Russian in the geoip databases, so the
 // built-in list has to reach the VPN before the country rule in every format.
-func TestDefaultListKeepsTelegramOffTheDirectRoute(t *testing.T) {
-	plan := mustPlan(t, "ru", DefaultProxyList, allGeo)
+func TestBuiltinListKeepsTelegramOffTheDirectRoute(t *testing.T) {
+	plan := mustPlan(t, "ru", "", allGeo)
 	telegram := []string{
 		"91.108.0.0/16", "149.154.160.0/20", "95.161.64.0/20", "185.76.151.0/24",
 		"2001:67c:4e8::/48", "2001:b28:f23c::/46", "2a0a:f280::/32",
 	}
 
 	t.Run("xray", func(t *testing.T) {
-		rules := plan.XrayRules()
-		proxyAt, countryAt := -1, -1
-		for i, rule := range rules {
+		at := map[string]int{"proxyDomains": -1, "countryDomains": -1, "proxyIPs": -1, "countryIPs": -1}
+		for i, rule := range plan.XrayRules() {
 			fields := rule.(map[string]any)
+			domains, _ := fields["domain"].([]string)
 			ips, _ := fields["ip"].([]string)
-			if fields["outboundTag"] == "proxy" && slices.Contains(ips, telegram[0]) {
-				proxyAt = i
+			switch {
+			case fields["outboundTag"] == "proxy" && slices.Contains(domains, "domain:telegram.org"):
+				at["proxyDomains"] = i
+			case fields["outboundTag"] == "direct" && slices.Contains(domains, "domain:ru"):
+				at["countryDomains"] = i
+			case fields["outboundTag"] == "proxy" && len(ips) > 0:
+				at["proxyIPs"] = i
 				for _, cidr := range telegram {
 					if !slices.Contains(ips, cidr) {
 						t.Fatalf("always-VPN rule misses %s: %v", cidr, ips)
 					}
 				}
+			case fields["outboundTag"] == "direct" && slices.Contains(ips, "geoip:ru"):
+				at["countryIPs"] = i
 			}
 			if fields["outboundTag"] == "direct" {
 				for _, cidr := range telegram {
@@ -291,13 +326,10 @@ func TestDefaultListKeepsTelegramOffTheDirectRoute(t *testing.T) {
 						t.Fatalf("%s is routed direct: %v", cidr, ips)
 					}
 				}
-				if slices.Contains(ips, "geoip:ru") {
-					countryAt = i
-				}
 			}
 		}
-		if proxyAt < 0 || countryAt < 0 || proxyAt > countryAt {
-			t.Fatalf("always-VPN rule at %d, geoip:ru at %d; the VPN rule must come first", proxyAt, countryAt)
+		if at["proxyDomains"] < 0 || at["proxyDomains"] > at["countryDomains"] || at["proxyIPs"] < 0 || at["proxyIPs"] > at["countryIPs"] {
+			t.Fatalf("rule positions %v: each always-VPN rule must precede the country rule of its kind", at)
 		}
 	})
 
@@ -345,8 +377,8 @@ func TestDefaultListKeepsTelegramOffTheDirectRoute(t *testing.T) {
 	})
 }
 
-func TestDefaultListCoversTheNamedServices(t *testing.T) {
-	plan := mustPlan(t, "ru", DefaultProxyList, allGeo)
+func TestBuiltinListCoversTheNamedServices(t *testing.T) {
+	plan := mustPlan(t, "ru", "", allGeo)
 	for _, domain := range []string{
 		"telegram.org", "t.me", "youtube.com", "googlevideo.com", "instagram.com", "facebook.com",
 		"whatsapp.com", "whatsapp.net", "discord.com", "openai.com", "chatgpt.com", "anthropic.com", "claude.ai",
@@ -358,7 +390,7 @@ func TestDefaultListCoversTheNamedServices(t *testing.T) {
 }
 
 func TestShadowrocketIsASCII(t *testing.T) {
-	conf := mustPlan(t, "ir", DefaultProxyList, allGeo).Shadowrocket()
+	conf := mustPlan(t, "ir", "example.org\n2001:db8::/32", allGeo).Shadowrocket()
 	for i := 0; i < len(conf); i++ {
 		if conf[i] > 0x7e || (conf[i] < 0x20 && conf[i] != '\n') {
 			t.Fatalf("byte %#x at offset %d is not printable ASCII", conf[i], i)
@@ -366,12 +398,15 @@ func TestShadowrocketIsASCII(t *testing.T) {
 	}
 }
 
-func TestProxyListEntriesAreCanonical(t *testing.T) {
-	plan := mustPlan(t, "ru", "Example.COM\nexample.com\n10.1.2.3\n10.1.2.3/32\n2001:DB8::1/32\n", allGeo)
-	if !slices.Equal(plan.ProxyDomains, []string{"example.com"}) {
-		t.Fatalf("domains = %v", plan.ProxyDomains)
+// The operator's lines extend the built-in list: a release that adds a range to it
+// reaches every panel, and an entry both lists name is routed once.
+func TestOperatorEntriesFollowTheBuiltinList(t *testing.T) {
+	builtin := mustPlan(t, "ru", "", allGeo)
+	plan := mustPlan(t, "ru", "Example.COM\nexample.com\nTelegram.org\n10.1.2.3\n10.1.2.3/32\n2001:DB8::1/32\n91.108.0.0/16\n", allGeo)
+	if want := append(slices.Clone(builtin.ProxyDomains), "example.com"); !slices.Equal(plan.ProxyDomains, want) {
+		t.Fatalf("domains = %v, want the built-in ones and then example.com", plan.ProxyDomains)
 	}
-	if !slices.Equal(plan.ProxyIPs, []string{"10.1.2.3/32", "2001:db8::/32"}) {
-		t.Fatalf("ips = %v", plan.ProxyIPs)
+	if want := append(slices.Clone(builtin.ProxyIPs), "10.1.2.3/32", "2001:db8::/32"); !slices.Equal(plan.ProxyIPs, want) {
+		t.Fatalf("ips = %v, want the built-in ones and then the two additions", plan.ProxyIPs)
 	}
 }

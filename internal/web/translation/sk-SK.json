@@ -2100,7 +2100,7 @@
       "subLocalDirectDesc": "Klienti odberu otvárajú stránky vybranej krajiny priamo a všetko ostatné posielajú cez VPN. Funguje v odberoch JSON, Clash/Mihomo a Happ/INCY a na stránku odberu pridá súbor pravidiel pre Shadowrocket; obyčajný zoznam odkazov pravidlá preniesť nedokáže. Ak pre niektorý formát nastavíte vlastný profil smerovania, v tom formáte má prednosť on.",
       "subLocalDirectOff": "Vypnuté",
       "subLocalDirectProxy": "Vždy cez VPN",
-      "subLocalDirectProxyDesc": "Domény a rozsahy IP, ktoré idú cez VPN, aj keď vyzerajú ako miestne, jeden na riadok; kontrolujú sa pred pravidlom krajiny. Vyprázdnite pole, ak chcete obnoviť vstavaný zoznam.",
+      "subLocalDirectProxyDesc": "Telegram, YouTube, Instagram, Facebook, WhatsApp, Discord, ChatGPT a Claude idú vždy cez VPN, aj keď vyzerajú ako miestne. Pridajte sem ďalšie domény alebo rozsahy IP, jeden na riadok; kontrolujú sa pred pravidlom krajiny.",
       "subProbeOrder": "Používať výsledky sond",
       "subProbeOrderDesc": "Odkazy, ktoré sondy dostupnosti hlásia ako nedostupné (2 zlyhania za sebou), sa presunú na koniec predplatného alebo sa skryjú, vo všetkých formátoch: odkazy, JSON aj Clash. Používateľovi vždy ostane aspoň jeden odkaz a bez čerstvých výsledkov sond sa nič nemení. Stránka sond ukazuje, čo sa deje s každým koncovým bodom.",
       "subProbeOrderOff": "Vypnuté (predvolené)",

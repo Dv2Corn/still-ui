@@ -21,7 +21,6 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/database"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 	"github.com/mhsanaei/3x-ui/v3/internal/logger"
-	"github.com/mhsanaei/3x-ui/v3/internal/sub/localdirect"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/common"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/netproxy"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/random"
@@ -198,7 +197,7 @@ var defaultValueMap = map[string]string{
 	"subClashAutoGroupInterval":   "300",
 	"subClashAutoGroupTolerance":  "50",
 	"subLocalDirect":              "",
-	"subLocalDirectProxy":         localdirect.DefaultProxyList,
+	"subLocalDirectProxy":         "",
 	"subJsonMux":                  "",
 	"subJsonRules":                "",
 	"subJsonRoutingRules":         "",

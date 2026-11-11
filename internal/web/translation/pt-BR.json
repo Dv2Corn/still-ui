@@ -1979,7 +1979,7 @@
       "subLocalDirectDesc": "Os clientes da assinatura abrem os sites do país escolhido diretamente e enviam todo o resto pela VPN. Funciona nas assinaturas JSON, Clash/Mihomo e Happ/INCY e adiciona um arquivo de regras do Shadowrocket à página da assinatura; uma lista simples de links não consegue levar regras. Se você definir seu próprio perfil de roteamento para um formato, ele tem prioridade nesse formato.",
       "subLocalDirectOff": "Desligado",
       "subLocalDirectProxy": "Sempre pela VPN",
-      "subLocalDirectProxyDesc": "Domínios e faixas de IP que vão pela VPN mesmo que pareçam locais, um por linha; são verificados antes da regra do país. Esvazie o campo para restaurar a lista embutida.",
+      "subLocalDirectProxyDesc": "Telegram, YouTube, Instagram, Facebook, WhatsApp, Discord, ChatGPT e Claude sempre vão pela VPN, mesmo que pareçam locais. Adicione aqui outros domínios ou faixas de IP, um por linha; são verificados antes da regra do país.",
       "subProbeOrder": "Usar os resultados das sondas",
       "subProbeOrderDesc": "Links que as sondas de acessibilidade indicam como fora do ar (2 falhas seguidas) vão para o fim da assinatura ou são ocultados, em todos os formatos: links, JSON e Clash. O usuário sempre mantém pelo menos um link e, sem resultados recentes das sondas, nada muda. A página de sondas mostra o que acontece com cada endpoint.",
       "subProbeOrderOff": "Desligado (padrão)",
