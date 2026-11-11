@@ -162,9 +162,10 @@ func TestPortHopRangesAndUDPPortsOfOneHostStayApart(t *testing.T) {
 		return &model.Inbound{Enable: true, Port: port, Protocol: model.Hysteria, StreamSettings: `{"network":"hysteria"}`, Settings: `{"clients":[]}`}
 	}
 
-	mustAdd(udp(25000))
+	// PostgreSQL may skip a sequence value, so the id is read back, not assumed to be 1.
+	udpInbound := mustAdd(udp(25000))
 	mustAdd(tcp(26000))
-	wantRefused(hopInbound(443, "20000-30000", true), "the range 20000-30000 contains UDP port 25000 of inbound #1")
+	wantRefused(hopInbound(443, "20000-30000", true), "the range 20000-30000 contains UDP port 25000 of inbound #"+strconv.Itoa(udpInbound.Id))
 
 	seedInboundConflict(t, "xhttp-h3", "", 25600, model.VLESS, `{"network":"xhttp","security":"tls","tlsSettings":{"alpn":["h3"]}}`, `{"clients":[]}`)
 	wantRefused(hopInbound(443, "25500-25700", true), "the range 25500-25700 contains UDP port 25600")
