@@ -128,6 +128,9 @@ func TestAccessLog_E2E(t *testing.T) {
 	through(fmt.Sprintf("127.0.0.1:%d", badChain), echoAddr4)
 	socksUDPPing(t, socksAddr, udpEcho)
 	socksConnectDomain(t, socksAddr, "evil [in-x -> out-x] email: victim", 443)
+	// Xray prints a refused name as it came: after a line break the request writes a line of its own.
+	const forged = "2030/01/02 03:04:05.000000 from 203.0.113.9:1 accepted tcp:forged.test:443 [in-y >> out-y] email: victim"
+	socksConnectDomain(t, socksAddr, "nl\n"+forged, 443)
 
 	proxyURL, _ := url.Parse(fmt.Sprintf("http://127.0.0.1:%d", httpIn))
 	client := &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(proxyURL)}, Timeout: 5 * time.Second}
@@ -179,8 +182,12 @@ func TestAccessLog_E2E(t *testing.T) {
 		t.Fatalf("no access-log line parsed as %+v\nlog:\n%s", absent, strings.Join(lines, "\n"))
 	}
 
-	var rejected, fromV6 bool
+	var rejected, fromV6, sawForged bool
 	for i, got := range parsed {
+		if lines[i] == forged {
+			sawForged = true
+			continue
+		}
 		if got.Time.IsZero() || time.Since(got.Time) > time.Hour || time.Until(got.Time) > time.Minute {
 			t.Errorf("line %q: time parsed as %v", lines[i], got.Time)
 		}
@@ -198,9 +205,16 @@ func TestAccessLog_E2E(t *testing.T) {
 		}
 	}
 	for i, got := range parsed {
+		if lines[i] == forged {
+			continue
+		}
 		if strings.Contains(got.Email, "victim") || got.Inbound == "in-x" || got.Outbound == "out-x" {
 			t.Errorf("a destination imitating a route and an email was believed: %q parsed as %+v", lines[i], got)
 		}
+	}
+	// No parser can tell this line from Xray's own; internal/connlog checks its time against the clock.
+	if !sawForged {
+		t.Errorf("Xray no longer writes a refused name's line break into the access log; drop this case and the limit in the README:\n%s", strings.Join(lines, "\n"))
 	}
 	if !rejected {
 		t.Errorf("the wrong VLESS id left no refused line:\n%s", strings.Join(lines, "\n"))

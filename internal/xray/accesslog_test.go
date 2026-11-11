@@ -17,17 +17,22 @@ func TestParseAccessLogLineOnRealLines(t *testing.T) {
 	}
 	lines := strings.Split(strings.TrimRight(string(raw), "\n"), "\n")
 	want := []AccessLogLine{
-		{From: "tcp:127.0.0.1:46638", Accepted: true, To: "tcp:127.0.0.1:40877", Inbound: "in-socks", Outbound: "direct"},
-		{From: "tcp:127.0.0.1:46648", Accepted: true, To: "tcp:localhost:40877", Inbound: "in-socks", Outbound: "direct"},
-		{From: "tcp:127.0.0.1:46656", Accepted: true, To: "tcp:[::1]:40877", Inbound: "in-socks", Outbound: "direct"},
-		{From: "tcp:[::1]:34158", Accepted: true, To: "tcp:127.0.0.1:40877", Inbound: "in-socks6", Outbound: "direct"},
-		{From: "tcp:127.0.0.1:46662", Accepted: true, To: "tcp:blocked.test:80", Inbound: "in-socks", Outbound: "blocked"},
-		{From: "tcp:127.0.0.1:46754", Accepted: true, To: "tcp:127.0.0.1:40877", Inbound: "in-chain", Outbound: "to-vless"},
-		{From: "127.0.0.1:38290", Accepted: true, To: "tcp:127.0.0.1:40877", Inbound: "in-vless", Outbound: "direct", Email: "alice@example.com"},
-		{From: "tcp:127.0.0.1:45742", Accepted: true, To: "tcp:127.0.0.1:40877", Inbound: "in-badchain", Outbound: "to-vless-bad"},
-		{From: "127.0.0.1:38306"},
-		{From: "udp:127.0.0.1:35883", Accepted: true, To: "udp:127.0.0.1:42496", Inbound: "in-socks", Outbound: "direct"},
-		{From: "127.0.0.1:41708", Accepted: true, To: "http://127.0.0.1:37345/some/path?q=1", Inbound: "in-http", Outbound: "direct"},
+		{From: "tcp:127.0.0.1:46064", Accepted: true, To: "tcp:127.0.0.1:42899", Inbound: "in-socks", Outbound: "direct"},
+		{From: "tcp:127.0.0.1:46078", Accepted: true, To: "tcp:localhost:42899", Inbound: "in-socks", Outbound: "direct"},
+		{From: "tcp:127.0.0.1:46094", Accepted: true, To: "tcp:[::1]:42899", Inbound: "in-socks", Outbound: "direct"},
+		{From: "tcp:[::1]:46564", Accepted: true, To: "tcp:127.0.0.1:42899", Inbound: "in-socks6", Outbound: "direct"},
+		{From: "tcp:127.0.0.1:46106", Accepted: true, To: "tcp:blocked.test:80", Inbound: "in-socks", Outbound: "blocked"},
+		{From: "tcp:127.0.0.1:54700", Accepted: true, To: "tcp:127.0.0.1:42899", Inbound: "in-chain", Outbound: "to-vless"},
+		{From: "127.0.0.1:38588", Accepted: true, To: "tcp:127.0.0.1:42899", Inbound: "in-vless", Outbound: "direct", Email: "alice@example.com"},
+		{From: "tcp:127.0.0.1:56876", Accepted: true, To: "tcp:127.0.0.1:42899", Inbound: "in-badchain", Outbound: "to-vless-bad"},
+		{From: "127.0.0.1:38604"},
+		{From: "udp:127.0.0.1:52224", Accepted: true, To: "udp:127.0.0.1:60647", Inbound: "in-socks", Outbound: "direct"},
+		// a refused name that imitates a route and an email: not a connection
+		{From: "tcp:127.0.0.1:46136"},
+		// a refused name with a line break in it: the request's own line follows, and it reads as Xray's
+		{From: "tcp:127.0.0.1:46138"},
+		{From: "203.0.113.9:1", Accepted: true, To: "tcp:forged.test:443", Inbound: "in-y", Outbound: "out-y", Email: "victim"},
+		{From: "127.0.0.1:58336", Accepted: true, To: "http://127.0.0.1:41641/some/path?q=1", Inbound: "in-http", Outbound: "direct"},
 	}
 	if len(lines) != len(want) {
 		t.Fatalf("fixture has %d lines, the table %d", len(lines), len(want))

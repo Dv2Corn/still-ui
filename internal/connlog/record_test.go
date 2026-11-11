@@ -71,6 +71,8 @@ func TestRecordFromOnRealXrayLines(t *testing.T) {
 		"alice@example.com|in-vless|direct|127.0.0.1|tcp|127.0.0.1",
 		"|in-badchain|to-vless-bad|127.0.0.1|tcp|127.0.0.1",
 		"|in-socks|direct|127.0.0.1|udp|127.0.0.1",
+		// the line a refused request wrote for itself: only its date, years ahead, gives it away to the collector
+		"victim|in-y|out-y|203.0.113.9|tcp|forged.test",
 		"|in-http|direct|127.0.0.1|tcp|127.0.0.1",
 	}
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {

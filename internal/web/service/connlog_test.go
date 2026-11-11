@@ -147,6 +147,11 @@ func TestConnLogCollectsQueriesAndExports(t *testing.T) {
 	stamp := time.Now().Format("2006/01/02 15:04:05.000000")
 	var lines strings.Builder
 	for _, line := range strings.Split(strings.TrimRight(string(raw), "\n"), "\n") {
+		// The line a request wrote for itself keeps its own date, years ahead: it must not be stored.
+		if strings.HasPrefix(line, "2030/") {
+			lines.WriteString(line + "\n")
+			continue
+		}
 		lines.WriteString(stamp + line[len(stamp):] + "\n")
 	}
 	appendAccessLog(t, accessLog, lines.String())
@@ -160,7 +165,7 @@ func TestConnLogCollectsQueriesAndExports(t *testing.T) {
 		t.Fatalf("got %d rows, enabled %v, %d bytes, next %q; want the fixture's 10 connections", len(page.Rows), page.Enabled, page.SizeBytes, page.Next)
 	}
 	page, err = svc.Query(context.Background(), connlog.ConnFilter{Client: "alice@example.com"})
-	if err != nil || len(page.Rows) != 1 || page.Rows[0].Inbound != "in-vless" || page.Rows[0].Host != "127.0.0.1" || page.Rows[0].Source != "127.0.0.1" || page.Rows[0].SourcePort != 38290 {
+	if err != nil || len(page.Rows) != 1 || page.Rows[0].Inbound != "in-vless" || page.Rows[0].Host != "127.0.0.1" || page.Rows[0].Source != "127.0.0.1" || page.Rows[0].SourcePort != 38588 {
 		t.Fatalf("alice's connections: %+v, err %v", page.Rows, err)
 	}
 
@@ -186,7 +191,7 @@ func TestConnLogCollectsQueriesAndExports(t *testing.T) {
 	utc := time.Now().UTC().Format("2006-01-02T")
 	if len(rows) != 3 || rows[0] != "time_utc,client,inbound,outbound,source,source_port,network,host,port" ||
 		!strings.HasPrefix(rows[1], utc) || !strings.HasSuffix(rows[1], ",bob,in-vless,direct,203.0.113.0/24,0,tcp,example.co.uk,443") ||
-		!strings.HasSuffix(rows[2], ",alice@example.com,in-vless,direct,127.0.0.1,38290,tcp,127.0.0.1,40877") {
+		!strings.HasSuffix(rows[2], ",alice@example.com,in-vless,direct,127.0.0.1,38588,tcp,127.0.0.1,42899") {
 		t.Errorf("export:\n%s", out.String())
 	}
 }

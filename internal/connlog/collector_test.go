@@ -2,6 +2,7 @@ package connlog
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -253,4 +254,41 @@ func TestCollectorSkipsRefusedAndApiLines(t *testing.T) {
 		f.line("kept"))
 	f.step()
 	f.expect("kept")
+}
+
+// A request can write a line of its own into Xray's access log (TestAccessLog_E2E). Dated
+// ahead of the clock it would be the newest day for years: every later row filed with it.
+func TestCollectorLeavesOutALineDatedAheadOfTheClock(t *testing.T) {
+	f := newFixture(t)
+	f.write("")
+	f.step()
+	forged := time.Now().AddDate(1, 0, 0).Format("2006/01/02 15:04:05.000000") +
+		" from 203.0.113.9:1 accepted tcp:forged.test:443 [in-y >> out-y] email: victim\n"
+	f.write(f.line("a") + forged + f.line("b"))
+	if err := f.c.Step(context.Background(), f.cfg, time.Now()); !errors.Is(err, ErrLineAheadOfClock) {
+		t.Errorf("step error %v, want ErrLineAheadOfClock", err)
+	}
+	f.expect("a b")
+	if got, today := days(f.cfg.Dir), time.Now().UTC().Format(dayLayout); len(got) != 1 || got[0] > today {
+		t.Errorf("day files %v, want one no later than %s", got, today)
+	}
+	f.write(f.line("c"))
+	f.step()
+	f.expect("a b c")
+}
+
+// What the retention would delete at once is not filed first: an old date must not make a
+// day file of its own, which the next prune would remove with the position in it.
+func TestCollectorLeavesOutLinesOlderThanTheRetention(t *testing.T) {
+	f := newFixture(t)
+	f.write("")
+	f.step()
+	old := time.Now().AddDate(0, 0, -f.cfg.RetentionDays-2).Format("2006/01/02 15:04:05.000000") +
+		" from 203.0.113.9:1 accepted tcp:old.test:443 [in-1 >> direct] email: alice\n"
+	f.write(f.line("a") + old)
+	f.step()
+	f.expect("a")
+	f.write(f.line("b"))
+	f.step()
+	f.expect("a b")
 }

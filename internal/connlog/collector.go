@@ -21,7 +21,13 @@ const (
 	headBytes = 64
 
 	pruneEvery = time.Minute
+	// clockSlack is how far ahead of the panel's clock a line's time may be.
+	clockSlack = time.Minute
 )
+
+// ErrLineAheadOfClock reports a line that was left out for its time. Xray stamps a line as
+// it writes it, so a time yet to come was put there by a request, not by Xray.
+var ErrLineAheadOfClock = errors.New("a line dated ahead of the clock was not stored: Xray writes a refused request's text into the access log as it came, line breaks included")
 
 // Config is what one step of the collector works with; the caller reads it from the settings.
 type Config struct {
@@ -49,6 +55,9 @@ type Collector struct {
 	resumed bool
 	halted  bool
 
+	// now is the clock of the step being run; ahead says it met a line dated after it.
+	now    time.Time
+	ahead  bool
 	pruned time.Time
 	batch  []ConnRecord
 }
@@ -60,8 +69,12 @@ func (c *Collector) Step(ctx context.Context, cfg Config, now time.Time) error {
 		return nil
 	}
 	defer c.mu.Unlock()
-	c.cfg, c.halted = cfg, false
+	c.cfg, c.halted, c.now = cfg, false, now
 	err := c.collect(ctx)
+	if c.ahead {
+		c.ahead = false
+		err = errors.Join(err, ErrLineAheadOfClock)
+	}
 	return errors.Join(err, c.pruneDue(ctx, cfg, now))
 }
 
@@ -100,7 +113,7 @@ func (c *Collector) TruncateLog(ctx context.Context, policy Policy, truncate fun
 	if c.log == nil {
 		return truncate()
 	}
-	c.cfg.Policy = policy
+	c.cfg.Policy, c.now = policy, time.Now()
 	readErr := c.readAll(ctx)
 	if err := truncate(); err != nil {
 		return errors.Join(readErr, err)
@@ -218,13 +231,21 @@ func (c *Collector) readAll(ctx context.Context) error {
 	}
 	batch := c.batch[:0]
 	defer func() { c.batch = batch[:0] }()
+	// A day the retention deletes at once is not written at all: it would only be filed and removed.
+	oldest := c.now.UTC().AddDate(0, 0, -c.cfg.RetentionDays).Format(dayLayout)
+	latest := c.now.Add(clockSlack).UnixMilli()
 	for {
 		line, size, terminated, err := xray.ReadAccessLogLine(c.reader)
 		more := err == nil && terminated
 		if more {
 			c.off += int64(size)
 			if rec, ok := recordFrom(xray.ParseAccessLogLine(line), c.cfg.Policy); ok {
-				batch = append(batch, rec)
+				switch {
+				case rec.Time > latest:
+					c.ahead = true
+				case dayOf(rec.Time) >= oldest:
+					batch = append(batch, rec)
+				}
 			}
 		}
 		if !more || len(batch) == batchRows {
