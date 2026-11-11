@@ -106,6 +106,8 @@ func run(root, outDir string) error {
 				"NewUUIDResponse",
 				"MLDSA65Response",
 				"AwgSignaturePacketResponse",
+				"PortHopRule",
+				"PortHopStatus",
 				"MLKEM768Response",
 				"NodeMutationRequest",
 				"NodeView",

@@ -1,6 +1,7 @@
 import { NativeSelect } from '@/components/form/NativeSelect';
 import { useEffect, useId, useRef, useState } from 'react';
 import {
+  Alert,
   AutoComplete,
   Button,
   Divider,
@@ -17,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 import type { FormInstance } from 'antd/es/form';
 import type { NamePath } from 'antd/es/form/interface';
 
+import { usePortHopQuery } from '@/api/queries/usePortHopQuery';
 import { selectTagRender } from '@/components/form/SelectTag';
 import { RandomUtil } from '@/utils';
 import { activateOnKey } from '@/utils/a11y';
@@ -42,6 +44,8 @@ export interface FinalMaskFormProps {
   // udphop runs only on the dialing side (the core refuses it on a listener), so a server keeps
   // the advertised hop range in quicParams.udpHop; filter is the listener-only counterpart.
   side?: 'server' | 'client';
+  // The inbound lives on a node: this panel's own host says nothing about the hop redirect.
+  remoteTarget?: boolean;
 }
 
 const TCP_NETWORKS = ['raw', 'tcp', 'httpupgrade', 'ws', 'grpc', 'xhttp', 'xdrive'];
@@ -273,6 +277,7 @@ export default function FinalMaskForm({
   form,
   showAll = false,
   side = 'client',
+  remoteTarget = false,
 }: FinalMaskFormProps) {
   const uid = useId();
   const base = asPath(name);
@@ -371,6 +376,13 @@ export default function FinalMaskForm({
               base={[...base, 'quicParams']}
               form={form}
               showUdpHop={side === 'server'}
+              hopRedirect={
+                side === 'server' && isHysteria && !showAll
+                  ? remoteTarget
+                    ? 'node'
+                    : 'local'
+                  : undefined
+              }
             />
           )}
         </>
@@ -2104,14 +2116,64 @@ function ItemEditor({
   );
 }
 
+// HopRedirectField is the server half of port hopping: without it the range is only advertised.
+function HopRedirectField({
+  base,
+  target,
+}: {
+  base: (string | number)[];
+  target: 'local' | 'node';
+}) {
+  const { t } = useTranslation();
+  const { data: status } = usePortHopQuery(target === 'local');
+  let unavailable = '';
+  if (target === 'local' && status) {
+    if (!status.supported) unavailable = t('pages.inbounds.form.hopRedirectNotLinux');
+    else if (!status.nftInstalled) unavailable = t('pages.inbounds.form.hopRedirectNoNft');
+    else if (!status.permitted) unavailable = t('pages.inbounds.form.hopRedirectNoPermission');
+  }
+  return (
+    <>
+      <Form.Item
+        label={t('pages.inbounds.form.hopRedirect')}
+        name={[...base, 'redirect']}
+        valuePropName="checked"
+        extra={
+          target === 'node'
+            ? t('pages.inbounds.form.hopRedirectNode')
+            : t('pages.inbounds.form.hopRedirectHint')
+        }
+      >
+        <Switch />
+      </Form.Item>
+      {unavailable ? (
+        <Form.Item label=" " colon={false}>
+          <Alert type="warning" showIcon title={unavailable} />
+        </Form.Item>
+      ) : null}
+      {target === 'local' && status?.error ? (
+        <Form.Item label=" " colon={false}>
+          <Alert
+            type="error"
+            showIcon
+            title={t('pages.inbounds.form.hopRedirectError', { error: status.error })}
+          />
+        </Form.Item>
+      ) : null}
+    </>
+  );
+}
+
 function QuicParamsForm({
   base,
   form,
   showUdpHop,
+  hopRedirect,
 }: {
   base: (string | number)[];
   form: FormInstance;
   showUdpHop: boolean;
+  hopRedirect?: 'local' | 'node';
 }) {
   const uid = useId();
   const congestion = Form.useWatch([...base, 'congestion'], form) as string | undefined;
@@ -2192,6 +2254,7 @@ function QuicParamsForm({
               <Form.Item label="Hop Interval (s)" name={[...base, 'udpHop', 'interval']}>
                 <Input placeholder="e.g. 5-10" />
               </Form.Item>
+              {hopRedirect && <HopRedirectField base={[...base, 'udpHop']} target={hopRedirect} />}
             </>
           )}
         </>

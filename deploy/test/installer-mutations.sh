@@ -201,6 +201,8 @@ mutate "install: 3x-ui import keeps no migrate.sh to undo it" install.sh _still_
     'install.sh: the retired migrate.sh puts back'
 mutate "menu: uninstall keeps the torrent block" x-ui.sh uninstall '        nft delete table inet still_torrent_block > /dev/null 2>&1' '        :' \
     'x-ui.sh: uninstall removes the program and, by default, keeps the data (exit 0)'
+mutate "menu: uninstall keeps the port hopping redirect" x-ui.sh uninstall '        nft delete table inet still_port_hop > /dev/null 2>&1' '        :' \
+    'x-ui.sh: uninstall removes the program and, by default, keeps the data (exit 0)'
 mutate "menu: reinstall hint from a branch" x-ui.sh uninstall 'https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh' 'https://raw.githubusercontent.com/Dv2Corn/still-ui/main/install.sh' \
     'x-ui.sh: uninstall removes the program and, by default, keeps the data (exit 0)'
 mutate "install: install-result.env not shell-escaped" install.sh write_install_result "printf 'XUI_PASSWORD=%q\n'" "printf 'XUI_PASSWORD=%s\n'" \

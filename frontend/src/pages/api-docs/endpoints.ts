@@ -476,6 +476,13 @@ export const sections: readonly Section[] = [
       },
       {
         method: 'GET',
+        path: '/panel/api/server/portHop',
+        summary:
+          'State of Hysteria2 port hopping on this host. A Hysteria inbound whose streamSettings.finalmask.quicParams.udpHop has redirect=true gets its hop range (udpHop.ports, 1024-65535) redirected to its own port by the nftables table inet still_port_hop; the panel converges that table every 10 seconds and removes it when no inbound asks for a redirect. supported/nftInstalled/permitted say whether this host can do that (Linux, nft, NET_ADMIN), active whether the table is loaded, packets how many flows it has redirected since it was loaded, rules what the enabled local inbounds ask for, error the last failure.',
+        responseSchema: 'PortHopStatus',
+      },
+      {
+        method: 'GET',
         path: '/panel/api/server/egressFilter',
         summary:
           'State of the egress filter: the stored settings (managedBy is set when a central panel owns them), the TCP ports "server" blocks (panel and SSH), whether the template already blackholes geoip:private, whether this host can run the nftables half and has it loaded, its packet counters, the last apply error, and how far each node is with this panel\'s filter.',

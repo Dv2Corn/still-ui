@@ -1057,6 +1057,23 @@ export interface PeerActivity {
   up: number;
 }
 
+export interface PortHopRule {
+  inboundId: number;
+  ports: string;
+  remark: string;
+  toPort: number;
+}
+
+export interface PortHopStatus {
+  active: boolean;
+  error: string;
+  nftInstalled: boolean;
+  packets: number;
+  permitted: boolean;
+  rules: PortHopRule[];
+  supported: boolean;
+}
+
 export interface ProbeResultUI {
   cpuPct: number;
   error: string;

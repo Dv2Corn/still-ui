@@ -412,10 +412,11 @@ uninstall() {
         systemctl daemon-reload
         systemctl reset-failed
     fi
-    # The nftables tables of the egress filter and the torrent block go with the panel.
+    # The nftables tables of the egress filter, the torrent block and port hopping go with the panel.
     if command -v nft > /dev/null 2>&1; then
         nft delete table inet still_egress_filter > /dev/null 2>&1
         nft delete table inet still_torrent_block > /dev/null 2>&1
+        nft delete table inet still_port_hop > /dev/null 2>&1
     fi
 
     local panel_used_postgres="false"

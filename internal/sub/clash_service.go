@@ -602,6 +602,10 @@ func (s *SubClashService) buildHysteriaProxy(subReq *SubService, inbound *model.
 	}
 
 	applyHysteriaFinalMask(proxy, rawStream)
+	// Only the inbound's own interval: an imported link carries none, and mihomo's default stays.
+	if seconds := hysteriaHopIntervalSeconds(rawStream); seconds > 0 && proxy["ports"] != nil {
+		proxy["hop-interval"] = seconds
+	}
 
 	return proxy
 }

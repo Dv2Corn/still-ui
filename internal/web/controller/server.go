@@ -33,6 +33,7 @@ type ServerController struct {
 	xrayMetricsService service.XrayMetricsService
 	torrentBlock       service.TorrentBlockService
 	egressFilter       service.EgressFilterService
+	portHop            service.PortHopService
 	xrayService        service.XrayService
 }
 
@@ -73,6 +74,7 @@ func (a *ServerController) initRouter(g *gin.RouterGroup) {
 	g.GET("/fail2banStatus", a.getFail2banStatus)
 	g.GET("/torrentBlock", a.getTorrentBlock)
 	g.GET("/egressFilter", a.getEgressFilter)
+	g.GET("/portHop", a.getPortHop)
 
 	g.POST("/stopXrayService", a.stopXrayService)
 	g.POST("/restartXrayService", a.restartXrayService)
@@ -123,6 +125,11 @@ func (a *ServerController) status(c *gin.Context) { jsonObj(c, a.serverService.C
 
 func (a *ServerController) getFail2banStatus(c *gin.Context) {
 	jsonObj(c, a.serverService.GetFail2banStatus(), nil)
+}
+
+// getPortHop reports whether this host can redirect Hysteria2 hop ranges and what it redirects now.
+func (a *ServerController) getPortHop(c *gin.Context) {
+	jsonObj(c, a.portHop.Status(), nil)
 }
 
 func (a *ServerController) getTorrentBlock(c *gin.Context) {

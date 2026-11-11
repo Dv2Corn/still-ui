@@ -1161,6 +1161,28 @@ export const EXAMPLES: Record<string, unknown> = {
     "tag": "inbound-51820",
     "up": 1048576
   },
+  "PortHopRule": {
+    "inboundId": 7,
+    "ports": "20000-50000",
+    "remark": "hy2",
+    "toPort": 443
+  },
+  "PortHopStatus": {
+    "active": true,
+    "error": "",
+    "nftInstalled": true,
+    "packets": 1204,
+    "permitted": true,
+    "rules": [
+      {
+        "inboundId": 7,
+        "ports": "20000-50000",
+        "remark": "hy2",
+        "toPort": 443
+      }
+    ],
+    "supported": true
+  },
   "ProbeResultUI": {
     "cpuPct": 12.5,
     "error": "",

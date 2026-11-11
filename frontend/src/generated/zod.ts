@@ -1125,6 +1125,25 @@ export const PeerActivitySchema = z.object({
 });
 export type PeerActivity = z.infer<typeof PeerActivitySchema>;
 
+export const PortHopRuleSchema = z.object({
+  inboundId: z.number().int(),
+  ports: z.string(),
+  remark: z.string(),
+  toPort: z.number().int(),
+});
+export type PortHopRule = z.infer<typeof PortHopRuleSchema>;
+
+export const PortHopStatusSchema = z.object({
+  active: z.boolean(),
+  error: z.string(),
+  nftInstalled: z.boolean(),
+  packets: z.number().int(),
+  permitted: z.boolean(),
+  rules: z.array(z.lazy(() => PortHopRuleSchema)),
+  supported: z.boolean(),
+});
+export type PortHopStatus = z.infer<typeof PortHopStatusSchema>;
+
 export const ProbeResultUISchema = z.object({
   cpuPct: z.number(),
   error: z.string(),

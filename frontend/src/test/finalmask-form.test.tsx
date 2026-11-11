@@ -1,9 +1,16 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 
 import { FinalMaskField } from '@/lib/xray/forms/fields';
+import type { FinalMaskStreamSettings } from '@/schemas/protocols/stream/finalmask';
+import { HttpUtil, Msg } from '@/utils';
 
-import { chooseSelectOption, listSelectOptions, renderWithProviders } from './test-utils';
+import {
+  chooseSelectOption,
+  listSelectOptions,
+  makeTestQueryClient,
+  renderWithProviders,
+} from './test-utils';
 
 describe('FinalMaskForm item types', () => {
   // Only the noise mask parses tag expressions; header-custom items go through the
@@ -138,5 +145,95 @@ describe('FinalMaskForm TCP mask presets', () => {
       <FinalMaskField network="tcp" protocol="vless" side="server" value={{ tcp: [], udp: [] }} />,
     );
     expect(screen.queryByRole('combobox', { name: 'Presets' })).toBeNull();
+  });
+});
+
+describe('FinalMaskForm port hopping redirect', () => {
+  const hopping = {
+    tcp: [],
+    udp: [],
+    quicParams: { congestion: 'bbr' as const, udpHop: { ports: '20000-50000', interval: '5-10' } },
+  };
+  const hostStatus = (over: Record<string, unknown>) =>
+    new Msg(true, '', {
+      supported: true,
+      nftInstalled: true,
+      permitted: true,
+      active: false,
+      packets: 0,
+      rules: [],
+      error: '',
+      ...over,
+    });
+
+  it('is off until the operator turns it on, and then travels with the hop range', async () => {
+    vi.spyOn(HttpUtil, 'get').mockResolvedValue(hostStatus({}));
+    let latest: FinalMaskStreamSettings | undefined;
+    renderWithProviders(
+      <FinalMaskField
+        network="hysteria"
+        protocol="hysteria"
+        side="server"
+        value={hopping}
+        onChange={(next) => {
+          latest = next;
+        }}
+      />,
+      { queryClient: makeTestQueryClient() },
+    );
+    const toggle = document.getElementById(
+      'finalmask_quicParams_udpHop_redirect',
+    ) as HTMLButtonElement;
+    expect(toggle.getAttribute('aria-checked')).toBe('false');
+
+    fireEvent.click(toggle);
+    await waitFor(() =>
+      expect(latest?.quicParams?.udpHop).toEqual({
+        ports: '20000-50000',
+        interval: '5-10',
+        redirect: true,
+      }),
+    );
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('says why this server cannot redirect', async () => {
+    vi.spyOn(HttpUtil, 'get').mockResolvedValue(hostStatus({ nftInstalled: false }));
+    renderWithProviders(
+      <FinalMaskField network="hysteria" protocol="hysteria" side="server" value={hopping} />,
+      { queryClient: makeTestQueryClient() },
+    );
+    expect(
+      await screen.findByText(
+        'Not available here: nft is not installed. Install the nftables package.',
+      ),
+    ).toBeTruthy();
+  });
+
+  it("does not judge a node inbound by this panel's own server", async () => {
+    const get = vi.spyOn(HttpUtil, 'get').mockResolvedValue(hostStatus({ supported: false }));
+    get.mockClear();
+    renderWithProviders(
+      <FinalMaskField
+        network="hysteria"
+        protocol="hysteria"
+        side="server"
+        remoteTarget
+        value={hopping}
+      />,
+      { queryClient: makeTestQueryClient() },
+    );
+    expect(await screen.findByText(/The node's own panel installs the redirect/)).toBeTruthy();
+    expect(get).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Not available here/)).toBeNull();
+  });
+
+  it('is not offered where no hop range is advertised from', () => {
+    renderWithProviders(
+      <FinalMaskField network="xhttp" protocol="vless" side="server" value={hopping} />,
+      { queryClient: makeTestQueryClient() },
+    );
+    expect(document.getElementById('finalmask_quicParams_udpHop_ports')).not.toBeNull();
+    expect(document.getElementById('finalmask_quicParams_udpHop_redirect')).toBeNull();
   });
 });

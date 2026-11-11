@@ -420,7 +420,9 @@ describe('InboundFormModal', () => {
             { certificateFile: '/etc/ssl/certs/hy.crt', keyFile: '/etc/ssl/private/hy.key' },
           ],
         },
-        finalmask: { quicParams: { udpHop: { ports: '20000-30000', interval: '5-10' } } },
+        finalmask: {
+          quicParams: { udpHop: { ports: '20000-30000', interval: '5-10', redirect: true } },
+        },
       },
       sniffing: { enabled: false },
       nodeId: null,
@@ -440,8 +442,9 @@ describe('InboundFormModal', () => {
     await waitFor(() => expect(post.mock.calls.some(isUpdate)).toBe(true));
     const payload = post.mock.calls.find(isUpdate)![1] as { streamSettings: string };
     const finalmask = JSON.parse(payload.streamSettings).finalmask as Record<string, unknown>;
+    // redirect is the panel's own switch: dropping it on save would silently remove the nft rule.
     expect(finalmask.quicParams).toMatchObject({
-      udpHop: { ports: '20000-30000', interval: '5-10' },
+      udpHop: { ports: '20000-30000', interval: '5-10', redirect: true },
     });
     expect(JSON.stringify(finalmask.udp ?? [])).not.toContain('udphop');
   });

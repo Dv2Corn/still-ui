@@ -11,6 +11,7 @@ interface FinalMaskFieldProps {
   protocol: string;
   showAll?: boolean;
   side?: 'server' | 'client';
+  remoteTarget?: boolean;
 }
 
 const EMPTY: FinalMaskStreamSettings = { tcp: [], udp: [] };
@@ -22,6 +23,7 @@ export default function FinalMaskField({
   protocol,
   showAll,
   side,
+  remoteTarget,
 }: FinalMaskFieldProps) {
   const [form] = Form.useForm();
   const [initial] = useState(() => value ?? EMPTY);
@@ -58,6 +60,7 @@ export default function FinalMaskField({
         form={form}
         showAll={showAll}
         side={side}
+        remoteTarget={remoteTarget}
       />
     </Form>
   );

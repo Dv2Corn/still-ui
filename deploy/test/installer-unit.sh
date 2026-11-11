@@ -1019,6 +1019,7 @@ program_gone() {
     called "systemctl daemon-reload"
     called "nft delete table inet still_egress_filter"
     called "nft delete table inet still_torrent_block"
+    called "nft delete table inet still_port_hop"
     has "$R/out" "releases/latest/download/install.sh"
     hasnt "$R/out" "raw.githubusercontent.com"
     local p

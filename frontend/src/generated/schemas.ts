@@ -4714,6 +4714,80 @@ export const SCHEMAS: Record<string, unknown> = {
     ],
     "type": "object"
   },
+  "PortHopRule": {
+    "description": "PortHopRule is the redirect one inbound asks for.",
+    "properties": {
+      "inboundId": {
+        "example": 7,
+        "type": "integer"
+      },
+      "ports": {
+        "example": "20000-50000",
+        "type": "string"
+      },
+      "remark": {
+        "example": "hy2",
+        "type": "string"
+      },
+      "toPort": {
+        "example": 443,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "inboundId",
+      "ports",
+      "remark",
+      "toPort"
+    ],
+    "type": "object"
+  },
+  "PortHopStatus": {
+    "description": "PortHopStatus is what this host does for Hysteria2 port hopping.",
+    "properties": {
+      "active": {
+        "example": true,
+        "type": "boolean"
+      },
+      "error": {
+        "type": "string"
+      },
+      "nftInstalled": {
+        "example": true,
+        "type": "boolean"
+      },
+      "packets": {
+        "example": 1204,
+        "format": "int64",
+        "type": "integer"
+      },
+      "permitted": {
+        "description": "Permitted is false when nft runs but may not change rules (no NET_ADMIN).",
+        "example": true,
+        "type": "boolean"
+      },
+      "rules": {
+        "items": {
+          "$ref": "#/components/schemas/PortHopRule"
+        },
+        "type": "array"
+      },
+      "supported": {
+        "example": true,
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "active",
+      "error",
+      "nftInstalled",
+      "packets",
+      "permitted",
+      "rules",
+      "supported"
+    ],
+    "type": "object"
+  },
   "ProbeResultUI": {
     "properties": {
       "cpuPct": {
