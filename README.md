@@ -58,10 +58,11 @@ still-ui migrate-rollback
 - **An egress filter for clients.** Clients can be kept from sending mail on port 25 (on by default for new installs), from reaching private networks behind the server and the server's own panel and SSH ports, and from addresses and ports you list. It applies to every client inbound through Xray and, with `nft`, to AmneziaWG kernel-mode clients; a master can hand it to its nodes. [Details](#mobile-networks-in-russia).
 - **A monthly traffic limit for each node.** The master counts the traffic of a node's own inbounds per month (from the reset day you pick), sends a Telegram alert at 80% (adjustable) and at the limit, and can turn the node's inbounds off until the next period. An accounting multiplier from 0.1 to 100 scales that node's traffic in client totals, from the moment it is set (earlier traffic keeps its old rate). The node checks each client's quota by its own master's count, so masters with different multipliers can share a node. No limit by default.
 - **Adding a node takes one command.** **Nodes → Add with a command** makes a one-time invitation (valid 30 minutes by default, can be revoked); running the command it shows as root on a new server installs still-ui from the release, sets it up as a node and adds it to the master. No API tokens or certificate pins to copy by hand; the node checks the master's key before it changes anything. [Guide](docs/content/docs/en/operations/multi-node.mdx).
+- **Panel memory over several days: checked.** 72 hours under mixed load (200 users; a client change every 5 s; UI and API calls; subscriptions; VLESS, VMess and AmneziaWG traffic), still-ui v1.6.0 next to 3x-ui v3.11.0 with the same data and the same load: no growth in either (+0.1 MB/h over the last 24 h, goroutines and file descriptors flat, no restarts). Many *slow* AmneziaWG clients can still hold kernel socket buffers (about 12 MB per slow stream) that count against the panel; the panel's default memory cap keeps that in check.
 
 ### In progress
 
-- **Panel memory over several days.** The growth under AmneziaWG connection churn is found and fixed (see above); what is left is a multi-day measurement under load to confirm there is no other source of growth.
+- Nothing at the moment.
 
 The full plan (in Russian) is in [docs/ROADMAP.md](docs/ROADMAP.md).
 
