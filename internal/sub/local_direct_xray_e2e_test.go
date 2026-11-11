@@ -50,13 +50,8 @@ func socksRequest(t *testing.T, proxy, host string) {
 	_, _ = io.Copy(io.Discard, conn)
 }
 
-// TestLocalDirectRoutesInRealXray feeds the JSON subscription to a real core and reads its
-// routing decisions from the access log: nothing else shows a rule that parses but never matches.
-//
-// Skipped unless XRAY_E2E_BINARY points at an xray built from go.mod's xray-core:
-//
-//	go build -o /tmp/xray github.com/xtls/xray-core/main
-//	XRAY_E2E_BINARY=/tmp/xray go test ./internal/sub -run TestLocalDirectRoutesInRealXray -v
+// TestLocalDirectRoutesInRealXray feeds the JSON subscription to a real core and reads its routing
+// decisions from the access log. Needs XRAY_E2E_BINARY: an xray built from go.mod's xray-core.
 func TestLocalDirectRoutesInRealXray(t *testing.T) {
 	bin := os.Getenv("XRAY_E2E_BINARY")
 	if bin == "" {

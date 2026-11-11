@@ -23,9 +23,8 @@ func generatedConfigBytes(t *testing.T) []byte {
 	return out
 }
 
-// A panel that uses the other features of the release (a hop redirect, a device limit, local
-// sites direct, imported old links): the connection log turned on and off again leaves the
-// generated Xray config byte for byte as it was before the log was ever on.
+// With the release's other features in use (hop redirect, device limit, local sites direct, old
+// links), the connection log turned on and off again leaves the generated Xray config unchanged.
 func TestConnLogOffKeepsTheGeneratedConfigWithTheOtherFeaturesOn(t *testing.T) {
 	connLogPanel(t)
 	useFakePortHopHost(t)
