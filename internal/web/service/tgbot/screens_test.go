@@ -481,9 +481,13 @@ func TestScreenArtReprobeWindow(t *testing.T) {
 	srv, calls := recordingServer(t, false)
 	swapTestBot(t, srv.URL)
 	defer srv.Close()
-	resetScreenArt()
 
 	tb := &Tgbot{}
+	// ensureScreenArt decides at once and probes off-path: waiting the probe out reads the decision.
+	probes := func() int {
+		artProbes.Wait()
+		return countMethod(calls(), "getUserProfilePhotos")
+	}
 
 	// A miss two minutes ago is past the retry window: a probe must fire.
 	screenArtMu.Lock()
@@ -492,14 +496,8 @@ func TestScreenArtReprobeWindow(t *testing.T) {
 	screenArtMu.Unlock()
 
 	tb.ensureScreenArt()
-	for range 50 {
-		if countMethod(calls(), "getUserProfilePhotos") > 0 {
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	if countMethod(calls(), "getUserProfilePhotos") == 0 {
-		t.Error("a stale missing avatar was not re-probed")
+	if got := probes(); got != 1 {
+		t.Errorf("a stale missing avatar was probed %d times, want 1", got)
 	}
 
 	// A known avatar is inside its long window: no probe.
@@ -508,24 +506,31 @@ func TestScreenArtReprobeWindow(t *testing.T) {
 	artProbedAt = time.Now().Add(-2 * time.Minute)
 	screenArtMu.Unlock()
 
-	before := countMethod(calls(), "getUserProfilePhotos")
 	tb.ensureScreenArt()
-	time.Sleep(80 * time.Millisecond)
-	if countMethod(calls(), "getUserProfilePhotos") != before {
-		t.Error("a freshly read avatar was re-probed too eagerly")
+	if got := probes(); got != 1 {
+		t.Errorf("a freshly read avatar was re-probed too eagerly: %d probes, want 1", got)
 	}
 }
 
 // A probe a previous test left in flight held the process-wide probe slot, so under -race -shuffle
 // the next test's stale avatar was never re-probed (CI flake in TestScreenArtReprobeWindow).
 func TestScreenArtResetWaitsForAProbeLeftInFlight(t *testing.T) {
+	arrived := make(chan struct{})
+	var once sync.Once
 	slow := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		once.Do(func() { close(arrived) })
 		time.Sleep(300 * time.Millisecond)
 		http.Error(w, "gone", http.StatusServiceUnavailable)
 	}))
 	defer slow.Close()
 	swapTestBot(t, slow.URL)
 	(&Tgbot{}).ensureScreenArt()
+	// A probe that has not started yet would read the next bot and never be left in flight at all.
+	select {
+	case <-arrived:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the stale avatar was never probed against the first bot")
+	}
 
 	srv, calls := recordingServer(t, false)
 	defer srv.Close()
@@ -535,13 +540,10 @@ func TestScreenArtResetWaitsForAProbeLeftInFlight(t *testing.T) {
 	screenArtMu.Unlock()
 
 	(&Tgbot{}).ensureScreenArt()
-	for range 100 {
-		if countMethod(calls(), "getUserProfilePhotos") > 0 {
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
+	artProbes.Wait()
+	if countMethod(calls(), "getUserProfilePhotos") != 1 {
+		t.Fatal("the probe left in flight by the previous bot kept the new one from probing")
 	}
-	t.Fatal("the probe left in flight by the previous bot kept the new one from probing")
 }
 
 func TestScreenKeepsArtFromTheBotAvatar(t *testing.T) {

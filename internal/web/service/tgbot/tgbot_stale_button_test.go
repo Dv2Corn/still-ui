@@ -53,6 +53,8 @@ func swapTestBot(t *testing.T, url string) {
 	origBot := liveBot()
 	origPool := messageWorkerPool
 	t.Cleanup(func() {
+		// A probe this test left in flight would log, and write the art cache, inside the next test.
+		artProbes.Wait()
 		setTestBot(origBot)
 		messageWorkerPool = origPool
 	})
@@ -60,12 +62,14 @@ func swapTestBot(t *testing.T, url string) {
 	if err != nil {
 		t.Fatalf("NewBot: %v", err)
 	}
+	// Before the swap: a probe requested under the previous bot but not yet started reads the
+	// live bot when it runs, and would spend its request on this test's server.
+	resetScreenArt()
 	setTestBot(newBot)
 	messageWorkerPool = make(chan struct{}, 10)
 	// The screen store is process-wide state: a screen left by an earlier test
 	// would make this one edit an unrelated message instead of sending.
 	screens.reset()
-	resetScreenArt()
 }
 
 func newStaleButtonTgbot(t *testing.T) *Tgbot {

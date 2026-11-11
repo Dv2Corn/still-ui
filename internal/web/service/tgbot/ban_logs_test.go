@@ -13,7 +13,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/mhsanaei/3x-ui/v3/internal/logger"
 	"github.com/mhsanaei/3x-ui/v3/internal/xray"
 )
 
@@ -180,15 +179,15 @@ func TestSendBanLogsFile(t *testing.T) {
 				t.Errorf("notices = %q, want %q", notices, wantNotices)
 			}
 			if tt.wantWarning {
-				logs := logger.GetLogs(10, "warning")
 				path := xray.GetIPLimitBannedLogPath()
 				if tt.failUpload == previous {
 					path = xray.GetIPLimitBannedPrevLogPath()
 				}
-				if !slices.ContainsFunc(logs, func(entry string) bool {
-					return strings.Contains(entry, path) && strings.Contains(entry, "controlled upload failure")
+				// The path sits in this test's own temp folder, so no other test's warning can match.
+				if !slices.ContainsFunc(warningsMentioning(path), func(entry string) bool {
+					return strings.Contains(entry, "controlled upload failure")
 				}) {
-					t.Errorf("upload failure not logged: %v", logs)
+					t.Errorf("upload failure for %s not logged", path)
 				}
 			}
 			for name, contents := range tt.files {
