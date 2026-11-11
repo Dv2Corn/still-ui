@@ -429,6 +429,7 @@ All registered in `web.go` → `startTask()`. Each is a struct with a `Run()` me
 | `@every 1m`         | `check_cpu_usage`                                                                                | Only if a CPU alarm is configured (TG, Discord, or email); publishes `cpu.high`       |
 | `@every 1m`         | `check_memory_usage`                                                                             | Only if a memory alarm is configured (TG, Discord, or email); publishes `memory.high` |
 | `@every 1m`         | (inline func in `startTask`)                                                                     | Only if "Block torrents for clients" is on; reloads the nftables table if it vanished |
+| `@every 10s`        | (inline func in `startTask`)                                                                     | Hysteria2 port hopping: keeps the `still_port_hop` redirect in step with the inbounds |
 | configurable        | `free_os_memory`                                                                                 | Only if `sys.MemoryReleaseIntervalMinutes() > 0`; returns heap to OS                  |
 
 To change _when_ something runs, edit `startTask()`. To change _what_ it does, edit the job file.
