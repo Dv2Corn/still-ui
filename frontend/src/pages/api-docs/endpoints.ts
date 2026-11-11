@@ -1694,10 +1694,10 @@ export const sections: readonly Section[] = [
         method: 'POST',
         path: '/panel/api/clients/hwids/:email',
         summary:
-          'List registered HWID devices for a client with a short fingerprint. Full hashes are not exposed.',
+          'List registered HWID devices for a client with a short fingerprint. Full hashes are not exposed. The entry with noId true is the one slot that all apps sending no device ID share; it has no fingerprint.',
         params: [{ name: 'email', in: 'path', type: 'string', desc: 'Client email.' }],
         response:
-          '{\n  "success": true,\n  "obj": [\n    {\n      "id": 1,\n      "firstSeen": 1735000000000,\n      "lastSeen": 1735100000000,\n      "userAgent": "Happ/1.0",\n      "deviceOs": "android",\n      "osVersion": "15",\n      "deviceModel": "Pixel 9",\n      "fingerprint": "6ad17c93e821"\n    }\n  ]\n}',
+          '{\n  "success": true,\n  "obj": [\n    {\n      "id": 1,\n      "firstSeen": 1735000000000,\n      "lastSeen": 1735100000000,\n      "userAgent": "Happ/1.0",\n      "deviceOs": "android",\n      "osVersion": "15",\n      "deviceModel": "Pixel 9",\n      "fingerprint": "6ad17c93e821",\n      "noId": false\n    }\n  ]\n}',
       },
       {
         method: 'DELETE',
@@ -2943,7 +2943,7 @@ export const sections: readonly Section[] = [
         method: 'GET',
         path: '/{subPath}:subid',
         summary:
-          'Return base64-encoded subscription links for all enabled clients matching the subscription ID. When the request has an Accept: text/html header or ?html=1, renders a styled info page instead. With ?format=info, returns the page view-model as JSON (traffic, expiry, online status; no links) for live polling. The path prefix is configured by subPath.',
+          'Return base64-encoded subscription links for all enabled clients matching the subscription ID. When the request has an Accept: text/html header or ?html=1, renders a styled info page instead. With ?format=info, returns the page view-model as JSON (traffic, expiry, online status; no links) for live polling; under a device limit it also carries deviceLimit and deviceCount. A new device over the limit of the subscription (X-HWID header) still gets 200: the only entry of the body is a notice, repeated in Announce, with X-Hwid-Max-Devices-Reached: true. The path prefix is configured by subPath.',
         params: [
           { name: 'subid', in: 'path', type: 'string', desc: 'Client subscription ID.' },
           {

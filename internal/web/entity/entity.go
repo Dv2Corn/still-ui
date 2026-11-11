@@ -44,6 +44,11 @@ type AllSetting struct {
 	SubCalendarExpireInclusive bool   `json:"subCalendarExpireInclusive" form:"subCalendarExpireInclusive"`
 	SubExpiredTemplate         string `json:"subExpiredTemplate" form:"subExpiredTemplate"`
 	SubTrafficDepletedTemplate string `json:"subTrafficDepletedTemplate" form:"subTrafficDepletedTemplate"`
+	SubHwidDefaultLimit        int    `json:"subHwidDefaultLimit" form:"subHwidDefaultLimit" validate:"gte=0,lte=1000" example:"0"`
+	SubHwidNoIdPolicy          string `json:"subHwidNoIdPolicy" form:"subHwidNoIdPolicy" example:"shared"`
+	SubHwidExpireDays          int    `json:"subHwidExpireDays" form:"subHwidExpireDays" validate:"gte=0,lte=3650" example:"30"`
+	SubHwidLimitNotice         string `json:"subHwidLimitNotice" form:"subHwidLimitNotice"`
+	SubHwidNoIdNotice          string `json:"subHwidNoIdNotice" form:"subHwidNoIdNotice"`
 	SubProbeOrder              string `json:"subProbeOrder" form:"subProbeOrder" example:"off"`
 	SubProbeMinAgents          int    `json:"subProbeMinAgents" form:"subProbeMinAgents" validate:"gte=0,lte=10" example:"0"`
 	SubProbeStaleMinutes       int    `json:"subProbeStaleMinutes" form:"subProbeStaleMinutes" validate:"gte=5,lte=1440" example:"30"`

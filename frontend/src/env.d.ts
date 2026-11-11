@@ -23,6 +23,8 @@ interface SubPageData {
   announce?: string;
   localDirect?: string;
   shadowrocketConfUrl?: string;
+  deviceLimit?: number;
+  deviceCount?: number;
   downloadByte?: string | number;
   uploadByte?: string | number;
   usedByte?: string | number;

@@ -57,6 +57,8 @@ const heroData = {
   total: subData.total || '∞',
   remained: subData.remained || '',
   datepicker: subData.datepicker || 'gregorian',
+  deviceLimit: Number(subData.deviceLimit || 0),
+  deviceCount: Number(subData.deviceCount || 0),
 };
 
 const apps = buildSubApps({ subUrl, sId, subTitle });

@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -41,6 +42,8 @@ const (
 	DefaultRemarkTemplate             = "{{INBOUND}}-{{EMAIL}}|📊{{TRAFFIC_LEFT}}|⏳{{DAYS_LEFT}}D"
 	DefaultSubExpiredTemplate         = "⛔ {{EMAIL}} | Expired: {{EXPIRE_DATE}}"
 	DefaultSubTrafficDepletedTemplate = "🚫 {{EMAIL}} | Traffic Depleted | {{TRAFFIC_USED}}/{{TRAFFIC_TOTAL}}"
+	DefaultSubHwidLimitNotice         = "Device limit {{LIMIT}} reached. Remove a device in your account or ask the seller."
+	DefaultSubHwidNoIdNotice          = "This app sends no device ID. Use an app that does (Happ, v2rayTun) or ask the seller."
 	DefaultTrustedProxyCIDRs          = "127.0.0.1/32,::1/128"
 	maxRegexLength                    = 2048
 )
@@ -87,6 +90,11 @@ var defaultValueMap = map[string]string{
 	"subCalendarExpireInclusive":  "false",
 	"subExpiredTemplate":          DefaultSubExpiredTemplate,
 	"subTrafficDepletedTemplate":  DefaultSubTrafficDepletedTemplate,
+	"subHwidDefaultLimit":         "0",
+	"subHwidNoIdPolicy":           HwidNoIdShared,
+	"subHwidExpireDays":           "30",
+	"subHwidLimitNotice":          DefaultSubHwidLimitNotice,
+	"subHwidNoIdNotice":           DefaultSubHwidNoIdNotice,
 	"subProbeOrder":               SubProbeOrderOff,
 	"subProbeMinAgents":           "0",
 	"subProbeStaleMinutes":        strconv.Itoa(SubProbeStaleMinutesDefault),
@@ -869,6 +877,42 @@ func (s *SettingService) GetSubExpiredTemplate() (string, error) {
 
 func (s *SettingService) GetSubTrafficDepletedTemplate() (string, error) {
 	return s.getString("subTrafficDepletedTemplate")
+}
+
+// SubHwidNotices returns the texts a refused device gets instead of servers: the
+// limit-reached one and the one for an app that sent no device id.
+func (s *SettingService) SubHwidNotices() (limitReached, noID string) {
+	limitReached, noID = DefaultSubHwidLimitNotice, DefaultSubHwidNoIdNotice
+	if v, err := s.getString("subHwidLimitNotice"); err == nil && strings.TrimSpace(v) != "" {
+		limitReached = v
+	}
+	if v, err := s.getString("subHwidNoIdNotice"); err == nil && strings.TrimSpace(v) != "" {
+		noID = v
+	}
+	return limitReached, noID
+}
+
+func validateSubHwidSettings(all *entity.AllSetting) error {
+	switch all.SubHwidNoIdPolicy {
+	case "":
+		all.SubHwidNoIdPolicy = HwidNoIdShared
+	case HwidNoIdShared, HwidNoIdAllow, HwidNoIdRefuse:
+	default:
+		return errors.New("device limit: apps without a device id must be set to shared, allow or refuse")
+	}
+	if all.SubHwidDefaultLimit < 0 || all.SubHwidDefaultLimit > SubHwidDefaultLimitMax {
+		return common.NewErrorf("default device limit must be 0 to %d", SubHwidDefaultLimitMax)
+	}
+	if all.SubHwidExpireDays < 0 || all.SubHwidExpireDays > SubHwidExpireDaysMax {
+		return common.NewErrorf("devices expire after 0 to %d days", SubHwidExpireDaysMax)
+	}
+	for _, notice := range []*string{&all.SubHwidLimitNotice, &all.SubHwidNoIdNotice} {
+		*notice = strings.TrimSpace(*notice)
+		if utf8.RuneCountInString(*notice) > SubHwidNoticeMaxLength {
+			return common.NewErrorf("device limit notice must not exceed %d characters", SubHwidNoticeMaxLength)
+		}
+	}
+	return nil
 }
 
 func (s *SettingService) GetSecret() ([]byte, error) {
@@ -1761,6 +1805,9 @@ func (s *SettingService) UpdateAllSetting(allSetting *entity.AllSetting, clears 
 	if err := normalizeSubProbeSettings(allSetting); err != nil {
 		return err
 	}
+	if err := validateSubHwidSettings(allSetting); err != nil {
+		return err
+	}
 	switch allSetting.SubProfileMode {
 	case "", SubProfileModeNone, SubProfileModeBuiltin, SubProfileModeCustom:
 		allSetting.SubProfileMode = effectiveSubProfileMode(allSetting.SubProfileMode, allSetting.SubProfileUrl)
@@ -1800,7 +1847,7 @@ func (s *SettingService) UpdateAllSetting(allSetting *entity.AllSetting, clears 
 	fields := reflect_util.GetFields(t)
 
 	db := database.GetDB()
-	return db.Transaction(func(tx *gorm.DB) error {
+	if err := db.Transaction(func(tx *gorm.DB) error {
 		var existing []*model.Setting
 		if err := tx.Find(&existing).Error; err != nil {
 			return err
@@ -1828,7 +1875,10 @@ func (s *SettingService) UpdateAllSetting(allSetting *entity.AllSetting, clears 
 			}
 		}
 		return nil
-	})
+	}); err != nil {
+		return err
+	}
+	return applyHwidPanelDefault()
 }
 
 func validateSubUserAgentRegexes(allSetting *entity.AllSetting) error {

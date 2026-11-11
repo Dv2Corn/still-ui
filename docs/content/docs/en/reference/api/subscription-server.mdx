@@ -16,9 +16,12 @@ _openapi:
         matching the subscription ID. When the request has an Accept: text/html
         header or ?html=1, renders a styled info page instead. With
         ?format=info, returns the page view-model as JSON (traffic, expiry,
-        online status; no links) for live polling. The path prefix is configured
-        by subPath.'
-      url: '#return-base64-encoded-subscription-links-for-all-enabled-clients-matching-the-subscription-id-when-the-request-has-an-accept-texthtml-header-or-html1-renders-a-styled-info-page-instead-with-formatinfo-returns-the-page-view-model-as-json-traffic-expiry-online-status-no-links-for-live-polling-the-path-prefix-is-configured-by-subpath'
+        online status; no links) for live polling; under a device limit it also
+        carries deviceLimit and deviceCount. A new device over the limit of the
+        subscription (X-HWID header) still gets 200: the only entry of the body
+        is a notice, repeated in Announce, with X-Hwid-Max-Devices-Reached:
+        true. The path prefix is configured by subPath.'
+      url: '#return-base64-encoded-subscription-links-for-all-enabled-clients-matching-the-subscription-id-when-the-request-has-an-accept-texthtml-header-or-html1-renders-a-styled-info-page-instead-with-formatinfo-returns-the-page-view-model-as-json-traffic-expiry-online-status-no-links-for-live-polling-under-a-device-limit-it-also-carries-devicelimit-and-devicecount-a-new-device-over-the-limit-of-the-subscription-x-hwid-header-still-gets-200-the-only-entry-of-the-body-is-a-notice-repeated-in-announce-with-x-hwid-max-devices-reached-true-the-path-prefix-is-configured-by-subpath'
     - depth: 2
       title: Return the same status and subscription metadata headers as GET without a
         response body.
@@ -69,9 +72,13 @@ _openapi:
           matching the subscription ID. When the request has an Accept:
           text/html header or ?html=1, renders a styled info page instead. With
           ?format=info, returns the page view-model as JSON (traffic, expiry,
-          online status; no links) for live polling. The path prefix is
-          configured by subPath.'
-        id: return-base64-encoded-subscription-links-for-all-enabled-clients-matching-the-subscription-id-when-the-request-has-an-accept-texthtml-header-or-html1-renders-a-styled-info-page-instead-with-formatinfo-returns-the-page-view-model-as-json-traffic-expiry-online-status-no-links-for-live-polling-the-path-prefix-is-configured-by-subpath
+          online status; no links) for live polling; under a device limit it
+          also carries deviceLimit and deviceCount. A new device over the limit
+          of the subscription (X-HWID header) still gets 200: the only entry of
+          the body is a notice, repeated in Announce, with
+          X-Hwid-Max-Devices-Reached: true. The path prefix is configured by
+          subPath.'
+        id: return-base64-encoded-subscription-links-for-all-enabled-clients-matching-the-subscription-id-when-the-request-has-an-accept-texthtml-header-or-html1-renders-a-styled-info-page-instead-with-formatinfo-returns-the-page-view-model-as-json-traffic-expiry-online-status-no-links-for-live-polling-under-a-device-limit-it-also-carries-devicelimit-and-devicecount-a-new-device-over-the-limit-of-the-subscription-x-hwid-header-still-gets-200-the-only-entry-of-the-body-is-a-notice-repeated-in-announce-with-x-hwid-max-devices-reached-true-the-path-prefix-is-configured-by-subpath
       - content: Return the same status and subscription metadata headers as GET without
           a response body.
         id: return-the-same-status-and-subscription-metadata-headers-as-get-without-a-response-body

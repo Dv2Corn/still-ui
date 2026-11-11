@@ -116,8 +116,13 @@ func (s *SubJsonService) bakedTemplate() map[string]any {
 
 // GetJson generates a JSON subscription configuration for the given subscription ID and host.
 func (s *SubJsonService) GetJson(subId string, host string, alwaysReturnArray bool) (string, string, error) {
+	return s.getJson(subId, host, alwaysReturnArray, "")
+}
+
+func (s *SubJsonService) getJson(subId string, host string, alwaysReturnArray bool, deviceNotice string) (string, string, error) {
 	subReq := s.SubService.ForRequest(host)
 	subReq.subscriptionBody = true
+	subReq.deviceNotice = deviceNotice
 	return s.renderJson(subReq, subId, host, alwaysReturnArray)
 }
 
@@ -132,6 +137,10 @@ func (s *SubJsonService) renderJson(subReq *SubService, subId string, host strin
 	}
 	if len(inbounds) == 0 && len(externalLinks) == 0 {
 		return "", "", nil
+	}
+	if subReq.deviceNotice != "" {
+		notice := []json_util.RawMessage{s.genDummySocksConfig(subReq.deviceNotice)}
+		return marshalJsonSub(notice, alwaysReturnArray), subReq.subscriptionUserinfo(subReq.refusedTraffic(subId, inbounds, externalLinks)), nil
 	}
 
 	var header string
@@ -327,14 +336,17 @@ func (s *SubJsonService) renderJson(subReq *SubService, subId string, host strin
 		return "", header, nil
 	}
 
+	return marshalJsonSub(configArray, alwaysReturnArray), header, nil
+}
+
+func marshalJsonSub(configArray []json_util.RawMessage, alwaysReturnArray bool) string {
 	var finalJson []byte
 	if len(configArray) == 1 && !alwaysReturnArray {
 		finalJson, _ = json.MarshalIndent(configArray[0], "", "  ")
 	} else {
 		finalJson, _ = json.MarshalIndent(configArray, "", "  ")
 	}
-
-	return string(finalJson), header, nil
+	return string(finalJson)
 }
 
 // subConfigEntry is one ordered block of the JSON subscription: an inbound's

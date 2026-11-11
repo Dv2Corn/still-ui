@@ -423,6 +423,28 @@
             "example": "inbound-first",
             "type": "string"
           },
+          "subHwidDefaultLimit": {
+            "example": 0,
+            "maximum": 1000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "subHwidExpireDays": {
+            "example": 30,
+            "maximum": 3650,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "subHwidLimitNotice": {
+            "type": "string"
+          },
+          "subHwidNoIdNotice": {
+            "type": "string"
+          },
+          "subHwidNoIdPolicy": {
+            "example": "shared",
+            "type": "string"
+          },
           "subIncyAnnounceUrl": {
             "type": "string"
           },
@@ -817,6 +839,11 @@
           "subHappTunType",
           "subHideSettings",
           "subHostSortMode",
+          "subHwidDefaultLimit",
+          "subHwidExpireDays",
+          "subHwidLimitNotice",
+          "subHwidNoIdNotice",
+          "subHwidNoIdPolicy",
           "subIncyAnnounceUrl",
           "subIncyAppAutoDetect",
           "subIncyBannerBgColor",
@@ -1326,6 +1353,28 @@
             "example": "inbound-first",
             "type": "string"
           },
+          "subHwidDefaultLimit": {
+            "example": 0,
+            "maximum": 1000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "subHwidExpireDays": {
+            "example": 30,
+            "maximum": 3650,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "subHwidLimitNotice": {
+            "type": "string"
+          },
+          "subHwidNoIdNotice": {
+            "type": "string"
+          },
+          "subHwidNoIdPolicy": {
+            "example": "shared",
+            "type": "string"
+          },
           "subIncyAnnounceUrl": {
             "type": "string"
           },
@@ -1728,6 +1777,11 @@
           "subHappTunType",
           "subHideSettings",
           "subHostSortMode",
+          "subHwidDefaultLimit",
+          "subHwidExpireDays",
+          "subHwidLimitNotice",
+          "subHwidNoIdNotice",
+          "subHwidNoIdPolicy",
           "subIncyAnnounceUrl",
           "subIncyAppAutoDetect",
           "subIncyBannerBgColor",
@@ -11853,7 +11907,7 @@
         "tags": [
           "Clients"
         ],
-        "summary": "List registered HWID devices for a client with a short fingerprint. Full hashes are not exposed.",
+        "summary": "List registered HWID devices for a client with a short fingerprint. Full hashes are not exposed. The entry with noId true is the one slot that all apps sending no device ID share; it has no fingerprint.",
         "operationId": "post_panel_api_clients_hwids_email",
         "parameters": [
           {
@@ -11894,7 +11948,8 @@
                       "deviceOs": "android",
                       "osVersion": "15",
                       "deviceModel": "Pixel 9",
-                      "fingerprint": "6ad17c93e821"
+                      "fingerprint": "6ad17c93e821",
+                      "noId": false
                     }
                   ]
                 }
@@ -17600,7 +17655,7 @@
         "tags": [
           "Subscription Server"
         ],
-        "summary": "Return base64-encoded subscription links for all enabled clients matching the subscription ID. When the request has an Accept: text/html header or ?html=1, renders a styled info page instead. With ?format=info, returns the page view-model as JSON (traffic, expiry, online status; no links) for live polling. The path prefix is configured by subPath.",
+        "summary": "Return base64-encoded subscription links for all enabled clients matching the subscription ID. When the request has an Accept: text/html header or ?html=1, renders a styled info page instead. With ?format=info, returns the page view-model as JSON (traffic, expiry, online status; no links) for live polling; under a device limit it also carries deviceLimit and deviceCount. A new device over the limit of the subscription (X-HWID header) still gets 200: the only entry of the body is a notice, repeated in Announce, with X-Hwid-Max-Devices-Reached: true. The path prefix is configured by subPath.",
         "operationId": "get_subPath_subid",
         "parameters": [
           {

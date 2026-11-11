@@ -16,6 +16,9 @@ export type SubClashAutoGroupType = z.infer<typeof SubClashAutoGroupTypeSchema>;
 export const SubProbeOrderSchema = z.enum(['off', 'reorder', 'hide']);
 export type SubProbeOrder = z.infer<typeof SubProbeOrderSchema>;
 
+export const SubHwidNoIdPolicySchema = z.enum(['shared', 'allow', 'refuse']);
+export type SubHwidNoIdPolicy = z.infer<typeof SubHwidNoIdPolicySchema>;
+
 export const AllSettingSchema = z
   .object({
     webListen: z.string().optional(),
@@ -42,6 +45,11 @@ export const AllSettingSchema = z
     subCalendarExpireInclusive: z.boolean().optional(),
     subExpiredTemplate: z.string().optional(),
     subTrafficDepletedTemplate: z.string().optional(),
+    subHwidDefaultLimit: z.number().int().min(0).max(1000).optional(),
+    subHwidNoIdPolicy: SubHwidNoIdPolicySchema.optional(),
+    subHwidExpireDays: z.number().int().min(0).max(3650).optional(),
+    subHwidLimitNotice: z.string().max(256).optional(),
+    subHwidNoIdNotice: z.string().max(256).optional(),
     datepicker: z.enum(['gregorian', 'jalalian']).optional(),
     tgBotEnable: z.boolean().optional(),
     tgBotToken: z.string().optional(),

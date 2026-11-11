@@ -397,6 +397,28 @@ export const SCHEMAS: Record<string, unknown> = {
         "example": "inbound-first",
         "type": "string"
       },
+      "subHwidDefaultLimit": {
+        "example": 0,
+        "maximum": 1000,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "subHwidExpireDays": {
+        "example": 30,
+        "maximum": 3650,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "subHwidLimitNotice": {
+        "type": "string"
+      },
+      "subHwidNoIdNotice": {
+        "type": "string"
+      },
+      "subHwidNoIdPolicy": {
+        "example": "shared",
+        "type": "string"
+      },
       "subIncyAnnounceUrl": {
         "type": "string"
       },
@@ -791,6 +813,11 @@ export const SCHEMAS: Record<string, unknown> = {
       "subHappTunType",
       "subHideSettings",
       "subHostSortMode",
+      "subHwidDefaultLimit",
+      "subHwidExpireDays",
+      "subHwidLimitNotice",
+      "subHwidNoIdNotice",
+      "subHwidNoIdPolicy",
       "subIncyAnnounceUrl",
       "subIncyAppAutoDetect",
       "subIncyBannerBgColor",
@@ -1300,6 +1327,28 @@ export const SCHEMAS: Record<string, unknown> = {
         "example": "inbound-first",
         "type": "string"
       },
+      "subHwidDefaultLimit": {
+        "example": 0,
+        "maximum": 1000,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "subHwidExpireDays": {
+        "example": 30,
+        "maximum": 3650,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "subHwidLimitNotice": {
+        "type": "string"
+      },
+      "subHwidNoIdNotice": {
+        "type": "string"
+      },
+      "subHwidNoIdPolicy": {
+        "example": "shared",
+        "type": "string"
+      },
       "subIncyAnnounceUrl": {
         "type": "string"
       },
@@ -1702,6 +1751,11 @@ export const SCHEMAS: Record<string, unknown> = {
       "subHappTunType",
       "subHideSettings",
       "subHostSortMode",
+      "subHwidDefaultLimit",
+      "subHwidExpireDays",
+      "subHwidLimitNotice",
+      "subHwidNoIdNotice",
+      "subHwidNoIdPolicy",
       "subIncyAnnounceUrl",
       "subIncyAppAutoDetect",
       "subIncyBannerBgColor",
