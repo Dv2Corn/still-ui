@@ -1889,7 +1889,7 @@
       "subTrafficDepletedTemplateDesc": "Template for the dummy config when subscriber traffic quota is exhausted.",
       "deviceLimit": "Device limit",
       "subHwidDefaultLimit": "Default device limit",
-      "subHwidDefaultLimitDesc": "How many devices one subscription works on, for every client without a limit of its own. 0 = no default limit.",
+      "subHwidDefaultLimitDesc": "How many devices one subscription works on, for every client without a limit of its own. 0 = no default limit. When you save it, a subscription with more devices keeps the most recently seen ones.",
       "subHwidNoIdPolicy": "Apps without a device ID",
       "subHwidNoIdPolicyDesc": "What a limited subscription answers an app that sends no device ID (the X-HWID header).",
       "subHwidNoIdShared": "One shared slot for all of them (default)",

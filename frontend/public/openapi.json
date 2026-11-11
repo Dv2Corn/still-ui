@@ -11891,7 +11891,7 @@
         "tags": [
           "Clients"
         ],
-        "summary": "List registered HWID devices for a client with a short fingerprint. Full hashes are not exposed.",
+        "summary": "List registered HWID devices for a client with a short fingerprint. Full hashes are not exposed. The entry with noId true is the one slot that all apps sending no device ID share; it has no fingerprint.",
         "operationId": "post_panel_api_clients_hwids_email",
         "parameters": [
           {
@@ -11932,7 +11932,8 @@
                       "deviceOs": "android",
                       "osVersion": "15",
                       "deviceModel": "Pixel 9",
-                      "fingerprint": "6ad17c93e821"
+                      "fingerprint": "6ad17c93e821",
+                      "noId": false
                     }
                   ]
                 }

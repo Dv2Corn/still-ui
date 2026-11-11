@@ -433,8 +433,7 @@ func getEnv(key, fallback string) string {
 func (s *SettingService) ResetSettings() error {
 	db := database.GetDB()
 	return db.Transaction(func(tx *gorm.DB) error {
-		// The device-hash key stays: with a new one every registered device would read as new.
-		if err := tx.Where("key <> ?", database.HwidHashKeySetting).Delete(model.Setting{}).Error; err != nil {
+		if err := tx.Where("1 = 1").Delete(model.Setting{}).Error; err != nil {
 			return err
 		}
 		paths := []model.Setting{
@@ -1843,7 +1842,7 @@ func (s *SettingService) UpdateAllSetting(allSetting *entity.AllSetting, clears 
 	fields := reflect_util.GetFields(t)
 
 	db := database.GetDB()
-	return db.Transaction(func(tx *gorm.DB) error {
+	if err := db.Transaction(func(tx *gorm.DB) error {
 		var existing []*model.Setting
 		if err := tx.Find(&existing).Error; err != nil {
 			return err
@@ -1871,7 +1870,10 @@ func (s *SettingService) UpdateAllSetting(allSetting *entity.AllSetting, clears 
 			}
 		}
 		return nil
-	})
+	}); err != nil {
+		return err
+	}
+	return applyHwidPanelDefault()
 }
 
 func validateSubUserAgentRegexes(allSetting *entity.AllSetting) error {

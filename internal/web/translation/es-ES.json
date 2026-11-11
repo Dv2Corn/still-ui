@@ -1768,7 +1768,7 @@
       "subTrafficDepletedTemplateDesc": "Plantilla para el nodo ficticio cuando el límite de tráfico se ha agotado.",
       "deviceLimit": "Límite de dispositivos",
       "subHwidDefaultLimit": "Límite de dispositivos por defecto",
-      "subHwidDefaultLimitDesc": "En cuántos dispositivos funciona una suscripción, para cada cliente sin límite propio. 0 = sin límite por defecto.",
+      "subHwidDefaultLimitDesc": "En cuántos dispositivos funciona una suscripción, para cada cliente sin límite propio. 0 = sin límite por defecto. Al guardar, una suscripción con más dispositivos conserva los vistos más recientemente.",
       "subHwidNoIdPolicy": "Aplicaciones sin ID de dispositivo",
       "subHwidNoIdPolicyDesc": "Qué responde una suscripción con límite a una aplicación que no envía ID de dispositivo (cabecera X-HWID).",
       "subHwidNoIdShared": "Una plaza compartida para todas (por defecto)",

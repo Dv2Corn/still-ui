@@ -1768,7 +1768,7 @@
       "subTrafficDepletedTemplateDesc": "Templat untuk konfigurasi dummy saat kuota data langganan telah habis.",
       "deviceLimit": "Batas perangkat",
       "subHwidDefaultLimit": "Batas perangkat bawaan",
-      "subHwidDefaultLimitDesc": "Di berapa perangkat satu langganan dapat dipakai, untuk setiap klien tanpa batas sendiri. 0 = tanpa batas bawaan.",
+      "subHwidDefaultLimitDesc": "Di berapa perangkat satu langganan dapat dipakai, untuk setiap klien tanpa batas sendiri. 0 = tanpa batas bawaan. Saat disimpan, langganan dengan perangkat lebih banyak mempertahankan yang terakhir terlihat.",
       "subHwidNoIdPolicy": "Aplikasi tanpa ID perangkat",
       "subHwidNoIdPolicyDesc": "Jawaban langganan yang dibatasi kepada aplikasi yang tidak mengirim ID perangkat (header X-HWID).",
       "subHwidNoIdShared": "Satu slot bersama untuk semuanya (bawaan)",

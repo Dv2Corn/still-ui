@@ -1768,7 +1768,7 @@
       "subTrafficDepletedTemplateDesc": "使用者訂閱流量用盡時提示配置的備註範本。",
       "deviceLimit": "裝置限制",
       "subHwidDefaultLimit": "預設裝置限制",
-      "subHwidDefaultLimitDesc": "一個訂閱可在多少台裝置上使用，適用於沒有個別限制的每個用戶端。0 = 無預設限制。",
+      "subHwidDefaultLimitDesc": "一個訂閱可在多少台裝置上使用，適用於沒有個別限制的每個用戶端。0 = 無預設限制。儲存時，裝置數超出的訂閱只保留最近活躍的裝置。",
       "subHwidNoIdPolicy": "不傳送裝置 ID 的應用程式",
       "subHwidNoIdPolicyDesc": "有裝置限制的訂閱如何回應不傳送裝置 ID（X-HWID 標頭）的應用程式。",
       "subHwidNoIdShared": "它們共用一個名額（預設）",

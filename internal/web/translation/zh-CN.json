@@ -1768,7 +1768,7 @@
       "subTrafficDepletedTemplateDesc": "用户订阅流量用尽时提示配置的备注模板。",
       "deviceLimit": "设备限制",
       "subHwidDefaultLimit": "默认设备限制",
-      "subHwidDefaultLimitDesc": "一个订阅可在多少台设备上使用，适用于没有单独限制的每个客户端。0 = 无默认限制。",
+      "subHwidDefaultLimitDesc": "一个订阅可在多少台设备上使用，适用于没有单独限制的每个客户端。0 = 无默认限制。保存时，设备数超出的订阅只保留最近活跃的设备。",
       "subHwidNoIdPolicy": "不发送设备 ID 的应用",
       "subHwidNoIdPolicyDesc": "有设备限制的订阅如何答复不发送设备 ID（X-HWID 请求头）的应用。",
       "subHwidNoIdShared": "它们合用一个名额（默认）",

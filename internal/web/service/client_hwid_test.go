@@ -197,11 +197,7 @@ func TestClientHwidGateRegistersAndBlocks(t *testing.T) {
 		}
 		if row.DeviceModel == "updated-model" && row.UserAgent == "Karing/2.0" && row.DeviceOS == "ios" && row.OsVersion == "18" {
 			foundUpdated = true
-			full, err := hashHwid(database.GetDB(), rec.SubID, firstRaw)
-			if err != nil {
-				t.Fatalf("hash HWID: %v", err)
-			}
-			want := full[:hwidFingerprintLength]
+			want := hashHwid(firstRaw)[:hwidFingerprintLength]
 			if row.Fingerprint != want {
 				t.Fatalf("fingerprint = %q, want %q", row.Fingerprint, want)
 			}

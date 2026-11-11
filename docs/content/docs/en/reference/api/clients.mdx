@@ -257,8 +257,9 @@ _openapi:
       url: '#reset-the-recorded-ip-list-for-a-client'
     - depth: 2
       title: List registered HWID devices for a client with a short fingerprint. Full
-        hashes are not exposed.
-      url: '#list-registered-hwid-devices-for-a-client-with-a-short-fingerprint-full-hashes-are-not-exposed'
+        hashes are not exposed. The entry with noId true is the one slot that
+        all apps sending no device ID share; it has no fingerprint.
+      url: '#list-registered-hwid-devices-for-a-client-with-a-short-fingerprint-full-hashes-are-not-exposed-the-entry-with-noid-true-is-the-one-slot-that-all-apps-sending-no-device-id-share-it-has-no-fingerprint'
     - depth: 2
       title: Clear all registered HWID devices for a client so new devices can
         register again.
@@ -535,8 +536,9 @@ _openapi:
       - content: Reset the recorded IP list for a client.
         id: reset-the-recorded-ip-list-for-a-client
       - content: List registered HWID devices for a client with a short fingerprint.
-          Full hashes are not exposed.
-        id: list-registered-hwid-devices-for-a-client-with-a-short-fingerprint-full-hashes-are-not-exposed
+          Full hashes are not exposed. The entry with noId true is the one slot
+          that all apps sending no device ID share; it has no fingerprint.
+        id: list-registered-hwid-devices-for-a-client-with-a-short-fingerprint-full-hashes-are-not-exposed-the-entry-with-noid-true-is-the-one-slot-that-all-apps-sending-no-device-id-share-it-has-no-fingerprint
       - content: Clear all registered HWID devices for a client so new devices can
           register again.
         id: clear-all-registered-hwid-devices-for-a-client-so-new-devices-can-register-again

@@ -1768,7 +1768,7 @@
       "subTrafficDepletedTemplateDesc": "Abonelik trafik kotası bittiğinde sahte yapılandırma için kullanılacak şablon.",
       "deviceLimit": "Cihaz sınırı",
       "subHwidDefaultLimit": "Varsayılan cihaz sınırı",
-      "subHwidDefaultLimitDesc": "Bir aboneliğin kaç cihazda çalışacağı; kendi sınırı olmayan her istemci için geçerlidir. 0 = varsayılan sınır yok.",
+      "subHwidDefaultLimitDesc": "Bir aboneliğin kaç cihazda çalışacağı; kendi sınırı olmayan her istemci için geçerlidir. 0 = varsayılan sınır yok. Kaydettiğinizde, daha fazla cihazı olan abonelik en son görülenleri korur.",
       "subHwidNoIdPolicy": "Cihaz kimliği göndermeyen uygulamalar",
       "subHwidNoIdPolicyDesc": "Sınırlı bir aboneliğin, cihaz kimliği (X-HWID başlığı) göndermeyen uygulamaya vereceği yanıt.",
       "subHwidNoIdShared": "Hepsi için tek ortak yer (varsayılan)",

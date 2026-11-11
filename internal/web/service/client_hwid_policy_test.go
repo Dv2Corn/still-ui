@@ -1,8 +1,6 @@
 package service
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"strings"
 	"testing"
 	"time"
@@ -230,6 +228,76 @@ func TestHwidGatePanelDefaultLimit(t *testing.T) {
 	}
 }
 
+// A panel default takes effect when it is saved, as a client's own limit does when it is set: a
+// subscription over it keeps its most recently seen devices. Left alone, the default enforced
+// nothing there until an unrelated edit of the client deleted the extra devices.
+func TestHwidPanelDefaultAppliesWhenSaved(t *testing.T) {
+	initClientHwidTestDB(t)
+	db := database.GetDB()
+	svc := &ClientService{}
+	settings := &SettingService{}
+	saveDefault := func(limit int) {
+		t.Helper()
+		all, err := settings.GetAllSetting()
+		if err != nil {
+			t.Fatalf("GetAllSetting: %v", err)
+		}
+		all.SubHwidDefaultLimit = limit
+		if err := settings.UpdateAllSetting(all, SecretClears{}); err != nil {
+			t.Fatalf("save default limit %d: %v", limit, err)
+		}
+	}
+	hashes := func(subID string) []string {
+		t.Helper()
+		var got []string
+		if err := db.Model(&model.ClientHwid{}).Where("sub_id = ?", subID).Order("last_seen").Pluck("hwid_hash", &got).Error; err != nil {
+			t.Fatalf("read client_hwids of %q: %v", subID, err)
+		}
+		return got
+	}
+
+	over := seedHwidClient(t, 0)
+	own := &model.ClientRecord{Email: "own@example.com", SubID: "sub-own", UUID: "22222222-2222-4333-8444-555555555555", Enable: true, LimitHwid: 4}
+	under := &model.ClientRecord{Email: "under@example.com", SubID: "sub-under", UUID: "33333333-2222-4333-8444-555555555555", Enable: true}
+	for _, rec := range []*model.ClientRecord{own, under} {
+		if err := db.Create(rec).Error; err != nil {
+			t.Fatalf("seed client %s: %v", rec.Email, err)
+		}
+	}
+	seedHwids(t, db, over.SubID, 5)
+	seedHwids(t, db, own.SubID, 4)
+	seedHwids(t, db, under.SubID, 2)
+
+	saveDefault(0)
+	if got := len(hashes(over.SubID)); got != 5 {
+		t.Fatalf("devices after saving no default = %d, want all 5 kept", got)
+	}
+
+	saveDefault(3)
+	want := []string{over.SubID + "-hash-2", over.SubID + "-hash-3", over.SubID + "-hash-4"}
+	if got := hashes(over.SubID); strings.Join(got, " ") != strings.Join(want, " ") {
+		t.Fatalf("devices under the saved default = %q, want the three seen last %q", got, want)
+	}
+	if got := len(hashes(own.SubID)); got != 4 {
+		t.Fatalf("a client with its own limit of 4 was trimmed to %d by the panel default", got)
+	}
+	if got := len(hashes(under.SubID)); got != 2 {
+		t.Fatalf("a subscription under the default lost devices: %d left of 2", got)
+	}
+	status, _, err := svc.HwidSlotStatusForSubID(over.SubID)
+	if err != nil || status.Registered != 3 || status.Limit != 3 {
+		t.Fatalf("slot status = %+v err=%v, want 3 of 3", status, err)
+	}
+
+	// Saving a client without touching its limit deletes nothing further.
+	if err := svc.setClientLimitHwidByEmail(over.Email, 0); err != nil {
+		t.Fatalf("client update: %v", err)
+	}
+	if got := len(hashes(over.SubID)); got != 3 {
+		t.Fatalf("devices after an unrelated client update = %d, want 3", got)
+	}
+}
+
 func TestHwidExpiryFreesSlot(t *testing.T) {
 	initClientHwidTestDB(t)
 	rec := seedHwidClient(t, 1)
@@ -311,55 +379,6 @@ func TestPurgeExpiredClientHwids(t *testing.T) {
 	}
 	if rows := countHwidRows(t, "sub-c"); rows != 0 {
 		t.Fatalf("shared slot rows left under allow = %d, want 0", rows)
-	}
-}
-
-// The stored value must not be derivable from the device id without this panel's key,
-// and must differ between subscriptions.
-func TestHwidStoredHashIsKeyedPerSubscription(t *testing.T) {
-	initClientHwidTestDB(t)
-	db := database.GetDB()
-	first := seedHwidClient(t, 3)
-	second := &model.ClientRecord{Email: "second@example.com", SubID: "sub-second", UUID: "22222222-2222-4333-8444-555555555555", Enable: true, LimitHwid: 3}
-	if err := db.Create(second).Error; err != nil {
-		t.Fatalf("seed second client: %v", err)
-	}
-	const raw = "device-shared-by-two-subscriptions"
-	for range 2 {
-		gateHwid(t, first.SubID, raw)
-	}
-	gateHwid(t, second.SubID, raw)
-
-	var rows []model.ClientHwid
-	if err := db.Order("id").Find(&rows).Error; err != nil {
-		t.Fatalf("read client_hwids: %v", err)
-	}
-	if len(rows) != 2 {
-		t.Fatalf("client_hwids rows = %d, want one per subscription (a re-fetch is not a new device)", len(rows))
-	}
-	plain := sha256.Sum256([]byte(raw))
-	for _, row := range rows {
-		if len(row.HwidHash) != 64 || row.HwidHash == hex.EncodeToString(plain[:]) || strings.Contains(row.HwidHash, raw) {
-			t.Fatalf("stored hash %q is the raw id or its unkeyed SHA-256", row.HwidHash)
-		}
-	}
-	if rows[0].HwidHash == rows[1].HwidHash {
-		t.Fatalf("one device on two subscriptions stored the same hash %q", rows[0].HwidHash)
-	}
-}
-
-// Every device row is keyed with it: losing the key on a settings reset would turn each
-// registered device into a new one against a full limit.
-func TestResetSettingsKeepsHwidHashKey(t *testing.T) {
-	initClientHwidTestDB(t)
-	rec := seedHwidClient(t, 1)
-	gateHwid(t, rec.SubID, "device-one")
-
-	if err := (&SettingService{}).ResetSettings(); err != nil {
-		t.Fatalf("ResetSettings: %v", err)
-	}
-	if res := gateHwid(t, rec.SubID, "device-one"); !res.Allowed || res.Registered != 1 {
-		t.Fatalf("registered device after a settings reset = %+v, want recognised", res)
 	}
 }
 

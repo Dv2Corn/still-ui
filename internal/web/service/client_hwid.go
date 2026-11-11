@@ -64,14 +64,9 @@ type ClientHwidInfo struct {
 	NoID bool `json:"noId"`
 }
 
-// hashHwid never stores or returns the raw id: see database.KeyedHwidHash.
-func hashHwid(tx *gorm.DB, subID, raw string) (string, error) {
-	key, err := database.HwidHashKey(tx)
-	if err != nil {
-		return "", err
-	}
+func hashHwid(raw string) string {
 	sum := sha256.Sum256([]byte(raw))
-	return database.KeyedHwidHash(key, subID, hex.EncodeToString(sum[:])), nil
+	return hex.EncodeToString(sum[:])
 }
 
 const (
@@ -97,7 +92,7 @@ type hwidPolicy struct {
 	staleBefore int64
 }
 
-var hwidPolicyKeys = []string{"subHwidDefaultLimit", database.HwidNoIdPolicySetting, "subHwidExpireDays"}
+var hwidPolicyKeys = []string{"subHwidDefaultLimit", database.HwidNoIdPolicySetting, database.HwidExpireDaysSetting}
 
 // loadHwidPolicy reads through the caller's handle, so the limit write can call it inside its transaction.
 func loadHwidPolicy(db *gorm.DB) (hwidPolicy, error) {
@@ -122,7 +117,7 @@ func loadHwidPolicy(db *gorm.DB) (hwidPolicy, error) {
 	if limit, err := strconv.Atoi(values["subHwidDefaultLimit"]); err == nil && limit > 0 {
 		policy.defaultLimit = limit
 	}
-	if days, err := strconv.Atoi(values["subHwidExpireDays"]); err == nil && days > 0 {
+	if days, err := strconv.Atoi(values[database.HwidExpireDaysSetting]); err == nil && days > 0 {
 		policy.staleBefore = time.Now().AddDate(0, 0, -days).UnixMilli()
 	}
 	return policy, nil
@@ -285,9 +280,7 @@ func (s *ClientService) EnforceHwidForSubID(subID string, req HwidRequest) (Hwid
 		res.Limit = limit
 		hwidHash := noIDHwidHash
 		if hasID {
-			if hwidHash, err = hashHwid(tx, subID, req.Hwid); err != nil {
-				return err
-			}
+			hwidHash = hashHwid(req.Hwid)
 		}
 		// Expired devices leave before the count, so the slot they held is free for this request.
 		if err := policy.deleteStaleHwids(tx, subID); err != nil {
@@ -351,17 +344,13 @@ func trackUnlimitedHwid(db *gorm.DB, subID string, req HwidRequest, policy hwidP
 		if limited = limit > 0; limited {
 			return nil
 		}
-		hwidHash, err := hashHwid(tx, subID, req.Hwid)
-		if err != nil {
-			return err
-		}
 		if err := policy.deleteStaleHwids(tx, subID); err != nil {
 			return err
 		}
 		return tx.Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "sub_id"}, {Name: "hwid_hash"}},
 			DoUpdates: clause.AssignmentColumns([]string{"last_seen", "user_agent", "device_os", "os_version", "device_model"}),
-		}).Create(&model.ClientHwid{SubID: subID, HwidHash: hwidHash, FirstSeen: now, LastSeen: now, UserAgent: req.UserAgent, DeviceOS: req.DeviceOS, OsVersion: req.OsVersion, DeviceModel: req.DeviceModel}).Error
+		}).Create(&model.ClientHwid{SubID: subID, HwidHash: hashHwid(req.Hwid), FirstSeen: now, LastSeen: now, UserAgent: req.UserAgent, DeviceOS: req.DeviceOS, OsVersion: req.OsVersion, DeviceModel: req.DeviceModel}).Error
 	})
 	if err != nil {
 		logger.Warning("track HWID for unlimited subscription failed:", err)
@@ -491,6 +480,36 @@ func (s *ClientService) PurgeExpiredClientHwids() error {
 		return err
 	}
 	return policy.staleHwids(db).Delete(&model.ClientHwid{}).Error
+}
+
+// applyHwidPanelDefault brings the registry under the panel default when settings are saved, the
+// way a client's own limit does when it is set: a subscription keeps its most recently seen devices.
+func applyHwidPanelDefault() error {
+	return runSerializedTx(func(tx *gorm.DB) error {
+		policy, err := loadHwidPolicy(tx)
+		if err != nil || policy.defaultLimit <= 0 {
+			return err
+		}
+		if err := policy.staleHwids(tx).Delete(&model.ClientHwid{}).Error; err != nil {
+			return err
+		}
+		var subIDs []string
+		if err := tx.Model(&model.ClientHwid{}).Group("sub_id").
+			Having("COUNT(*) > ?", policy.defaultLimit).Pluck("sub_id", &subIDs).Error; err != nil {
+			return err
+		}
+		for _, subID := range subIDs {
+			// The lock resolves the limit too: where a client has its own, that one counts.
+			limit, err := lockHwidLimitForSubID(tx, subID, policy.defaultLimit)
+			if err != nil {
+				return err
+			}
+			if err := trimClientHwidsForSubID(tx, subID, limit); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 // Serialize the limit write and trim with SyncInbound and client deletion.

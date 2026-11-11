@@ -1768,7 +1768,7 @@
       "subTrafficDepletedTemplateDesc": "Modelo para a configuração fictícia quando a cota de tráfego foi esgotada.",
       "deviceLimit": "Limite de dispositivos",
       "subHwidDefaultLimit": "Limite padrão de dispositivos",
-      "subHwidDefaultLimitDesc": "Em quantos dispositivos uma assinatura funciona, para cada cliente sem limite próprio. 0 = sem limite padrão.",
+      "subHwidDefaultLimitDesc": "Em quantos dispositivos uma assinatura funciona, para cada cliente sem limite próprio. 0 = sem limite padrão. Ao salvar, uma assinatura com mais dispositivos mantém os vistos mais recentemente.",
       "subHwidNoIdPolicy": "Aplicativos sem ID de dispositivo",
       "subHwidNoIdPolicyDesc": "O que uma assinatura com limite responde a um aplicativo que não envia ID de dispositivo (cabeçalho X-HWID).",
       "subHwidNoIdShared": "Uma vaga compartilhada para todos (padrão)",

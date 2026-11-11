@@ -1768,7 +1768,7 @@
       "subTrafficDepletedTemplateDesc": "サブスクリプションの通信量が上限に達した際のダミー構成用テンプレート。",
       "deviceLimit": "デバイス制限",
       "subHwidDefaultLimit": "既定のデバイス制限",
-      "subHwidDefaultLimitDesc": "1 つのサブスクリプションを使えるデバイス数。個別の制限がないすべてのクライアントに適用されます。0 = 既定の制限なし。",
+      "subHwidDefaultLimitDesc": "1 つのサブスクリプションを使えるデバイス数。個別の制限がないすべてのクライアントに適用されます。0 = 既定の制限なし。保存すると、デバイス数が上回るサブスクリプションには直近に取得したデバイスだけが残ります。",
       "subHwidNoIdPolicy": "デバイス ID を送らないアプリ",
       "subHwidNoIdPolicyDesc": "制限付きサブスクリプションが、デバイス ID（X-HWID ヘッダー）を送らないアプリにどう応答するか。",
       "subHwidNoIdShared": "まとめて 1 枠を共有（既定）",

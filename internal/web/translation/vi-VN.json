@@ -1768,7 +1768,7 @@
       "subTrafficDepletedTemplateDesc": "Mẫu cho cấu hình ảo khi tài khoản đăng ký đã dùng hết dung lượng.",
       "deviceLimit": "Giới hạn thiết bị",
       "subHwidDefaultLimit": "Giới hạn thiết bị mặc định",
-      "subHwidDefaultLimitDesc": "Một gói đăng ký dùng được trên bao nhiêu thiết bị, áp dụng cho mọi khách không có giới hạn riêng. 0 = không có giới hạn mặc định.",
+      "subHwidDefaultLimitDesc": "Một gói đăng ký dùng được trên bao nhiêu thiết bị, áp dụng cho mọi khách không có giới hạn riêng. 0 = không có giới hạn mặc định. Khi lưu, gói đăng ký có nhiều thiết bị hơn sẽ giữ lại những thiết bị hoạt động gần nhất.",
       "subHwidNoIdPolicy": "Ứng dụng không gửi ID thiết bị",
       "subHwidNoIdPolicyDesc": "Gói đăng ký có giới hạn trả lời thế nào cho ứng dụng không gửi ID thiết bị (header X-HWID).",
       "subHwidNoIdShared": "Một chỗ dùng chung cho tất cả (mặc định)",

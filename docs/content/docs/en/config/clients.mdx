@@ -45,8 +45,10 @@ inbounds** at once, with per-client traffic accounting.
   from **Settings → Subscription → Device limit** (unlimited when that is `0`
   too). A new device over the limit gets a valid answer for its app whose only
   server is a notice ("Device limit N reached…", editable), never an error;
-  registered devices keep working. A device that has not fetched the
-  subscription for 30 days (adjustable, `0` = never) frees its slot. Apps that
+  registered devices keep working. When a panel default is saved, a
+  subscription that already has more devices keeps the most recently seen ones.
+  A device that has not fetched the subscription for 30 days (adjustable, `0` =
+  never; an upgraded panel starts at `0`) frees its slot. Apps that
   send no device ID share one slot of the subscription (the default on a new
   panel), are refused with a notice, or are served and not counted — your choice
   in the same settings tab. With "served and not counted" (what an upgraded
