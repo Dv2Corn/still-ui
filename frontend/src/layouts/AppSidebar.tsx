@@ -23,6 +23,7 @@ import {
   PushpinOutlined,
   ReadOutlined,
   SafetyOutlined,
+  ImportOutlined,
   SaveOutlined,
   SearchOutlined,
   SettingOutlined,
@@ -250,6 +251,11 @@ export default function AppSidebar() {
         key: '/settings#backups',
         icon: <SaveOutlined aria-hidden />,
         label: t('pages.settings.backupSettings'),
+      },
+      {
+        key: '/settings#import',
+        icon: <ImportOutlined aria-hidden />,
+        label: t('pages.settings.importSettings'),
       },
       {
         key: '/settings#subscription',

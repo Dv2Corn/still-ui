@@ -1033,6 +1033,27 @@ export interface OutboundTraffics {
   up: number;
 }
 
+export interface PanelImportInbound {
+  clients: number;
+  hosts: number;
+  port: number;
+  protocol: string;
+  skipped: string;
+  tag: string;
+}
+
+export interface PanelImportReport {
+  admins: string[];
+  applied: boolean;
+  backup: string;
+  clients: number;
+  inbounds: PanelImportInbound[];
+  legacySubLinks: number;
+  notEmpty: boolean;
+  notes: string[];
+  source: string;
+}
+
 export interface PanelUpdateStatus {
   exitCode: number;
   finishedAt: number;

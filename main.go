@@ -759,6 +759,8 @@ func main() {
 		os.Exit(runLocalBackup())
 	case "restore":
 		os.Exit(restoreLocalBackup(os.Args[2:], os.Stdin))
+	case "import":
+		os.Exit(runPanelImport(os.Args[2:], os.Stdout, os.Stderr))
 	case "cert":
 		err := settingCmd.Parse(os.Args[2:])
 		if err != nil {
@@ -793,6 +795,8 @@ Commands:
                    master's Nodes page is read from STILL_NODE_INVITE or stdin
     backup         take a local backup now, with the panel's backup settings
     restore        replace the database with a backup (-file F [-identity KEY|-]); stop the panel first
+    import         bring inbounds and users over from Marzban or an old x-ui
+                   (marzban|x-ui <database> [-dry-run] [-merge])
     xray-unit-check
                    list what keeps Xray from running as the still-xray service (exit 3)
     install-awg-kernel

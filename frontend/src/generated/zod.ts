@@ -1098,6 +1098,29 @@ export const OutboundTrafficsSchema = z.object({
 });
 export type OutboundTraffics = z.infer<typeof OutboundTrafficsSchema>;
 
+export const PanelImportInboundSchema = z.object({
+  clients: z.number().int(),
+  hosts: z.number().int(),
+  port: z.number().int(),
+  protocol: z.string(),
+  skipped: z.string(),
+  tag: z.string(),
+});
+export type PanelImportInbound = z.infer<typeof PanelImportInboundSchema>;
+
+export const PanelImportReportSchema = z.object({
+  admins: z.array(z.string()),
+  applied: z.boolean(),
+  backup: z.string(),
+  clients: z.number().int(),
+  inbounds: z.array(z.lazy(() => PanelImportInboundSchema)),
+  legacySubLinks: z.number().int(),
+  notEmpty: z.boolean(),
+  notes: z.array(z.string()),
+  source: z.string(),
+});
+export type PanelImportReport = z.infer<typeof PanelImportReportSchema>;
+
 export const PanelUpdateStatusSchema = z.object({
   exitCode: z.number().int(),
   finishedAt: z.number().int(),

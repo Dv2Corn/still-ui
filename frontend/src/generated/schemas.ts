@@ -4610,6 +4610,110 @@ export const SCHEMAS: Record<string, unknown> = {
     ],
     "type": "object"
   },
+  "PanelImportInbound": {
+    "description": "PanelImportInbound is one source inbound and what the import does with it.",
+    "properties": {
+      "clients": {
+        "example": 12,
+        "type": "integer"
+      },
+      "hosts": {
+        "example": 1,
+        "type": "integer"
+      },
+      "port": {
+        "example": 443,
+        "type": "integer"
+      },
+      "protocol": {
+        "example": "vless",
+        "type": "string"
+      },
+      "skipped": {
+        "description": "Skipped is why the inbound is left out; empty when it is imported.",
+        "type": "string"
+      },
+      "tag": {
+        "example": "VLESS TCP REALITY",
+        "type": "string"
+      }
+    },
+    "required": [
+      "clients",
+      "hosts",
+      "port",
+      "protocol",
+      "skipped",
+      "tag"
+    ],
+    "type": "object"
+  },
+  "PanelImportReport": {
+    "description": "PanelImportReport is the dry-run answer and, with Applied, the record of a real import.",
+    "properties": {
+      "admins": {
+        "example": [
+          "admin"
+        ],
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "applied": {
+        "example": false,
+        "type": "boolean"
+      },
+      "backup": {
+        "example": "/etc/still-ui/backups/still-ui-host-20261111T101500Z.db",
+        "type": "string"
+      },
+      "clients": {
+        "example": 12,
+        "type": "integer"
+      },
+      "inbounds": {
+        "items": {
+          "$ref": "#/components/schemas/PanelImportInbound"
+        },
+        "type": "array"
+      },
+      "legacySubLinks": {
+        "description": "LegacySubLinks counts the users whose subscription links from the source keep working.",
+        "example": 12,
+        "type": "integer"
+      },
+      "notEmpty": {
+        "example": false,
+        "type": "boolean"
+      },
+      "notes": {
+        "example": [
+          "user bob: the yearly traffic reset has no equivalent, set to never"
+        ],
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "source": {
+        "example": "marzban",
+        "type": "string"
+      }
+    },
+    "required": [
+      "admins",
+      "applied",
+      "backup",
+      "clients",
+      "inbounds",
+      "legacySubLinks",
+      "notEmpty",
+      "notes",
+      "source"
+    ],
+    "type": "object"
+  },
   "PanelUpdateStatus": {
     "description": "PanelUpdateStatus reports the outcome of the most recently launched panel\nself-update. RunID lets the caller confirm this status belongs to the\nupdate it started rather than a stale result left over from an earlier\nrun; State is one of \"pending\", \"success\", or \"failed\". RunID is a decimal\nstring, not a JSON number: it's a formatted UnixNano timestamp, and\nJavaScript's number type can't represent that precisely (it exceeds\nNumber.MAX_SAFE_INTEGER), which would let two different runs round to the\nsame value on the wire and defeat the whole point of this field.",
     "properties": {

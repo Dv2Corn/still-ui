@@ -58,6 +58,7 @@ still-ui migrate-rollback
 - **客户端出站过滤。** 可以禁止客户端经 25 端口发信（新安装默认开启）、访问服务器后面的私有网络和服务器自身的面板与 SSH 端口，以及你列出的地址和端口。对经 Xray 的所有客户端入站生效，有 `nft` 时也对内核模式的 AmneziaWG 客户端生效；主面板可以把过滤规则下发给节点。
 - **每个节点的月流量上限。** 主面板按月（从你选定的重置日起）统计节点自身入站的流量，在 80%（可调）和达到上限时发送 Telegram 告警，并可在下一周期前关闭该节点的入站。计费系数（0.1 到 100）按比例换算该节点计入客户端统计的流量，从修改时起生效（之前的流量按原系数计）。节点按每个客户端所属主面板的计数检查其配额，因此系数不同的主面板可以共用一个节点。默认不设上限。
 - **一条命令添加节点。** **节点 → 用命令添加** 会生成一次性邀请（默认 30 分钟有效，可撤销）；在新服务器上以 root 运行面板给出的命令，即可从发行版安装 still-ui、把它设为节点并加入主面板。无需手动复制 API 令牌和证书指纹；节点在做任何改动前会先校验主面板的密钥。[说明（英文）](docs/content/docs/en/operations/multi-node.mdx)。
+- **一条命令从 Marzban 或旧版 x-ui 迁移。** `still-ui import marzban /var/lib/marzban` 会迁移入站、用户和主机，保留相同的 UUID 和密码、相同的 REALITY 密钥和 short ID、端口、已用流量、限额、到期时间和状态，因此用户手中已有的链接可以继续连接，Marzban 签发的订阅链接也继续可用。`-dry-run` 显示将导入什么、哪些无法导入；真正导入前会先备份，并且要么全部写入、要么什么都不写。面板的 **设置 → 导入** 提供同样的功能。见 [从 Marzban 或 x-ui 迁移](#从-marzban-或-x-ui-迁移)。
 - **面板数天内的内存：已验证。** 在混合负载下运行 72 小时（200 个用户；每 5 秒修改一个客户端；界面和 API 请求；订阅；VLESS、VMess 和 AmneziaWG 流量），still-ui v1.6.0 与 3x-ui v3.11.0 使用相同数据和相同负载：两者均无增长（最后 24 小时 +0.1 MB/h，goroutine 和文件描述符平稳，无重启）。大量*慢速* AmneziaWG 客户端仍可能占用计入面板的内核套接字缓冲区（每个慢速流约 12 MB）；安装程序为服务设置的内存上限可以控制这一点（使用 Docker 时请设置 `mem_limit`）。
 
 ### 进行中
@@ -269,6 +270,37 @@ still-ui migrate-rollback
 普通安装也会提议接管 `/etc/x-ui/x-ui.db`（非交互方式：`STILL_UI_IMPORT_3XUI=yes`），但不包含上述检查和备份。它会停止 3x-ui，把它的单元文件移到 `/root/still-ui-3x-ui-retired/`，同样让 acme.sh 续期指向 still-ui；`bash /root/still-ui-3x-ui-retired/migrate.sh restore-import /root/still-ui-3x-ui-retired` 会把两者恢复原样（`still-ui uninstall --purge` 会自动执行；保留数据以便重装的卸载会让 3x-ui 保持停用）。
 
 面板和订阅服务器会在半分钟内自动使用续期后的证书文件，无需重启。
+
+## 从 Marzban 或 x-ui 迁移
+
+先安装 still-ui（装在 Marzban 所在的服务器上，或装在新服务器上并把 Marzban 的数据目录复制过去），然后：
+
+```bash
+still-ui import marzban /var/lib/marzban -dry-run   # 只出报告，不写入任何内容
+still-ui import marzban /var/lib/marzban            # 备份、导入、重启
+```
+
+参数是 Marzban 的数据目录或其中的 `db.sqlite3`；入站从旁边的 `xray_config.json` 读取（用 `-config 文件` 指定其他文件）。两个文件都只会被读取。面板的 **设置 → 导入** 做同样的事：上传这两个文件，查看报告，然后确认。
+
+会迁移的内容：
+
+- **入站** — 任意传输方式上的 VLESS、VMess、Trojan 和 Shadowsocks，带 TLS 或 REALITY，与 Xray 中的配置一致：端口、REALITY 私钥和 short ID、路径。证书文件必须能在本服务器的相同路径读取；找不到证书的入站会列在报告中并被跳过。
+- **用户** — UUID 和密码、flow、已用流量和限额、到期时间、备注和状态：被禁用的保持禁用，流量用尽或已过期的在续期前保持封禁，“on hold” 的用户从首次连接开始计时。按日、按周、按月的流量重置会迁移，按年的不会。
+- **主机** — 地址、端口、SNI、Host 头、路径、ALPN 和指纹，作为该入站的主机。地址为 `{SERVER_IP}` 的主机使用获取订阅时访问的地址。
+- **订阅链接** — Marzban 的 `/sub/<token>` 链接原样接受，并遵守每个用户的吊销时间。无论 still-ui 自己的订阅路径是什么，这些链接都在 `/sub/` 下提供，而且只有它们：普通的订阅 ID 仍然需要面板自己的路径。把用户手中的地址（主机和端口）指向 still-ui 的订阅服务器；如果 Marzban 用的是其他 `XRAY_SUBSCRIPTION_PATH`，请在 **设置 → 订阅** 中把它设为订阅路径。为了校验这些链接，still-ui 会把 Marzban 的签名密钥保存在自己的数据库里。任何持有该密钥的人（旧的 Marzban 备份、前任管理员）都能通过这类链接打开已迁移用户的订阅，所以在用户换用 still-ui 的链接之后，请运行 `still-ui import forget-links`：旧链接不再被接受，密钥也会被删除。每个已迁移用户在 still-ui 中自己的订阅 ID 是随机的，无法由该密钥推算出来。
+
+不会迁移的内容：
+
+- 管理员（报告会列出）、节点、用户模板，以及订阅链接下的 `/info`、`/usage` 和按客户端类型的路径。
+- 这里的一个客户端只有一个 UUID 和一个密码，而 Marzban 给每种协议各一个。同时拥有 VLESS 和 VMess 入站、或同时拥有 Trojan 和 Shadowsocks 入站的用户，会变成同一订阅下的两个客户端（`名称` 和 `名称.vmess` 或 `名称.ss`），各自拥有完整的限额和独立的流量计数。
+- 链接名称：still-ui 按自己的备注模板命名链接，而不是按主机备注。所有连接参数都相同。
+- 使用 MySQL 或 MariaDB 的 Marzban：只读取 SQLite 文件。
+
+`still-ui import x-ui /etc/x-ui/x-ui.db` 对 x-ui（vaxilu/x-ui 及其分支）和 v3 之前的 3x-ui 做同样的事：入站及其客户端和流量；没有 email 的客户端会得到一个名称。对 3x-ui 2.0 及更高版本，建议使用[上面的迁移](#从-3x-ui-迁移)，它还会保留设置和面板登录信息。
+
+已有入站的面板需要 `-merge`：端口或标签已被占用的入站、email 已存在的客户端，以及订阅 ID 在这里属于另一个客户端的客户端，会被跳过并列出。要撤销导入，恢复它打印出的备份：`still-ui restore <文件>`。
+
+已在 Docker 中端到端测试（`scripts/test-import-marzban.sh`）：使用官方镜像的 Marzban v0.8.4，带 VLESS REALITY、VMess WebSocket 和 Shadowsocks 入站，然后由 still-ui 接替；Xray 客户端使用 Marzban 给出的链接和订阅链接，原样连接成功。
 
 ## 从受审查网络内部检查可达性
 

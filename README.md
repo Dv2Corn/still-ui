@@ -58,6 +58,7 @@ still-ui migrate-rollback
 - **An egress filter for clients.** Clients can be kept from sending mail on port 25 (on by default for new installs), from reaching private networks behind the server and the server's own panel and SSH ports, and from addresses and ports you list. It applies to every client inbound through Xray and, with `nft`, to AmneziaWG kernel-mode clients; a master can hand it to its nodes. [Details](#mobile-networks-in-russia).
 - **A monthly traffic limit for each node.** The master counts the traffic of a node's own inbounds per month (from the reset day you pick), sends a Telegram alert at 80% (adjustable) and at the limit, and can turn the node's inbounds off until the next period. An accounting multiplier from 0.1 to 100 scales that node's traffic in client totals, from the moment it is set (earlier traffic keeps its old rate). The node checks each client's quota by its own master's count, so masters with different multipliers can share a node. No limit by default.
 - **Adding a node takes one command.** **Nodes → Add with a command** makes a one-time invitation (valid 30 minutes by default, can be revoked); running the command it shows as root on a new server installs still-ui from the release, sets it up as a node and adds it to the master. No API tokens or certificate pins to copy by hand; the node checks the master's key before it changes anything. [Guide](docs/content/docs/en/operations/multi-node.mdx).
+- **Moving from Marzban or an old x-ui takes one command.** `still-ui import marzban /var/lib/marzban` brings inbounds, users and hosts over with the same UUIDs and passwords, the same REALITY key and short IDs, ports, traffic used, limits, expiry dates and states, so the links users already have keep connecting, and the subscription links Marzban issued keep working. `-dry-run` shows what would be imported and what cannot be; a real import takes a backup first and writes all or nothing. The same is in **Settings → Import**. See [Moving from Marzban or x-ui](#moving-from-marzban-or-x-ui).
 - **Panel memory over several days: checked.** 72 hours under mixed load (200 users; a client change every 5 s; UI and API calls; subscriptions; VLESS, VMess and AmneziaWG traffic), still-ui v1.6.0 next to 3x-ui v3.11.0 with the same data and the same load: no growth in either (+0.1 MB/h over the last 24 h, goroutines and file descriptors flat, no restarts). Many *slow* AmneziaWG clients can still hold kernel socket buffers (about 12 MB per slow stream) that count against the panel; the memory cap the installer sets for the service keeps that in check (with Docker, set `mem_limit`).
 
 ### In progress
@@ -306,6 +307,37 @@ Changes made in still-ui after the migration (new clients, traffic counters) do 
 A plain install also offers to take over `/etc/x-ui/x-ui.db` (non-interactive: `STILL_UI_IMPORT_3XUI=yes`), without the checks and the backup above. It stops 3x-ui, moves its unit to `/root/still-ui-3x-ui-retired/` and points acme.sh renewals at still-ui too; `bash /root/still-ui-3x-ui-retired/migrate.sh restore-import /root/still-ui-3x-ui-retired` puts both back (`still-ui uninstall --purge` runs it; an uninstall that keeps the data for a reinstall leaves 3x-ui retired).
 
 The panel and the subscription server pick up a renewed certificate file within half a minute, without a restart.
+
+## Moving from Marzban or x-ui
+
+Install still-ui (on the Marzban server or on a new one with Marzban's data folder copied to it), then:
+
+```bash
+still-ui import marzban /var/lib/marzban -dry-run   # report only, writes nothing
+still-ui import marzban /var/lib/marzban            # backup, import, restart
+```
+
+The argument is Marzban's data folder or its `db.sqlite3`; the inbounds are read from `xray_config.json` beside it (`-config FILE` names another one). Both files are only read. **Settings → Import** in the panel does the same: upload the two files, read the report, confirm.
+
+What comes over:
+
+- **Inbounds** — VLESS, VMess, Trojan and Shadowsocks on any transport, with TLS or REALITY, as Xray had them: port, REALITY private key and short IDs, paths. Certificate files must be readable at the same paths on this server; an inbound whose certificate is missing is listed and left out.
+- **Users** — UUIDs and passwords, flow, traffic used and limit, expiry, note and state: a disabled user stays disabled, a limited or expired one stays blocked until renewed, a user on hold starts counting on the first connection. Daily, weekly and monthly traffic resets carry over; a yearly one does not.
+- **Hosts** — address, port, SNI, host header, path, ALPN and fingerprint, as the hosts of the inbound. A host whose address is `{SERVER_IP}` uses the address the subscription is fetched from.
+- **Subscription links** — Marzban's `/sub/<token>` links are accepted as they are, each user's revoke date included. They are served at `/sub/` whatever still-ui's own subscription path is, and only they: a plain subscription ID still needs the panel's own path. Point the address users have (host and port) at still-ui's subscription server; if Marzban had another `XRAY_SUBSCRIPTION_PATH`, set that as the subscription path in **Settings → Subscription**. To check these links still-ui keeps Marzban's signing secret in its own database. Whoever has that secret — an old Marzban backup, a former admin — can open imported users' subscriptions through such links, so once users have moved to the links from still-ui, run `still-ui import forget-links`: it stops accepting the old links and deletes the secret. Each imported user's own still-ui subscription ID is random and cannot be worked out from the secret.
+
+What does not:
+
+- Admins (the report lists them), nodes, user templates, and the `/info`, `/usage` and client-type paths under a subscription link.
+- A client here has one UUID and one password, while Marzban gives each protocol its own. A user with both VLESS and VMess inbounds, or both Trojan and Shadowsocks, becomes two clients in one subscription (`name` and `name.vmess` or `name.ss`), each with the full limit and its own traffic counter.
+- Link names: still-ui names links by its own remark template, not by the host remark. Every connection setting is the same.
+- Marzban on MySQL or MariaDB: only the SQLite file is read.
+
+`still-ui import x-ui /etc/x-ui/x-ui.db` does the same for x-ui (vaxilu/x-ui and its forks) and 3x-ui before v3: inbounds with their clients and traffic; a client without an email gets a name. For 3x-ui 2.0 and later prefer [the migration above](#moving-from-3x-ui), which also keeps the settings and the panel login.
+
+A panel that already has inbounds needs `-merge`: inbounds whose port or tag is taken and clients whose email exists or whose subscription ID belongs to another client here are skipped and listed. To undo an import, restore the backup it printed: `still-ui restore <file>`.
+
+Tested end to end in Docker (`scripts/test-import-marzban.sh`): Marzban v0.8.4 from its official image with VLESS REALITY, VMess WebSocket and Shadowsocks inbounds, then still-ui in its place; an Xray client connects with the links and the subscription link Marzban gave, unchanged.
 
 ## Check reachability from Russia
 

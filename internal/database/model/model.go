@@ -1267,6 +1267,16 @@ type HostTombstone struct {
 
 func (HostTombstone) TableName() string { return "host_tombstones" }
 
+// LegacySubUser maps a user of an imported panel to its subscription here, so the links
+// that panel issued keep working; NotBefore is the issue time before which they are revoked.
+type LegacySubUser struct {
+	Username  string `json:"username" gorm:"primaryKey;column:username"`
+	SubID     string `json:"subId" gorm:"column:sub_id;not null"`
+	NotBefore int64  `json:"notBefore" gorm:"column:not_before;default:0"`
+}
+
+func (LegacySubUser) TableName() string { return "legacy_sub_users" }
+
 // KeepAliveSeconds returns a scalar value; ranges are emitted by native AWG config.
 func (c Client) KeepAliveSeconds() int {
 	if c.KeepAlive == nil {

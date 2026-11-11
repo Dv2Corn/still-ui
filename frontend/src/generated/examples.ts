@@ -1140,6 +1140,38 @@ export const EXAMPLES: Record<string, unknown> = {
     "total": 0,
     "up": 0
   },
+  "PanelImportInbound": {
+    "clients": 12,
+    "hosts": 1,
+    "port": 443,
+    "protocol": "vless",
+    "skipped": "",
+    "tag": "VLESS TCP REALITY"
+  },
+  "PanelImportReport": {
+    "admins": [
+      "admin"
+    ],
+    "applied": false,
+    "backup": "/etc/still-ui/backups/still-ui-host-20261111T101500Z.db",
+    "clients": 12,
+    "inbounds": [
+      {
+        "clients": 12,
+        "hosts": 1,
+        "port": 443,
+        "protocol": "vless",
+        "skipped": "",
+        "tag": "VLESS TCP REALITY"
+      }
+    ],
+    "legacySubLinks": 12,
+    "notEmpty": false,
+    "notes": [
+      "user bob: the yearly traffic reset has no equivalent, set to never"
+    ],
+    "source": "marzban"
+  },
   "PanelUpdateStatus": {
     "exitCode": 0,
     "finishedAt": 1735689612,

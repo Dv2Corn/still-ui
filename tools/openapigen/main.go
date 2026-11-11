@@ -122,6 +122,8 @@ func run(root, outDir string) error {
 				"NodeInviteInput",
 				"NodeInviteView",
 				"NodeInviteCreated",
+				"PanelImportInbound",
+				"PanelImportReport",
 			),
 		},
 		{

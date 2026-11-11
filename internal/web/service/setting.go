@@ -280,6 +280,8 @@ var defaultValueMap = map[string]string{
 	"backupKeep":          "14",
 	"backupAgeRecipients": "",
 	"backupTelegram":      "false",
+	// Set by a Marzban import: the secret its subscription links are signed with.
+	"marzbanSubSecret": "",
 
 	// Server health alerts (still-ui): thresholds shared by every notifier
 	"alertXrayRestarts":      "3",
@@ -691,6 +693,10 @@ func (s *SettingService) GetBackupSchedule() (string, error) { return s.getStrin
 
 // GetBackupKeep is how many local backups are kept.
 func (s *SettingService) GetBackupKeep() (int, error) { return s.getInt("backupKeep") }
+
+func (s *SettingService) GetMarzbanSubSecret() (string, error) {
+	return s.getString("marzbanSubSecret")
+}
 
 // GetBackupAgeRecipients are the public keys backups are encrypted to; empty means unencrypted.
 func (s *SettingService) GetBackupAgeRecipients() (string, error) {
