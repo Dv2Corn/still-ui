@@ -129,7 +129,8 @@
     "pinSidebar": "固定側邊欄",
     "unpinSidebar": "取消固定側邊欄",
     "subFormats": "Sub Formats",
-    "probes": "探針"
+    "probes": "探針",
+    "connections": "連線"
   },
   "pages": {
     "login": {
@@ -1983,7 +1984,24 @@
       "eventGroupProbe": "可達性探針",
       "eventProbeDown": "入站無法連線",
       "eventProbeUp": "入站已恢復",
-      "eventProbeStale": "探針無回應"
+      "eventProbeStale": "探針無回應",
+      "connLogSettings": "連線記錄",
+      "connLogEnable": "記錄連線",
+      "connLogEnableDesc": "記錄誰在何時透過哪個入站連線到哪裡。預設關閉。開啟或關閉時，如果 Xray 本身的存取記錄設為 none，Xray 會重新啟動一次。",
+      "connLogRetention": "保留天數",
+      "connLogRetentionDesc": "更早的日期會自動刪除。",
+      "connLogMaxSize": "大小上限（MB）",
+      "connLogMaxSizeDesc": "記錄超過此大小時，先刪除最早的日期。",
+      "connLogDestination": "目標",
+      "connLogDestinationDesc": "保存客戶端連線目標的哪些資訊。",
+      "connLogDestinationFull": "完整主機名稱或 IP 位址",
+      "connLogDestinationDomain": "僅註冊網域（example.com）",
+      "connLogStoreNothing": "不保存",
+      "connLogSource": "客戶端位址",
+      "connLogSourceDesc": "保存客戶端來源位址的哪些資訊。",
+      "connLogSourceFull": "完整位址與連接埠",
+      "connLogSourceMasked": "僅網段（IPv4 為 /24，IPv6 為 /48）",
+      "connLogPrivacyHint": "此記錄包含個人資料：只保留需要的內容。它存放在面板資料庫旁邊，不在資料庫內，也不在其備份中。變更只對新連線生效；已保存的記錄維持原樣，直到過期。"
     },
     "xray": {
       "save": "儲存",
@@ -2747,6 +2765,27 @@
           "allFailingHint": "此探針上所有端點同時失敗，通常是它自身的網路或測試 URL 出了問題，因此訂閱會忽略它。"
         }
       }
+    },
+    "connections": {
+      "title": "連線記錄",
+      "intro": "誰在何時透過哪個入站連線到哪裡。資料讀取自本伺服器上的 Xray 存取記錄；每個節點保存各自的記錄。",
+      "off": "連線記錄已關閉，目前不記錄任何內容。",
+      "openSettings": "開啟設定",
+      "time": "時間",
+      "client": "客戶端",
+      "inbound": "入站",
+      "source": "來源",
+      "destination": "目標",
+      "clientPlaceholder": "客戶端（完整名稱）",
+      "hostPlaceholder": "目標包含…",
+      "sourcePlaceholder": "來源位址包含…",
+      "exportCsv": "匯出 CSV",
+      "exportHint": "匯出最多包含目前篩選條件下的 {count} 列，時間為 UTC。",
+      "onDisk": "磁碟用量",
+      "empty": "沒有符合的連線。",
+      "newer": "較新",
+      "older": "較舊",
+      "ofClient": "此客戶端的連線"
     }
   },
   "tgbot": {

@@ -59,6 +59,7 @@ still-ui migrate-rollback
 - **A monthly traffic limit for each node.** The master counts the traffic of a node's own inbounds per month (from the reset day you pick), sends a Telegram alert at 80% (adjustable) and at the limit, and can turn the node's inbounds off until the next period. An accounting multiplier from 0.1 to 100 scales that node's traffic in client totals, from the moment it is set (earlier traffic keeps its old rate). The node checks each client's quota by its own master's count, so masters with different multipliers can share a node. No limit by default.
 - **Adding a node takes one command.** **Nodes → Add with a command** makes a one-time invitation (valid 30 minutes by default, can be revoked); running the command it shows as root on a new server installs still-ui from the release, sets it up as a node and adds it to the master. No API tokens or certificate pins to copy by hand; the node checks the master's key before it changes anything. [Guide](docs/content/docs/en/operations/multi-node.mdx).
 - **Panel memory over several days: checked.** 72 hours under mixed load (200 users; a client change every 5 s; UI and API calls; subscriptions; VLESS, VMess and AmneziaWG traffic), still-ui v1.6.0 next to 3x-ui v3.11.0 with the same data and the same load: no growth in either (+0.1 MB/h over the last 24 h, goroutines and file descriptors flat, no restarts). Many *slow* AmneziaWG clients can still hold kernel socket buffers (about 12 MB per slow stream) that count against the panel; the memory cap the installer sets for the service keeps that in check (with Docker, set `mem_limit`).
+- **A connection log in the panel.** The **Connections** page shows who connected, when, through which inbound and where to, with filters by client, inbound, time, destination and source address, and a CSV export; the icon in a client's row opens that client's connections. An abuse complaint ("who reached this host at that time") is answered without shell access. Off by default. You choose how long it is kept (30 days by default), a size limit, and what is stored: the full destination, only its registered domain or nothing; the client's full address, only its network or nothing. Old days delete themselves. [How it works](#connection-log).
 
 ### In progress
 
@@ -111,6 +112,7 @@ Release builds exist for **Linux amd64 and arm64** only. The current release is 
 | Settings | `/etc/default/still-ui` |
 | Xray | service `still-xray`, config `/etc/still-xray`, logs `/var/log/still-xray` |
 | Backups | `/etc/still-ui/backups` (`XUI_BACKUP_FOLDER` in the settings file moves them) |
+| Connection log | `/etc/still-ui/connlog` (one file per day; not part of the backups) |
 
 ### Memory cap
 
@@ -172,6 +174,18 @@ You can also decrypt elsewhere: `age -d -i key.txt backup.db.age > x-ui.db`.
 | Backup failed | a scheduled backup (or its Telegram upload) failed | on |
 
 Checks run every minute. An alert is sent once when the problem starts, again every **Remind every** hours while it lasts (6 by default, 0 = never), and once more when it is fixed. The state lives in memory: after a panel restart a problem that is still there is reported once again.
+
+### Connection log
+
+**Settings → Connection log** in the panel, then the **Connections** page:
+
+- **Record connections** — off by default. While it is on, the panel reads Xray's access log every five seconds. If that log is set to `none`, the panel turns it on for as long as the switch is on (`access.log` in Xray's log folder), which restarts Xray once; an access log you set yourself is used as it is, with no restart. Turning the switch off puts the Xray config back.
+- **Keep for (days)** (30) and **Size limit (MB)** (2048). Each day is one file in `/etc/still-ui/connlog`, outside the panel database and its backups. Days past the retention are deleted; when the folder grows past the limit, the oldest day goes first, and if a single day is larger than the limit, its oldest connections go. A million connections take about 75 MB and about half a minute of one CPU core to store.
+- **Destination**: the full host name or IP address, only the registered domain (`maps.example.co.uk` becomes `example.co.uk`; an IP address stays as it is), or nothing. **Client address**: the full address and port, only the network (/24 for IPv4, /48 for IPv6, no port), or nothing. A change applies to new connections; what is already stored stays as it is until it expires.
+- **Connections** — filter by client (exact name), inbound, time range, part of the destination and part of the source address. Newest first, 50 per page. **Export CSV** saves up to 100 000 rows of the current filter, times in UTC.
+- Only an admin can read it: the page and its API (`/panel/api/connlog/list` and `/export`) need a panel login or an admin API token; monitor and node tokens are refused. Every query and export is written to the panel log with the user, their address and the filter.
+
+Limits. The log holds what passes through Xray: AmneziaWG and TUIC connections are logged with their client and destination, but with a local source address, because the panel hands them to Xray on the same machine; MTProto connections are not attributed to a client. With `maskAddress` set in Xray's log settings, Xray hides part of the client address before the panel sees it. Each node keeps its own log, which you read in that node's panel; the master does not collect it. When the panel empties a large access log, it stores the lines it has not read yet first.
 
 ## Update, roll back, remove
 

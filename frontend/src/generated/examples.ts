@@ -12,6 +12,11 @@ export const EXAMPLES: Record<string, unknown> = {
     "backupKeep": 1,
     "backupSchedule": "@daily",
     "backupTelegram": false,
+    "connLogDestination": "full",
+    "connLogEnable": false,
+    "connLogMaxSizeMB": 2048,
+    "connLogRetentionDays": 30,
+    "connLogSource": "full",
     "datepicker": "",
     "discordAdminIds": "",
     "discordBotBackup": false,
@@ -213,6 +218,11 @@ export const EXAMPLES: Record<string, unknown> = {
     "backupKeep": 1,
     "backupSchedule": "@daily",
     "backupTelegram": false,
+    "connLogDestination": "full",
+    "connLogEnable": false,
+    "connLogMaxSizeMB": 2048,
+    "connLogRetentionDays": 30,
+    "connLogSource": "full",
     "datepicker": "",
     "discordAdminIds": "",
     "discordBotBackup": false,
@@ -665,6 +675,45 @@ export const EXAMPLES: Record<string, unknown> = {
     ],
     "onlineCount": 1,
     "total": 2000
+  },
+  "ConnFilter": {
+    "before": "20250101:4096",
+    "client": "alice@example.com",
+    "from": 1735689600000,
+    "host": "example.com",
+    "inbound": "inbound-443",
+    "limit": 50,
+    "source": "203.0.113.",
+    "to": 1735775999999
+  },
+  "ConnPage": {
+    "enabled": true,
+    "next": "20250101:4046",
+    "rows": [
+      {
+        "client": "alice@example.com",
+        "host": "example.com",
+        "inbound": "inbound-443",
+        "network": "tcp",
+        "outbound": "direct",
+        "port": 443,
+        "source": "203.0.113.9",
+        "sourcePort": 54321,
+        "time": 1735732800000
+      }
+    ],
+    "sizeBytes": 36700160
+  },
+  "ConnRecord": {
+    "client": "alice@example.com",
+    "host": "example.com",
+    "inbound": "inbound-443",
+    "network": "tcp",
+    "outbound": "direct",
+    "port": 443,
+    "source": "203.0.113.9",
+    "sourcePort": 54321,
+    "time": 1735732800000
   },
   "FallbackParentInfo": {
     "masterId": 0,

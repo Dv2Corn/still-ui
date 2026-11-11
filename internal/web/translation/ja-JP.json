@@ -129,7 +129,8 @@
     "pinSidebar": "サイドバーを固定",
     "unpinSidebar": "サイドバーの固定を解除",
     "subFormats": "Sub Formats",
-    "probes": "プローブ"
+    "probes": "プローブ",
+    "connections": "接続"
   },
   "pages": {
     "login": {
@@ -1983,7 +1984,24 @@
       "eventGroupProbe": "到達性プローブ",
       "eventProbeDown": "インバウンド到達不可",
       "eventProbeUp": "インバウンド復旧",
-      "eventProbeStale": "プローブ無応答"
+      "eventProbeStale": "プローブ無応答",
+      "connLogSettings": "接続ログ",
+      "connLogEnable": "接続を記録する",
+      "connLogEnableDesc": "誰が、いつ、どのインバウンドを通って、どこへ接続したかを記録します。既定ではオフです。オン・オフを切り替えると、Xray 自身のアクセスログが none の場合に Xray が一度再起動します。",
+      "connLogRetention": "保存期間（日）",
+      "connLogRetentionDesc": "それより古い日は自動的に削除されます。",
+      "connLogMaxSize": "サイズ上限（MB）",
+      "connLogMaxSizeDesc": "ログがこれを超えると、最も古い日から削除されます。",
+      "connLogDestination": "接続先",
+      "connLogDestinationDesc": "クライアントの接続先について何を保存するか。",
+      "connLogDestinationFull": "完全なホスト名または IP アドレス",
+      "connLogDestinationDomain": "登録ドメインのみ（example.com）",
+      "connLogStoreNothing": "保存しない",
+      "connLogSource": "クライアントのアドレス",
+      "connLogSourceDesc": "クライアントの接続元アドレスについて何を保存するか。",
+      "connLogSourceFull": "完全なアドレスとポート",
+      "connLogSourceMasked": "ネットワークのみ（IPv4 は /24、IPv6 は /48）",
+      "connLogPrivacyHint": "このログには個人データが含まれます。必要なものだけを保存してください。パネルのデータベースの隣に保存され、データベースにもそのバックアップにも含まれません。変更は新しい接続に適用され、保存済みの記録は期限が切れるまでそのまま残ります。"
     },
     "xray": {
       "importRules": "ルールをインポート",
@@ -2747,6 +2765,27 @@
           "allFailingHint": "このプローブではすべてのエンドポイントが同時に失敗しています。通常はプローブ自身のネットワークかテスト URL の問題なので、サブスクリプションはこれを無視します。"
         }
       }
+    },
+    "connections": {
+      "title": "接続ログ",
+      "intro": "誰が、いつ、どのインバウンドを通って、どこへ接続したか。このサーバーの Xray アクセスログから読み取ります。ノードごとに別のログを持ちます。",
+      "off": "接続ログはオフです。何も記録されていません。",
+      "openSettings": "設定を開く",
+      "time": "時刻",
+      "client": "クライアント",
+      "inbound": "インバウンド",
+      "source": "接続元",
+      "destination": "接続先",
+      "clientPlaceholder": "クライアント（完全一致）",
+      "hostPlaceholder": "接続先に含まれる文字…",
+      "sourcePlaceholder": "接続元アドレスに含まれる文字…",
+      "exportCsv": "CSV をエクスポート",
+      "exportHint": "エクスポートは現在のフィルターの最大 {count} 行で、時刻は UTC です。",
+      "onDisk": "ディスク使用量",
+      "empty": "一致する接続はありません。",
+      "newer": "新しい方へ",
+      "older": "古い方へ",
+      "ofClient": "このクライアントの接続"
     }
   },
   "tgbot": {

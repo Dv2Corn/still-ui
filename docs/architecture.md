@@ -142,6 +142,8 @@ node heartbeat every 5s, periodic traffic resets (hourly/daily/weekly/monthly). 
 │   │   └── model/              # **ALL GORM models** (model.go ~1.1k lines + siblings:
 │   │                           #   node_client_traffic.go, node_client_ip.go,
 │   │                           #   client_global_traffic.go). ⭐ Start here for data shape.
+│   ├── connlog/                # Connection log: access-log follower, one SQLite file per day,
+│   │                           #   retention + size cap, paged queries (not the panel DB)
 │   ├── pia/                    # PIA WireGuard protocol client (auth, signed server list, /addKey)
 │   ├── eventbus/               # In-process pub/sub (buffered channel): outbound.down|up,
 │   │                           #   xray.crash, node.down|up, cpu.high, memory.high, login.attempt
@@ -418,6 +420,7 @@ All registered in `web.go` → `startTask()`. Each is a struct with a `Run()` me
 | `@every 10s`        | `mtproto_job`                                                                                    | Reconcile `mtg` sidecars against enabled MTProto inbounds                             |
 | `@every 10s`        | `amneziawg_job`                                                                                  | Reconcile embedded AmneziaWG interfaces against enabled local inbounds                |
 | `@every 5m`         | `outbound_subscription_job`                                                                      | Refresh outbound provider configs                                                     |
+| `@every 5s`         | (`ConnLogService.Tick` in `startTask`)                                                           | Connection log: store new access-log lines while it is on; prune once a minute        |
 | `@every 10m`        | `clear_logs_job` (`PruneXrayLogsJob`)                                                            | Truncate Xray access/error logs once either exceeds 64 MiB                            |
 | `@hourly`           | `warp_ip_job`, `periodic_traffic_reset_job("hourly")`                                            | WARP IP rotation; traffic resets                                                      |
 | `@daily`            | `clear_logs_job`, `periodic_traffic_reset_job("daily")`, `periodic_traffic_reset_job("monthly")` | IP-limit and Xray access/error log cleanup; daily resets and due monthly resets       |
@@ -541,6 +544,7 @@ for AutoMigrate in `internal/database/db.go`.
 | **Fallbacks** (shared 443, SNI routing)                                           | `service/fallback.go`, `controller/inbound.go`                               | model `InboundFallback`                                                                             |
 | **Geo category browser** empty / won't open                                       | `xray/geodata/` (`Store`, `reader.go`), `service/geodata.go`                 | `controller/xray_setting.go` (`/panel/api/xray/geodata/*`), asset dir = `config.GetBinFolderPath()` |
 | **`geosite:`/`geoip:` token** reported unknown in a routing rule                  | `xray/geodata/token.go`, `service/geodata.go` (`Validate`)                   | `frontend/src/lib/xray/geoTokens.ts`, `frontend/src/components/geodata/`                            |
+| **Connection log** empty / missing lines / too large                              | `internal/connlog/` (`collector.go`, `store.go`), `service/connlog.go`       | `xray/accesslog.go` (parser), `job/clear_logs_job.go` (truncation), `controller/connlog.go`         |
 | **Telegram bot** commands                                                         | `service/tgbot/`                                                             | `job/stats_notify_job.go`                                                                           |
 | **Discord bot** commands & reports                                                | `service/discord/`                                                           | `job/discord_notify_job.go`                                                                         |
 | **Email notifications**                                                           | `service/email/`                                                             | `internal/eventbus/` (consumers)                                                                    |

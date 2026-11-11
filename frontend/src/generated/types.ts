@@ -22,6 +22,11 @@ export interface AllSetting {
   backupKeep: number;
   backupSchedule: string;
   backupTelegram: boolean;
+  connLogDestination: string;
+  connLogEnable: boolean;
+  connLogMaxSizeMB: number;
+  connLogRetentionDays: number;
+  connLogSource: string;
   datepicker: string;
   discordAdminIds: string;
   discordBotBackup: boolean;
@@ -224,6 +229,11 @@ export interface AllSettingView {
   backupKeep: number;
   backupSchedule: string;
   backupTelegram: boolean;
+  connLogDestination: string;
+  connLogEnable: boolean;
+  connLogMaxSizeMB: number;
+  connLogRetentionDays: number;
+  connLogSource: string;
   datepicker: string;
   discordAdminIds: string;
   discordBotBackup: boolean;
@@ -619,6 +629,36 @@ export interface ClientsSummary {
   online: string[];
   onlineCount: number;
   total: number;
+}
+
+export interface ConnFilter {
+  before: string;
+  client: string;
+  from: number;
+  host: string;
+  inbound: string;
+  limit: number;
+  source: string;
+  to: number;
+}
+
+export interface ConnPage {
+  enabled: boolean;
+  next: string;
+  rows: ConnRecord[];
+  sizeBytes: number;
+}
+
+export interface ConnRecord {
+  client: string;
+  host: string;
+  inbound: string;
+  network: string;
+  outbound: string;
+  port: number;
+  source: string;
+  sourcePort: number;
+  time: number;
 }
 
 export interface FallbackParentInfo {

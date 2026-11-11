@@ -281,6 +281,13 @@ var defaultValueMap = map[string]string{
 	"backupAgeRecipients": "",
 	"backupTelegram":      "false",
 
+	// Connection log (still-ui)
+	"connLogEnable":        "false",
+	"connLogRetentionDays": "30",
+	"connLogMaxSizeMB":     "2048",
+	"connLogDestination":   "full",
+	"connLogSource":        "full",
+
 	// Server health alerts (still-ui): thresholds shared by every notifier
 	"alertXrayRestarts":      "3",
 	"alertXrayRestartWindow": "10",
@@ -699,6 +706,46 @@ func (s *SettingService) GetBackupAgeRecipients() (string, error) {
 
 // GetBackupTelegram reports whether each encrypted scheduled backup is sent to the Telegram admins.
 func (s *SettingService) GetBackupTelegram() (bool, error) { return s.getBool("backupTelegram") }
+
+// ConnLogSettings is the connection log's configuration.
+type ConnLogSettings struct {
+	Enable        bool
+	RetentionDays int
+	MaxSizeMB     int
+	Destination   string
+	Source        string
+}
+
+// GetConnLogEnable reports whether the connection log is on; an unreadable switch reads as off.
+func (s *SettingService) GetConnLogEnable() bool {
+	enable, _ := s.getBool("connLogEnable")
+	return enable
+}
+
+// GetConnLogSettings reads the connection log settings. An unreadable or empty one keeps
+// its default; an unreadable switch reads as off.
+func (s *SettingService) GetConnLogSettings() ConnLogSettings {
+	number := func(key string) int {
+		if v, err := s.getInt(key); err == nil && v > 0 {
+			return v
+		}
+		v, _ := strconv.Atoi(defaultValueMap[key])
+		return v
+	}
+	text := func(key string) string {
+		if v, err := s.getString(key); err == nil && v != "" {
+			return v
+		}
+		return defaultValueMap[key]
+	}
+	return ConnLogSettings{
+		Enable:        s.GetConnLogEnable(),
+		RetentionDays: number("connLogRetentionDays"),
+		MaxSizeMB:     number("connLogMaxSizeMB"),
+		Destination:   text("connLogDestination"),
+		Source:        text("connLogSource"),
+	}
+}
 
 // HealthAlertThresholds are the limits the health alerts compare against.
 type HealthAlertThresholds struct {
@@ -1758,6 +1805,21 @@ func (s *SettingService) UpdateAllSetting(allSetting *entity.AllSetting, clears 
 	}
 	if err := normalizeSubProbeSettings(allSetting); err != nil {
 		return err
+	}
+	// A form saved by an older page or script has no connection log fields: keep the defaults.
+	for _, field := range []struct {
+		value *int
+		key   string
+	}{{&allSetting.ConnLogRetentionDays, "connLogRetentionDays"}, {&allSetting.ConnLogMaxSizeMB, "connLogMaxSizeMB"}} {
+		if *field.value == 0 {
+			*field.value, _ = strconv.Atoi(defaultValueMap[field.key])
+		}
+	}
+	if allSetting.ConnLogDestination == "" {
+		allSetting.ConnLogDestination = defaultValueMap["connLogDestination"]
+	}
+	if allSetting.ConnLogSource == "" {
+		allSetting.ConnLogSource = defaultValueMap["connLogSource"]
 	}
 	switch allSetting.SubProfileMode {
 	case "", SubProfileModeNone, SubProfileModeBuiltin, SubProfileModeCustom:

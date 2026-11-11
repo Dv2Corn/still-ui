@@ -129,7 +129,8 @@
     "pinSidebar": "固定侧边栏",
     "unpinSidebar": "取消固定侧边栏",
     "subFormats": "Sub Formats",
-    "probes": "探针"
+    "probes": "探针",
+    "connections": "连接"
   },
   "pages": {
     "login": {
@@ -1983,7 +1984,24 @@
       "eventGroupProbe": "可达性探针",
       "eventProbeDown": "入站不可达",
       "eventProbeUp": "入站已恢复",
-      "eventProbeStale": "探针无响应"
+      "eventProbeStale": "探针无响应",
+      "connLogSettings": "连接日志",
+      "connLogEnable": "记录连接",
+      "connLogEnableDesc": "记录谁在何时通过哪个入站连接到了哪里。默认关闭。开启或关闭时，如果 Xray 自身的访问日志设置为 none，Xray 会重启一次。",
+      "connLogRetention": "保留天数",
+      "connLogRetentionDesc": "更早的日期会自动删除。",
+      "connLogMaxSize": "大小上限（MB）",
+      "connLogMaxSizeDesc": "日志超过该大小时，先删除最早的日期。",
+      "connLogDestination": "目标",
+      "connLogDestinationDesc": "保存客户端连接目标的哪些信息。",
+      "connLogDestinationFull": "完整主机名或 IP 地址",
+      "connLogDestinationDomain": "仅注册域名（example.com）",
+      "connLogStoreNothing": "不保存",
+      "connLogSource": "客户端地址",
+      "connLogSourceDesc": "保存客户端来源地址的哪些信息。",
+      "connLogSourceFull": "完整地址和端口",
+      "connLogSourceMasked": "仅网段（IPv4 为 /24，IPv6 为 /48）",
+      "connLogPrivacyHint": "此日志包含个人数据：只保留需要的内容。它存放在面板数据库旁边，不在数据库内，也不在其备份中。更改只对新连接生效；已保存的记录保持原样，直到过期。"
     },
     "xray": {
       "importRules": "导入规则",
@@ -2747,6 +2765,27 @@
           "allFailingHint": "此探针上所有端点同时失败，通常是它自身的网络或测试 URL 出了问题，因此订阅会忽略它。"
         }
       }
+    },
+    "connections": {
+      "title": "连接日志",
+      "intro": "谁在何时通过哪个入站连接到了哪里。数据读取自本服务器上的 Xray 访问日志；每个节点保存各自的日志。",
+      "off": "连接日志已关闭，当前不记录任何内容。",
+      "openSettings": "打开设置",
+      "time": "时间",
+      "client": "客户端",
+      "inbound": "入站",
+      "source": "来源",
+      "destination": "目标",
+      "clientPlaceholder": "客户端（完整名称）",
+      "hostPlaceholder": "目标包含…",
+      "sourcePlaceholder": "来源地址包含…",
+      "exportCsv": "导出 CSV",
+      "exportHint": "导出最多包含当前筛选条件下的 {count} 行，时间为 UTC。",
+      "onDisk": "磁盘占用",
+      "empty": "没有匹配的连接。",
+      "newer": "较新",
+      "older": "较旧",
+      "ofClient": "此客户端的连接"
     }
   },
   "tgbot": {

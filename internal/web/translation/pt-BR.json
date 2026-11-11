@@ -129,7 +129,8 @@
     "pinSidebar": "Fixar barra lateral",
     "unpinSidebar": "Desafixar barra lateral",
     "subFormats": "Sub Formats",
-    "probes": "Sondas"
+    "probes": "Sondas",
+    "connections": "Conexões"
   },
   "pages": {
     "login": {
@@ -1983,7 +1984,24 @@
       "eventGroupProbe": "Sondas de acessibilidade",
       "eventProbeDown": "Entrada inacessível",
       "eventProbeUp": "Entrada acessível de novo",
-      "eventProbeStale": "Sonda em silêncio"
+      "eventProbeStale": "Sonda em silêncio",
+      "connLogSettings": "Registro de conexões",
+      "connLogEnable": "Registrar conexões",
+      "connLogEnableDesc": "Manter um registro de quem se conectou, quando, por qual entrada e para onde. Desligado por padrão. Ao ligar ou desligar, o Xray reinicia uma vez se o log de acesso dele estiver em none.",
+      "connLogRetention": "Manter por (dias)",
+      "connLogRetentionDesc": "Os dias mais antigos são apagados automaticamente.",
+      "connLogMaxSize": "Limite de tamanho (MB)",
+      "connLogMaxSizeDesc": "Quando o registro passa disso, os dias mais antigos são apagados primeiro.",
+      "connLogDestination": "Destino",
+      "connLogDestinationDesc": "O que é guardado sobre para onde um cliente se conectou.",
+      "connLogDestinationFull": "Nome de host completo ou endereço IP",
+      "connLogDestinationDomain": "Somente o domínio registrado (example.com)",
+      "connLogStoreNothing": "Nada",
+      "connLogSource": "Endereço do cliente",
+      "connLogSourceDesc": "O que é guardado sobre o endereço de onde um cliente se conectou.",
+      "connLogSourceFull": "Endereço completo e porta",
+      "connLogSourceMasked": "Somente a rede (/24 em IPv4, /48 em IPv6)",
+      "connLogPrivacyHint": "Este registro contém dados pessoais: guarde só o necessário. Ele fica ao lado do banco de dados do painel, não dentro dele nem nos backups. Uma mudança vale para as conexões novas; o que já foi gravado fica como está até expirar."
     },
     "xray": {
       "importRules": "Importar regras",
@@ -2747,6 +2765,27 @@
           "allFailingHint": "Nesta sonda todos os endpoints falham ao mesmo tempo. Isso costuma indicar problema na rede dela ou na URL de teste, então as assinaturas a ignoram."
         }
       }
+    },
+    "connections": {
+      "title": "Registro de conexões",
+      "intro": "Quem se conectou, quando, por qual entrada e para onde. Lido do log de acesso do Xray neste servidor; cada nó mantém o seu próprio registro.",
+      "off": "O registro de conexões está desligado. Nada está sendo gravado.",
+      "openSettings": "Abrir as configurações",
+      "time": "Hora",
+      "client": "Cliente",
+      "inbound": "Entrada",
+      "source": "Origem",
+      "destination": "Destino",
+      "clientPlaceholder": "Cliente (nome exato)",
+      "hostPlaceholder": "O destino contém…",
+      "sourcePlaceholder": "O endereço de origem contém…",
+      "exportCsv": "Exportar CSV",
+      "exportHint": "A exportação traz até {count} linhas do filtro atual, com horários em UTC.",
+      "onDisk": "Em disco",
+      "empty": "Nenhuma conexão corresponde.",
+      "newer": "Mais recentes",
+      "older": "Mais antigas",
+      "ofClient": "Conexões deste cliente"
     }
   },
   "tgbot": {

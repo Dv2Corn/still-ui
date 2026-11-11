@@ -326,6 +326,8 @@ const (
 	cadenceMemoryAlarm = "@every 1m"
 	// Server health alerts: Xray down/restarts, memory, disk, certificates, backups.
 	cadenceHealthAlerts = "@every 1m"
+	// Connection log: read the access log's new lines, prune once a minute inside the step.
+	cadenceConnLog = "@every 5s"
 )
 
 // startTask schedules background jobs (Xray checks, traffic jobs, cron
@@ -432,6 +434,10 @@ func (s *Server) startTask(restartXray, forceXrayRestart bool, loc *time.Locatio
 	_, _ = s.cron.AddFunc(cadenceHealthAlerts, func() {
 		(&service.HealthAlertService{}).Run()
 	})
+
+	// Connection log (still-ui): the step reads the setting itself, so on/off needs no restart.
+	connLog := service.ConnLogService{}
+	_, _ = s.cron.AddFunc(cadenceConnLog, connLog.Tick)
 
 	// Scheduled local backups (still-ui): snapshot, encrypt, rotate, optionally send to Telegram.
 	if on, _ := s.settingService.GetBackupEnable(); on {

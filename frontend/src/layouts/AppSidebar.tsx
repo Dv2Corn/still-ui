@@ -14,6 +14,7 @@ import {
   DiscordOutlined,
   GithubOutlined,
   HeartOutlined,
+  HistoryOutlined,
   LogoutOutlined,
   MailOutlined,
   MenuOutlined,
@@ -250,6 +251,11 @@ export default function AppSidebar() {
         key: '/settings#backups',
         icon: <SaveOutlined aria-hidden />,
         label: t('pages.settings.backupSettings'),
+      },
+      {
+        key: '/settings#connections',
+        icon: <HistoryOutlined aria-hidden />,
+        label: t('pages.settings.connLogSettings'),
       },
       {
         key: '/settings#subscription',

@@ -292,6 +292,9 @@ func (s *XrayService) GetXrayConfig() (*xray.Config, error) {
 		return nil, err
 	}
 	xrayConfig.LogConfig = resolveXrayLogPaths(xrayConfig.LogConfig)
+	if s.settingService.GetConnLogEnable() {
+		xrayConfig.LogConfig = ensureAccessLog(xrayConfig.LogConfig)
+	}
 	xrayConfig.API = ensureAPIServices(xrayConfig.API)
 	xrayConfig.Policy = ensureStatsPolicy(xrayConfig.Policy)
 	xrayConfig.RouterConfig = stripDisabledRules(xrayConfig.RouterConfig)
@@ -1391,6 +1394,31 @@ func resolveXrayLogPaths(logCfg json_util.RawMessage) json_util.RawMessage {
 	if !changed {
 		return logCfg
 	}
+	out, err := json.Marshal(parsed)
+	if err != nil {
+		return logCfg
+	}
+	return out
+}
+
+// connLogAccessLogName is the access log the connection log turns on when the operator has none.
+const connLogAccessLogName = "access.log"
+
+// ensureAccessLog gives the generated config an access log for the connection log to read.
+// A log the operator already set is left alone; the stored template is never modified.
+func ensureAccessLog(logCfg json_util.RawMessage) json_util.RawMessage {
+	parsed := map[string]any{}
+	if len(logCfg) > 0 {
+		if err := json.Unmarshal(logCfg, &parsed); err != nil {
+			return logCfg
+		}
+	}
+	if access, ok := parsed["access"].(string); ok {
+		if trimmed := strings.TrimSpace(access); trimmed != "" && !strings.EqualFold(trimmed, "none") {
+			return logCfg
+		}
+	}
+	parsed["access"] = filepath.Join(xrayLogFolder(), connLogAccessLogName)
 	out, err := json.Marshal(parsed)
 	if err != nil {
 		return logCfg

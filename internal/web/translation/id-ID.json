@@ -129,7 +129,8 @@
     "pinSidebar": "Sematkan bilah sisi",
     "unpinSidebar": "Lepas sematan bilah sisi",
     "subFormats": "Sub Formats",
-    "probes": "Probe"
+    "probes": "Probe",
+    "connections": "Koneksi"
   },
   "pages": {
     "login": {
@@ -1983,7 +1984,24 @@
       "eventGroupProbe": "Probe keterjangkauan",
       "eventProbeDown": "Inbound tidak terjangkau",
       "eventProbeUp": "Inbound terjangkau lagi",
-      "eventProbeStale": "Probe diam"
+      "eventProbeStale": "Probe diam",
+      "connLogSettings": "Log koneksi",
+      "connLogEnable": "Catat koneksi",
+      "connLogEnableDesc": "Simpan log tentang siapa yang terhubung, kapan, lewat inbound mana, dan ke mana. Mati secara bawaan. Saat dinyalakan atau dimatikan, Xray dimulai ulang sekali jika log akses Xray sendiri diatur ke none.",
+      "connLogRetention": "Simpan selama (hari)",
+      "connLogRetentionDesc": "Hari yang lebih lama dihapus otomatis.",
+      "connLogMaxSize": "Batas ukuran (MB)",
+      "connLogMaxSizeDesc": "Jika log melebihi batas ini, hari yang paling lama dihapus lebih dulu.",
+      "connLogDestination": "Tujuan",
+      "connLogDestinationDesc": "Apa yang disimpan tentang ke mana klien terhubung.",
+      "connLogDestinationFull": "Nama host lengkap atau alamat IP",
+      "connLogDestinationDomain": "Hanya domain terdaftar (example.com)",
+      "connLogStoreNothing": "Tidak ada",
+      "connLogSource": "Alamat klien",
+      "connLogSourceDesc": "Apa yang disimpan tentang alamat asal koneksi klien.",
+      "connLogSourceFull": "Alamat lengkap dan port",
+      "connLogSourceMasked": "Hanya jaringan (/24 untuk IPv4, /48 untuk IPv6)",
+      "connLogPrivacyHint": "Log ini berisi data pribadi: simpan hanya yang diperlukan. Log disimpan di samping basis data panel, bukan di dalamnya dan bukan di cadangannya. Perubahan berlaku untuk koneksi baru; yang sudah tersimpan tetap seperti adanya sampai kedaluwarsa."
     },
     "xray": {
       "save": "Simpan",
@@ -2747,6 +2765,27 @@
           "allFailingHint": "Semua endpoint gagal sekaligus pada probe ini. Biasanya jaringan probe itu sendiri atau URL ujinya bermasalah, jadi langganan mengabaikannya."
         }
       }
+    },
+    "connections": {
+      "title": "Log koneksi",
+      "intro": "Siapa yang terhubung, kapan, lewat inbound mana, dan ke mana. Dibaca dari log akses Xray di server ini; setiap node menyimpan log-nya sendiri.",
+      "off": "Log koneksi mati. Tidak ada yang dicatat.",
+      "openSettings": "Buka pengaturan",
+      "time": "Waktu",
+      "client": "Klien",
+      "inbound": "Inbound",
+      "source": "Sumber",
+      "destination": "Tujuan",
+      "clientPlaceholder": "Klien (nama persis)",
+      "hostPlaceholder": "Tujuan mengandung…",
+      "sourcePlaceholder": "Alamat sumber mengandung…",
+      "exportCsv": "Ekspor CSV",
+      "exportHint": "Ekspor berisi hingga {count} baris dari filter saat ini, dengan waktu UTC.",
+      "onDisk": "Di disk",
+      "empty": "Tidak ada koneksi yang cocok.",
+      "newer": "Lebih baru",
+      "older": "Lebih lama",
+      "ofClient": "Koneksi klien ini"
     }
   },
   "tgbot": {

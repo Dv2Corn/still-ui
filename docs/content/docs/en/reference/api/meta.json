@@ -14,6 +14,7 @@
     "subscription-balancers",
     "hosts",
     "reachability-probes",
+    "connection-log",
     "nodes",
     "backup",
     "websocket"

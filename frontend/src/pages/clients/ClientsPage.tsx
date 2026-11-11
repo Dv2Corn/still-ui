@@ -1,6 +1,6 @@
 import { lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { useLocation, useSearchParams } from 'react-router';
+import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import {
   Badge,
@@ -36,6 +36,7 @@ import {
   DownloadOutlined,
   EditOutlined,
   FilterOutlined,
+  HistoryOutlined,
   InfoCircleOutlined,
   LinkOutlined,
   MoreOutlined,
@@ -432,6 +433,11 @@ export default function ClientsPage() {
   const initial = readFilterState();
   const location = useLocation();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const onShowConnections = useCallback(
+    (email: string) => navigate(`/connections?client=${encodeURIComponent(email)}`),
+    [navigate],
+  );
   const searchParam = searchParams.get('search');
   const [searchKey, setSearchKey] = useState(
     searchParam !== null ? searchParam : initial.searchKey,
@@ -1060,7 +1066,7 @@ export default function ClientsPage() {
       {
         title: t('pages.clients.actions'),
         key: 'actions',
-        width: 200,
+        width: 232,
         render: (_v, record) => (
           <ClientRowActions
             email={record.email}
@@ -1068,6 +1074,7 @@ export default function ClientsPage() {
             onShowInfo={onShowInfo}
             onResetTraffic={onResetTraffic}
             onEdit={onEdit}
+            onShowConnections={onShowConnections}
             onDelete={onDelete}
           />
         ),
@@ -1844,6 +1851,16 @@ export default function ClientsPage() {
                                                 </>
                                               ),
                                               onClick: () => onEdit(row.email),
+                                            },
+                                            {
+                                              key: 'connections',
+                                              label: (
+                                                <>
+                                                  <HistoryOutlined aria-hidden />{' '}
+                                                  {t('pages.connections.ofClient')}
+                                                </>
+                                              ),
+                                              onClick: () => onShowConnections(row.email),
                                             },
                                             {
                                               key: 'delete',
