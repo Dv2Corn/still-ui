@@ -3,6 +3,7 @@ package tgbot
 import (
 	"encoding/json"
 	"errors"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,7 +12,6 @@ import (
 
 	"github.com/mhsanaei/3x-ui/v3/internal/logger"
 
-	"github.com/mymmrac/telego"
 	tu "github.com/mymmrac/telego/telegoutil"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 )
@@ -42,60 +42,47 @@ func TestIsTelegramNotModifiedError(t *testing.T) {
 // telego.NewBot rejects any token that does not match `^\d+:[\w-]{35}$`.
 var testBotToken = "123456:" + strings.Repeat("a", 35)
 
-func TestEditMessageTgBotSkipsNotModified(t *testing.T) {
-	// Mock Telegram API that always returns "message is not modified".
+// warningsMentioning returns the buffered warnings (or worse) that carry marker. The log is shared by
+// every goroutine of the process, so a test finds its own text in it and never counts entries.
+func warningsMentioning(marker string) []string {
+	var found []string
+	for _, entry := range logger.GetLogs(math.MaxInt, "warning") {
+		if strings.Contains(entry, marker) {
+			found = append(found, entry)
+		}
+	}
+	return found
+}
+
+// notModifiedBot answers every call with Telegram's "not modified" error; the description carries
+// the test's name, so a warning about that error is recognisable as this test's own.
+func notModifiedBot(t *testing.T) {
+	t.Helper()
 	mock := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
 			"ok":          false,
 			"error_code":  400,
-			"description": "Bad Request: message is not modified: specified new message content and reply markup are exactly the same as a current content and reply markup of the message.",
+			"description": "Bad Request: message is not modified: " + t.Name(),
 		})
 	}))
-	defer mock.Close()
+	t.Cleanup(mock.Close)
+	swapTestBot(t, mock.URL)
+}
 
-	// Point the package-level bot at the mock.
-	origBot := liveBot()
-	t.Cleanup(func() { setTestBot(origBot) })
-	var err error
-	bot, err = telego.NewBot(testBotToken, telego.WithAPIServer(mock.URL))
-	if err != nil {
-		t.Fatalf("NewBot: %v", err)
-	}
-
-	// Snapshot warning count before the edit call.
-	before := logger.GetLogs(100, "warning")
+func TestEditMessageTgBotSkipsNotModified(t *testing.T) {
+	notModifiedBot(t)
 
 	tb := &Tgbot{}
 	tb.editMessageTgBot(123, 456, "<b>hello</b>")
 
-	after := logger.GetLogs(100, "warning")
-	if len(after) > len(before) {
-		t.Errorf("editMessageTgBot logged %d new warnings, want 0; new entries: %v",
-			len(after)-len(before), after[len(before):])
+	if logged := warningsMentioning(t.Name()); len(logged) != 0 {
+		t.Errorf("editMessageTgBot warned about an unchanged message: %v", logged)
 	}
 }
 
 func TestEditMessageCallbackTgBotSkipsNotModified(t *testing.T) {
-	mock := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{
-			"ok":          false,
-			"error_code":  400,
-			"description": "Bad Request: message is not modified",
-		})
-	}))
-	defer mock.Close()
-
-	origBot := liveBot()
-	t.Cleanup(func() { setTestBot(origBot) })
-	var err error
-	bot, err = telego.NewBot(testBotToken, telego.WithAPIServer(mock.URL))
-	if err != nil {
-		t.Fatalf("NewBot: %v", err)
-	}
-
-	before := logger.GetLogs(100, "warning")
+	notModifiedBot(t)
 
 	tb := &Tgbot{}
 	kb := tu.InlineKeyboard(tu.InlineKeyboardRow(
@@ -103,10 +90,8 @@ func TestEditMessageCallbackTgBotSkipsNotModified(t *testing.T) {
 	))
 	tb.editMessageCallbackTgBot(123, 456, kb)
 
-	after := logger.GetLogs(100, "warning")
-	if len(after) > len(before) {
-		t.Errorf("editMessageCallbackTgBot logged %d new warnings, want 0; new entries: %v",
-			len(after)-len(before), after[len(before):])
+	if logged := warningsMentioning(t.Name()); len(logged) != 0 {
+		t.Errorf("editMessageCallbackTgBot warned about an unchanged reply markup: %v", logged)
 	}
 }
 
