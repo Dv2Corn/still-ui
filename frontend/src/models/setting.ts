@@ -233,6 +233,11 @@ export class AllSetting {
   alertDisk = 90;
   alertCertDays = 7;
   alertRemindHours = 6;
+  connLogEnable = false;
+  connLogRetentionDays = 30;
+  connLogMaxSizeMB = 2048;
+  connLogDestination = 'full';
+  connLogSource = 'full';
 
   constructor(data?: unknown) {
     if (data != null) {

@@ -4,6 +4,7 @@ import { Button, Popover, Space, Tag, Tooltip } from 'antd';
 import {
   DeleteOutlined,
   EditOutlined,
+  HistoryOutlined,
   InfoCircleOutlined,
   QrcodeOutlined,
   RetweetOutlined,
@@ -20,12 +21,13 @@ interface ClientRowActionsProps {
   onShowInfo: (email: string) => void;
   onResetTraffic: (email: string) => void;
   onEdit: (email: string) => void;
+  onShowConnections: (email: string) => void;
   onDelete: (email: string) => void;
 }
 
-// Five Tooltip-wrapped buttons per row, none of which depend on traffic. Left
+// Six Tooltip-wrapped buttons per row, none of which depend on traffic. Left
 // inline they re-ran rc-tooltip's alignment machinery for every visible row on
-// every traffic push — 125 Tooltips on a 25-row page, five seconds apart.
+// every traffic push — 150 Tooltips on a 25-row page, five seconds apart.
 // Keyed on the email rather than the row object, because a push replaces the row
 // object of every client whose counters moved; the page resolves the live row.
 export const ClientRowActions = memo(function ClientRowActions({
@@ -34,6 +36,7 @@ export const ClientRowActions = memo(function ClientRowActions({
   onShowInfo,
   onResetTraffic,
   onEdit,
+  onShowConnections,
   onDelete,
 }: ClientRowActionsProps) {
   const { t } = useTranslation();
@@ -77,6 +80,16 @@ export const ClientRowActions = memo(function ClientRowActions({
           icon={<EditOutlined aria-hidden />}
           aria-label={t('edit')}
           onClick={() => onEdit(email)}
+        />
+      </Tooltip>
+      <Tooltip title={t('pages.connections.ofClient')}>
+        <Button
+          size="small"
+          type="text"
+          style={ICON_BUTTON_STYLE}
+          icon={<HistoryOutlined aria-hidden />}
+          aria-label={t('pages.connections.ofClient')}
+          onClick={() => onShowConnections(email)}
         />
       </Tooltip>
       <Tooltip title={t('delete')}>

@@ -78,6 +78,40 @@
           "backupTelegram": {
             "type": "boolean"
           },
+          "connLogDestination": {
+            "enum": [
+              "full",
+              "domain",
+              "none"
+            ],
+            "example": "full",
+            "type": "string"
+          },
+          "connLogEnable": {
+            "description": "Connection log (still-ui), off by default: how long and how much is kept, and what is\nstored of a destination (full, domain, none) and of a client address (full, masked, none).",
+            "type": "boolean"
+          },
+          "connLogMaxSizeMB": {
+            "example": 2048,
+            "maximum": 1048576,
+            "minimum": 16,
+            "type": "integer"
+          },
+          "connLogRetentionDays": {
+            "example": 30,
+            "maximum": 3650,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "connLogSource": {
+            "enum": [
+              "full",
+              "masked",
+              "none"
+            ],
+            "example": "full",
+            "type": "string"
+          },
           "datepicker": {
             "type": "string"
           },
@@ -734,6 +768,11 @@
           "backupKeep",
           "backupSchedule",
           "backupTelegram",
+          "connLogDestination",
+          "connLogEnable",
+          "connLogMaxSizeMB",
+          "connLogRetentionDays",
+          "connLogSource",
           "datepicker",
           "discordAdminIds",
           "discordBotBackup",
@@ -983,6 +1022,40 @@
           },
           "backupTelegram": {
             "type": "boolean"
+          },
+          "connLogDestination": {
+            "enum": [
+              "full",
+              "domain",
+              "none"
+            ],
+            "example": "full",
+            "type": "string"
+          },
+          "connLogEnable": {
+            "description": "Connection log (still-ui), off by default: how long and how much is kept, and what is\nstored of a destination (full, domain, none) and of a client address (full, masked, none).",
+            "type": "boolean"
+          },
+          "connLogMaxSizeMB": {
+            "example": 2048,
+            "maximum": 1048576,
+            "minimum": 16,
+            "type": "integer"
+          },
+          "connLogRetentionDays": {
+            "example": 30,
+            "maximum": 3650,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "connLogSource": {
+            "enum": [
+              "full",
+              "masked",
+              "none"
+            ],
+            "example": "full",
+            "type": "string"
           },
           "datepicker": {
             "type": "string"
@@ -1664,6 +1737,11 @@
           "backupKeep",
           "backupSchedule",
           "backupTelegram",
+          "connLogDestination",
+          "connLogEnable",
+          "connLogMaxSizeMB",
+          "connLogRetentionDays",
+          "connLogSource",
           "datepicker",
           "discordAdminIds",
           "discordBotBackup",
@@ -2803,6 +2881,147 @@
           "online",
           "onlineCount",
           "total"
+        ],
+        "type": "object"
+      },
+      "ConnFilter": {
+        "description": "ConnFilter narrows a query; an empty field does not filter. Client and Inbound match\nexactly, Host and Source match any part of the stored text, ignoring ASCII case.",
+        "properties": {
+          "before": {
+            "description": "Before is the Next of the previous page; empty starts at the newest row.",
+            "example": "20250101:4096",
+            "type": "string"
+          },
+          "client": {
+            "example": "alice@example.com",
+            "type": "string"
+          },
+          "from": {
+            "description": "From and To are unix milliseconds, both inclusive; 0 leaves that side open.",
+            "example": 1735689600000,
+            "format": "int64",
+            "type": "integer"
+          },
+          "host": {
+            "example": "example.com",
+            "type": "string"
+          },
+          "inbound": {
+            "example": "inbound-443",
+            "type": "string"
+          },
+          "limit": {
+            "example": 50,
+            "type": "integer"
+          },
+          "source": {
+            "example": "203.0.113.",
+            "type": "string"
+          },
+          "to": {
+            "example": 1735775999999,
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "before",
+          "client",
+          "from",
+          "host",
+          "inbound",
+          "limit",
+          "source",
+          "to"
+        ],
+        "type": "object"
+      },
+      "ConnPage": {
+        "description": "ConnPage is one page of connections, newest first.",
+        "properties": {
+          "enabled": {
+            "description": "Enabled tells whether connections are being recorded now; SizeBytes is the log on disk.",
+            "example": true,
+            "type": "boolean"
+          },
+          "next": {
+            "description": "Next goes into ConnFilter.Before to read the following page; empty on the last one.",
+            "example": "20250101:4046",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/ConnRecord"
+            },
+            "type": "array"
+          },
+          "sizeBytes": {
+            "example": 36700160,
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "enabled",
+          "next",
+          "rows",
+          "sizeBytes"
+        ],
+        "type": "object"
+      },
+      "ConnRecord": {
+        "description": "ConnRecord is one accepted connection.",
+        "properties": {
+          "client": {
+            "example": "alice@example.com",
+            "type": "string"
+          },
+          "host": {
+            "example": "example.com",
+            "type": "string"
+          },
+          "inbound": {
+            "example": "inbound-443",
+            "type": "string"
+          },
+          "network": {
+            "example": "tcp",
+            "type": "string"
+          },
+          "outbound": {
+            "example": "direct",
+            "type": "string"
+          },
+          "port": {
+            "example": 443,
+            "type": "integer"
+          },
+          "source": {
+            "description": "Source is the client's address, or its /24 (IPv4) or /48 (IPv6) network when masked.",
+            "example": "203.0.113.9",
+            "type": "string"
+          },
+          "sourcePort": {
+            "example": 54321,
+            "type": "integer"
+          },
+          "time": {
+            "description": "Time is unix milliseconds.",
+            "example": 1735732800000,
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "client",
+          "host",
+          "inbound",
+          "network",
+          "outbound",
+          "port",
+          "source",
+          "sourcePort",
+          "time"
         ],
         "type": "object"
       },
@@ -5747,6 +5966,10 @@
     {
       "name": "Reachability probes",
       "description": "External agents that test the inbounds from inside a censored network (cmd/still-probe). These endpoints manage the probes; the agents use probe/v1/job and probe/v1/report under the panel base path with their own Bearer token, which opens nothing under /panel/api."
+    },
+    {
+      "name": "Connection log",
+      "description": "Who connected, when, through which inbound and where to, read from the Xray access log of this panel's own server. Off until \"Record connections\" is turned on in the settings; what is stored of a destination and of a client address follows the settings too. Admin only: a monitor, node-sync or node-admin token is refused. Each request is written to the panel log with the user and the filter."
     },
     {
       "name": "Backup",
@@ -15044,6 +15267,124 @@
                   "success": true,
                   "obj": {
                     "token": "new-token-string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/connlog/list": {
+      "post": {
+        "tags": [
+          "Connection log"
+        ],
+        "summary": "One page of connections, newest first. Every filter field is optional: client and inbound match exactly, host and source match any part of the stored text, from and to are unix milliseconds. Pass the response's next as before to read the following page.",
+        "operationId": "post_panel_api_connlog_list",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "client": "alice@example.com",
+                "inbound": "",
+                "host": "example.com",
+                "source": "",
+                "from": 1735689600000,
+                "to": 1735775999999,
+                "before": "",
+                "limit": 50
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "$ref": "#/components/schemas/ConnPage"
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": {
+                    "enabled": true,
+                    "next": "20250101:4046",
+                    "rows": [
+                      {
+                        "client": "alice@example.com",
+                        "host": "example.com",
+                        "inbound": "inbound-443",
+                        "network": "tcp",
+                        "outbound": "direct",
+                        "port": 443,
+                        "source": "203.0.113.9",
+                        "sourcePort": 54321,
+                        "time": 1735732800000
+                      }
+                    ],
+                    "sizeBytes": 36700160
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/connlog/export": {
+      "post": {
+        "tags": [
+          "Connection log"
+        ],
+        "summary": "The connections matching the same filter as CSV (text/csv), newest first, at most 100000 rows, times in UTC. before and limit are ignored. A cell that a spreadsheet would read as a formula is prefixed with an apostrophe.",
+        "operationId": "post_panel_api_connlog_export",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "client": "alice@example.com",
+                "from": 1735689600000,
+                "to": 1735775999999
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
                   }
                 }
               }

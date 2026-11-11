@@ -107,6 +107,7 @@ describe('clients table row cells', () => {
               onShowInfo={noop}
               onResetTraffic={noop}
               onEdit={onEdit}
+              onShowConnections={noop}
               onDelete={noop}
             />
           );
@@ -120,9 +121,9 @@ describe('clients table row cells', () => {
 
     // Queried by position rather than label: the suite loads the real en-US
     // bundle, so the aria-labels are translated strings, not keys. Order is
-    // QR, info, reset traffic, edit, delete.
+    // QR, info, reset traffic, edit, connections, delete.
     const buttons = screen.getAllByRole('button');
-    expect(buttons).toHaveLength(5);
+    expect(buttons).toHaveLength(6);
     await userEvent.click(buttons[0]);
     await userEvent.click(buttons[3]);
 

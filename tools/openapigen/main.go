@@ -133,6 +133,10 @@ func run(root, outDir string) error {
 			StructAllow: setOf("TgBotCapabilities"),
 		},
 		{
+			Path:        resolveRel(root, "internal/connlog"),
+			StructAllow: setOf("ConnRecord", "ConnFilter", "ConnPage"),
+		},
+		{
 			Path:        resolveRel(root, "internal/amneziawg"),
 			StructAllow: setOf("ServerSettings"),
 		},

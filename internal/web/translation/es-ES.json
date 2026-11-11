@@ -134,7 +134,8 @@
     "pinSidebar": "Fijar barra lateral",
     "unpinSidebar": "Desfijar barra lateral",
     "subFormats": "Sub Formats",
-    "probes": "Sondas"
+    "probes": "Sondas",
+    "connections": "Conexiones"
   },
   "pages": {
     "login": {
@@ -2009,7 +2010,24 @@
       "eventGroupProbe": "Sondas de accesibilidad",
       "eventProbeDown": "Entrada inaccesible",
       "eventProbeUp": "Entrada accesible de nuevo",
-      "eventProbeStale": "Sonda en silencio"
+      "eventProbeStale": "Sonda en silencio",
+      "connLogSettings": "Registro de conexiones",
+      "connLogEnable": "Registrar conexiones",
+      "connLogEnableDesc": "Guardar un registro de quién se conectó, cuándo, por qué entrada y a dónde. Desactivado por defecto. Al activarlo o desactivarlo, Xray se reinicia una vez si su propio registro de acceso está en none.",
+      "connLogRetention": "Conservar (días)",
+      "connLogRetentionDesc": "Los días más antiguos se borran automáticamente.",
+      "connLogMaxSize": "Límite de tamaño (MB)",
+      "connLogMaxSizeDesc": "Cuando el registro lo supera, se borran primero los días más antiguos.",
+      "connLogDestination": "Destino",
+      "connLogDestinationDesc": "Qué se guarda sobre a dónde se conectó un cliente.",
+      "connLogDestinationFull": "Nombre de host completo o dirección IP",
+      "connLogDestinationDomain": "Solo el dominio registrado (example.com)",
+      "connLogStoreNothing": "Nada",
+      "connLogSource": "Dirección del cliente",
+      "connLogSourceDesc": "Qué se guarda sobre la dirección desde la que se conectó un cliente.",
+      "connLogSourceFull": "Dirección completa y puerto",
+      "connLogSourceMasked": "Solo la red (/24 en IPv4, /48 en IPv6)",
+      "connLogPrivacyHint": "Este registro contiene datos personales: guarde solo lo necesario. Se almacena junto a la base de datos del panel, no dentro de ella ni en sus copias de seguridad. Un cambio se aplica a las conexiones nuevas; lo ya guardado queda como está hasta que caduque."
     },
     "xray": {
       "save": "Guardar configuración",
@@ -2773,6 +2791,27 @@
           "allFailingHint": "En esta sonda fallan todos los puntos de acceso a la vez. Suele indicar que falla su propia red o su URL de prueba, así que las suscripciones la ignoran."
         }
       }
+    },
+    "connections": {
+      "title": "Registro de conexiones",
+      "intro": "Quién se conectó, cuándo, por qué entrada y a dónde. Se lee del registro de acceso de Xray en este servidor; cada nodo guarda su propio registro.",
+      "off": "El registro de conexiones está desactivado. No se guarda nada.",
+      "openSettings": "Abrir los ajustes",
+      "time": "Hora",
+      "client": "Cliente",
+      "inbound": "Entrada",
+      "source": "Origen",
+      "destination": "Destino",
+      "clientPlaceholder": "Cliente (nombre exacto)",
+      "hostPlaceholder": "El destino contiene…",
+      "sourcePlaceholder": "La dirección de origen contiene…",
+      "exportCsv": "Exportar CSV",
+      "exportHint": "La exportación contiene hasta {count} filas del filtro actual, con horas en UTC.",
+      "onDisk": "En disco",
+      "empty": "Ninguna conexión coincide.",
+      "newer": "Más recientes",
+      "older": "Más antiguas",
+      "ofClient": "Conexiones de este cliente"
     }
   },
   "tgbot": {

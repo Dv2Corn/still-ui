@@ -2132,6 +2132,32 @@ export const sections: readonly Section[] = [
   },
 
   {
+    id: 'connlog',
+    title: 'Connection log',
+    description:
+      'Who connected, when, through which inbound and where to, read from the Xray access log of this panel\'s own server. Off until "Record connections" is turned on in the settings; what is stored of a destination and of a client address follows the settings too. Admin only: a monitor, node-sync or node-admin token is refused. Each request is written to the panel log with the user and the filter.',
+    endpoints: [
+      {
+        method: 'POST',
+        path: '/panel/api/connlog/list',
+        summary:
+          "One page of connections, newest first. Every filter field is optional: client and inbound match exactly, host and source match any part of the stored text, from and to are unix milliseconds. Pass the response's next as before to read the following page.",
+        body: '{\n  "client": "alice@example.com",\n  "inbound": "",\n  "host": "example.com",\n  "source": "",\n  "from": 1735689600000,\n  "to": 1735775999999,\n  "before": "",\n  "limit": 50\n}',
+        responseSchema: 'ConnPage',
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/connlog/export',
+        summary:
+          'The connections matching the same filter as CSV (text/csv), newest first, at most 100000 rows, times in UTC. before and limit are ignored. A cell that a spreadsheet would read as a formula is prefixed with an apostrophe.',
+        body: '{\n  "client": "alice@example.com",\n  "from": 1735689600000,\n  "to": 1735775999999\n}',
+        response:
+          'time_utc,client,inbound,outbound,source,source_port,network,host,port\n2025-01-01T12:00:00.000Z,alice@example.com,inbound-443,direct,203.0.113.9,54321,tcp,example.com,443',
+      },
+    ],
+  },
+
+  {
     id: 'backup',
     title: 'Backup',
     description: 'Operations that interact with the configured Telegram bot.',

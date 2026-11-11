@@ -291,6 +291,13 @@ var defaultValueMap = map[string]string{
 	"backupAgeRecipients": "",
 	"backupTelegram":      "false",
 
+	// Connection log (still-ui)
+	"connLogEnable":        "false",
+	"connLogRetentionDays": "30",
+	"connLogMaxSizeMB":     "2048",
+	"connLogDestination":   "full",
+	"connLogSource":        "full",
+
 	// Server health alerts (still-ui): thresholds shared by every notifier
 	"alertXrayRestarts":      "3",
 	"alertXrayRestartWindow": "10",
@@ -709,6 +716,47 @@ func (s *SettingService) GetBackupAgeRecipients() (string, error) {
 
 // GetBackupTelegram reports whether each encrypted scheduled backup is sent to the Telegram admins.
 func (s *SettingService) GetBackupTelegram() (bool, error) { return s.getBool("backupTelegram") }
+
+// ConnLogSettings is the connection log's configuration.
+type ConnLogSettings struct {
+	Enable        bool
+	RetentionDays int
+	MaxSizeMB     int
+	Destination   string
+	Source        string
+}
+
+// GetConnLogEnable reports whether the connection log is on; an unreadable switch reads as off.
+func (s *SettingService) GetConnLogEnable() bool {
+	enable, _ := s.getBool("connLogEnable")
+	return enable
+}
+
+// GetConnLogSettings reads the connection log settings; an empty or malformed one keeps its
+// default. A database that cannot be read is an error: defaults then would delete stored days.
+func (s *SettingService) GetConnLogSettings() (ConnLogSettings, error) {
+	var readErr error
+	text := func(key string) string {
+		v, err := s.getString(key)
+		readErr = errors.Join(readErr, err)
+		return effectiveSettingValue(key, v)
+	}
+	number := func(key string) int {
+		v, err := strconv.Atoi(text(key))
+		if err != nil || v <= 0 {
+			v, _ = strconv.Atoi(defaultValueMap[key])
+		}
+		return v
+	}
+	enable, _ := strconv.ParseBool(text("connLogEnable"))
+	return ConnLogSettings{
+		Enable:        enable,
+		RetentionDays: number("connLogRetentionDays"),
+		MaxSizeMB:     number("connLogMaxSizeMB"),
+		Destination:   text("connLogDestination"),
+		Source:        text("connLogSource"),
+	}, readErr
+}
 
 // HealthAlertThresholds are the limits the health alerts compare against.
 type HealthAlertThresholds struct {
@@ -1807,6 +1855,24 @@ func (s *SettingService) UpdateAllSetting(allSetting *entity.AllSetting, clears 
 	}
 	if err := validateSubHwidSettings(allSetting); err != nil {
 		return err
+	}
+	// A form saved by an older page or script has no connection log fields: what is stored
+	// stays, or a shorter retention would delete days the operator meant to keep.
+	connLog, err := s.GetConnLogSettings()
+	if err != nil {
+		return err
+	}
+	if allSetting.ConnLogRetentionDays == 0 {
+		allSetting.ConnLogRetentionDays = connLog.RetentionDays
+	}
+	if allSetting.ConnLogMaxSizeMB == 0 {
+		allSetting.ConnLogMaxSizeMB = connLog.MaxSizeMB
+	}
+	if allSetting.ConnLogDestination == "" {
+		allSetting.ConnLogDestination = connLog.Destination
+	}
+	if allSetting.ConnLogSource == "" {
+		allSetting.ConnLogSource = connLog.Source
 	}
 	switch allSetting.SubProfileMode {
 	case "", SubProfileModeNone, SubProfileModeBuiltin, SubProfileModeCustom:

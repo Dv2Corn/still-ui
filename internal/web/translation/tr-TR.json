@@ -134,7 +134,8 @@
     "pinSidebar": "Kenar çubuğunu sabitle",
     "unpinSidebar": "Kenar çubuğu sabitlemesini kaldır",
     "subFormats": "Abonelik Formatları",
-    "probes": "Yoklayıcılar"
+    "probes": "Yoklayıcılar",
+    "connections": "Bağlantılar"
   },
   "pages": {
     "login": {
@@ -2009,7 +2010,24 @@
       "eventGroupProbe": "Erişilebilirlik yoklayıcıları",
       "eventProbeDown": "Gelen bağlantıya erişilemiyor",
       "eventProbeUp": "Gelen bağlantı yeniden erişilebilir",
-      "eventProbeStale": "Yoklayıcı sessiz"
+      "eventProbeStale": "Yoklayıcı sessiz",
+      "connLogSettings": "Bağlantı günlüğü",
+      "connLogEnable": "Bağlantıları kaydet",
+      "connLogEnableDesc": "Kimin, ne zaman, hangi gelen bağlantı üzerinden ve nereye bağlandığının günlüğünü tut. Varsayılan olarak kapalı. Açıp kapatırken, Xray'in kendi erişim günlüğü none ise Xray bir kez yeniden başlar.",
+      "connLogRetention": "Saklama süresi (gün)",
+      "connLogRetentionDesc": "Daha eski günler otomatik silinir.",
+      "connLogMaxSize": "Boyut sınırı (MB)",
+      "connLogMaxSizeDesc": "Günlük bunu aşınca önce en eski günler silinir.",
+      "connLogDestination": "Hedef",
+      "connLogDestinationDesc": "Kullanıcının nereye bağlandığı hakkında ne saklanır.",
+      "connLogDestinationFull": "Tam ana makine adı veya IP adresi",
+      "connLogDestinationDomain": "Yalnızca kayıtlı alan adı (example.com)",
+      "connLogStoreNothing": "Hiçbir şey",
+      "connLogSource": "Kullanıcı adresi",
+      "connLogSourceDesc": "Kullanıcının bağlandığı adres hakkında ne saklanır.",
+      "connLogSourceFull": "Tam adres ve port",
+      "connLogSourceMasked": "Yalnızca ağ (IPv4 için /24, IPv6 için /48)",
+      "connLogPrivacyHint": "Bu günlük kişisel veri içerir: yalnızca gerekeni saklayın. Panel veritabanının yanında durur; veritabanının ve yedeklerinin içinde değildir. Değişiklik yeni bağlantılara uygulanır; kaydedilmiş olanlar süresi dolana kadar olduğu gibi kalır."
     },
     "xray": {
       "save": "Kaydet",
@@ -2773,6 +2791,27 @@
           "allFailingHint": "Bu yoklayıcıda tüm uç noktalar aynı anda başarısız. Genelde yoklayıcının kendi ağı veya test URL'si bozuktur, bu yüzden abonelikler onu yok sayar."
         }
       }
+    },
+    "connections": {
+      "title": "Bağlantı günlüğü",
+      "intro": "Kim, ne zaman, hangi gelen bağlantı üzerinden ve nereye bağlandı. Bu sunucudaki Xray erişim günlüğünden okunur; her düğüm kendi günlüğünü tutar.",
+      "off": "Bağlantı günlüğü kapalı. Hiçbir şey kaydedilmiyor.",
+      "openSettings": "Ayarları aç",
+      "time": "Zaman",
+      "client": "Kullanıcı",
+      "inbound": "Gelen bağlantı",
+      "source": "Kaynak",
+      "destination": "Hedef",
+      "clientPlaceholder": "Kullanıcı (tam ad)",
+      "hostPlaceholder": "Hedef şunu içerir…",
+      "sourcePlaceholder": "Kaynak adresi şunu içerir…",
+      "exportCsv": "CSV dışa aktar",
+      "exportHint": "Dışa aktarma, geçerli filtrenin en fazla {count} satırını içerir; saatler UTC.",
+      "onDisk": "Diskte",
+      "empty": "Eşleşen bağlantı yok.",
+      "newer": "Daha yeni",
+      "older": "Daha eski",
+      "ofClient": "Bu kullanıcının bağlantıları"
     }
   },
   "tgbot": {

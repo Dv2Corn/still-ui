@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/logger"
+	"github.com/mhsanaei/3x-ui/v3/internal/web/service"
 	"github.com/mhsanaei/3x-ui/v3/internal/xray"
 )
 
@@ -93,16 +94,20 @@ func (j *ClearLogsJob) Run() {
 }
 
 func (j *PruneXrayLogsJob) Run() {
-	truncateXrayLog(xray.GetAccessLogPath, maxXrayLogBytes)
-	truncateXrayLog(xray.GetErrorLogPath, maxXrayLogBytes)
+	truncateXrayLog(xray.GetAccessLogPath, maxXrayLogBytes, service.TruncateAccessLog)
+	truncateXrayLog(xray.GetErrorLogPath, maxXrayLogBytes, runTruncate)
 }
 
 func wipeXrayLogs() {
-	truncateXrayLog(xray.GetAccessLogPath, 0)
-	truncateXrayLog(xray.GetErrorLogPath, 0)
+	truncateXrayLog(xray.GetAccessLogPath, 0, service.TruncateAccessLog)
+	truncateXrayLog(xray.GetErrorLogPath, 0, runTruncate)
 }
 
-func truncateXrayLog(pathFn func() (string, error), maxBytes int64) {
+func runTruncate(_ string, truncate func() error) error { return truncate() }
+
+// truncateXrayLog empties a log through cut, which lets the connection log store the
+// access log's unread lines before they go.
+func truncateXrayLog(pathFn func() (string, error), maxBytes int64, cut func(path string, truncate func() error) error) {
 	logPath, err := pathFn()
 	if err != nil || disabledLogPath(logPath) {
 		return
@@ -126,7 +131,7 @@ func truncateXrayLog(pathFn func() (string, error), maxBytes int64) {
 			return
 		}
 	}
-	if err := f.Truncate(0); err != nil {
+	if err := cut(logPath, func() error { return f.Truncate(0) }); err != nil {
 		logger.Warning("Failed to truncate Xray log:", logPath, "-", err)
 	}
 }

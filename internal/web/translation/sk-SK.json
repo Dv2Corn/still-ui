@@ -134,7 +134,8 @@
     "pinSidebar": "Pripnúť bočné menu",
     "unpinSidebar": "Odopnúť bočné menu",
     "subFormats": "Formáty odberu",
-    "probes": "Sondy"
+    "probes": "Sondy",
+    "connections": "Pripojenia"
   },
   "pages": {
     "login": {
@@ -2130,7 +2131,24 @@
       "eventGroupProbe": "Sondy dostupnosti",
       "eventProbeDown": "Vstup nedostupný",
       "eventProbeUp": "Vstup opäť dostupný",
-      "eventProbeStale": "Sonda mlčí"
+      "eventProbeStale": "Sonda mlčí",
+      "connLogSettings": "Denník pripojení",
+      "connLogEnable": "Zaznamenávať pripojenia",
+      "connLogEnableDesc": "Viesť denník o tom, kto sa pripojil, kedy, cez ktorý vstup a kam. Predvolene vypnuté. Pri zapnutí alebo vypnutí sa Xray raz reštartuje, ak je jeho vlastný prístupový denník nastavený na none.",
+      "connLogRetention": "Uchovávať (dni)",
+      "connLogRetentionDesc": "Staršie dni sa mažú automaticky.",
+      "connLogMaxSize": "Limit veľkosti (MB)",
+      "connLogMaxSizeDesc": "Keď denník túto veľkosť prekročí, najprv sa zmažú najstaršie dni.",
+      "connLogDestination": "Cieľ",
+      "connLogDestinationDesc": "Čo sa ukladá o tom, kam sa klient pripojil.",
+      "connLogDestinationFull": "Celý názov hostiteľa alebo IP adresa",
+      "connLogDestinationDomain": "Iba registrovaná doména (example.com)",
+      "connLogStoreNothing": "Nič",
+      "connLogSource": "Adresa klienta",
+      "connLogSourceDesc": "Čo sa ukladá o adrese, z ktorej sa klient pripojil.",
+      "connLogSourceFull": "Celá adresa a port",
+      "connLogSourceMasked": "Iba sieť (/24 pre IPv4, /48 pre IPv6)",
+      "connLogPrivacyHint": "Tento denník obsahuje osobné údaje: uchovávajte len to, čo potrebujete. Je uložený vedľa databázy panela, nie v nej ani v jej zálohách. Zmena platí pre nové pripojenia; už uložené záznamy zostanú bez zmeny, kým nevypršia."
     },
     "xray": {
       "save": "Uložiť",
@@ -2773,6 +2791,27 @@
           "allFailingHint": "Na tejto sonde zlyhávajú naraz všetky koncové body. Zvyčajne to znamená chybu jej vlastnej siete alebo testovacej URL, preto ju predplatné ignoruje."
         }
       }
+    },
+    "connections": {
+      "title": "Denník pripojení",
+      "intro": "Kto sa pripojil, kedy, cez ktorý vstup a kam. Číta sa z prístupového denníka Xray na tomto serveri; každý server má vlastný denník.",
+      "off": "Denník pripojení je vypnutý. Nič sa nezaznamenáva.",
+      "openSettings": "Otvoriť nastavenia",
+      "time": "Čas",
+      "client": "Klient",
+      "inbound": "Vstup",
+      "source": "Zdroj",
+      "destination": "Cieľ",
+      "clientPlaceholder": "Klient (presné meno)",
+      "hostPlaceholder": "Cieľ obsahuje…",
+      "sourcePlaceholder": "Zdrojová adresa obsahuje…",
+      "exportCsv": "Exportovať CSV",
+      "exportHint": "Export obsahuje najviac {count} riadkov aktuálneho filtra, časy sú v UTC.",
+      "onDisk": "Na disku",
+      "empty": "Nezodpovedajú žiadne pripojenia.",
+      "newer": "Novšie",
+      "older": "Staršie",
+      "ofClient": "Pripojenia tohto klienta"
     }
   },
   "tgbot": {

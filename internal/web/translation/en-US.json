@@ -134,7 +134,8 @@
     "pinSidebar": "Pin sidebar",
     "unpinSidebar": "Unpin sidebar",
     "subFormats": "Sub Formats",
-    "probes": "Probes"
+    "probes": "Probes",
+    "connections": "Connections"
   },
   "pages": {
     "login": {
@@ -2130,7 +2131,24 @@
       "eventGroupProbe": "Reachability probes",
       "eventProbeDown": "Inbound unreachable",
       "eventProbeUp": "Inbound reachable again",
-      "eventProbeStale": "Probe silent"
+      "eventProbeStale": "Probe silent",
+      "connLogSettings": "Connection log",
+      "connLogEnable": "Record connections",
+      "connLogEnableDesc": "Keep a log of who connected, when, through which inbound and where to. Off by default. Turning it on or off restarts Xray once if Xray's own access log is set to none.",
+      "connLogRetention": "Keep for (days)",
+      "connLogRetentionDesc": "Older days are deleted automatically.",
+      "connLogMaxSize": "Size limit (MB)",
+      "connLogMaxSizeDesc": "When the log grows past this, the oldest days are deleted first.",
+      "connLogDestination": "Destination",
+      "connLogDestinationDesc": "What is stored about where a client connected.",
+      "connLogDestinationFull": "Full host name or IP address",
+      "connLogDestinationDomain": "Registered domain only (example.com)",
+      "connLogStoreNothing": "Nothing",
+      "connLogSource": "Client address",
+      "connLogSourceDesc": "What is stored about the address a client connected from.",
+      "connLogSourceFull": "Full address and port",
+      "connLogSourceMasked": "Network only (/24 for IPv4, /48 for IPv6)",
+      "connLogPrivacyHint": "This log holds personal data: keep only what you need. It is stored beside the panel database, not in it and not in its backups. A change applies to new connections; what is already stored stays as it is until it expires."
     },
     "xray": {
       "save": "Save",
@@ -2773,6 +2791,27 @@
           "allFailingHint": "Every endpoint fails at once on this probe, and so does its check without the VPN (or, without that check, endpoints on several servers fail). That usually means its own network or test URL is broken, so subscriptions ignore it."
         }
       }
+    },
+    "connections": {
+      "title": "Connection log",
+      "intro": "Who connected, when, through which inbound and where to. Read from Xray's access log on this server; each node keeps its own log.",
+      "off": "The connection log is off. Nothing is being recorded.",
+      "openSettings": "Open the settings",
+      "time": "Time",
+      "client": "Client",
+      "inbound": "Inbound",
+      "source": "Source",
+      "destination": "Destination",
+      "clientPlaceholder": "Client (exact name)",
+      "hostPlaceholder": "Destination contains…",
+      "sourcePlaceholder": "Source address contains…",
+      "exportCsv": "Export CSV",
+      "exportHint": "The export holds up to {count} rows of the current filter, with times in UTC.",
+      "onDisk": "On disk",
+      "empty": "No connections match.",
+      "newer": "Newer",
+      "older": "Older",
+      "ofClient": "This client's connections"
     }
   },
   "tgbot": {

@@ -277,6 +277,12 @@ func GetBackupFolderPath() string {
 	return filepath.Join(GetDBFolderPath(), "backups")
 }
 
+// GetConnLogFolderPath is where the connection log keeps its day files: beside the database,
+// yet outside it, so backups and the panel's own queries never carry them.
+func GetConnLogFolderPath() string {
+	return filepath.Join(GetDBFolderPath(), "connlog")
+}
+
 // GetLogFolder returns the path to the log folder based on environment variables or platform defaults.
 func GetLogFolder() string {
 	logFolderPath := os.Getenv("XUI_LOG_FOLDER")

@@ -6,6 +6,7 @@ import {
   DashboardOutlined,
   ExportOutlined,
   GlobalOutlined,
+  HistoryOutlined,
   RadarChartOutlined,
   ImportOutlined,
   SettingOutlined,
@@ -22,6 +23,7 @@ const GroupsPage = lazy(() => import('@/pages/groups/GroupsPage'));
 const NodesPage = lazy(() => import('@/pages/nodes/NodesPage'));
 const HostsPage = lazy(() => import('@/pages/hosts/HostsPage'));
 const ProbesPage = lazy(() => import('@/pages/probes/ProbesPage'));
+const ConnectionsPage = lazy(() => import('@/pages/connections/ConnectionsPage'));
 const SettingsPage = lazy(() => import('@/pages/settings/SettingsPage'));
 const XrayPage = lazy(() => import('@/pages/xray/XrayPage'));
 const ApiDocsPage = lazy(() => import('@/pages/api-docs/ApiDocsPage'));
@@ -43,6 +45,12 @@ export const PANEL_ROUTES: PanelRoute[] = [
   { path: '/nodes', titleKey: 'menu.nodes', icon: ClusterOutlined, component: NodesPage },
   { path: '/hosts', titleKey: 'menu.hosts', icon: GlobalOutlined, component: HostsPage },
   { path: '/probes', titleKey: 'menu.probes', icon: RadarChartOutlined, component: ProbesPage },
+  {
+    path: '/connections',
+    titleKey: 'menu.connections',
+    icon: HistoryOutlined,
+    component: ConnectionsPage,
+  },
   { path: '/outbound', titleKey: 'menu.outbounds', icon: ExportOutlined, component: XrayPage },
   { path: '/routing', titleKey: 'menu.routing', icon: SwapOutlined, component: XrayPage },
   { path: '/settings', titleKey: 'menu.settings', icon: SettingOutlined, component: SettingsPage },

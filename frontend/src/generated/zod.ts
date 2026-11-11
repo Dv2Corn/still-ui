@@ -42,6 +42,11 @@ export const AllSettingSchema = z.object({
   backupKeep: z.number().int().min(1).max(1000),
   backupSchedule: z.string(),
   backupTelegram: z.boolean(),
+  connLogDestination: z.enum(['full', 'domain', 'none']),
+  connLogEnable: z.boolean(),
+  connLogMaxSizeMB: z.number().int().min(16).max(1048576),
+  connLogRetentionDays: z.number().int().min(1).max(3650),
+  connLogSource: z.enum(['full', 'masked', 'none']),
   datepicker: z.string(),
   discordAdminIds: z.string(),
   discordBotBackup: z.boolean(),
@@ -252,6 +257,11 @@ export const AllSettingViewSchema = z.object({
   backupKeep: z.number().int().min(1).max(1000),
   backupSchedule: z.string(),
   backupTelegram: z.boolean(),
+  connLogDestination: z.enum(['full', 'domain', 'none']),
+  connLogEnable: z.boolean(),
+  connLogMaxSizeMB: z.number().int().min(16).max(1048576),
+  connLogRetentionDays: z.number().int().min(1).max(3650),
+  connLogSource: z.enum(['full', 'masked', 'none']),
   datepicker: z.string(),
   discordAdminIds: z.string(),
   discordBotBackup: z.boolean(),
@@ -670,6 +680,39 @@ export const ClientsSummarySchema = z.object({
   total: z.number().int(),
 });
 export type ClientsSummary = z.infer<typeof ClientsSummarySchema>;
+
+export const ConnFilterSchema = z.object({
+  before: z.string(),
+  client: z.string(),
+  from: z.number().int(),
+  host: z.string(),
+  inbound: z.string(),
+  limit: z.number().int(),
+  source: z.string(),
+  to: z.number().int(),
+});
+export type ConnFilter = z.infer<typeof ConnFilterSchema>;
+
+export const ConnPageSchema = z.object({
+  enabled: z.boolean(),
+  next: z.string(),
+  rows: z.array(z.lazy(() => ConnRecordSchema)),
+  sizeBytes: z.number().int(),
+});
+export type ConnPage = z.infer<typeof ConnPageSchema>;
+
+export const ConnRecordSchema = z.object({
+  client: z.string(),
+  host: z.string(),
+  inbound: z.string(),
+  network: z.string(),
+  outbound: z.string(),
+  port: z.number().int(),
+  source: z.string(),
+  sourcePort: z.number().int(),
+  time: z.number().int(),
+});
+export type ConnRecord = z.infer<typeof ConnRecordSchema>;
 
 export const FallbackParentInfoSchema = z.object({
   masterId: z.number().int(),

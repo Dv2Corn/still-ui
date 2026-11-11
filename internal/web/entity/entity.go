@@ -98,6 +98,14 @@ type AllSetting struct {
 	BackupAgeRecipients string `json:"backupAgeRecipients" form:"backupAgeRecipients"`
 	BackupTelegram      bool   `json:"backupTelegram" form:"backupTelegram"`
 
+	// Connection log (still-ui), off by default: how long and how much is kept, and what is
+	// stored of a destination (full, domain, none) and of a client address (full, masked, none).
+	ConnLogEnable        bool   `json:"connLogEnable" form:"connLogEnable"`
+	ConnLogRetentionDays int    `json:"connLogRetentionDays" form:"connLogRetentionDays" validate:"omitempty,gte=1,lte=3650" example:"30"`
+	ConnLogMaxSizeMB     int    `json:"connLogMaxSizeMB" form:"connLogMaxSizeMB" validate:"omitempty,gte=16,lte=1048576" example:"2048"`
+	ConnLogDestination   string `json:"connLogDestination" form:"connLogDestination" validate:"omitempty,oneof=full domain none" example:"full"`
+	ConnLogSource        string `json:"connLogSource" form:"connLogSource" validate:"omitempty,oneof=full masked none" example:"full"`
+
 	// Server health alert thresholds (events xray.down, xray.flapping, process.memory,
 	// disk.high, cert.expiring, backup.failed); a reminder repeats every alertRemindHours, 0 = never.
 	AlertXrayRestarts      int `json:"alertXrayRestarts" form:"alertXrayRestarts" validate:"gte=1,lte=100"`

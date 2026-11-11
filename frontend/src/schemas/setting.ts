@@ -220,6 +220,11 @@ export const AllSettingSchema = z
     alertDisk: z.number().int().min(1).max(100).optional(),
     alertCertDays: z.number().int().min(1).max(365).optional(),
     alertRemindHours: z.number().int().min(0).max(720).optional(),
+    connLogEnable: z.boolean().optional(),
+    connLogRetentionDays: z.number().int().min(1).max(3650).optional(),
+    connLogMaxSizeMB: z.number().int().min(16).max(1048576).optional(),
+    connLogDestination: z.enum(['full', 'domain', 'none']).optional(),
+    connLogSource: z.enum(['full', 'masked', 'none']).optional(),
   })
   .loose();
 

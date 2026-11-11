@@ -22,6 +22,9 @@ export const keys = {
     list: () => ['probes', 'list'] as const,
     history: (id: number) => ['probes', 'history', id] as const,
   },
+  connlog: {
+    list: (filter: unknown) => ['connlog', 'list', filter] as const,
+  },
   subBalancers: {
     root: () => ['sub-balancers'] as const,
     list: () => ['sub-balancers', 'list'] as const,

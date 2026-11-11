@@ -52,6 +52,40 @@ export const SCHEMAS: Record<string, unknown> = {
       "backupTelegram": {
         "type": "boolean"
       },
+      "connLogDestination": {
+        "enum": [
+          "full",
+          "domain",
+          "none"
+        ],
+        "example": "full",
+        "type": "string"
+      },
+      "connLogEnable": {
+        "description": "Connection log (still-ui), off by default: how long and how much is kept, and what is\nstored of a destination (full, domain, none) and of a client address (full, masked, none).",
+        "type": "boolean"
+      },
+      "connLogMaxSizeMB": {
+        "example": 2048,
+        "maximum": 1048576,
+        "minimum": 16,
+        "type": "integer"
+      },
+      "connLogRetentionDays": {
+        "example": 30,
+        "maximum": 3650,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "connLogSource": {
+        "enum": [
+          "full",
+          "masked",
+          "none"
+        ],
+        "example": "full",
+        "type": "string"
+      },
       "datepicker": {
         "type": "string"
       },
@@ -708,6 +742,11 @@ export const SCHEMAS: Record<string, unknown> = {
       "backupKeep",
       "backupSchedule",
       "backupTelegram",
+      "connLogDestination",
+      "connLogEnable",
+      "connLogMaxSizeMB",
+      "connLogRetentionDays",
+      "connLogSource",
       "datepicker",
       "discordAdminIds",
       "discordBotBackup",
@@ -957,6 +996,40 @@ export const SCHEMAS: Record<string, unknown> = {
       },
       "backupTelegram": {
         "type": "boolean"
+      },
+      "connLogDestination": {
+        "enum": [
+          "full",
+          "domain",
+          "none"
+        ],
+        "example": "full",
+        "type": "string"
+      },
+      "connLogEnable": {
+        "description": "Connection log (still-ui), off by default: how long and how much is kept, and what is\nstored of a destination (full, domain, none) and of a client address (full, masked, none).",
+        "type": "boolean"
+      },
+      "connLogMaxSizeMB": {
+        "example": 2048,
+        "maximum": 1048576,
+        "minimum": 16,
+        "type": "integer"
+      },
+      "connLogRetentionDays": {
+        "example": 30,
+        "maximum": 3650,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "connLogSource": {
+        "enum": [
+          "full",
+          "masked",
+          "none"
+        ],
+        "example": "full",
+        "type": "string"
       },
       "datepicker": {
         "type": "string"
@@ -1638,6 +1711,11 @@ export const SCHEMAS: Record<string, unknown> = {
       "backupKeep",
       "backupSchedule",
       "backupTelegram",
+      "connLogDestination",
+      "connLogEnable",
+      "connLogMaxSizeMB",
+      "connLogRetentionDays",
+      "connLogSource",
       "datepicker",
       "discordAdminIds",
       "discordBotBackup",
@@ -2777,6 +2855,147 @@ export const SCHEMAS: Record<string, unknown> = {
       "online",
       "onlineCount",
       "total"
+    ],
+    "type": "object"
+  },
+  "ConnFilter": {
+    "description": "ConnFilter narrows a query; an empty field does not filter. Client and Inbound match\nexactly, Host and Source match any part of the stored text, ignoring ASCII case.",
+    "properties": {
+      "before": {
+        "description": "Before is the Next of the previous page; empty starts at the newest row.",
+        "example": "20250101:4096",
+        "type": "string"
+      },
+      "client": {
+        "example": "alice@example.com",
+        "type": "string"
+      },
+      "from": {
+        "description": "From and To are unix milliseconds, both inclusive; 0 leaves that side open.",
+        "example": 1735689600000,
+        "format": "int64",
+        "type": "integer"
+      },
+      "host": {
+        "example": "example.com",
+        "type": "string"
+      },
+      "inbound": {
+        "example": "inbound-443",
+        "type": "string"
+      },
+      "limit": {
+        "example": 50,
+        "type": "integer"
+      },
+      "source": {
+        "example": "203.0.113.",
+        "type": "string"
+      },
+      "to": {
+        "example": 1735775999999,
+        "format": "int64",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "before",
+      "client",
+      "from",
+      "host",
+      "inbound",
+      "limit",
+      "source",
+      "to"
+    ],
+    "type": "object"
+  },
+  "ConnPage": {
+    "description": "ConnPage is one page of connections, newest first.",
+    "properties": {
+      "enabled": {
+        "description": "Enabled tells whether connections are being recorded now; SizeBytes is the log on disk.",
+        "example": true,
+        "type": "boolean"
+      },
+      "next": {
+        "description": "Next goes into ConnFilter.Before to read the following page; empty on the last one.",
+        "example": "20250101:4046",
+        "type": "string"
+      },
+      "rows": {
+        "items": {
+          "$ref": "#/components/schemas/ConnRecord"
+        },
+        "type": "array"
+      },
+      "sizeBytes": {
+        "example": 36700160,
+        "format": "int64",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "enabled",
+      "next",
+      "rows",
+      "sizeBytes"
+    ],
+    "type": "object"
+  },
+  "ConnRecord": {
+    "description": "ConnRecord is one accepted connection.",
+    "properties": {
+      "client": {
+        "example": "alice@example.com",
+        "type": "string"
+      },
+      "host": {
+        "example": "example.com",
+        "type": "string"
+      },
+      "inbound": {
+        "example": "inbound-443",
+        "type": "string"
+      },
+      "network": {
+        "example": "tcp",
+        "type": "string"
+      },
+      "outbound": {
+        "example": "direct",
+        "type": "string"
+      },
+      "port": {
+        "example": 443,
+        "type": "integer"
+      },
+      "source": {
+        "description": "Source is the client's address, or its /24 (IPv4) or /48 (IPv6) network when masked.",
+        "example": "203.0.113.9",
+        "type": "string"
+      },
+      "sourcePort": {
+        "example": 54321,
+        "type": "integer"
+      },
+      "time": {
+        "description": "Time is unix milliseconds.",
+        "example": 1735732800000,
+        "format": "int64",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "client",
+      "host",
+      "inbound",
+      "network",
+      "outbound",
+      "port",
+      "source",
+      "sourcePort",
+      "time"
     ],
     "type": "object"
   },
