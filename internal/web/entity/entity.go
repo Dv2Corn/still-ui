@@ -45,7 +45,7 @@ type AllSetting struct {
 	SubExpiredTemplate         string `json:"subExpiredTemplate" form:"subExpiredTemplate"`
 	SubTrafficDepletedTemplate string `json:"subTrafficDepletedTemplate" form:"subTrafficDepletedTemplate"`
 	SubHwidDefaultLimit        int    `json:"subHwidDefaultLimit" form:"subHwidDefaultLimit" validate:"gte=0,lte=1000" example:"0"`
-	SubHwidNoIdPolicy          string `json:"subHwidNoIdPolicy" form:"subHwidNoIdPolicy" example:"allow"`
+	SubHwidNoIdPolicy          string `json:"subHwidNoIdPolicy" form:"subHwidNoIdPolicy" example:"shared"`
 	SubHwidExpireDays          int    `json:"subHwidExpireDays" form:"subHwidExpireDays" validate:"gte=0,lte=3650" example:"30"`
 	SubHwidLimitNotice         string `json:"subHwidLimitNotice" form:"subHwidLimitNotice"`
 	SubHwidNoIdNotice          string `json:"subHwidNoIdNotice" form:"subHwidNoIdNotice"`

@@ -1802,7 +1802,7 @@ func runSeeders(isUsersEmpty bool) error {
 	}
 
 	if !slices.Contains(seedersHistory, "HwidNoIdPolicyKeep") {
-		if err := keepHwidNoIdRefusal(); err != nil {
+		if err := keepHwidNoIdPolicy(); err != nil {
 			return err
 		}
 	}

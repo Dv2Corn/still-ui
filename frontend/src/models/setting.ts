@@ -35,7 +35,7 @@ export class AllSetting {
   subTrafficDepletedTemplate =
     '🚫 {{EMAIL}} | Traffic Depleted | {{TRAFFIC_USED}}/{{TRAFFIC_TOTAL}}';
   subHwidDefaultLimit = 0;
-  subHwidNoIdPolicy: SubHwidNoIdPolicy = 'allow';
+  subHwidNoIdPolicy: SubHwidNoIdPolicy = 'shared';
   subHwidExpireDays = 30;
   subHwidLimitNotice =
     'Device limit {{LIMIT}} reached. Remove a device in your account or ask the seller.';

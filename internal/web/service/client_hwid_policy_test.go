@@ -38,19 +38,20 @@ func ageHwidRows(t *testing.T, subID string, days int) {
 	}
 }
 
-// An app that sends no device id is let in without taking a slot by default; "refuse" turns it away.
-func TestHwidGateNoIdPolicy(t *testing.T) {
+// Under "allow" an app that sends no device id passes without taking a slot; "refuse" turns it away.
+func TestHwidGateNoIdAllowAndRefuse(t *testing.T) {
 	initClientHwidTestDB(t)
 	rec := seedHwidClient(t, 1)
+	setHwidSetting(t, "subHwidNoIdPolicy", HwidNoIdAllow)
 
 	for range 2 {
 		res := gateHwid(t, rec.SubID, "")
 		if want := (HwidGateResult{Allowed: true, Active: true, Limit: 1}); res != want {
-			t.Fatalf("no id under the default policy = %+v, want %+v", res, want)
+			t.Fatalf("no id under allow = %+v, want %+v", res, want)
 		}
 	}
 	if rows := countHwidRows(t, rec.SubID); rows != 0 {
-		t.Fatalf("an app without an id took %d slot(s), want 0", rows)
+		t.Fatalf("an app without an id took %d slot(s) under allow, want 0", rows)
 	}
 	if res := gateHwid(t, rec.SubID, "device-one"); !res.Allowed || res.Registered != 1 {
 		t.Fatalf("the only slot must still be free for a device with an id: %+v", res)
@@ -64,6 +65,110 @@ func TestHwidGateNoIdPolicy(t *testing.T) {
 	// An id shorter than the minimum is no id.
 	if res := gateHwid(t, rec.SubID, "abc"); res.Allowed || !res.NotSupported {
 		t.Fatalf("a too-short id under refuse = %+v, want refused as not supported", res)
+	}
+}
+
+// The default: every app without a device id shares one slot of the subscription, so leaving
+// the header out does not get a device past the limit.
+func TestHwidGateNoIdSharedSlot(t *testing.T) {
+	initClientHwidTestDB(t)
+	rec := seedHwidClient(t, 2)
+	svc := &ClientService{}
+
+	for range 3 {
+		res := gateHwid(t, rec.SubID, "")
+		if want := (HwidGateResult{Allowed: true, Active: true, Limit: 2, Registered: 1}); res != want {
+			t.Fatalf("no id under the shared slot = %+v, want %+v", res, want)
+		}
+	}
+	if rows := countHwidRows(t, rec.SubID); rows != 1 {
+		t.Fatalf("apps without an id hold %d rows, want one shared slot", rows)
+	}
+	list, err := svc.ListClientHwids(rec.Email)
+	if err != nil || len(list) != 1 || !list[0].NoID || list[0].Fingerprint != "" {
+		t.Fatalf("device list = %+v err=%v, want one entry marked as the shared no-id slot", list, err)
+	}
+
+	if res := gateHwid(t, rec.SubID, "device-one"); !res.Allowed || res.Registered != 2 || !res.LimitReached {
+		t.Fatalf("a device with an id takes the second slot: %+v", res)
+	}
+	if res := gateHwid(t, rec.SubID, "device-two"); res.Allowed || !res.MaxDevicesReached {
+		t.Fatalf("a third device = %+v, want refused: the shared slot counts", res)
+	}
+	if res := gateHwid(t, rec.SubID, ""); !res.Allowed {
+		t.Fatalf("the registered shared slot must keep passing at a full limit: %+v", res)
+	}
+}
+
+// With every slot taken by real devices, an app without an id is refused as over the limit.
+func TestHwidGateNoIdSharedSlotRefusedAtFullLimit(t *testing.T) {
+	initClientHwidTestDB(t)
+	rec := seedHwidClient(t, 1)
+	if res := gateHwid(t, rec.SubID, "device-one"); !res.Allowed {
+		t.Fatalf("register the first device: %+v", res)
+	}
+	res := gateHwid(t, rec.SubID, "")
+	if want := (HwidGateResult{Active: true, MaxDevicesReached: true, LimitReached: true, Limit: 1, Registered: 1}); res != want {
+		t.Fatalf("no id at a full limit = %+v, want %+v", res, want)
+	}
+	if rows := countHwidRows(t, rec.SubID); rows != 1 {
+		t.Fatalf("a refused no-id fetch left %d rows, want only the registered device", rows)
+	}
+}
+
+// Changing the policy must not leave a slot held by nobody, nor count one that is not there.
+func TestHwidNoIdPolicySwitchKeepsRegistryConsistent(t *testing.T) {
+	initClientHwidTestDB(t)
+	rec := seedHwidClient(t, 2)
+	svc := &ClientService{}
+	registered := func() int {
+		t.Helper()
+		status, _, err := svc.HwidSlotStatusForSubID(rec.SubID)
+		if err != nil {
+			t.Fatalf("slot status: %v", err)
+		}
+		return status.Registered
+	}
+
+	gateHwid(t, rec.SubID, "")
+	gateHwid(t, rec.SubID, "device-one")
+	if got := registered(); got != 2 {
+		t.Fatalf("registered under shared = %d, want the shared slot and one device", got)
+	}
+
+	for _, policy := range []string{HwidNoIdAllow, HwidNoIdRefuse} {
+		setHwidSetting(t, "subHwidNoIdPolicy", policy)
+		if got := registered(); got != 1 {
+			t.Fatalf("registered under %s = %d, want 1: the shared slot no longer counts", policy, got)
+		}
+		if list, err := svc.ListClientHwids(rec.Email); err != nil || len(list) != 1 || list[0].NoID {
+			t.Fatalf("device list under %s = %+v err=%v, want only the real device", policy, list, err)
+		}
+	}
+	// The slot the shared row held is free for a real device, and the row goes with the fetch.
+	if res := gateHwid(t, rec.SubID, "device-two"); !res.Allowed || res.Registered != 2 {
+		t.Fatalf("second device after leaving shared = %+v, want admitted as the second of two", res)
+	}
+	if rows := countHwidRows(t, rec.SubID); rows != 2 {
+		t.Fatalf("client_hwids rows = %d, want the two real devices and no leftover shared row", rows)
+	}
+
+	// Back to shared with both slots taken: the apps without an id have to wait for a free one.
+	setHwidSetting(t, "subHwidNoIdPolicy", HwidNoIdShared)
+	if res := gateHwid(t, rec.SubID, ""); res.Allowed || !res.MaxDevicesReached {
+		t.Fatalf("no id back under shared at a full limit = %+v, want refused", res)
+	}
+	if err := svc.ClearClientHwids(rec.Email); err != nil {
+		t.Fatalf("clear devices: %v", err)
+	}
+	if res := gateHwid(t, rec.SubID, ""); !res.Allowed || res.Registered != 1 {
+		t.Fatalf("no id under shared with a free slot = %+v, want it registered", res)
+	}
+
+	// A stored value nobody can have saved reads as the default, never as "let everyone in".
+	setHwidSetting(t, "subHwidNoIdPolicy", "bogus")
+	if got := registered(); got != 1 {
+		t.Fatalf("registered under an unknown policy = %d, want the shared slot counted", got)
 	}
 }
 
@@ -101,9 +206,14 @@ func TestHwidGatePanelDefaultLimit(t *testing.T) {
 	if rows := countHwidRows(t, "never-issued"); rows != 0 {
 		t.Fatalf("client_hwids rows for an unknown subId = %d, want 0", rows)
 	}
-	setHwidSetting(t, "subHwidNoIdPolicy", HwidNoIdRefuse)
-	if res := gateHwid(t, "never-issued", ""); res != (HwidGateResult{Allowed: true}) {
-		t.Fatalf("unknown subId without a device id = %+v, want a plain pass, not a refusal", res)
+	for _, policy := range []string{HwidNoIdShared, HwidNoIdRefuse} {
+		setHwidSetting(t, "subHwidNoIdPolicy", policy)
+		if res := gateHwid(t, "never-issued", ""); res != (HwidGateResult{Allowed: true}) {
+			t.Fatalf("unknown subId without a device id under %s = %+v, want a plain pass", policy, res)
+		}
+	}
+	if rows := countHwidRows(t, "never-issued"); rows != 0 {
+		t.Fatalf("a shared slot was stored for an unknown subId: %d rows", rows)
 	}
 
 	status, found, err := (&ClientService{}).HwidSlotStatusForSubID(rec.SubID)
@@ -167,6 +277,7 @@ func TestPurgeExpiredClientHwids(t *testing.T) {
 		{SubID: "sub-a", HwidHash: "fresh", FirstSeen: 1, LastSeen: now.AddDate(0, 0, -29).UnixMilli()},
 		{SubID: "sub-a", HwidHash: "stale", FirstSeen: 1, LastSeen: now.AddDate(0, 0, -31).UnixMilli()},
 		{SubID: "sub-b", HwidHash: "stale", FirstSeen: 1, LastSeen: now.AddDate(0, 0, -400).UnixMilli()},
+		{SubID: "sub-c", HwidHash: noIDHwidHash, FirstSeen: 1, LastSeen: now.UnixMilli()},
 	}
 	if err := db.Create(&rows).Error; err != nil {
 		t.Fatalf("seed client_hwids: %v", err)
@@ -177,8 +288,8 @@ func TestPurgeExpiredClientHwids(t *testing.T) {
 	if err := svc.PurgeExpiredClientHwids(); err != nil {
 		t.Fatalf("purge with expiry off: %v", err)
 	}
-	if got := countHwidRows(t, "sub-a") + countHwidRows(t, "sub-b"); got != 3 {
-		t.Fatalf("rows with expiry off = %d, want all 3 kept", got)
+	if got := countHwidRows(t, "sub-a") + countHwidRows(t, "sub-b") + countHwidRows(t, "sub-c"); got != 4 {
+		t.Fatalf("rows with expiry off = %d, want all 4 kept", got)
 	}
 
 	setHwidSetting(t, "subHwidExpireDays", "30")
@@ -189,8 +300,17 @@ func TestPurgeExpiredClientHwids(t *testing.T) {
 	if err := db.Model(&model.ClientHwid{}).Order("id").Pluck("hwid_hash", &left).Error; err != nil {
 		t.Fatalf("read client_hwids: %v", err)
 	}
-	if len(left) != 1 || left[0] != "fresh" {
-		t.Fatalf("rows after purge = %q, want [fresh]", left)
+	if len(left) != 2 || left[0] != "fresh" || left[1] != noIDHwidHash {
+		t.Fatalf("rows after purge = %q, want the fresh device and the shared slot", left)
+	}
+
+	// Once apps without an id are no longer counted, the slot they shared is nobody's.
+	setHwidSetting(t, "subHwidNoIdPolicy", HwidNoIdAllow)
+	if err := svc.PurgeExpiredClientHwids(); err != nil {
+		t.Fatalf("purge under allow: %v", err)
+	}
+	if rows := countHwidRows(t, "sub-c"); rows != 0 {
+		t.Fatalf("shared slot rows left under allow = %d, want 0", rows)
 	}
 }
 
@@ -251,9 +371,10 @@ func TestValidateSubHwidSettings(t *testing.T) {
 		wantErr    string
 		wantPolicy string
 	}{
-		{name: "blank policy becomes allow", in: entity.AllSetting{}, wantPolicy: HwidNoIdAllow},
+		{name: "blank policy becomes the shared slot", in: entity.AllSetting{}, wantPolicy: HwidNoIdShared},
+		{name: "allow kept", in: entity.AllSetting{SubHwidNoIdPolicy: HwidNoIdAllow}, wantPolicy: HwidNoIdAllow},
 		{name: "refuse kept", in: entity.AllSetting{SubHwidNoIdPolicy: HwidNoIdRefuse, SubHwidDefaultLimit: 5, SubHwidExpireDays: 30}, wantPolicy: HwidNoIdRefuse},
-		{name: "unknown policy", in: entity.AllSetting{SubHwidNoIdPolicy: "block"}, wantErr: "device limit: apps without a device id must be set to allow or refuse"},
+		{name: "unknown policy", in: entity.AllSetting{SubHwidNoIdPolicy: "block"}, wantErr: "device limit: apps without a device id must be set to shared, allow or refuse"},
 		{name: "negative default limit", in: entity.AllSetting{SubHwidDefaultLimit: -1}, wantErr: "default device limit must be 0 to 1000"},
 		{name: "default limit too large", in: entity.AllSetting{SubHwidDefaultLimit: 1001}, wantErr: "default device limit must be 0 to 1000"},
 		{name: "negative expiry", in: entity.AllSetting{SubHwidExpireDays: -1}, wantErr: "devices expire after 0 to 3650 days"},

@@ -9,6 +9,7 @@ export type ClientHwidInfo = {
   osVersion: string;
   deviceModel: string;
   fingerprint: string;
+  noId?: boolean;
 };
 
 // normalizeClientHwids accepts the API payload and returns typed entries,

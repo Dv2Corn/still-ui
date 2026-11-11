@@ -16,7 +16,7 @@ export type SubClashAutoGroupType = z.infer<typeof SubClashAutoGroupTypeSchema>;
 export const SubProbeOrderSchema = z.enum(['off', 'reorder', 'hide']);
 export type SubProbeOrder = z.infer<typeof SubProbeOrderSchema>;
 
-export const SubHwidNoIdPolicySchema = z.enum(['allow', 'refuse']);
+export const SubHwidNoIdPolicySchema = z.enum(['shared', 'allow', 'refuse']);
 export type SubHwidNoIdPolicy = z.infer<typeof SubHwidNoIdPolicySchema>;
 
 export const AllSettingSchema = z

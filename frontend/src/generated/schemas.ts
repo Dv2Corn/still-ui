@@ -416,7 +416,7 @@ export const SCHEMAS: Record<string, unknown> = {
         "type": "string"
       },
       "subHwidNoIdPolicy": {
-        "example": "allow",
+        "example": "shared",
         "type": "string"
       },
       "subIncyAnnounceUrl": {
@@ -1338,7 +1338,7 @@ export const SCHEMAS: Record<string, unknown> = {
         "type": "string"
       },
       "subHwidNoIdPolicy": {
-        "example": "allow",
+        "example": "shared",
         "type": "string"
       },
       "subIncyAnnounceUrl": {

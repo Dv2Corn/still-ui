@@ -91,7 +91,7 @@ var defaultValueMap = map[string]string{
 	"subExpiredTemplate":          DefaultSubExpiredTemplate,
 	"subTrafficDepletedTemplate":  DefaultSubTrafficDepletedTemplate,
 	"subHwidDefaultLimit":         "0",
-	"subHwidNoIdPolicy":           HwidNoIdAllow,
+	"subHwidNoIdPolicy":           HwidNoIdShared,
 	"subHwidExpireDays":           "30",
 	"subHwidLimitNotice":          DefaultSubHwidLimitNotice,
 	"subHwidNoIdNotice":           DefaultSubHwidNoIdNotice,
@@ -894,10 +894,10 @@ func (s *SettingService) SubHwidNotices() (limitReached, noID string) {
 func validateSubHwidSettings(all *entity.AllSetting) error {
 	switch all.SubHwidNoIdPolicy {
 	case "":
-		all.SubHwidNoIdPolicy = HwidNoIdAllow
-	case HwidNoIdAllow, HwidNoIdRefuse:
+		all.SubHwidNoIdPolicy = HwidNoIdShared
+	case HwidNoIdShared, HwidNoIdAllow, HwidNoIdRefuse:
 	default:
-		return errors.New("device limit: apps without a device id must be set to allow or refuse")
+		return errors.New("device limit: apps without a device id must be set to shared, allow or refuse")
 	}
 	if all.SubHwidDefaultLimit < 0 || all.SubHwidDefaultLimit > SubHwidDefaultLimitMax {
 		return common.NewErrorf("default device limit must be 0 to %d", SubHwidDefaultLimitMax)

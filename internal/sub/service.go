@@ -505,19 +505,33 @@ const (
 	infoNodeActive
 	infoNodeExpired
 	infoNodeDepleted
-	infoNodeDeviceRefused
 )
 
-// replacesServers reports the modes whose dummy entry is the whole body, not a first line of it.
-func (m infoNodeMode) replacesServers() bool {
-	return m == infoNodeExpired || m == infoNodeDepleted || m == infoNodeDeviceRefused
+// infoNodeLink is the raw-format entry that only carries a text: a server no app can use.
+func infoNodeLink(remark string) string {
+	return fmt.Sprintf("socks://127.0.0.1:1080#%s", strings.ReplaceAll(url.QueryEscape(remark), "+", "%20"))
+}
+
+// refusedTraffic is the usage a fetch the device gate refused still reports. Every renderer
+// returns right after it: nothing of the client's servers is built for a refused device.
+func (s *SubService) refusedTraffic(subId string, inbounds []*model.Inbound, externalLinks []externalLinkEntry) xray.ClientTraffic {
+	seenEmails := make(map[string]struct{})
+	hasEnabledClient := false
+	for _, inbound := range inbounds {
+		if countHiddenClients(s.matchingClients(inbound, subId), seenEmails) {
+			hasEnabledClient = true
+		}
+	}
+	for _, ext := range externalLinks {
+		seenEmails[ext.Email] = struct{}{}
+		hasEnabledClient = hasEnabledClient || ext.Enable
+	}
+	traffic, _ := s.AggregateTrafficByEmails(slices.Sorted(maps.Keys(seenEmails)))
+	traffic.Enable = hasEnabledClient
+	return traffic
 }
 
 func (s *SubService) resolveInfoNodeRemark(subId string, uniqueEmails []string, traffic xray.ClientTraffic, hasEntries bool) (infoNodeMode, string) {
-	// Set for a fetch the device gate refused: the notice is then the only entry of the body.
-	if s.deviceNotice != "" && s.subscriptionBody {
-		return infoNodeDeviceRefused, s.deviceNotice
-	}
 	if !s.subInfoNodeEnable || !s.subscriptionBody {
 		return infoNodeNone, ""
 	}
@@ -589,6 +603,9 @@ func (s *SubService) getSubs(subId string) ([]string, []string, int64, xray.Clie
 
 	if len(inbounds) == 0 && len(externalLinks) == 0 {
 		return nil, nil, 0, traffic, nil
+	}
+	if s.deviceNotice != "" {
+		return []string{infoNodeLink(s.deviceNotice)}, nil, 0, s.refusedTraffic(subId, inbounds, externalLinks), nil
 	}
 
 	seenEmails := make(map[string]struct{})
@@ -699,8 +716,8 @@ func (s *SubService) getSubs(subId string) ([]string, []string, int64, xray.Clie
 	traffic.Enable = hasEnabledClient
 
 	if mode, remark := s.resolveInfoNodeRemark(subId, uniqueEmails, traffic, len(result) > 0); mode != infoNodeNone {
-		dummyLink := fmt.Sprintf("socks://127.0.0.1:1080#%s", strings.ReplaceAll(url.QueryEscape(remark), "+", "%20"))
-		if mode.replacesServers() {
+		dummyLink := infoNodeLink(remark)
+		if mode == infoNodeExpired || mode == infoNodeDepleted {
 			return []string{dummyLink}, emails, lastOnline, traffic, nil
 		}
 		result = append([]string{dummyLink}, result...)

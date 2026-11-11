@@ -76,16 +76,18 @@ func TestClientHwidRowsRekeyedOnUpgrade(t *testing.T) {
 	}
 }
 
-// A panel that already limited devices refused apps without a device id. The upgrade pins
-// that; a panel without limits takes the new default.
-func TestHwidNoIdRefusalKeptOnUpgrade(t *testing.T) {
+// An upgraded panel keeps how it treated apps without a device id: refused where devices were
+// limited, served elsewhere. A choice the admin already saved is not overwritten.
+func TestHwidNoIdPolicyKeptOnUpgrade(t *testing.T) {
 	for _, tc := range []struct {
-		name  string
-		limit int
-		want  []string
+		name   string
+		limit  int
+		stored string
+		want   []string
 	}{
 		{name: "panel with a device limit", limit: 2, want: []string{HwidNoIdRefuse}},
-		{name: "panel without device limits", limit: 0, want: nil},
+		{name: "panel without device limits", limit: 0, want: []string{HwidNoIdAllow}},
+		{name: "panel with a saved choice", limit: 2, stored: "shared", want: []string{"shared"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dbPath := filepath.Join(t.TempDir(), "x-ui.db")
@@ -95,6 +97,11 @@ func TestHwidNoIdRefusalKeptOnUpgrade(t *testing.T) {
 			t.Cleanup(func() { _ = CloseDB() })
 			if err := db.Create(&model.ClientRecord{Email: "a@x", SubID: "sub-a", Enable: true, LimitHwid: tc.limit}).Error; err != nil {
 				t.Fatalf("seed client: %v", err)
+			}
+			if tc.stored != "" {
+				if err := db.Create(&model.Setting{Key: HwidNoIdPolicySetting, Value: tc.stored}).Error; err != nil {
+					t.Fatalf("seed policy: %v", err)
+				}
 			}
 			reopenWithoutSeeder(t, dbPath, "HwidNoIdPolicyKeep")
 

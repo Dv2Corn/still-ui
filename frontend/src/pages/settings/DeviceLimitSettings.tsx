@@ -1,4 +1,4 @@
-import { Input, InputNumber, Select } from 'antd';
+import { Alert, Input, InputNumber, Select } from 'antd';
 import { useTranslation } from 'react-i18next';
 import { AllSetting } from '@/models/setting';
 import type { SubHwidNoIdPolicy } from '@/schemas/setting';
@@ -46,11 +46,15 @@ export default function DeviceLimitSettings({
           value={allSetting.subHwidNoIdPolicy}
           onChange={(value: SubHwidNoIdPolicy) => updateSetting({ subHwidNoIdPolicy: value })}
           options={[
+            { value: 'shared', label: t('pages.settings.subHwidNoIdShared') },
             { value: 'allow', label: t('pages.settings.subHwidNoIdAllow') },
             { value: 'refuse', label: t('pages.settings.subHwidNoIdRefuse') },
           ]}
         />
       </SettingListItem>
+      {allSetting.subHwidNoIdPolicy === 'allow' && (
+        <Alert type="warning" showIcon title={t('pages.settings.subHwidNoIdAllowWarning')} />
+      )}
       <SettingListItem
         paddings="small"
         title={t('pages.settings.subHwidExpireDays')}

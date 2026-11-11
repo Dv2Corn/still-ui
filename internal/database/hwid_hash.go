@@ -16,9 +16,10 @@ import (
 // A settings reset must keep it: without it every registered device reads as new.
 const HwidHashKeySetting = "hwidHashKey"
 
-// HwidNoIdPolicySetting and its refuse value: the seeder below writes them before the service layer loads.
+// HwidNoIdPolicySetting and its values live here because the upgrade seeder below writes them.
 const (
 	HwidNoIdPolicySetting = "subHwidNoIdPolicy"
+	HwidNoIdAllow         = "allow"
 	HwidNoIdRefuse        = "refuse"
 )
 
@@ -77,9 +78,9 @@ func rehashClientHwidsKeyed() error {
 	})
 }
 
-// Until now a limited subscription refused every app that sends no device id; a panel that
-// already limits devices keeps that when the default becomes "allow".
-func keepHwidNoIdRefusal() error {
+// An upgraded panel keeps what its subscribers have: one that limits devices went on refusing
+// apps without a device id, any other served them. Only a new panel gets the shared slot.
+func keepHwidNoIdPolicy() error {
 	return db.Transaction(func(tx *gorm.DB) error {
 		var limited, stored int64
 		if err := tx.Model(&model.ClientRecord{}).Where("limit_hwid > 0").Count(&limited).Error; err != nil {
@@ -88,8 +89,12 @@ func keepHwidNoIdRefusal() error {
 		if err := tx.Model(&model.Setting{}).Where("key = ?", HwidNoIdPolicySetting).Count(&stored).Error; err != nil {
 			return err
 		}
-		if limited > 0 && stored == 0 {
-			if err := tx.Create(&model.Setting{Key: HwidNoIdPolicySetting, Value: HwidNoIdRefuse}).Error; err != nil {
+		if stored == 0 {
+			policy := HwidNoIdAllow
+			if limited > 0 {
+				policy = HwidNoIdRefuse
+			}
+			if err := tx.Create(&model.Setting{Key: HwidNoIdPolicySetting, Value: policy}).Error; err != nil {
 				return err
 			}
 		}

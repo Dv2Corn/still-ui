@@ -84,7 +84,9 @@ export default function ClientHwidListModal({
             >
               <div style={{ flex: 1, minWidth: 0 }}>
                 <Typography.Text strong>
-                  {entry.deviceModel || entry.userAgent || t('pages.clients.hwidDevice')}
+                  {entry.noId
+                    ? t('pages.clients.hwidNoIdShared')
+                    : entry.deviceModel || entry.userAgent || t('pages.clients.hwidDevice')}
                 </Typography.Text>
                 <br />
                 <Typography.Text type="secondary">

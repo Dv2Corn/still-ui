@@ -442,7 +442,7 @@
             "type": "string"
           },
           "subHwidNoIdPolicy": {
-            "example": "allow",
+            "example": "shared",
             "type": "string"
           },
           "subIncyAnnounceUrl": {
@@ -1364,7 +1364,7 @@
             "type": "string"
           },
           "subHwidNoIdPolicy": {
-            "example": "allow",
+            "example": "shared",
             "type": "string"
           },
           "subIncyAnnounceUrl": {

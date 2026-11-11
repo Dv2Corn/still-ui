@@ -60,6 +60,8 @@ type ClientHwidInfo struct {
 	OsVersion   string `json:"osVersion"`
 	DeviceModel string `json:"deviceModel"`
 	Fingerprint string `json:"fingerprint"`
+	// NoID marks the one slot all apps without a device id share; it has no fingerprint.
+	NoID bool `json:"noId"`
 }
 
 // hashHwid never stores or returns the raw id: see database.KeyedHwidHash.
@@ -73,8 +75,13 @@ func hashHwid(tx *gorm.DB, subID, raw string) (string, error) {
 }
 
 const (
-	HwidNoIdAllow  = "allow"
+	// HwidNoIdShared: every app that sends no device id shares one slot of the subscription.
+	HwidNoIdShared = "shared"
+	HwidNoIdAllow  = database.HwidNoIdAllow
 	HwidNoIdRefuse = database.HwidNoIdRefuse
+
+	// noIDHwidHash marks the shared slot's row. A device hash is 64 hex characters, so it cannot collide.
+	noIDHwidHash = "no-device-id"
 
 	SubHwidDefaultLimitMax = 1000
 	SubHwidExpireDaysMax   = 3650
@@ -85,7 +92,7 @@ const (
 type hwidPolicy struct {
 	// defaultLimit applies to a subscription whose clients set no limit of their own; 0 is none.
 	defaultLimit int
-	refuseNoID   bool
+	noID         string
 	// staleBefore is the last_seen (ms) below which a device has expired; 0 keeps every device.
 	staleBefore int64
 }
@@ -107,7 +114,11 @@ func loadHwidPolicy(db *gorm.DB) (hwidPolicy, error) {
 			values[row.Key] = row.Value
 		}
 	}
-	policy := hwidPolicy{refuseNoID: values[database.HwidNoIdPolicySetting] == HwidNoIdRefuse}
+	policy := hwidPolicy{noID: values[database.HwidNoIdPolicySetting]}
+	// A value nobody can have saved must not open the limit: it reads as the default.
+	if policy.noID != HwidNoIdAllow && policy.noID != HwidNoIdRefuse {
+		policy.noID = HwidNoIdShared
+	}
 	if limit, err := strconv.Atoi(values["subHwidDefaultLimit"]); err == nil && limit > 0 {
 		policy.defaultLimit = limit
 	}
@@ -117,16 +128,25 @@ func loadHwidPolicy(db *gorm.DB) (hwidPolicy, error) {
 	return policy, nil
 }
 
-// liveHwids narrows a client_hwids query to devices that have not expired.
+// liveHwids narrows a client_hwids query to the rows that hold a slot: not expired, and the
+// shared no-id slot only while the policy counts it.
 func (p hwidPolicy) liveHwids(tx *gorm.DB) *gorm.DB {
-	return tx.Where("last_seen >= ?", p.staleBefore)
+	if p.noID == HwidNoIdShared {
+		return tx.Where("last_seen >= ?", p.staleBefore)
+	}
+	return tx.Where("last_seen >= ? AND hwid_hash <> ?", p.staleBefore, noIDHwidHash)
+}
+
+// staleHwids is the complement of liveHwids: the rows to delete.
+func (p hwidPolicy) staleHwids(tx *gorm.DB) *gorm.DB {
+	if p.noID == HwidNoIdShared {
+		return tx.Where("last_seen < ?", p.staleBefore)
+	}
+	return tx.Where("(last_seen < ? OR hwid_hash = ?)", p.staleBefore, noIDHwidHash)
 }
 
 func (p hwidPolicy) deleteStaleHwids(tx *gorm.DB, subID string) error {
-	if p.staleBefore <= 0 {
-		return nil
-	}
-	return tx.Where("sub_id = ? AND last_seen < ?", subID, p.staleBefore).Delete(&model.ClientHwid{}).Error
+	return p.staleHwids(tx.Where("sub_id = ?", subID)).Delete(&model.ClientHwid{}).Error
 }
 
 func shortHwidFingerprint(hash string) string {
@@ -245,10 +265,10 @@ func (s *ClientService) EnforceHwidForSubID(subID string, req HwidRequest) (Hwid
 
 	res.Active = true
 	res.Limit = limit
-	if !hasID {
-		// Uncounted when let in: without an id there is nothing to tell two devices apart.
-		res.NotSupported = policy.refuseNoID
-		res.Allowed = !policy.refuseNoID
+	// Without an id two devices cannot be told apart: they are refused, share one slot, or pass uncounted.
+	if !hasID && policy.noID != HwidNoIdShared {
+		res.NotSupported = policy.noID == HwidNoIdRefuse
+		res.Allowed = !res.NotSupported
 		return res, nil
 	}
 
@@ -263,9 +283,11 @@ func (s *ClientService) EnforceHwidForSubID(subID string, req HwidRequest) (Hwid
 		}
 		res.Active = true
 		res.Limit = limit
-		hwidHash, err := hashHwid(tx, subID, req.Hwid)
-		if err != nil {
-			return err
+		hwidHash := noIDHwidHash
+		if hasID {
+			if hwidHash, err = hashHwid(tx, subID, req.Hwid); err != nil {
+				return err
+			}
 		}
 		// Expired devices leave before the count, so the slot they held is free for this request.
 		if err := policy.deleteStaleHwids(tx, subID); err != nil {
@@ -418,7 +440,11 @@ func (s *ClientService) ListClientHwids(email string) ([]ClientHwidInfo, error) 
 			OsVersion:   r.OsVersion,
 			DeviceModel: r.DeviceModel,
 			Fingerprint: shortHwidFingerprint(r.HwidHash),
+			NoID:        r.HwidHash == noIDHwidHash,
 		})
+		if r.HwidHash == noIDHwidHash {
+			out[len(out)-1].Fingerprint = ""
+		}
 	}
 	return out, nil
 }
@@ -461,10 +487,10 @@ func (s *ClientService) DeleteClientHwid(email string, id int) error {
 func (s *ClientService) PurgeExpiredClientHwids() error {
 	db := database.GetDB()
 	policy, err := loadHwidPolicy(db)
-	if err != nil || policy.staleBefore <= 0 {
+	if err != nil {
 		return err
 	}
-	return db.Where("last_seen < ?", policy.staleBefore).Delete(&model.ClientHwid{}).Error
+	return policy.staleHwids(db).Delete(&model.ClientHwid{}).Error
 }
 
 // Serialize the limit write and trim with SyncInbound and client deletion.

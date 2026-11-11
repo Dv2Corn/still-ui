@@ -168,16 +168,26 @@ func TestDeviceLimitNoticeTextIsConfigurable(t *testing.T) {
 	assertServesNotice(t, path, requestSub(t, router, http.MethodGet, path, "device-two", ""), "Лимит устройств: 1. Напишите продавцу.")
 }
 
-// An app that sends no device id is served and not counted by default; under "refuse" it gets
-// its own notice.
+// Apps that send no device id share one slot by default, so dropping the header is no way past
+// the limit; "allow" serves them uncounted and "refuse" answers with its own notice.
 func TestDeviceLimitNoIdPolicy(t *testing.T) {
 	router, subID := initHwidSubRouter(t, 1)
 	routes := hwidBodyRoutes(subID)
+	statusPath := "/sub/" + subID + "/hwid-status"
+	path := "/sub/" + subID
 
 	for _, path := range routes {
 		assertServesRealServers(t, path, requestSub(t, router, http.MethodGet, path, "", ""))
 	}
-	assertHwidStatus(t, requestSub(t, router, http.MethodGet, "/sub/"+subID+"/hwid-status", "", ""), true, 1, 0, 1, false)
+	assertHwidStatus(t, requestSub(t, router, http.MethodGet, statusPath, "", ""), true, 1, 1, 0, true)
+	assertServesNotice(t, path, requestSub(t, router, http.MethodGet, path, "device-one", ""), limitOneNotice)
+
+	setSubSetting(t, "subHwidNoIdPolicy", service.HwidNoIdAllow)
+	for _, path := range routes {
+		assertServesRealServers(t, path, requestSub(t, router, http.MethodGet, path, "", ""))
+	}
+	assertHwidStatus(t, requestSub(t, router, http.MethodGet, statusPath, "", ""), true, 1, 0, 1, false)
+	assertServesRealServers(t, path, requestSub(t, router, http.MethodGet, path, "device-one", ""))
 
 	setSubSetting(t, "subHwidNoIdPolicy", service.HwidNoIdRefuse)
 	for _, path := range routes {
@@ -187,7 +197,6 @@ func TestDeviceLimitNoIdPolicy(t *testing.T) {
 			t.Fatalf("%s missing HWID headers = %#v", path, rec.Header())
 		}
 	}
-	path := "/sub/" + subID
 	assertServesRealServers(t, path, requestSub(t, router, http.MethodGet, path, "device-one", ""))
 }
 
