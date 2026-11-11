@@ -198,9 +198,10 @@ func (s *PortHopService) desired() ([]porthop.Redirect, []PortHopRule, []uint16,
 // EnsureHost converges the nftables table; it runs on start and on a short cadence, so a
 // saved, disabled or deleted inbound and a flushed ruleset are all picked up without a hook.
 func (s *PortHopService) EnsureHost() {
-	redirects, _, protected, err := s.desired()
+	// Read under the lock: a pass that read earlier must not apply after one that read later.
 	portHopMu.Lock()
 	defer portHopMu.Unlock()
+	redirects, _, protected, err := s.desired()
 	if err == nil {
 		err = portHopHostImpl.Ensure(redirects, protected)
 	}

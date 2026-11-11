@@ -3,6 +3,7 @@ package porthop
 import (
 	"errors"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -10,6 +11,15 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/nfttable"
 	"github.com/mhsanaei/3x-ui/v3/internal/nfttable/nfttest"
 )
+
+// manyPorts appends n more single ports, all different.
+func manyPorts(n int) string {
+	var b strings.Builder
+	for i := range n {
+		b.WriteString("," + strconv.Itoa(40000+i))
+	}
+	return b.String()
+}
 
 func TestParseRanges(t *testing.T) {
 	ok := []struct {
@@ -26,16 +36,21 @@ func TestParseRanges(t *testing.T) {
 			t.Errorf("ParseRanges(%q) = %v, %v; want %v", tc.in, got, err, tc.want)
 		}
 	}
+	if got, err := ParseRanges(manyPorts(maxRanges)[1:]); err != nil || len(got) != maxRanges {
+		t.Errorf("ParseRanges of %d entries = %d entries, %v", maxRanges, len(got), err)
+	}
 	bad := map[string]string{
-		"":                  "has an empty entry",
-		"20000,":            "has an empty entry",
-		"abc":               "is not a port or a low-high range",
-		"30000-20000":       "is not a port or a low-high range",
-		"20000-70000":       "is not a port or a low-high range",
-		"20000-30000-40000": "is not a port or a low-high range",
-		"443":               "starts below 1024",
-		"1-65535":           "starts below 1024",
-		"-5":                "is not a port or a low-high range",
+		"":                            "has an empty entry",
+		"20000,":                      "has an empty entry",
+		"abc":                         "is not a port or a low-high range",
+		"30000-20000":                 "is not a port or a low-high range",
+		"20000-70000":                 "is not a port or a low-high range",
+		"20000-30000-40000":           "is not a port or a low-high range",
+		"443":                         "starts below 1024",
+		"1-65535":                     "starts below 1024",
+		"-5":                          "is not a port or a low-high range",
+		"20000-30000,25000":           "repeats ports of an earlier entry",
+		"2000" + manyPorts(maxRanges): "has more than 32 entries",
 	}
 	for in, want := range bad {
 		if _, err := ParseRanges(in); err == nil || !strings.Contains(err.Error(), want) {

@@ -20,6 +20,9 @@ const TableName = "still_port_hop"
 // MinPort keeps a hop range off the well-known ports, where the server's own services answer.
 const MinPort = 1024
 
+// maxRanges bounds the work per inbound: the panel looks into every entry on each pass.
+const maxRanges = 32
+
 // presenceCheckEvery is how often an unchanged table is looked up again: a reboot or a
 // foreign "nft flush ruleset" removes it without the panel knowing.
 const presenceCheckEvery = time.Minute
@@ -65,7 +68,15 @@ func ParseRanges(spec string) ([]Range, error) {
 		if lo < MinPort {
 			return nil, fmt.Errorf("port range %q starts below %d", part, MinPort)
 		}
-		out = append(out, Range{From: uint16(lo), To: uint16(hi)})
+		r := Range{From: uint16(lo), To: uint16(hi)}
+		// A repeated port is a typo; refuse it rather than rely on how nft merges intervals.
+		if slices.ContainsFunc(out, r.Overlaps) {
+			return nil, fmt.Errorf("port range %q repeats ports of an earlier entry", part)
+		}
+		if len(out) == maxRanges {
+			return nil, fmt.Errorf("port range %q has more than %d entries", spec, maxRanges)
+		}
+		out = append(out, r)
 	}
 	return out, nil
 }
