@@ -39,6 +39,17 @@ inbounds** at once, with per-client traffic accounting.
 - **Limit IP** caps simultaneous source IPs. Enforcement relies on Fail2ban —
   see [Security](/docs/operations/security). You can view a client's recent IPs
   and clear them from the client's actions.
+- **HWID Limit** caps the devices one subscription works on, counted where the
+  subscription is fetched by the device ID the app sends (`X-HWID`: Happ,
+  v2rayTun and others); no Fail2ban is involved. `0` takes the panel default
+  from **Settings → Subscription → Device limit** (unlimited when that is `0`
+  too). A new device over the limit gets a valid answer for its app whose only
+  server is a notice ("Device limit N reached…", editable), never an error;
+  registered devices keep working. A device that has not fetched the
+  subscription for 30 days (adjustable, `0` = never) frees its slot. Apps that
+  send no device ID are served and not counted, or refused with a notice — your
+  choice in the same settings tab. The client's card lists its devices and
+  removes them; the subscription page shows the subscriber only the count.
 - **Online status** and **last-online** times are tracked per client (and per
   node in multi-node setups).
 

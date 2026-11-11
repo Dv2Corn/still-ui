@@ -33,16 +33,17 @@ func NewSubClashService(enableRouting bool, clashRules string, clashRemoteDNS bo
 }
 
 func (s *SubClashService) GetClash(subId string, host string) (string, string, error) {
-	return s.getClash(subId, host, false)
+	return s.getClash(subId, host, false, "")
 }
 
 func (s *SubClashService) GetClashLegacy(subId string, host string) (string, string, error) {
-	return s.getClash(subId, host, true)
+	return s.getClash(subId, host, true, "")
 }
 
-func (s *SubClashService) getClash(subId string, host string, legacy bool) (string, string, error) {
+func (s *SubClashService) getClash(subId string, host string, legacy bool, deviceNotice string) (string, string, error) {
 	subReq := s.SubService.ForRequest(host)
 	subReq.subscriptionBody = true
+	subReq.deviceNotice = deviceNotice
 	return s.renderClash(subReq, subId, host, legacy)
 }
 
@@ -189,7 +190,7 @@ func (s *SubClashService) renderClash(subReq *SubService, subId string, host str
 			"server": "127.0.0.1",
 			"port":   1080,
 		}
-		if mode == infoNodeExpired || mode == infoNodeDepleted {
+		if mode.replacesServers() {
 			proxies = []map[string]any{dummyProxy}
 		} else {
 			proxies = append([]map[string]any{dummyProxy}, proxies...)

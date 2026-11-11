@@ -127,6 +127,11 @@ export interface AllSetting {
   subHappTunType: string;
   subHideSettings: boolean;
   subHostSortMode: string;
+  subHwidDefaultLimit: number;
+  subHwidExpireDays: number;
+  subHwidLimitNotice: string;
+  subHwidNoIdNotice: string;
+  subHwidNoIdPolicy: string;
   subIncyAnnounceUrl: string;
   subIncyAppAutoDetect: boolean;
   subIncyBannerBgColor: string;
@@ -337,6 +342,11 @@ export interface AllSettingView {
   subHappTunType: string;
   subHideSettings: boolean;
   subHostSortMode: string;
+  subHwidDefaultLimit: number;
+  subHwidExpireDays: number;
+  subHwidLimitNotice: string;
+  subHwidNoIdNotice: string;
+  subHwidNoIdPolicy: string;
   subIncyAnnounceUrl: string;
   subIncyAppAutoDetect: boolean;
   subIncyBannerBgColor: string;

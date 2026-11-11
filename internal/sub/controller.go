@@ -28,6 +28,8 @@ import (
 const (
 	subMihomoPath      = "/mihomo/"
 	subClashLegacyPath = "/clash-legacy/"
+	// deviceNoticeKey holds, on the request context, what a refused device is told instead of servers.
+	deviceNoticeKey = "sub_device_notice"
 )
 
 // writeSubError translates a service-layer result into an HTTP response.
@@ -460,6 +462,9 @@ func (a *SUBController) buildSubPageData(c *gin.Context) (PageData, bool) {
 	metadata := a.metadataForSubRequest(func() *SubService { return subReq }, subId, "")
 	page := subReq.BuildPageData(subId, hostHeader, traffic, lastOnline, subs, emails, subURL, subJsonURL, subClashURL, basePathStr, metadata.Title, metadata.SupportURL)
 	page.SubAnnounce = metadata.Announce
+	if devices, found, err := a.clientService.HwidSlotStatusForSubID(subId); err == nil && found && devices.Active {
+		page.DeviceLimit, page.DeviceCount = devices.Limit, devices.Registered
+	}
 	return page, true
 }
 
@@ -508,6 +513,7 @@ func (a *SUBController) subs(c *gin.Context) {
 	scheme, host, hostWithPort, _ := a.subService.ResolveRequest(c)
 	subReq := a.subService.ForRequest(host)
 	subReq.subscriptionBody = true
+	subReq.deviceNotice = c.GetString(deviceNoticeKey)
 	subs, _, _, traffic, err := subReq.getSubs(subId)
 	if err != nil || subs == nil {
 		writeSubError(c, err)
@@ -546,6 +552,10 @@ func (a *SUBController) subs(c *gin.Context) {
 
 func (a *SUBController) recordSubscriptionFetch(c *gin.Context) {
 	if c.Request == nil || c.Request.Method != http.MethodGet || c.Writer.Status() != http.StatusOK {
+		return
+	}
+	// A refused device got the notice, not the subscription.
+	if c.GetString(deviceNoticeKey) != "" {
 		return
 	}
 	if err := a.subService.RecordSubscriptionFetch(c.Param("subid")); err != nil {
@@ -692,7 +702,7 @@ func (a *SUBController) subPageContext(page PageData) map[string]any {
 	subUpdates, _ := a.settingService.GetSubUpdates()
 	updateHours, _ := strconv.Atoi(subUpdates)
 
-	return map[string]any{
+	view := map[string]any{
 		"sId":           page.SId,
 		"enabled":       page.Enabled,
 		"isOnline":      page.IsOnline,
@@ -717,6 +727,11 @@ func (a *SUBController) subPageContext(page PageData) map[string]any {
 		"datepicker":    datepicker,
 		"announce":      page.SubAnnounce,
 	}
+	if page.DeviceLimit > 0 {
+		view["deviceLimit"] = page.DeviceLimit
+		view["deviceCount"] = page.DeviceCount
+	}
+	return view
 }
 
 func (a *SUBController) enforceHwid(c *gin.Context) bool {
@@ -733,10 +748,19 @@ func (a *SUBController) enforceHwid(c *gin.Context) bool {
 	}
 	applyHwidHeaders(c, result)
 	if !result.Allowed {
-		c.Status(http.StatusNotFound)
-		return false
+		c.Set(deviceNoticeKey, a.deviceNotice(result))
 	}
 	return true
+}
+
+// deviceNotice is the text a refused device reads as its only server and as the announcement:
+// an error status would show as a bare failure in the app, or as nothing at all.
+func (a *SUBController) deviceNotice(result service.HwidGateResult) string {
+	limitReached, noID := a.settingService.SubHwidNotices()
+	if result.NotSupported {
+		return noID
+	}
+	return strings.ReplaceAll(limitReached, "{{LIMIT}}", strconv.Itoa(result.Limit))
 }
 
 func applyHwidHeaders(c *gin.Context, result service.HwidGateResult) {
@@ -746,7 +770,8 @@ func applyHwidHeaders(c *gin.Context, result service.HwidGateResult) {
 	if result.NotSupported {
 		c.Header("X-Hwid-Not-Supported", "true")
 	}
-	if result.LimitReached {
+	// Only on a refusal: Happ shows a "limit reached" banner for it, also on a working device.
+	if result.LimitReached && !result.Allowed {
 		c.Header("X-Hwid-Limit", "true")
 	}
 	if result.MaxDevicesReached {
@@ -848,7 +873,7 @@ func (a *SUBController) serveJson(c *gin.Context, alwaysReturnArray bool, conten
 func (a *SUBController) serveJsonBody(c *gin.Context, alwaysReturnArray bool, contentType string, rawDownload bool) bool {
 	subId := c.Param("subid")
 	scheme, host, hostWithPort, _ := a.subService.ResolveRequest(c)
-	jsonSub, header, err := a.subJsonService.GetJson(subId, host, alwaysReturnArray)
+	jsonSub, header, err := a.subJsonService.getJson(subId, host, alwaysReturnArray, c.GetString(deviceNoticeKey))
 	if err != nil {
 		writeSubError(c, err)
 		return true
@@ -906,13 +931,7 @@ func (a *SUBController) subClash(c *gin.Context, legacy bool) {
 func (a *SUBController) serveClashBody(c *gin.Context, rawDownload bool, legacy bool) bool {
 	subId := c.Param("subid")
 	scheme, host, hostWithPort, _ := a.subService.ResolveRequest(c)
-	var clashSub, header string
-	var err error
-	if legacy {
-		clashSub, header, err = a.subClashService.GetClashLegacy(subId, host)
-	} else {
-		clashSub, header, err = a.subClashService.GetClash(subId, host)
-	}
+	clashSub, header, err := a.subClashService.getClash(subId, host, legacy, c.GetString(deviceNoticeKey))
 	if err != nil {
 		if errors.Is(err, errNoLegacyClashProxies) {
 			c.String(http.StatusUnprocessableEntity, err.Error())
@@ -972,6 +991,9 @@ func (a *SUBController) ApplyCommonHeaders(
 	}
 	if profileUrl != "" {
 		c.Writer.Header().Set("Profile-Web-Page-Url", profileUrl)
+	}
+	if notice := c.GetString(deviceNoticeKey); notice != "" {
+		profileAnnounce = notice
 	}
 	if profileAnnounce != "" {
 		c.Writer.Header().Set("Announce", "base64:"+base64.StdEncoding.EncodeToString([]byte(profileAnnounce)))

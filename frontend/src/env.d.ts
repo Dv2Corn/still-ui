@@ -21,6 +21,8 @@ interface SubPageData {
   emails?: string[];
   datepicker?: 'gregorian' | 'jalalian';
   announce?: string;
+  deviceLimit?: number;
+  deviceCount?: number;
   downloadByte?: string | number;
   uploadByte?: string | number;
   usedByte?: string | number;

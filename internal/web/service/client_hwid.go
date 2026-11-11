@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"strconv"
 	"strings"
 	"time"
 
@@ -61,9 +62,71 @@ type ClientHwidInfo struct {
 	Fingerprint string `json:"fingerprint"`
 }
 
-func hashHwid(raw string) string {
+// hashHwid never stores or returns the raw id: see database.KeyedHwidHash.
+func hashHwid(tx *gorm.DB, subID, raw string) (string, error) {
+	key, err := database.HwidHashKey(tx)
+	if err != nil {
+		return "", err
+	}
 	sum := sha256.Sum256([]byte(raw))
-	return hex.EncodeToString(sum[:])
+	return database.KeyedHwidHash(key, subID, hex.EncodeToString(sum[:])), nil
+}
+
+const (
+	HwidNoIdAllow  = "allow"
+	HwidNoIdRefuse = database.HwidNoIdRefuse
+
+	SubHwidDefaultLimitMax = 1000
+	SubHwidExpireDaysMax   = 3650
+	SubHwidNoticeMaxLength = 256
+)
+
+// hwidPolicy is the panel-wide part of the device limit, read once per request.
+type hwidPolicy struct {
+	// defaultLimit applies to a subscription whose clients set no limit of their own; 0 is none.
+	defaultLimit int
+	refuseNoID   bool
+	// staleBefore is the last_seen (ms) below which a device has expired; 0 keeps every device.
+	staleBefore int64
+}
+
+var hwidPolicyKeys = []string{"subHwidDefaultLimit", database.HwidNoIdPolicySetting, "subHwidExpireDays"}
+
+// loadHwidPolicy reads through the caller's handle, so the limit write can call it inside its transaction.
+func loadHwidPolicy(db *gorm.DB) (hwidPolicy, error) {
+	values := map[string]string{}
+	for _, key := range hwidPolicyKeys {
+		values[key] = defaultValueMap[key]
+	}
+	var rows []model.Setting
+	if err := db.Where("key IN ?", hwidPolicyKeys).Find(&rows).Error; err != nil {
+		return hwidPolicy{}, err
+	}
+	for _, row := range rows {
+		if row.Value != "" {
+			values[row.Key] = row.Value
+		}
+	}
+	policy := hwidPolicy{refuseNoID: values[database.HwidNoIdPolicySetting] == HwidNoIdRefuse}
+	if limit, err := strconv.Atoi(values["subHwidDefaultLimit"]); err == nil && limit > 0 {
+		policy.defaultLimit = limit
+	}
+	if days, err := strconv.Atoi(values["subHwidExpireDays"]); err == nil && days > 0 {
+		policy.staleBefore = time.Now().AddDate(0, 0, -days).UnixMilli()
+	}
+	return policy, nil
+}
+
+// liveHwids narrows a client_hwids query to devices that have not expired.
+func (p hwidPolicy) liveHwids(tx *gorm.DB) *gorm.DB {
+	return tx.Where("last_seen >= ?", p.staleBefore)
+}
+
+func (p hwidPolicy) deleteStaleHwids(tx *gorm.DB, subID string) error {
+	if p.staleBefore <= 0 {
+		return nil
+	}
+	return tx.Where("sub_id = ? AND last_seen < ?", subID, p.staleBefore).Delete(&model.ClientHwid{}).Error
 }
 
 func shortHwidFingerprint(hash string) string {
@@ -94,19 +157,26 @@ func normalizeHwidRequest(req HwidRequest) HwidRequest {
 
 // The subscription body is built for disabled clients too, so an expired,
 // depleted or suspended client must keep holding the limit of its subId.
-func effectiveHwidLimitForSubID(tx *gorm.DB, subID string) (int, error) {
-	var limit int
+func effectiveHwidLimitForSubID(tx *gorm.DB, subID string, defaultLimit int) (int, error) {
+	var row struct {
+		Clients  int64
+		OwnLimit int
+	}
 	err := tx.Model(&model.ClientRecord{}).
 		Where("sub_id = ?", subID).
-		Select("COALESCE(MAX(limit_hwid), 0)").
-		Scan(&limit).Error
-	return limit, err
+		Select("COUNT(*) AS clients, COALESCE(MAX(limit_hwid), 0) AS own_limit").
+		Scan(&row).Error
+	// The panel default belongs to subscriptions that exist: a subId no client owns has no limit.
+	if err != nil || row.OwnLimit > 0 || row.Clients == 0 {
+		return row.OwnLimit, err
+	}
+	return defaultLimit, nil
 }
 
 // lockHwidLimitForSubID is effectiveHwidLimitForSubID that also row-locks the subId's
 // clients (PostgreSQL; SQLite runs one writer at a time anyway), so concurrent new
 // devices of one subscription are counted and inserted one after another.
-func lockHwidLimitForSubID(tx *gorm.DB, subID string) (int, error) {
+func lockHwidLimitForSubID(tx *gorm.DB, subID string, defaultLimit int) (int, error) {
 	var limits []*int
 	if err := tx.Model(&model.ClientRecord{}).
 		Clauses(clause.Locking{Strength: "UPDATE"}).
@@ -121,6 +191,9 @@ func lockHwidLimitForSubID(tx *gorm.DB, subID string) (int, error) {
 			limit = max(limit, *l)
 		}
 	}
+	if limit <= 0 && len(limits) > 0 {
+		limit = defaultLimit
+	}
 	return limit, nil
 }
 
@@ -134,6 +207,8 @@ func subIDHasEnabledClient(tx *gorm.DB, subID string) (bool, error) {
 	return enabled > 0, err
 }
 
+// EnforceHwidForSubID is the device gate of a subscription fetch. A registered device always
+// passes; a new one takes a slot while fewer than the limit are registered, else it is refused.
 func (s *ClientService) EnforceHwidForSubID(subID string, req HwidRequest) (HwidGateResult, error) {
 	var res HwidGateResult
 	subID = strings.TrimSpace(subID)
@@ -143,13 +218,18 @@ func (s *ClientService) EnforceHwidForSubID(subID string, req HwidRequest) (Hwid
 	}
 
 	db := database.GetDB()
-	limit, err := effectiveHwidLimitForSubID(db, subID)
+	policy, err := loadHwidPolicy(db)
+	if err != nil {
+		return res, err
+	}
+	limit, err := effectiveHwidLimitForSubID(db, subID, policy.defaultLimit)
 	if err != nil {
 		return res, err
 	}
 	req = normalizeHwidRequest(req)
+	hasID := len(req.Hwid) >= minHwidLength
 	if limit <= 0 {
-		if len(req.Hwid) < minHwidLength {
+		if !hasID {
 			return HwidGateResult{Allowed: true}, nil
 		}
 		// The gate runs before the sub lookup; a subId no client owns gets no row.
@@ -158,21 +238,22 @@ func (s *ClientService) EnforceHwidForSubID(subID string, req HwidRequest) (Hwid
 			return res, err
 		}
 		// A limit set since the read above sends the request through the gate below.
-		if !known || trackUnlimitedHwid(db, subID, req) {
+		if !known || trackUnlimitedHwid(db, subID, req, policy) {
 			return HwidGateResult{Allowed: true}, nil
 		}
 	}
 
 	res.Active = true
 	res.Limit = limit
-	if len(req.Hwid) < minHwidLength {
-		res.NotSupported = true
+	if !hasID {
+		// Uncounted when let in: without an id there is nothing to tell two devices apart.
+		res.NotSupported = policy.refuseNoID
+		res.Allowed = !policy.refuseNoID
 		return res, nil
 	}
-	hwidHash := hashHwid(req.Hwid)
 
 	err = db.Transaction(func(tx *gorm.DB) error {
-		limit, err := lockHwidLimitForSubID(tx, subID)
+		limit, err := lockHwidLimitForSubID(tx, subID, policy.defaultLimit)
 		if err != nil {
 			return err
 		}
@@ -182,6 +263,14 @@ func (s *ClientService) EnforceHwidForSubID(subID string, req HwidRequest) (Hwid
 		}
 		res.Active = true
 		res.Limit = limit
+		hwidHash, err := hashHwid(tx, subID, req.Hwid)
+		if err != nil {
+			return err
+		}
+		// Expired devices leave before the count, so the slot they held is free for this request.
+		if err := policy.deleteStaleHwids(tx, subID); err != nil {
+			return err
+		}
 		now := time.Now().UnixMilli()
 		var existing model.ClientHwid
 		err = tx.Where("sub_id = ? AND hwid_hash = ?", subID, hwidHash).First(&existing).Error
@@ -227,23 +316,30 @@ func (s *ClientService) EnforceHwidForSubID(subID string, req HwidRequest) (Hwid
 // trackUnlimitedHwid lists devices of a sub with no HWID limit in the panel. It is
 // best-effort: a failed write must not deny a subscription nothing restricts.
 // False means the sub has a limit by now and no row was written.
-func trackUnlimitedHwid(db *gorm.DB, subID string, req HwidRequest) bool {
+func trackUnlimitedHwid(db *gorm.DB, subID string, req HwidRequest, policy hwidPolicy) bool {
 	limited := false
 	now := time.Now().UnixMilli()
 	err := db.Transaction(func(tx *gorm.DB) error {
 		// A row landing behind setClientLimitHwidByEmailTx's trim would stay registered
 		// above the limit, so the caller's read does not count here.
-		limit, err := effectiveHwidLimitForSubID(tx, subID)
+		limit, err := effectiveHwidLimitForSubID(tx, subID, policy.defaultLimit)
 		if err != nil {
 			return err
 		}
 		if limited = limit > 0; limited {
 			return nil
 		}
+		hwidHash, err := hashHwid(tx, subID, req.Hwid)
+		if err != nil {
+			return err
+		}
+		if err := policy.deleteStaleHwids(tx, subID); err != nil {
+			return err
+		}
 		return tx.Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "sub_id"}, {Name: "hwid_hash"}},
 			DoUpdates: clause.AssignmentColumns([]string{"last_seen", "user_agent", "device_os", "os_version", "device_model"}),
-		}).Create(&model.ClientHwid{SubID: subID, HwidHash: hashHwid(req.Hwid), FirstSeen: now, LastSeen: now, UserAgent: req.UserAgent, DeviceOS: req.DeviceOS, OsVersion: req.OsVersion, DeviceModel: req.DeviceModel}).Error
+		}).Create(&model.ClientHwid{SubID: subID, HwidHash: hwidHash, FirstSeen: now, LastSeen: now, UserAgent: req.UserAgent, DeviceOS: req.DeviceOS, OsVersion: req.OsVersion, DeviceModel: req.DeviceModel}).Error
 	})
 	if err != nil {
 		logger.Warning("track HWID for unlimited subscription failed:", err)
@@ -265,7 +361,11 @@ func (s *ClientService) HwidSlotStatusForSubID(subID string) (status HwidSlotSta
 		return status, false, err
 	}
 
-	limit, err := effectiveHwidLimitForSubID(db, subID)
+	policy, err := loadHwidPolicy(db)
+	if err != nil {
+		return status, false, err
+	}
+	limit, err := effectiveHwidLimitForSubID(db, subID, policy.defaultLimit)
 	if err != nil {
 		return status, false, err
 	}
@@ -274,7 +374,7 @@ func (s *ClientService) HwidSlotStatusForSubID(subID string) (status HwidSlotSta
 	}
 
 	var registered int64
-	if err := db.Model(&model.ClientHwid{}).Where("sub_id = ?", subID).Count(&registered).Error; err != nil {
+	if err := policy.liveHwids(db).Model(&model.ClientHwid{}).Where("sub_id = ?", subID).Count(&registered).Error; err != nil {
 		return status, false, err
 	}
 	status.Active = true
@@ -294,8 +394,13 @@ func (s *ClientService) ListClientHwids(email string) ([]ClientHwidInfo, error) 
 	if subID == "" {
 		return nil, nil
 	}
+	db := database.GetDB()
+	policy, err := loadHwidPolicy(db)
+	if err != nil {
+		return nil, err
+	}
 	var rows []model.ClientHwid
-	if err := database.GetDB().
+	if err := policy.liveHwids(db).
 		Where("sub_id = ?", subID).
 		Order("last_seen DESC").
 		Order("id DESC").
@@ -351,6 +456,17 @@ func (s *ClientService) DeleteClientHwid(email string, id int) error {
 	return nil
 }
 
+// PurgeExpiredClientHwids drops every device not seen for the configured days; the gate
+// only does so for the subscription being fetched.
+func (s *ClientService) PurgeExpiredClientHwids() error {
+	db := database.GetDB()
+	policy, err := loadHwidPolicy(db)
+	if err != nil || policy.staleBefore <= 0 {
+		return err
+	}
+	return db.Where("last_seen < ?", policy.staleBefore).Delete(&model.ClientHwid{}).Error
+}
+
 // Serialize the limit write and trim with SyncInbound and client deletion.
 func (s *ClientService) setClientLimitHwidByEmail(email string, limit int) error {
 	return runSerializedTx(func(tx *gorm.DB) error {
@@ -376,7 +492,11 @@ func (s *ClientService) setClientLimitHwidByEmailTx(tx *gorm.DB, email string, l
 	if subID == "" {
 		return nil
 	}
-	effective, err := effectiveHwidLimitForSubID(tx, subID)
+	policy, err := loadHwidPolicy(tx)
+	if err != nil {
+		return err
+	}
+	effective, err := effectiveHwidLimitForSubID(tx, subID, policy.defaultLimit)
 	if err != nil {
 		return err
 	}

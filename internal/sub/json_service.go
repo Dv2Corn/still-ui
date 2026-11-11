@@ -116,8 +116,13 @@ func (s *SubJsonService) bakedTemplate() map[string]any {
 
 // GetJson generates a JSON subscription configuration for the given subscription ID and host.
 func (s *SubJsonService) GetJson(subId string, host string, alwaysReturnArray bool) (string, string, error) {
+	return s.getJson(subId, host, alwaysReturnArray, "")
+}
+
+func (s *SubJsonService) getJson(subId string, host string, alwaysReturnArray bool, deviceNotice string) (string, string, error) {
 	subReq := s.SubService.ForRequest(host)
 	subReq.subscriptionBody = true
+	subReq.deviceNotice = deviceNotice
 	return s.renderJson(subReq, subId, host, alwaysReturnArray)
 }
 
@@ -316,7 +321,7 @@ func (s *SubJsonService) renderJson(subReq *SubService, subId string, host strin
 
 	if mode, remark := subReq.resolveInfoNodeRemark(subId, emails, traffic, len(configArray) > 0); mode != infoNodeNone {
 		dummyConfig := s.genDummySocksConfig(remark)
-		if mode == infoNodeExpired || mode == infoNodeDepleted {
+		if mode.replacesServers() {
 			configArray = []json_util.RawMessage{dummyConfig}
 		} else {
 			configArray = append([]json_util.RawMessage{dummyConfig}, configArray...)

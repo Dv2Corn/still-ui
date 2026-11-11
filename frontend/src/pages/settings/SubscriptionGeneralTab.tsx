@@ -4,6 +4,7 @@ import {
   CompassOutlined,
   IdcardOutlined,
   InfoCircleOutlined,
+  MobileOutlined,
   NodeIndexOutlined,
   SafetyCertificateOutlined,
   SettingOutlined,
@@ -23,6 +24,7 @@ import { RemarkTemplateField } from '@/components/form';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { catTabLabel } from './catTabLabel';
 import { sanitizePath, normalizePath } from './uriPath';
+import DeviceLimitSettings from './DeviceLimitSettings';
 import HappSettingsContent from './HappSettingsContent';
 import IncySettingsContent from './IncySettingsContent';
 import { remoteSourceBadge } from './subscriptionShared';
@@ -348,6 +350,15 @@ export default function SubscriptionGeneralTab({
               </SettingListItem>
             </>
           ),
+        },
+        {
+          key: 'devices',
+          label: catTabLabel(
+            <MobileOutlined aria-hidden />,
+            t('pages.settings.deviceLimit'),
+            isMobile,
+          ),
+          children: <DeviceLimitSettings allSetting={allSetting} updateSetting={updateSetting} />,
         },
         {
           key: '3',

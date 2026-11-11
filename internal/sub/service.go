@@ -55,6 +55,7 @@ type SubService struct {
 	calendarExpireLocation     *time.Location
 	subExpiredTemplate         string
 	subTrafficDepletedTemplate string
+	deviceNotice               string
 	inboundService             service.InboundService
 	settingService             service.SettingService
 	// nodesByID is populated per request from the Node table so
@@ -504,9 +505,19 @@ const (
 	infoNodeActive
 	infoNodeExpired
 	infoNodeDepleted
+	infoNodeDeviceRefused
 )
 
+// replacesServers reports the modes whose dummy entry is the whole body, not a first line of it.
+func (m infoNodeMode) replacesServers() bool {
+	return m == infoNodeExpired || m == infoNodeDepleted || m == infoNodeDeviceRefused
+}
+
 func (s *SubService) resolveInfoNodeRemark(subId string, uniqueEmails []string, traffic xray.ClientTraffic, hasEntries bool) (infoNodeMode, string) {
+	// Set for a fetch the device gate refused: the notice is then the only entry of the body.
+	if s.deviceNotice != "" && s.subscriptionBody {
+		return infoNodeDeviceRefused, s.deviceNotice
+	}
 	if !s.subInfoNodeEnable || !s.subscriptionBody {
 		return infoNodeNone, ""
 	}
@@ -689,7 +700,7 @@ func (s *SubService) getSubs(subId string) ([]string, []string, int64, xray.Clie
 
 	if mode, remark := s.resolveInfoNodeRemark(subId, uniqueEmails, traffic, len(result) > 0); mode != infoNodeNone {
 		dummyLink := fmt.Sprintf("socks://127.0.0.1:1080#%s", strings.ReplaceAll(url.QueryEscape(remark), "+", "%20"))
-		if mode == infoNodeExpired || mode == infoNodeDepleted {
+		if mode.replacesServers() {
 			return []string{dummyLink}, emails, lastOnline, traffic, nil
 		}
 		result = append([]string{dummyLink}, result...)
@@ -3388,6 +3399,9 @@ type PageData struct {
 	SubAnnounce   string
 	Result        []string
 	Emails        []string
+	// DeviceLimit is 0 when the subscription has no device limit; DeviceCount never names a device.
+	DeviceLimit int
+	DeviceCount int
 }
 
 // ResolveRequest extracts scheme, host, and header information from an HTTP request.
