@@ -113,6 +113,7 @@ func TestConnLogOnTurnsTheAccessLogOnOnlyWhenTheOperatorHasNone(t *testing.T) {
 		{"empty", `{"access":""}`, ours},
 		{"absent key", `{"loglevel":"warning"}`, ours},
 		{"no log section", ``, ours},
+		{"a null log section", `null`, ours},
 		{"the operator's own log is kept", `{"access":"/var/log/mine.log"}`, "/var/log/mine.log"},
 	}
 	for _, tt := range tests {
@@ -213,9 +214,8 @@ func TestConnLogExportDefusesFormulaCells(t *testing.T) {
 	}
 }
 
-// A settings form from before the connection log (a page left open across the upgrade, a
-// script) has none of its fields. Saving it must not shorten the retention, which would
-// delete stored days, nor store more than the operator chose.
+// A form from before the connection log (a page left open across the upgrade, a script) has
+// none of its fields: saving it must not shorten the retention or widen what is stored.
 func TestConnLogSettingsSurviveAFormWithoutThem(t *testing.T) {
 	connLogPanel(t)
 	s := &SettingService{}

@@ -73,6 +73,11 @@ func TestEnsureAPIServices(t *testing.T) {
 	if got := ensureAPIServices(nil); got != nil {
 		t.Fatalf("nil api block must stay nil, got %s", got)
 	}
+
+	// a JSON null is no api block either, and must not panic the config build
+	if got := ensureAPIServices(json_util.RawMessage(`null`)); string(got) != "null" {
+		t.Fatalf("null api block must pass through untouched, got %s", got)
+	}
 }
 
 func TestEnsureStatsPolicy(t *testing.T) {
@@ -95,6 +100,11 @@ func TestEnsureStatsPolicy(t *testing.T) {
 	}
 	if parsed.System["statsInboundDownlink"] != true {
 		t.Fatalf("system block must be preserved, got %v", parsed.System)
+	}
+
+	// a JSON null policy is left alone, like a missing one, and must not panic the config build
+	if got := ensureStatsPolicy(json_util.RawMessage(`null`)); string(got) != "null" {
+		t.Fatalf("null policy block must pass through untouched, got %s", got)
 	}
 
 	// missing levels block: level "0" is created with the flag

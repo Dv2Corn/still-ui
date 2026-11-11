@@ -1251,7 +1251,8 @@ func ensureAPIServices(api json_util.RawMessage) json_util.RawMessage {
 		return api
 	}
 	var parsed map[string]any
-	if err := json.Unmarshal(api, &parsed); err != nil {
+	// A JSON null parses into a nil map without an error; it is no api block either.
+	if err := json.Unmarshal(api, &parsed); err != nil || parsed == nil {
 		return api
 	}
 	services, _ := parsed["services"].([]any)
@@ -1292,7 +1293,7 @@ func ensureStatsPolicy(policy json_util.RawMessage) json_util.RawMessage {
 		return policy
 	}
 	var parsed map[string]any
-	if err := json.Unmarshal(policy, &parsed); err != nil {
+	if err := json.Unmarshal(policy, &parsed); err != nil || parsed == nil {
 		return policy
 	}
 	levels, _ := parsed["levels"].(map[string]any)
@@ -1408,11 +1409,15 @@ const connLogAccessLogName = "access-connlog.log"
 // ensureAccessLog gives the generated config an access log for the connection log to read.
 // A log the operator already set is left alone; the stored template is never modified.
 func ensureAccessLog(logCfg json_util.RawMessage) json_util.RawMessage {
-	parsed := map[string]any{}
+	var parsed map[string]any
 	if len(logCfg) > 0 {
 		if err := json.Unmarshal(logCfg, &parsed); err != nil {
 			return logCfg
 		}
+	}
+	// No log section, or a JSON null one, leaves the map nil.
+	if parsed == nil {
+		parsed = map[string]any{}
 	}
 	if access, ok := parsed["access"].(string); ok {
 		if trimmed := strings.TrimSpace(access); trimmed != "" && !strings.EqualFold(trimmed, "none") {
