@@ -476,6 +476,14 @@ func (s *InboundService) checkForwardedPortsConflict(ctx portConflictContext, fo
 		return fmt.Sprintf("the panel's own port (%d)", ctx.webPort)
 	}
 	for _, ib := range ctx.inbounds {
+		// A redirected hop range would take the forward's UDP before its listener sees it.
+		if ranges, _ := inboundPortHop(ib); ranges != nil {
+			for _, port := range amneziawg.ExpandForwardedPorts(forwardedPorts) {
+				if inRanges(ranges, port) {
+					return fmt.Sprintf("the port hopping range of inbound %s (port %d)", inboundDisplayName(ib), port)
+				}
+			}
+		}
 		if amneziawg.ForwardedPortsInclude(forwardedPorts, ib.Port) {
 			name := ib.Remark
 			if name == "" {

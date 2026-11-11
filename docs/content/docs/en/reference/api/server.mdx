@@ -30,6 +30,17 @@ _openapi:
         any.'
       url: '#state-of-block-torrents-for-clients-the-stored-toggle-whether-this-host-can-run-the-nftables-filter-linux-with-nft-whether-its-table-is-loaded-packet-counters-since-it-was-loaded-and-the-last-apply-error-if-any'
     - depth: 2
+      title: State of Hysteria2 port hopping on this host. A Hysteria inbound whose
+        streamSettings.finalmask.quicParams.udpHop has redirect=true gets its
+        hop range (udpHop.ports, 1024-65535) redirected to its own port by the
+        nftables table inet still_port_hop; the panel converges that table every
+        10 seconds and removes it when no inbound asks for a redirect.
+        supported/nftInstalled/permitted say whether this host can do that
+        (Linux, nft, NET_ADMIN), active whether the table is loaded, packets how
+        many flows it has redirected since it was loaded, rules what the enabled
+        local inbounds ask for, error the last failure.
+      url: '#state-of-hysteria2-port-hopping-on-this-host-a-hysteria-inbound-whose-streamsettingsfinalmaskquicparamsudphop-has-redirecttrue-gets-its-hop-range-udphopports-1024-65535-redirected-to-its-own-port-by-the-nftables-table-inet-still_port_hop-the-panel-converges-that-table-every-10-seconds-and-removes-it-when-no-inbound-asks-for-a-redirect-supportednftinstalledpermitted-say-whether-this-host-can-do-that-linux-nft-net_admin-active-whether-the-table-is-loaded-packets-how-many-flows-it-has-redirected-since-it-was-loaded-rules-what-the-enabled-local-inbounds-ask-for-error-the-last-failure'
+    - depth: 2
       title: 'State of the egress filter: the stored settings (managedBy is set when a
         central panel owns them), the TCP ports "server" blocks (panel and SSH),
         whether the template already blackholes geoip:private, whether this host
@@ -109,6 +120,14 @@ _openapi:
     - depth: 2
       title: Generate a new X25519 keypair for Reality.
       url: '#generate-a-new-x25519-keypair-for-reality'
+    - depth: 2
+      title: 'Build an AmneziaWG I1 signature packet shaped like the first datagram of
+        another protocol: "quic" is a QUIC v1 Initial header with a random
+        connection id and 1200-1232 bytes in total, "dns" a recursive A query
+        for a well-known name with a random id. The random parts are <r N> tags,
+        so every handshake sends different bytes. The value passes the inbound
+        validator as is.'
+      url: '#build-an-amneziawg-i1-signature-packet-shaped-like-the-first-datagram-of-another-protocol-quic-is-a-quic-v1-initial-header-with-a-random-connection-id-and-1200-1232-bytes-in-total-dns-a-recursive-a-query-for-a-well-known-name-with-a-random-id-the-random-parts-are-r-n-tags-so-every-handshake-sends-different-bytes-the-value-passes-the-inbound-validator-as-is'
     - depth: 2
       title: Generate a new ML-DSA-65 keypair. Returns {seed, verify}.
       url: '#generate-a-new-ml-dsa-65-keypair-returns-seed-verify'
@@ -199,6 +218,15 @@ _openapi:
         restarts after restore. Destructive.
       url: '#restore-the-panel-db-from-an-uploaded-backup-multipart-form-field-name-db-sqlite-panels-accept-a-sqlite-database-db-or-a-sqlite-migration-dump-dump-postgresql-panels-accept-a-pg_dump-archive-dump-a-sqlite-database-db-or-a-sqlite-migration-dump-the-panel-restarts-after-restore-destructive'
     - depth: 2
+      title: 'Import inbounds and users from another panel: a Marzban SQLite database
+        with its xray_config.json, or the database of x-ui / 3x-ui before v3
+        (multipart form). Without apply=true it only reports what would be
+        created and what cannot be, and writes nothing. A real import takes a
+        local backup first and writes all or nothing; the upload is only read. A
+        panel that already has inbounds needs merge=true, which skips what
+        conflicts.'
+      url: '#import-inbounds-and-users-from-another-panel-a-marzban-sqlite-database-with-its-xray_configjson-or-the-database-of-x-ui--3x-ui-before-v3-multipart-form-without-applytrue-it-only-reports-what-would-be-created-and-what-cannot-be-and-writes-nothing-a-real-import-takes-a-local-backup-first-and-writes-all-or-nothing-the-upload-is-only-read-a-panel-that-already-has-inbounds-needs-mergetrue-which-skips-what-conflicts'
+    - depth: 2
       title: 'Take a local backup now with the saved backup settings: a consistent
         database snapshot, encrypted to the configured age/SSH keys, rotated,
         and sent to Telegram when that is on. Returns the file written.'
@@ -219,18 +247,22 @@ _openapi:
     - depth: 2
       title: Run a live TLS 1.3 probe against a candidate REALITY target and return a
         feasibility verdict (TLS 1.3 + h2 + X25519 + trusted certificate) plus
-        the certificate SAN DNS names. A target on a private/loopback address is
-        reported with privateTarget=true and probed only when allowPrivate is
-        set.
-      url: '#run-a-live-tls-13-probe-against-a-candidate-reality-target-and-return-a-feasibility-verdict-tls-13--h2--x25519--trusted-certificate-plus-the-certificate-san-dns-names-a-target-on-a-privateloopback-address-is-reported-with-privatetargettrue-and-probed-only-when-allowprivate-is-set'
+        the certificate SAN DNS names. certExpiresSoon marks a certificate with
+        under 14 days left and mlkem768 a target that also accepts
+        X25519MLKEM768; neither changes the verdict. A target on a
+        private/loopback address is reported with privateTarget=true and probed
+        only when allowPrivate is set.
+      url: '#run-a-live-tls-13-probe-against-a-candidate-reality-target-and-return-a-feasibility-verdict-tls-13--h2--x25519--trusted-certificate-plus-the-certificate-san-dns-names-certexpiressoon-marks-a-certificate-with-under-14-days-left-and-mlkem768-a-target-that-also-accepts-x25519mlkem768-neither-changes-the-verdict-a-target-on-a-privateloopback-address-is-reported-with-privatetargettrue-and-probed-only-when-allowprivate-is-set'
     - depth: 2
       title: Probe/discover REALITY targets and return each verdict ranked by
-        feasibility then latency. Each comma-separated token may be a domain
-        (validated with SNI), a bare IP, or a CIDR range (discovered without SNI
-        by reading the certificate domain). When empty, the
-        realityScanCandidates setting is probed (the built-in seed list if that
-        setting is empty).
-      url: '#probediscover-reality-targets-and-return-each-verdict-ranked-by-feasibility-then-latency-each-comma-separated-token-may-be-a-domain-validated-with-sni-a-bare-ip-or-a-cidr-range-discovered-without-sni-by-reading-the-certificate-domain-when-empty-the-realityscancandidates-setting-is-probed-the-built-in-seed-list-if-that-setting-is-empty'
+        feasibility, then certificates with 14 days or more left, then latency.
+        Each comma-separated token may be a domain (validated with SNI), a bare
+        IP, or a CIDR range (discovered without SNI by reading the certificate
+        domain). When empty, the realityScanCandidates setting is probed (the
+        built-in seed list if that setting is empty). Address ranges are probed
+        on port 443 only, about 25 addresses a second, and never on private
+        addresses.
+      url: '#probediscover-reality-targets-and-return-each-verdict-ranked-by-feasibility-then-certificates-with-14-days-or-more-left-then-latency-each-comma-separated-token-may-be-a-domain-validated-with-sni-a-bare-ip-or-a-cidr-range-discovered-without-sni-by-reading-the-certificate-domain-when-empty-the-realityscancandidates-setting-is-probed-the-built-in-seed-list-if-that-setting-is-empty-address-ranges-are-probed-on-port-443-only-about-25-addresses-a-second-and-never-on-private-addresses'
     - depth: 2
       title: Fetch the fully aggregated inbound_client_ips database table. Used by
         nodes to sync recently active IPs across the cluster.
@@ -259,6 +291,16 @@ _openapi:
           is loaded, packet counters since it was loaded, and the last apply
           error if any.'
         id: state-of-block-torrents-for-clients-the-stored-toggle-whether-this-host-can-run-the-nftables-filter-linux-with-nft-whether-its-table-is-loaded-packet-counters-since-it-was-loaded-and-the-last-apply-error-if-any
+      - content: State of Hysteria2 port hopping on this host. A Hysteria inbound whose
+          streamSettings.finalmask.quicParams.udpHop has redirect=true gets its
+          hop range (udpHop.ports, 1024-65535) redirected to its own port by the
+          nftables table inet still_port_hop; the panel converges that table
+          every 10 seconds and removes it when no inbound asks for a redirect.
+          supported/nftInstalled/permitted say whether this host can do that
+          (Linux, nft, NET_ADMIN), active whether the table is loaded, packets
+          how many flows it has redirected since it was loaded, rules what the
+          enabled local inbounds ask for, error the last failure.
+        id: state-of-hysteria2-port-hopping-on-this-host-a-hysteria-inbound-whose-streamsettingsfinalmaskquicparamsudphop-has-redirecttrue-gets-its-hop-range-udphopports-1024-65535-redirected-to-its-own-port-by-the-nftables-table-inet-still_port_hop-the-panel-converges-that-table-every-10-seconds-and-removes-it-when-no-inbound-asks-for-a-redirect-supportednftinstalledpermitted-say-whether-this-host-can-do-that-linux-nft-net_admin-active-whether-the-table-is-loaded-packets-how-many-flows-it-has-redirected-since-it-was-loaded-rules-what-the-enabled-local-inbounds-ask-for-error-the-last-failure
       - content: 'State of the egress filter: the stored settings (managedBy is set when
           a central panel owns them), the TCP ports "server" blocks (panel and
           SSH), whether the template already blackholes geoip:private, whether
@@ -322,6 +364,13 @@ _openapi:
         id: read-only-summaries-guid-parentguid-name-address-status-versions-of-the-nodes-this-panel-manages-a-parent-panel-calls-it-on-a-node-via-the-node-api-token-to-surface-transitive-sub-nodes-in-a-chained-topology-counts-are-computed-by-the-parent-not-returned-here
       - content: Generate a new X25519 keypair for Reality.
         id: generate-a-new-x25519-keypair-for-reality
+      - content: 'Build an AmneziaWG I1 signature packet shaped like the first datagram
+          of another protocol: "quic" is a QUIC v1 Initial header with a random
+          connection id and 1200-1232 bytes in total, "dns" a recursive A query
+          for a well-known name with a random id. The random parts are <r N>
+          tags, so every handshake sends different bytes. The value passes the
+          inbound validator as is.'
+        id: build-an-amneziawg-i1-signature-packet-shaped-like-the-first-datagram-of-another-protocol-quic-is-a-quic-v1-initial-header-with-a-random-connection-id-and-1200-1232-bytes-in-total-dns-a-recursive-a-query-for-a-well-known-name-with-a-random-id-the-random-parts-are-r-n-tags-so-every-handshake-sends-different-bytes-the-value-passes-the-inbound-validator-as-is
       - content: Generate a new ML-DSA-65 keypair. Returns {seed, verify}.
         id: generate-a-new-ml-dsa-65-keypair-returns-seed-verify
       - content: Generate a new ML-KEM-768 keypair. Returns {seed, client}.
@@ -394,6 +443,14 @@ _openapi:
           (.dump), a SQLite database (.db), or a SQLite migration dump. The
           panel restarts after restore. Destructive.
         id: restore-the-panel-db-from-an-uploaded-backup-multipart-form-field-name-db-sqlite-panels-accept-a-sqlite-database-db-or-a-sqlite-migration-dump-dump-postgresql-panels-accept-a-pg_dump-archive-dump-a-sqlite-database-db-or-a-sqlite-migration-dump-the-panel-restarts-after-restore-destructive
+      - content: 'Import inbounds and users from another panel: a Marzban SQLite
+          database with its xray_config.json, or the database of x-ui / 3x-ui
+          before v3 (multipart form). Without apply=true it only reports what
+          would be created and what cannot be, and writes nothing. A real import
+          takes a local backup first and writes all or nothing; the upload is
+          only read. A panel that already has inbounds needs merge=true, which
+          skips what conflicts.'
+        id: import-inbounds-and-users-from-another-panel-a-marzban-sqlite-database-with-its-xray_configjson-or-the-database-of-x-ui--3x-ui-before-v3-multipart-form-without-applytrue-it-only-reports-what-would-be-created-and-what-cannot-be-and-writes-nothing-a-real-import-takes-a-local-backup-first-and-writes-all-or-nothing-the-upload-is-only-read-a-panel-that-already-has-inbounds-needs-mergetrue-which-skips-what-conflicts
       - content: 'Take a local backup now with the saved backup settings: a consistent
           database snapshot, encrypted to the configured age/SSH keys, rotated,
           and sent to Telegram when that is on. Returns the file written.'
@@ -410,17 +467,21 @@ _openapi:
         id: run-xray-tls-ping-against-a-remote-server-and-return-its-live-leaf-certificate-sha-256-hashes-for-pinning-pinnedpeercertsha256
       - content: Run a live TLS 1.3 probe against a candidate REALITY target and return
           a feasibility verdict (TLS 1.3 + h2 + X25519 + trusted certificate)
-          plus the certificate SAN DNS names. A target on a private/loopback
-          address is reported with privateTarget=true and probed only when
-          allowPrivate is set.
-        id: run-a-live-tls-13-probe-against-a-candidate-reality-target-and-return-a-feasibility-verdict-tls-13--h2--x25519--trusted-certificate-plus-the-certificate-san-dns-names-a-target-on-a-privateloopback-address-is-reported-with-privatetargettrue-and-probed-only-when-allowprivate-is-set
+          plus the certificate SAN DNS names. certExpiresSoon marks a
+          certificate with under 14 days left and mlkem768 a target that also
+          accepts X25519MLKEM768; neither changes the verdict. A target on a
+          private/loopback address is reported with privateTarget=true and
+          probed only when allowPrivate is set.
+        id: run-a-live-tls-13-probe-against-a-candidate-reality-target-and-return-a-feasibility-verdict-tls-13--h2--x25519--trusted-certificate-plus-the-certificate-san-dns-names-certexpiressoon-marks-a-certificate-with-under-14-days-left-and-mlkem768-a-target-that-also-accepts-x25519mlkem768-neither-changes-the-verdict-a-target-on-a-privateloopback-address-is-reported-with-privatetargettrue-and-probed-only-when-allowprivate-is-set
       - content: Probe/discover REALITY targets and return each verdict ranked by
-          feasibility then latency. Each comma-separated token may be a domain
-          (validated with SNI), a bare IP, or a CIDR range (discovered without
-          SNI by reading the certificate domain). When empty, the
-          realityScanCandidates setting is probed (the built-in seed list if
-          that setting is empty).
-        id: probediscover-reality-targets-and-return-each-verdict-ranked-by-feasibility-then-latency-each-comma-separated-token-may-be-a-domain-validated-with-sni-a-bare-ip-or-a-cidr-range-discovered-without-sni-by-reading-the-certificate-domain-when-empty-the-realityscancandidates-setting-is-probed-the-built-in-seed-list-if-that-setting-is-empty
+          feasibility, then certificates with 14 days or more left, then
+          latency. Each comma-separated token may be a domain (validated with
+          SNI), a bare IP, or a CIDR range (discovered without SNI by reading
+          the certificate domain). When empty, the realityScanCandidates setting
+          is probed (the built-in seed list if that setting is empty). Address
+          ranges are probed on port 443 only, about 25 addresses a second, and
+          never on private addresses.
+        id: probediscover-reality-targets-and-return-each-verdict-ranked-by-feasibility-then-certificates-with-14-days-or-more-left-then-latency-each-comma-separated-token-may-be-a-domain-validated-with-sni-a-bare-ip-or-a-cidr-range-discovered-without-sni-by-reading-the-certificate-domain-when-empty-the-realityscancandidates-setting-is-probed-the-built-in-seed-list-if-that-setting-is-empty-address-ranges-are-probed-on-port-443-only-about-25-addresses-a-second-and-never-on-private-addresses
       - content: Fetch the fully aggregated inbound_client_ips database table. Used by
           nodes to sync recently active IPs across the cluster.
         id: fetch-the-fully-aggregated-inbound_client_ips-database-table-used-by-nodes-to-sync-recently-active-ips-across-the-cluster
@@ -444,7 +505,7 @@ export default function Layout(props) {
   return (
     <>
       {props.children}
-      <OpenAPIPage document="./public/openapi.json" webhooks={[]} operations={[{"path":"/panel/api/openapi.json","method":"get"},{"path":"/panel/api/server/status","method":"get"},{"path":"/panel/api/server/fail2banStatus","method":"get"},{"path":"/panel/api/server/torrentBlock","method":"get"},{"path":"/panel/api/server/egressFilter","method":"get"},{"path":"/panel/api/server/cpuHistory/{bucket}","method":"get"},{"path":"/panel/api/server/history/{metric}/{bucket}","method":"get"},{"path":"/panel/api/server/xrayMetricsState","method":"get"},{"path":"/panel/api/server/xrayMetricsHistory/{metric}/{bucket}","method":"get"},{"path":"/panel/api/server/xrayObservatory","method":"get"},{"path":"/panel/api/server/xrayObservatoryHistory/{tag}/{bucket}","method":"get"},{"path":"/panel/api/server/getXrayVersion","method":"get"},{"path":"/panel/api/server/getPanelUpdateInfo","method":"get"},{"path":"/panel/api/server/getUpdateStatus","method":"get"},{"path":"/panel/api/server/getConfigJson","method":"get"},{"path":"/panel/api/server/getDb","method":"get"},{"path":"/panel/api/server/localBackups","method":"get"},{"path":"/panel/api/server/getMigration","method":"get"},{"path":"/panel/api/server/getNewUUID","method":"get"},{"path":"/panel/api/server/getWebCertFiles","method":"get"},{"path":"/panel/api/server/descendants","method":"get"},{"path":"/panel/api/server/getNewX25519Cert","method":"get"},{"path":"/panel/api/server/getNewmldsa65","method":"get"},{"path":"/panel/api/server/getNewmlkem768","method":"get"},{"path":"/panel/api/server/getNewVlessEnc","method":"get"},{"path":"/panel/api/server/stopXrayService","method":"post"},{"path":"/panel/api/server/restartXrayService","method":"post"},{"path":"/panel/api/server/installXray/{version}","method":"post"},{"path":"/panel/api/server/updatePanel","method":"post"},{"path":"/panel/api/server/setUpdateChannel","method":"post"},{"path":"/panel/api/server/setTorrentBlock","method":"post"},{"path":"/panel/api/server/setEgressFilter","method":"post"},{"path":"/panel/api/server/applyManagedEgressFilter","method":"post"},{"path":"/panel/api/server/updateGeofile","method":"post"},{"path":"/panel/api/server/updateGeofile/{fileName}","method":"post"},{"path":"/panel/api/server/logs/{count}","method":"post"},{"path":"/panel/api/server/xraylogs/{count}","method":"post"},{"path":"/panel/api/server/amneziawglogs/{count}","method":"post"},{"path":"/panel/api/server/importDB","method":"post"},{"path":"/panel/api/server/localBackup","method":"post"},{"path":"/panel/api/server/getNewEchCert","method":"post"},{"path":"/panel/api/server/getCertHash","method":"post"},{"path":"/panel/api/server/getRemoteCertHash","method":"post"},{"path":"/panel/api/server/scanRealityTarget","method":"post"},{"path":"/panel/api/server/scanRealityTargets","method":"post"},{"path":"/panel/api/server/clientIps","method":"get"},{"path":"/panel/api/server/clientIps","method":"post"}]} showTitle />
+      <OpenAPIPage document="./public/openapi.json" webhooks={[]} operations={[{"path":"/panel/api/openapi.json","method":"get"},{"path":"/panel/api/server/status","method":"get"},{"path":"/panel/api/server/fail2banStatus","method":"get"},{"path":"/panel/api/server/torrentBlock","method":"get"},{"path":"/panel/api/server/portHop","method":"get"},{"path":"/panel/api/server/egressFilter","method":"get"},{"path":"/panel/api/server/cpuHistory/{bucket}","method":"get"},{"path":"/panel/api/server/history/{metric}/{bucket}","method":"get"},{"path":"/panel/api/server/xrayMetricsState","method":"get"},{"path":"/panel/api/server/xrayMetricsHistory/{metric}/{bucket}","method":"get"},{"path":"/panel/api/server/xrayObservatory","method":"get"},{"path":"/panel/api/server/xrayObservatoryHistory/{tag}/{bucket}","method":"get"},{"path":"/panel/api/server/getXrayVersion","method":"get"},{"path":"/panel/api/server/getPanelUpdateInfo","method":"get"},{"path":"/panel/api/server/getUpdateStatus","method":"get"},{"path":"/panel/api/server/getConfigJson","method":"get"},{"path":"/panel/api/server/getDb","method":"get"},{"path":"/panel/api/server/localBackups","method":"get"},{"path":"/panel/api/server/getMigration","method":"get"},{"path":"/panel/api/server/getNewUUID","method":"get"},{"path":"/panel/api/server/getWebCertFiles","method":"get"},{"path":"/panel/api/server/descendants","method":"get"},{"path":"/panel/api/server/getNewX25519Cert","method":"get"},{"path":"/panel/api/server/getNewAwgSignaturePacket","method":"get"},{"path":"/panel/api/server/getNewmldsa65","method":"get"},{"path":"/panel/api/server/getNewmlkem768","method":"get"},{"path":"/panel/api/server/getNewVlessEnc","method":"get"},{"path":"/panel/api/server/stopXrayService","method":"post"},{"path":"/panel/api/server/restartXrayService","method":"post"},{"path":"/panel/api/server/installXray/{version}","method":"post"},{"path":"/panel/api/server/updatePanel","method":"post"},{"path":"/panel/api/server/setUpdateChannel","method":"post"},{"path":"/panel/api/server/setTorrentBlock","method":"post"},{"path":"/panel/api/server/setEgressFilter","method":"post"},{"path":"/panel/api/server/applyManagedEgressFilter","method":"post"},{"path":"/panel/api/server/updateGeofile","method":"post"},{"path":"/panel/api/server/updateGeofile/{fileName}","method":"post"},{"path":"/panel/api/server/logs/{count}","method":"post"},{"path":"/panel/api/server/xraylogs/{count}","method":"post"},{"path":"/panel/api/server/amneziawglogs/{count}","method":"post"},{"path":"/panel/api/server/importDB","method":"post"},{"path":"/panel/api/server/importPanel","method":"post"},{"path":"/panel/api/server/localBackup","method":"post"},{"path":"/panel/api/server/getNewEchCert","method":"post"},{"path":"/panel/api/server/getCertHash","method":"post"},{"path":"/panel/api/server/getRemoteCertHash","method":"post"},{"path":"/panel/api/server/scanRealityTarget","method":"post"},{"path":"/panel/api/server/scanRealityTargets","method":"post"},{"path":"/panel/api/server/clientIps","method":"get"},{"path":"/panel/api/server/clientIps","method":"post"}]} showTitle />
     </>
   );
 }

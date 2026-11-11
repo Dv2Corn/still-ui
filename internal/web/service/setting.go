@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -41,6 +42,8 @@ const (
 	DefaultRemarkTemplate             = "{{INBOUND}}-{{EMAIL}}|📊{{TRAFFIC_LEFT}}|⏳{{DAYS_LEFT}}D"
 	DefaultSubExpiredTemplate         = "⛔ {{EMAIL}} | Expired: {{EXPIRE_DATE}}"
 	DefaultSubTrafficDepletedTemplate = "🚫 {{EMAIL}} | Traffic Depleted | {{TRAFFIC_USED}}/{{TRAFFIC_TOTAL}}"
+	DefaultSubHwidLimitNotice         = "Device limit {{LIMIT}} reached. Remove a device in your account or ask the seller."
+	DefaultSubHwidNoIdNotice          = "This app sends no device ID. Use an app that does (Happ, v2rayTun) or ask the seller."
 	DefaultTrustedProxyCIDRs          = "127.0.0.1/32,::1/128"
 	maxRegexLength                    = 2048
 )
@@ -87,6 +90,11 @@ var defaultValueMap = map[string]string{
 	"subCalendarExpireInclusive":  "false",
 	"subExpiredTemplate":          DefaultSubExpiredTemplate,
 	"subTrafficDepletedTemplate":  DefaultSubTrafficDepletedTemplate,
+	"subHwidDefaultLimit":         "0",
+	"subHwidNoIdPolicy":           HwidNoIdShared,
+	"subHwidExpireDays":           "30",
+	"subHwidLimitNotice":          DefaultSubHwidLimitNotice,
+	"subHwidNoIdNotice":           DefaultSubHwidNoIdNotice,
 	"subProbeOrder":               SubProbeOrderOff,
 	"subProbeMinAgents":           "0",
 	"subProbeStaleMinutes":        strconv.Itoa(SubProbeStaleMinutesDefault),
@@ -196,6 +204,8 @@ var defaultValueMap = map[string]string{
 	"subClashAutoGroupUrl":        DefaultSubClashAutoGroupURL,
 	"subClashAutoGroupInterval":   "300",
 	"subClashAutoGroupTolerance":  "50",
+	"subLocalDirect":              "",
+	"subLocalDirectProxy":         "",
 	"subJsonMux":                  "",
 	"subJsonRules":                "",
 	"subJsonRoutingRules":         "",
@@ -280,6 +290,15 @@ var defaultValueMap = map[string]string{
 	"backupKeep":          "14",
 	"backupAgeRecipients": "",
 	"backupTelegram":      "false",
+	// Set by a Marzban import: the secret its subscription links are signed with.
+	"marzbanSubSecret": "",
+
+	// Connection log (still-ui)
+	"connLogEnable":        "false",
+	"connLogRetentionDays": "30",
+	"connLogMaxSizeMB":     "2048",
+	"connLogDestination":   "full",
+	"connLogSource":        "full",
 
 	// Server health alerts (still-ui): thresholds shared by every notifier
 	"alertXrayRestarts":      "3",
@@ -692,6 +711,10 @@ func (s *SettingService) GetBackupSchedule() (string, error) { return s.getStrin
 // GetBackupKeep is how many local backups are kept.
 func (s *SettingService) GetBackupKeep() (int, error) { return s.getInt("backupKeep") }
 
+func (s *SettingService) GetMarzbanSubSecret() (string, error) {
+	return s.getString("marzbanSubSecret")
+}
+
 // GetBackupAgeRecipients are the public keys backups are encrypted to; empty means unencrypted.
 func (s *SettingService) GetBackupAgeRecipients() (string, error) {
 	return s.getString("backupAgeRecipients")
@@ -699,6 +722,47 @@ func (s *SettingService) GetBackupAgeRecipients() (string, error) {
 
 // GetBackupTelegram reports whether each encrypted scheduled backup is sent to the Telegram admins.
 func (s *SettingService) GetBackupTelegram() (bool, error) { return s.getBool("backupTelegram") }
+
+// ConnLogSettings is the connection log's configuration.
+type ConnLogSettings struct {
+	Enable        bool
+	RetentionDays int
+	MaxSizeMB     int
+	Destination   string
+	Source        string
+}
+
+// GetConnLogEnable reports whether the connection log is on; an unreadable switch reads as off.
+func (s *SettingService) GetConnLogEnable() bool {
+	enable, _ := s.getBool("connLogEnable")
+	return enable
+}
+
+// GetConnLogSettings reads the connection log settings; an empty or malformed one keeps its
+// default. A database that cannot be read is an error: defaults then would delete stored days.
+func (s *SettingService) GetConnLogSettings() (ConnLogSettings, error) {
+	var readErr error
+	text := func(key string) string {
+		v, err := s.getString(key)
+		readErr = errors.Join(readErr, err)
+		return effectiveSettingValue(key, v)
+	}
+	number := func(key string) int {
+		v, err := strconv.Atoi(text(key))
+		if err != nil || v <= 0 {
+			v, _ = strconv.Atoi(defaultValueMap[key])
+		}
+		return v
+	}
+	enable, _ := strconv.ParseBool(text("connLogEnable"))
+	return ConnLogSettings{
+		Enable:        enable,
+		RetentionDays: number("connLogRetentionDays"),
+		MaxSizeMB:     number("connLogMaxSizeMB"),
+		Destination:   text("connLogDestination"),
+		Source:        text("connLogSource"),
+	}, readErr
+}
 
 // HealthAlertThresholds are the limits the health alerts compare against.
 type HealthAlertThresholds struct {
@@ -867,6 +931,42 @@ func (s *SettingService) GetSubExpiredTemplate() (string, error) {
 
 func (s *SettingService) GetSubTrafficDepletedTemplate() (string, error) {
 	return s.getString("subTrafficDepletedTemplate")
+}
+
+// SubHwidNotices returns the texts a refused device gets instead of servers: the
+// limit-reached one and the one for an app that sent no device id.
+func (s *SettingService) SubHwidNotices() (limitReached, noID string) {
+	limitReached, noID = DefaultSubHwidLimitNotice, DefaultSubHwidNoIdNotice
+	if v, err := s.getString("subHwidLimitNotice"); err == nil && strings.TrimSpace(v) != "" {
+		limitReached = v
+	}
+	if v, err := s.getString("subHwidNoIdNotice"); err == nil && strings.TrimSpace(v) != "" {
+		noID = v
+	}
+	return limitReached, noID
+}
+
+func validateSubHwidSettings(all *entity.AllSetting) error {
+	switch all.SubHwidNoIdPolicy {
+	case "":
+		all.SubHwidNoIdPolicy = HwidNoIdShared
+	case HwidNoIdShared, HwidNoIdAllow, HwidNoIdRefuse:
+	default:
+		return errors.New("device limit: apps without a device id must be set to shared, allow or refuse")
+	}
+	if all.SubHwidDefaultLimit < 0 || all.SubHwidDefaultLimit > SubHwidDefaultLimitMax {
+		return common.NewErrorf("default device limit must be 0 to %d", SubHwidDefaultLimitMax)
+	}
+	if all.SubHwidExpireDays < 0 || all.SubHwidExpireDays > SubHwidExpireDaysMax {
+		return common.NewErrorf("devices expire after 0 to %d days", SubHwidExpireDaysMax)
+	}
+	for _, notice := range []*string{&all.SubHwidLimitNotice, &all.SubHwidNoIdNotice} {
+		*notice = strings.TrimSpace(*notice)
+		if utf8.RuneCountInString(*notice) > SubHwidNoticeMaxLength {
+			return common.NewErrorf("device limit notice must not exceed %d characters", SubHwidNoticeMaxLength)
+		}
+	}
+	return nil
 }
 
 func (s *SettingService) GetSecret() ([]byte, error) {
@@ -1759,6 +1859,27 @@ func (s *SettingService) UpdateAllSetting(allSetting *entity.AllSetting, clears 
 	if err := normalizeSubProbeSettings(allSetting); err != nil {
 		return err
 	}
+	if err := validateSubHwidSettings(allSetting); err != nil {
+		return err
+	}
+	// A form saved by an older page or script has no connection log fields: what is stored
+	// stays, or a shorter retention would delete days the operator meant to keep.
+	connLog, err := s.GetConnLogSettings()
+	if err != nil {
+		return err
+	}
+	if allSetting.ConnLogRetentionDays == 0 {
+		allSetting.ConnLogRetentionDays = connLog.RetentionDays
+	}
+	if allSetting.ConnLogMaxSizeMB == 0 {
+		allSetting.ConnLogMaxSizeMB = connLog.MaxSizeMB
+	}
+	if allSetting.ConnLogDestination == "" {
+		allSetting.ConnLogDestination = connLog.Destination
+	}
+	if allSetting.ConnLogSource == "" {
+		allSetting.ConnLogSource = connLog.Source
+	}
 	switch allSetting.SubProfileMode {
 	case "", SubProfileModeNone, SubProfileModeBuiltin, SubProfileModeCustom:
 		allSetting.SubProfileMode = effectiveSubProfileMode(allSetting.SubProfileMode, allSetting.SubProfileUrl)
@@ -1783,6 +1904,9 @@ func (s *SettingService) UpdateAllSetting(allSetting *entity.AllSetting, clears 
 	if err := validateSubClashAutoGroup(allSetting); err != nil {
 		return err
 	}
+	if err := validateSubLocalDirect(allSetting); err != nil {
+		return err
+	}
 	if err := validateFinalMaskJSONSalamander(allSetting.SubJsonFinalMask); err != nil {
 		return err
 	}
@@ -1795,7 +1919,7 @@ func (s *SettingService) UpdateAllSetting(allSetting *entity.AllSetting, clears 
 	fields := reflect_util.GetFields(t)
 
 	db := database.GetDB()
-	return db.Transaction(func(tx *gorm.DB) error {
+	if err := db.Transaction(func(tx *gorm.DB) error {
 		var existing []*model.Setting
 		if err := tx.Find(&existing).Error; err != nil {
 			return err
@@ -1823,7 +1947,10 @@ func (s *SettingService) UpdateAllSetting(allSetting *entity.AllSetting, clears 
 			}
 		}
 		return nil
-	})
+	}); err != nil {
+		return err
+	}
+	return applyHwidPanelDefault()
 }
 
 func validateSubUserAgentRegexes(allSetting *entity.AllSetting) error {

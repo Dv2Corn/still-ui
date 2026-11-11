@@ -55,10 +55,17 @@ still-ui migrate-rollback
 - **AmneziaWG 转发缓冲区复用。** 经内置 AmneziaWG 的每个 TCP 连接都会新分配两个 32 KiB 复制缓冲区；现在改为从池中获取。仅转发部分：每个连接的分配约 69 KB → 2.9 KB。整个面板在 2 vCPU / 2 GiB 测试服务器上，经 AmneziaWG 每秒 100 个短连接、持续 5 分钟、各 3 次，3x-ui v3.11.0 对比 still-ui：负载下面板平均内存 403 → 176 MiB，峰值 525 → 211 MiB，空闲时相同。方法、限制和原始数据：[bench/awg-relay-churn](bench/awg-relay-churn/README.md)。
 - **Clash/Mihomo 订阅中的 Auto 组。** 订阅有两台或更多服务器时，Clash/Mihomo 配置会多出一个 `Auto` 组：应用通过隧道测试每台服务器并自动切换到可用的一台（最快的一台，容差 50 ms，每 300 秒检测一次；或第一台有响应的）。`Auto` 是 `PROXY` 中的默认选择，仍可手动选服务器。新安装默认开启；已有面板请在订阅设置中开启 **Auto group**。
 - **订阅参考可达性探测结果。** 探测报告为不可用（连续两次失败）的入口，其链接可以移到订阅末尾或隐藏，适用于所有格式：链接、JSON 和 Clash。用户至少保留一条链接；没有新的探测结果时不做任何改动。默认关闭。
+- **一个设置让本地网站直连。** 在 **设置 → 订阅 → 本地网站直连** 中选择国家后，客户端应用会直接访问该国网站（其域名后缀、`geosite` 中的现成列表和 `geoip`），其余流量走 VPN，这样拒绝境外地址的银行、政务和电商网站在开着 VPN 时也能正常使用。一份简短的“始终走 VPN”列表会先匹配——Telegram（其地址段在 geoip 库中被标为俄罗斯）、YouTube、Instagram、WhatsApp、Discord、ChatGPT、Claude——并且可以追加自己的条目。适用于 JSON、Clash/Mihomo 和 Happ/INCY 订阅，订阅页面还提供 Shadowrocket 规则文件；普通链接列表和 AmneziaWG 配置无法携带这类规则。默认关闭。[详情](docs/content/docs/zh/config/subscription.mdx)
 - **客户端出站过滤。** 可以禁止客户端经 25 端口发信（新安装默认开启）、访问服务器后面的私有网络和服务器自身的面板与 SSH 端口，以及你列出的地址和端口。对经 Xray 的所有客户端入站生效，有 `nft` 时也对内核模式的 AmneziaWG 客户端生效；主面板可以把过滤规则下发给节点。
 - **每个节点的月流量上限。** 主面板按月（从你选定的重置日起）统计节点自身入站的流量，在 80%（可调）和达到上限时发送 Telegram 告警，并可在下一周期前关闭该节点的入站。计费系数（0.1 到 100）按比例换算该节点计入客户端统计的流量，从修改时起生效（之前的流量按原系数计）。节点按每个客户端所属主面板的计数检查其配额，因此系数不同的主面板可以共用一个节点。默认不设上限。
 - **一条命令添加节点。** **节点 → 用命令添加** 会生成一次性邀请（默认 30 分钟有效，可撤销）；在新服务器上以 root 运行面板给出的命令，即可从发行版安装 still-ui、把它设为节点并加入主面板。无需手动复制 API 令牌和证书指纹；节点在做任何改动前会先校验主面板的密钥。[说明（英文）](docs/content/docs/en/operations/multi-node.mdx)。
+- **设备限制会告诉用户发生了什么，可设面板默认值，并会忘记旧设备。** 3x-ui v3.11.0 可以限制一个订阅的设备数（客户端的 **HWID 限制**；与 **IP 限制**不同，它不需要 Fail2ban，手机在 Wi-Fi 和移动网络之间切换时也不会误触发），但超出限制的设备只得到一个 404，不发送设备 ID 的应用一律被拒绝，没有面板级的默认值，设备在管理员删除之前一直占用名额。在 still-ui 中，超出限制的新设备会收到对其应用有效的应答，其中唯一的服务器是一条提示——“Device limit 3 reached. Remove a device in your account or ask the seller.”（文字可自定义；Happ 还会把它显示为公告），绝不返回错误；此前已注册的设备照常得到服务器。**设置 → 订阅 → 设备限制** 提供：对没有单独限制的所有客户端生效的默认限制（设置之前为关闭；设备数已超出的订阅只保留最近活跃的设备）、对不发送设备 ID 的应用的处理方式（它们合用订阅的一个名额，新面板默认如此；或拒绝并给出提示；或照常下发且不计数——升级后没有设备限制的面板保持这一方式，此时不发送 ID 的应用可以绕过限制，面板会给出警告），以及过期：30 天（可调；升级后的面板在你设置之前为关闭）没有拉取订阅的设备会腾出名额。订阅页面向用户显示设备数“2 / 3”，不显示设备本身的任何信息；管理员在客户端卡片中查看和删除设备，API 也可列出和删除（`/panel/api/clients/hwids/:email`）。面板只保存设备 ID 的哈希，从不保存 ID 本身。限制作用于拉取订阅：已导入应用的服务器仍然可用，手动复制的链接不计入。
+- **一条命令从 Marzban 或旧版 x-ui 迁移。** `still-ui import marzban /var/lib/marzban` 会迁移入站、用户和主机，保留相同的 UUID 和密码、相同的 REALITY 密钥和 short ID、端口、已用流量、限额、到期时间和状态，因此用户手中已有的链接可以继续连接，Marzban 签发的订阅链接也继续可用。`-dry-run` 显示将导入什么、哪些无法导入；真正导入前会先备份，并且要么全部写入、要么什么都不写。面板的 **设置 → 导入** 提供同样的功能。见 [从 Marzban 或 x-ui 迁移](#从-marzban-或-x-ui-迁移)。
 - **面板数天内的内存：已验证。** 在混合负载下运行 72 小时（200 个用户；每 5 秒修改一个客户端；界面和 API 请求；订阅；VLESS、VMess 和 AmneziaWG 流量），still-ui v1.6.0 与 3x-ui v3.11.0 使用相同数据和相同负载：两者均无增长（最后 24 小时 +0.1 MB/h，goroutine 和文件描述符平稳，无重启）。大量*慢速* AmneziaWG 客户端仍可能占用计入面板的内核套接字缓冲区（每个慢速流约 12 MB）；安装程序为服务设置的内存上限可以控制这一点（使用 Docker 时请设置 `mem_limit`）。
+- **面板内的连接日志。** **连接** 页面显示谁在何时通过哪个入站连接到了哪里，可按客户端、入站、时间、目标和来源地址筛选，并可导出 CSV；客户端一行中的图标可打开该客户端的连接。收到滥用投诉（“谁在那个时间访问了这个地址”）时，不用登录服务器就能回答。默认关闭。你可以选择保留多久（默认 30 天）、大小上限以及保存什么：完整目标、仅注册域名或不保存；客户端完整地址、仅网段或不保存。过期的日期会自动删除。[工作方式](#连接日志)。
+- **逐项显示检查结果的 REALITY 目标选择器。** REALITY 入站中的 **查找目标** 从你的服务器测试每个候选，并标出哪些通过：可达、TLS 1.3、X25519（以及是否同时接受 X25519MLKEM768）、HTTP/2、对该域名受信任的证书、证书剩余超过 14 天、延迟。候选来源：一份可编辑的短列表、你输入的任何内容，以及在勾选后服务器自身 /24 网段中的其他地址。**使用** 会填入目标和 SNI。面板中的任何列表都不是推荐：伪装成哪个网站由你决定。
+- **由面板自行配置的 Hysteria2 端口跳跃。** 在 3x-ui 中，跳跃端口范围只是告知客户端，服务器上的重定向要自己写。**UDP Hop → 在本服务器上重定向** 会加载一条 nftables 规则，把该范围转到入站端口，重启后自动恢复，并随入站一起移除。在无法生效的环境（没有 `nft`、容器没有 `NET_ADMIN`）面板会拒绝该选项，而不是把无法连通的端口发给客户端。默认关闭。
+- **AmneziaWG：首包伪装成 QUIC 或 DNS，一键设置 MTU 1280。** 两个按钮生成形似 QUIC Initial 或 DNS 查询的 `I1` 签名包；随机部分每次握手都不同。每个预设都在测试中由真实的 amneziawg-go 客户端和服务器完成握手。按钮只修改 `I1`–`I5`，已有客户端可继续使用。MTU 旁的 **设为 1280**：在俄罗斯移动网络上实测，AmneziaWG 在 1280 时比默认值快 4–5 倍。
 
 ### 进行中
 
@@ -88,7 +95,7 @@ STILL_UI_ARCHIVE=/path/still-ui-linux-amd64.tar.gz bash install.sh
 
 安装脚本会随机生成用户名、密码和面板访问路径，并在结束时显示出来，请妥善保存。之后运行 `still-ui` 即可打开管理菜单：启动和停止服务、查看或重置登录信息、修改端口、管理证书等。子命令与 3x-ui 的 `x-ui` 脚本相同：`still-ui start`、`stop`、`restart`、`status`、`log`、`update`、`legacy`、`uninstall` 等。
 
-发行版只提供 **Linux amd64 和 arm64** 的构建。当前版本：still-ui **1.6.1**（基于 3x-ui 3.11.0 及其后合并的修复），内置 still-ui 自行构建的 **Xray v26.10.31**（[有何不同](scripts/xray-build/README.md)）。
+发行版只提供 **Linux amd64 和 arm64** 的构建。当前版本：still-ui **1.7.0**（基于 3x-ui 3.11.0 及其后合并的修复），内置 still-ui 自行构建的 **Xray v26.10.31**（[有何不同](scripts/xray-build/README.md)）。
 
 ### 文件位置
 
@@ -101,6 +108,7 @@ STILL_UI_ARCHIVE=/path/still-ui-linux-amd64.tar.gz bash install.sh
 | 配置 | `/etc/default/still-ui` |
 | Xray | 服务 `still-xray`，配置 `/etc/still-xray`，日志 `/var/log/still-xray` |
 | 备份 | `/etc/still-ui/backups`（可用配置文件中的 `XUI_BACKUP_FOLDER` 更改位置） |
+| 连接日志 | `/etc/still-ui/connlog`（每天一个文件；不包含在备份中） |
 
 ### 内存上限
 
@@ -163,6 +171,18 @@ still-ui restore /etc/still-ui/backups/still-ui-<host>-<date>-<time>.db.age
 
 每分钟检查一次。问题出现时发送一次告警，持续期间每隔 **提醒间隔（小时）** 再发一次（默认 6，0 表示从不），修复后再发一次。状态保存在内存中：面板重启后，仍然存在的问题会再报告一次。
 
+### 连接日志
+
+面板中的 **设置 → 连接日志**，然后是 **连接** 页面：
+
+- **记录连接**——默认关闭。开启期间，面板每五秒读取一次 Xray 的访问日志。如果该日志设置为 `none`，面板会在开关开启期间把它打开（Xray 日志目录中的 `access-connlog.log`），Xray 会重启一次；你自己设置的访问日志会原样使用，不会重启。关闭开关会恢复 Xray 配置并清空该文件。
+- **保留天数**（30）和 **大小上限（MB）**（2048）。每天一个文件，位于 `/etc/still-ui/connlog`，不在面板数据库及其备份中。超过保留期的日期会被删除；目录超过上限时先删除最早的一天，如果单独一天就超过上限，则删除这一天中最早的连接。一百万条连接约占 75 MB，写入约需一个 CPU 核心半分钟。
+- **目标**：完整主机名或 IP 地址、仅注册域名（`maps.example.co.uk` 变为 `example.co.uk`；IP 地址保持不变）或不保存。**客户端地址**：完整地址和端口、仅网段（IPv4 为 /24，IPv6 为 /48，不含端口）或不保存。更改只对新连接生效；已保存的记录保持原样，直到过期。
+- **连接**——按客户端（完整名称）、入站、时间范围、目标的一部分和来源地址的一部分筛选。最新的在前，每页 50 条。**导出 CSV** 保存当前筛选条件下最多 100 000 行，时间为 UTC。
+- 只有管理员可以读取：页面及其 API（`/panel/api/connlog/list` 和 `/export`）需要面板登录或管理员 API 令牌；监控令牌和节点令牌会被拒绝。每次查询和导出都会连同用户、其地址和筛选条件写入面板日志。
+
+限制。日志只包含经过 Xray 的连接：AmneziaWG 和 TUIC 的连接会记录客户端和目标，但来源是本机地址，因为面板在同一台机器上把它们交给 Xray；MTProto 的连接不会归属到某个客户端。如果在 Xray 的日志设置中设置了 `maskAddress`，Xray 会在面板看到之前隐藏客户端地址的一部分。每个节点保存各自的日志，需在该节点的面板中查看；主面板不会收集。面板清空过大的访问日志之前，会先保存尚未读取的行。存储设置只作用于面板保存的内容，不作用于 Xray 的访问日志本身：该文件保存完整的行，直到面板将其清空（每天一次，或超过 64 MiB 时）。这份日志的可信度与 Xray 的访问日志相同：Xray 会把被拒绝请求中的文本原样写入访问日志，包括换行符，因此能向入站发送请求的人可以写入一行自己编造的记录，带有任意的客户端名称、地址和目标。日期晚于当前时间的行不会被保存，面板会在面板日志中说明；日期为当前时间的伪造行无法与 Xray 自己写的行区分。请把一条记录当作线索，而不是证据。
+
 ## 升级、回滚、卸载
 
 升级到最新版本——使用下面的命令，或点击面板中的更新按钮：
@@ -192,7 +212,7 @@ still-ui uninstall
 
 ## 移动网络
 
-**添加入站** → **预设** 中有两个面向移动网络的预设：TCP 443 上使用 `ios` 指纹的 VLESS REALITY，以及 UDP 443 上的 Hysteria2。**Xray 配置 → 路由 → 基本路由 → 阻止客户端使用种子下载** 选项（默认关闭）会在 Xray 中阻止客户端的 BitTorrent 流量，在装有 nftables 的 Linux 上还会在服务器本身进行阻止。完整说明（英文）：[Mobile networks in Russia](README.md#mobile-networks-in-russia)。
+**添加入站** → **预设** 中有两个面向移动网络的预设：TCP 443 上使用 `ios` 指纹的 VLESS REALITY，以及 UDP 443 上的 Hysteria2。**Xray 配置 → 路由 → 基本路由 → 阻止客户端使用种子下载** 选项（默认关闭）会在 Xray 中阻止客户端的 BitTorrent 流量，在装有 nftables 的 Linux 上还会在服务器本身进行阻止。REALITY 入站中的 **查找目标** 从服务器本身检查候选，并显示每项检查的结果。Hysteria 入站中的 **UDP Hop → 在本服务器上重定向**（默认关闭）用 nftables 把跳跃端口范围重定向到入站端口。AmneziaWG 入站中有 **类 QUIC 的 I1**、**类 DNS 的 I1** 按钮和 MTU 1280 快捷按钮。完整说明（英文）：[Mobile networks in Russia](README.md#mobile-networks-in-russia)。
 
 ## 验证发行版
 
@@ -206,10 +226,10 @@ still-ui uninstall
 | `still-probe-linux-<arch>.tar.gz`（及 `.sha256`） | 可达性检查代理程序，由 `scripts/still-probe-install.sh` 下载；与面板压缩包一样带有来源证明 |
 | `SHA256SUMS` | 压缩包、SBOM 和检查代理压缩包的校验和 |
 
-下载并核对校验和（把 `v1.6.1` 换成你要安装的版本）：
+下载并核对校验和（把 `v1.7.0` 换成你要安装的版本）：
 
 ```bash
-gh release download v1.6.1 -R Dv2Corn/still-ui -p 'still-ui-linux-amd64.tar.gz*' -p SHA256SUMS
+gh release download v1.7.0 -R Dv2Corn/still-ui -p 'still-ui-linux-amd64.tar.gz*' -p SHA256SUMS
 sha256sum -c SHA256SUMS --ignore-missing
 ```
 
@@ -217,7 +237,7 @@ sha256sum -c SHA256SUMS --ignore-missing
 
 ```bash
 gh attestation verify still-ui-linux-amd64.tar.gz -R Dv2Corn/still-ui \
-  --signer-workflow Dv2Corn/still-ui/.github/workflows/release.yml --source-ref refs/tags/v1.6.1
+  --signer-workflow Dv2Corn/still-ui/.github/workflows/release.yml --source-ref refs/tags/v1.7.0
 ```
 
 SBOM 同样附有证明：
@@ -231,7 +251,7 @@ gh attestation verify still-ui-linux-amd64.tar.gz -R Dv2Corn/still-ui --predicat
 ```bash
 tar -xzf still-ui-linux-amd64.tar.gz still-ui/bin/xray-linux-amd64
 sha256sum still-ui/bin/xray-linux-amd64
-git clone https://github.com/Dv2Corn/still-ui && cd still-ui && git checkout v1.6.1
+git clone https://github.com/Dv2Corn/still-ui && cd still-ui && git checkout v1.7.0
 scripts/xray-build/build.sh /tmp/xray-out amd64 arm64
 ```
 
@@ -269,6 +289,37 @@ still-ui migrate-rollback
 普通安装也会提议接管 `/etc/x-ui/x-ui.db`（非交互方式：`STILL_UI_IMPORT_3XUI=yes`），但不包含上述检查和备份。它会停止 3x-ui，把它的单元文件移到 `/root/still-ui-3x-ui-retired/`，同样让 acme.sh 续期指向 still-ui；`bash /root/still-ui-3x-ui-retired/migrate.sh restore-import /root/still-ui-3x-ui-retired` 会把两者恢复原样（`still-ui uninstall --purge` 会自动执行；保留数据以便重装的卸载会让 3x-ui 保持停用）。
 
 面板和订阅服务器会在半分钟内自动使用续期后的证书文件，无需重启。
+
+## 从 Marzban 或 x-ui 迁移
+
+先安装 still-ui（装在 Marzban 所在的服务器上，或装在新服务器上并把 Marzban 的数据目录复制过去），然后：
+
+```bash
+still-ui import marzban /var/lib/marzban -dry-run   # 只出报告，不写入任何内容
+still-ui import marzban /var/lib/marzban            # 备份、导入、重启
+```
+
+参数是 Marzban 的数据目录或其中的 `db.sqlite3`；入站从旁边的 `xray_config.json` 读取（用 `-config 文件` 指定其他文件）。两个文件都只会被读取。面板的 **设置 → 导入** 做同样的事：上传这两个文件，查看报告，然后确认。
+
+会迁移的内容：
+
+- **入站** — 任意传输方式上的 VLESS、VMess、Trojan 和 Shadowsocks，带 TLS 或 REALITY，与 Xray 中的配置一致：端口、REALITY 私钥和 short ID、路径。证书文件必须能在本服务器的相同路径读取；找不到证书的入站会列在报告中并被跳过。
+- **用户** — UUID 和密码、flow、已用流量和限额、到期时间、备注和状态：被禁用的保持禁用，流量用尽或已过期的在续期前保持封禁，“on hold” 的用户从首次连接开始计时。按日、按周、按月的流量重置会迁移到 still-ui 的日历上：按日在午夜，按周在周日，按月在该用户下一次 Marzban 重置到期的那一天（Marzban 是从每个用户自己上一次重置起数 1、7、30 天）；按年的不会。
+- **主机** — 地址、端口、SNI、Host 头、路径、ALPN 和指纹，作为该入站的主机。地址为 `{SERVER_IP}` 的主机使用获取订阅时访问的地址。
+- **订阅链接** — Marzban 的 `/sub/<token>` 链接原样接受，并遵守每个用户的吊销时间。无论 still-ui 自己的订阅路径是什么，这些链接都在 `/sub/` 下提供，而且只有它们：普通的订阅 ID 仍然需要面板自己的路径。把用户手中的地址（主机和端口）指向 still-ui 的订阅服务器；如果 Marzban 用的是其他 `XRAY_SUBSCRIPTION_PATH`，请在 **设置 → 订阅** 中把它设为订阅路径。为了校验这些链接，still-ui 会把 Marzban 的签名密钥保存在自己的数据库里。任何持有该密钥的人（旧的 Marzban 备份、前任管理员）都能通过这类链接打开已迁移用户的订阅，所以在用户换用 still-ui 的链接之后，请运行 `still-ui import forget-links`：旧链接不再被接受，密钥也会被删除。每个已迁移用户在 still-ui 中自己的订阅 ID 是随机的，无法由该密钥推算出来。
+
+不会迁移的内容：
+
+- 管理员（报告会列出）、节点、用户模板，以及订阅链接下的 `/info`、`/usage` 和按客户端类型的路径。
+- 这里的一个客户端只有一个 UUID 和一个密码，而 Marzban 给每种协议各一个。同时拥有 VLESS 和 VMess 入站、或同时拥有 Trojan 和 Shadowsocks 入站的用户，会变成同一订阅下的两个客户端（`名称` 和 `名称.vmess` 或 `名称.ss`），各自拥有完整的限额和独立的流量计数。
+- 链接名称：still-ui 按自己的备注模板命名链接，而不是按主机备注。所有连接参数都相同。
+- 使用 MySQL 或 MariaDB 的 Marzban：只读取 SQLite 文件。
+
+`still-ui import x-ui /etc/x-ui/x-ui.db` 对 x-ui（vaxilu/x-ui 及其分支）和 v3 之前的 3x-ui 做同样的事：入站及其客户端和流量；没有 email 的客户端会得到一个名称。对 3x-ui 2.0 及更高版本，建议使用[上面的迁移](#从-3x-ui-迁移)，它还会保留设置和面板登录信息。
+
+已有入站的面板需要 `-merge`：端口或标签已被占用的入站、email 已存在的客户端，以及订阅 ID 在这里属于另一个客户端的客户端，会被跳过并列出。要撤销导入，恢复它打印出的备份：`still-ui restore <文件>`。
+
+已在 Docker 中端到端测试（`scripts/test-import-marzban.sh`）：使用官方镜像的 Marzban v0.8.4，带 VLESS REALITY、VMess WebSocket 和 Shadowsocks 入站，然后由 still-ui 接替；Xray 客户端使用 Marzban 给出的链接和订阅链接，原样连接成功。
 
 ## 从受审查网络内部检查可达性
 

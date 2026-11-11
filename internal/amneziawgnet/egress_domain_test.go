@@ -48,6 +48,12 @@ type pairedTunnel struct {
 
 func newPairedTunnelForTest(t *testing.T) *pairedTunnel {
 	t.Helper()
+	obf := amneziawg.Obfuscation31{Jc: 4, Jmin: 40, Jmax: 70, S1: 20, S2: 30, S3: 20, S4: 20}
+	return newPairedTunnelWithObfuscation(t, obf, obf)
+}
+
+func newPairedTunnelWithObfuscation(t *testing.T, serverObf, clientObf amneziawg.Obfuscation31) *pairedTunnel {
+	t.Helper()
 	slog := verboseLoggerForTest("(tsrv) ")
 	serverPriv, serverPub, err := wgutil.GenerateWireguardKeypair()
 	if err != nil {
@@ -59,7 +65,6 @@ func newPairedTunnelForTest(t *testing.T) *pairedTunnel {
 	}
 	listenPort := freeUDPPort(t)
 
-	obf := amneziawg.Obfuscation31{Jc: 4, Jmin: 40, Jmax: 70, S1: 20, S2: 30, S3: 20, S4: 20}
 	serverInst := amneziawg.Instance{
 		Id:            1,
 		InterfaceName: "awg-dnstest",
@@ -68,7 +73,7 @@ func newPairedTunnelForTest(t *testing.T) *pairedTunnel {
 		PublicKey:     serverPub,
 		Address:       []string{tunnelTestServerAddr + "/24"},
 		MTU:           1420,
-		Obfuscation:   obf,
+		Obfuscation:   serverObf,
 		Peers: []amneziawg.Peer{{
 			PublicKey:  clientPub,
 			AllowedIPs: []string{tunnelTestClientAddr + "/32"},
@@ -91,7 +96,7 @@ func newPairedTunnelForTest(t *testing.T) *pairedTunnel {
 		Address:     []string{tunnelTestClientAddr + "/32"},
 		MTU:         1420,
 		PrivateKey:  clientPriv,
-		Obfuscation: obf,
+		Obfuscation: clientObf,
 		Peers: []amneziawg.OutboundPeer{{
 			PublicKey:  serverPub,
 			Endpoint:   net.JoinHostPort("127.0.0.1", strconv.Itoa(listenPort)),

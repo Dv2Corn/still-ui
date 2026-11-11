@@ -476,6 +476,13 @@ export const sections: readonly Section[] = [
       },
       {
         method: 'GET',
+        path: '/panel/api/server/portHop',
+        summary:
+          'State of Hysteria2 port hopping on this host. A Hysteria inbound whose streamSettings.finalmask.quicParams.udpHop has redirect=true gets its hop range (udpHop.ports, 1024-65535) redirected to its own port by the nftables table inet still_port_hop; the panel converges that table every 10 seconds and removes it when no inbound asks for a redirect. supported/nftInstalled/permitted say whether this host can do that (Linux, nft, NET_ADMIN), active whether the table is loaded, packets how many flows it has redirected since it was loaded, rules what the enabled local inbounds ask for, error the last failure.',
+        responseSchema: 'PortHopStatus',
+      },
+      {
+        method: 'GET',
         path: '/panel/api/server/egressFilter',
         summary:
           'State of the egress filter: the stored settings (managedBy is set when a central panel owns them), the TCP ports "server" blocks (panel and SSH), whether the template already blackholes geoip:private, whether this host can run the nftables half and has it loaded, its packet counters, the last apply error, and how far each node is with this panel\'s filter.',
@@ -643,6 +650,21 @@ export const sections: readonly Section[] = [
         summary: 'Generate a new X25519 keypair for Reality.',
         response:
           '{\n  "success": true,\n  "obj": {\n    "privateKey": "uN9qLfV3zH8w...",\n    "publicKey": "5v8xPqR2sM7k..."\n  }\n}',
+      },
+      {
+        method: 'GET',
+        path: '/panel/api/server/getNewAwgSignaturePacket',
+        summary:
+          'Build an AmneziaWG I1 signature packet shaped like the first datagram of another protocol: "quic" is a QUIC v1 Initial header with a random connection id and 1200-1232 bytes in total, "dns" a recursive A query for a well-known name with a random id. The random parts are <r N> tags, so every handshake sends different bytes. The value passes the inbound validator as is.',
+        params: [
+          {
+            name: 'preset',
+            in: 'query',
+            type: 'string',
+            desc: 'quic or dns.',
+          },
+        ],
+        responseSchema: 'AwgSignaturePacketResponse',
       },
       {
         method: 'GET',
@@ -886,6 +908,50 @@ export const sections: readonly Section[] = [
       },
       {
         method: 'POST',
+        path: '/panel/api/server/importPanel',
+        summary:
+          'Import inbounds and users from another panel: a Marzban SQLite database with its xray_config.json, or the database of x-ui / 3x-ui before v3 (multipart form). Without apply=true it only reports what would be created and what cannot be, and writes nothing. A real import takes a local backup first and writes all or nothing; the upload is only read. A panel that already has inbounds needs merge=true, which skips what conflicts.',
+        params: [
+          {
+            name: 'source',
+            in: 'body (multipart)',
+            type: 'string',
+            desc: 'marzban or x-ui.',
+          },
+          {
+            name: 'db',
+            in: 'body (multipart)',
+            type: 'file',
+            desc: 'The source SQLite database (Marzban: db.sqlite3; x-ui: x-ui.db).',
+          },
+          {
+            name: 'config',
+            in: 'body (multipart)',
+            type: 'file',
+            desc: "Marzban's xray_config.json, where its inbounds are. Required for marzban.",
+            optional: true,
+          },
+          {
+            name: 'apply',
+            in: 'body (multipart)',
+            type: 'boolean',
+            desc: 'true writes the import; anything else is a dry run.',
+            optional: true,
+            defaultValue: false,
+          },
+          {
+            name: 'merge',
+            in: 'body (multipart)',
+            type: 'boolean',
+            desc: 'Allow importing into a panel that already has inbounds.',
+            optional: true,
+            defaultValue: false,
+          },
+        ],
+        responseSchema: 'PanelImportReport',
+      },
+      {
+        method: 'POST',
         path: '/panel/api/server/localBackup',
         summary:
           'Take a local backup now with the saved backup settings: a consistent database snapshot, encrypted to the configured age/SSH keys, rotated, and sent to Telegram when that is on. Returns the file written.',
@@ -963,7 +1029,7 @@ export const sections: readonly Section[] = [
         method: 'POST',
         path: '/panel/api/server/scanRealityTarget',
         summary:
-          'Run a live TLS 1.3 probe against a candidate REALITY target and return a feasibility verdict (TLS 1.3 + h2 + X25519 + trusted certificate) plus the certificate SAN DNS names. A target on a private/loopback address is reported with privateTarget=true and probed only when allowPrivate is set.',
+          'Run a live TLS 1.3 probe against a candidate REALITY target and return a feasibility verdict (TLS 1.3 + h2 + X25519 + trusted certificate) plus the certificate SAN DNS names. certExpiresSoon marks a certificate with under 14 days left and mlkem768 a target that also accepts X25519MLKEM768; neither changes the verdict. A target on a private/loopback address is reported with privateTarget=true and probed only when allowPrivate is set.',
         params: [
           {
             name: 'target',
@@ -1000,7 +1066,7 @@ export const sections: readonly Section[] = [
         method: 'POST',
         path: '/panel/api/server/scanRealityTargets',
         summary:
-          'Probe/discover REALITY targets and return each verdict ranked by feasibility then latency. Each comma-separated token may be a domain (validated with SNI), a bare IP, or a CIDR range (discovered without SNI by reading the certificate domain). When empty, the realityScanCandidates setting is probed (the built-in seed list if that setting is empty).',
+          'Probe/discover REALITY targets and return each verdict ranked by feasibility, then certificates with 14 days or more left, then latency. Each comma-separated token may be a domain (validated with SNI), a bare IP, or a CIDR range (discovered without SNI by reading the certificate domain). When empty, the realityScanCandidates setting is probed (the built-in seed list if that setting is empty). Address ranges are probed on port 443 only, about 25 addresses a second, and never on private addresses.',
         params: [
           {
             name: 'targets',
@@ -1008,6 +1074,13 @@ export const sections: readonly Section[] = [
             type: 'string',
             optional: true,
             desc: 'Optional comma-separated tokens: domain[:port], IP[:port], or CIDR (e.g. 104.16.0.0/24). When omitted, the realityScanCandidates setting is probed (the built-in seed list if that setting is empty).',
+          },
+          {
+            name: 'neighbours',
+            in: 'body (form)',
+            type: 'boolean',
+            optional: true,
+            desc: 'true also probes port 443 of the other addresses in the /24 around each public IPv4 address of this server and reads the names in their certificates. One such scan runs at a time. Some hosting providers treat this as a port scan.',
           },
         ],
         body: 'targets=104.16.0.0/24,www.apple.com:443',
@@ -1694,10 +1767,10 @@ export const sections: readonly Section[] = [
         method: 'POST',
         path: '/panel/api/clients/hwids/:email',
         summary:
-          'List registered HWID devices for a client with a short fingerprint. Full hashes are not exposed.',
+          'List registered HWID devices for a client with a short fingerprint. Full hashes are not exposed. The entry with noId true is the one slot that all apps sending no device ID share; it has no fingerprint.',
         params: [{ name: 'email', in: 'path', type: 'string', desc: 'Client email.' }],
         response:
-          '{\n  "success": true,\n  "obj": [\n    {\n      "id": 1,\n      "firstSeen": 1735000000000,\n      "lastSeen": 1735100000000,\n      "userAgent": "Happ/1.0",\n      "deviceOs": "android",\n      "osVersion": "15",\n      "deviceModel": "Pixel 9",\n      "fingerprint": "6ad17c93e821"\n    }\n  ]\n}',
+          '{\n  "success": true,\n  "obj": [\n    {\n      "id": 1,\n      "firstSeen": 1735000000000,\n      "lastSeen": 1735100000000,\n      "userAgent": "Happ/1.0",\n      "deviceOs": "android",\n      "osVersion": "15",\n      "deviceModel": "Pixel 9",\n      "fingerprint": "6ad17c93e821",\n      "noId": false\n    }\n  ]\n}',
       },
       {
         method: 'DELETE',
@@ -2127,6 +2200,32 @@ export const sections: readonly Section[] = [
         summary: 'Issue a new token for a probe; the previous one stops working at once.',
         params: [{ name: 'id', in: 'path', type: 'number', desc: 'Probe ID.' }],
         response: '{\n  "success": true,\n  "obj": { "token": "new-token-string" }\n}',
+      },
+    ],
+  },
+
+  {
+    id: 'connlog',
+    title: 'Connection log',
+    description:
+      'Who connected, when, through which inbound and where to, read from the Xray access log of this panel\'s own server. Off until "Record connections" is turned on in the settings; what is stored of a destination and of a client address follows the settings too. Admin only: a monitor, node-sync or node-admin token is refused. Each request is written to the panel log with the user and the filter.',
+    endpoints: [
+      {
+        method: 'POST',
+        path: '/panel/api/connlog/list',
+        summary:
+          "One page of connections, newest first. Every filter field is optional: client and inbound match exactly, host and source match any part of the stored text, from and to are unix milliseconds. Pass the response's next as before to read the following page.",
+        body: '{\n  "client": "alice@example.com",\n  "inbound": "",\n  "host": "example.com",\n  "source": "",\n  "from": 1735689600000,\n  "to": 1735775999999,\n  "before": "",\n  "limit": 50\n}',
+        responseSchema: 'ConnPage',
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/connlog/export',
+        summary:
+          'The connections matching the same filter as CSV (text/csv), newest first, at most 100000 rows, times in UTC. before and limit are ignored. A cell that a spreadsheet would read as a formula is prefixed with an apostrophe.',
+        body: '{\n  "client": "alice@example.com",\n  "from": 1735689600000,\n  "to": 1735775999999\n}',
+        response:
+          'time_utc,client,inbound,outbound,source,source_port,network,host,port\n2025-01-01T12:00:00.000Z,alice@example.com,inbound-443,direct,203.0.113.9,54321,tcp,example.com,443',
       },
     ],
   },
@@ -2943,7 +3042,7 @@ export const sections: readonly Section[] = [
         method: 'GET',
         path: '/{subPath}:subid',
         summary:
-          'Return base64-encoded subscription links for all enabled clients matching the subscription ID. When the request has an Accept: text/html header or ?html=1, renders a styled info page instead. With ?format=info, returns the page view-model as JSON (traffic, expiry, online status; no links) for live polling. The path prefix is configured by subPath.',
+          'Return base64-encoded subscription links for all enabled clients matching the subscription ID. When the request has an Accept: text/html header or ?html=1, renders a styled info page instead. With ?format=info, returns the page view-model as JSON (traffic, expiry, online status; no links) for live polling; under a device limit it also carries deviceLimit and deviceCount. A new device over the limit of the subscription (X-HWID header) still gets 200: the only entry of the body is a notice, repeated in Announce, with X-Hwid-Max-Devices-Reached: true. The path prefix is configured by subPath.',
         params: [
           { name: 'subid', in: 'path', type: 'string', desc: 'Client subscription ID.' },
           {
@@ -2986,6 +3085,33 @@ export const sections: readonly Section[] = [
         path: '/{subPath}:subid/hwid-status',
         summary:
           'Return the HWID device-slot status code and headers as GET without a response body.',
+        params: [{ name: 'subid', in: 'path', type: 'string', desc: 'Client subscription ID.' }],
+        responses: {
+          '200': { description: 'Headers match GET; no response body.' },
+          ...hwidStatusErrorResponses,
+        },
+      },
+      {
+        method: 'GET',
+        path: '/{subPath}:subid/shadowrocket.conf',
+        summary:
+          'Return the Shadowrocket rules file of the "Local sites direct" setting: private networks and the chosen country (its domain zones and GEOIP) go direct, the always-VPN list and everything else go through the proxy. Registered only while the setting names a country. The path prefix is configured by subPath.',
+        description:
+          'A plain-text, ASCII-only Shadowrocket config with <code>[General]</code> and <code>[Rule]</code> sections and no <code>[Proxy]</code> section: the servers stay in the subscription. It carries no credentials and does not register a device, so it takes no HWID slot.',
+        params: [{ name: 'subid', in: 'path', type: 'string', desc: 'Client subscription ID.' }],
+        responses: {
+          '200': {
+            description: 'The rules file, sent as an attachment named shadowrocket.conf.',
+            content: { 'text/plain': { schema: { type: 'string' } } },
+          },
+          ...hwidStatusErrorResponses,
+        },
+      },
+      {
+        method: 'HEAD',
+        path: '/{subPath}:subid/shadowrocket.conf',
+        summary:
+          'Return the Shadowrocket rules file status code and headers as GET without a body.',
         params: [{ name: 'subid', in: 'path', type: 'string', desc: 'Client subscription ID.' }],
         responses: {
           '200': { description: 'Headers match GET; no response body.' },

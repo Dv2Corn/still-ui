@@ -239,6 +239,9 @@ func (a *APIController) initRouter(g *gin.RouterGroup) {
 	// External reachability probes (admin side; agents use {basePath}probe/v1)
 	NewReachProbeController(api.Group("/probes"))
 
+	// Connection log — who connected, when, through which inbound, where to
+	NewConnLogController(api.Group("/connlog"))
+
 	// Extra routes
 	api.POST("/backuptotgbot", a.BackuptoTgbot)
 }

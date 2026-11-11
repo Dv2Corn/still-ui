@@ -29,6 +29,8 @@ import TelegramTab from './TelegramTab';
 import EmailTab from './EmailTab';
 import DiscordTab from './DiscordTab';
 import BackupTab from './BackupTab';
+import ConnLogTab from './ConnLogTab';
+import ImportTab from './ImportTab';
 import SubscriptionGeneralTab from './SubscriptionGeneralTab';
 import SubscriptionFormatsTab from './SubscriptionFormatsTab';
 import SubscriptionBalancersTab from './SubscriptionBalancersTab';
@@ -45,6 +47,8 @@ const tabSlugs = [
   'email',
   'discord',
   'backups',
+  'connections',
+  'import',
   'subscription',
   'subscription-formats',
   'subscription-balancers',
@@ -225,6 +229,10 @@ export default function SettingsPage() {
         return <DiscordTab allSetting={allSetting} updateSetting={updateSetting} />;
       case 'backups':
         return <BackupTab allSetting={allSetting} updateSetting={updateSetting} />;
+      case 'connections':
+        return <ConnLogTab allSetting={allSetting} updateSetting={updateSetting} />;
+      case 'import':
+        return <ImportTab />;
       case 'subscription':
         return <SubscriptionGeneralTab allSetting={allSetting} updateSetting={updateSetting} />;
       case 'subscription-formats':

@@ -4,10 +4,12 @@ import {
   CompassOutlined,
   IdcardOutlined,
   InfoCircleOutlined,
+  MobileOutlined,
   NodeIndexOutlined,
   SafetyCertificateOutlined,
   SettingOutlined,
 } from '@ant-design/icons';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router';
 import type { AllSetting } from '@/models/setting';
@@ -23,9 +25,11 @@ import { RemarkTemplateField } from '@/components/form';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { catTabLabel } from './catTabLabel';
 import { sanitizePath, normalizePath } from './uriPath';
+import DeviceLimitSettings from './DeviceLimitSettings';
 import HappSettingsContent from './HappSettingsContent';
 import IncySettingsContent from './IncySettingsContent';
 import { remoteSourceBadge } from './subscriptionShared';
+import { localDirectCountryOptions } from './localDirectCountries';
 
 interface SubscriptionGeneralTabProps {
   allSetting: AllSetting;
@@ -39,13 +43,17 @@ export default function SubscriptionGeneralTab({
   allSetting,
   updateSetting,
 }: SubscriptionGeneralTabProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { isMobile } = useMediaQuery();
   // Keep the URL semantic while mapping to the legacy numeric key used by these inner tabs.
   const initialTab =
     searchParams.get('subscriptionTab') === 'happ' ? HAPP_SETTINGS_TAB : PANEL_SETTINGS_TAB;
+  const localDirectOptions = useMemo(
+    () => localDirectCountryOptions(t('pages.settings.subLocalDirectOff'), i18n.language),
+    [t, i18n.language],
+  );
 
   return (
     <Tabs
@@ -116,6 +124,34 @@ export default function SubscriptionGeneralTab({
                   ]}
                 />
               </SettingListItem>
+              <SettingListItem
+                paddings="small"
+                title={t('pages.settings.subLocalDirect')}
+                description={t('pages.settings.subLocalDirectDesc')}
+              >
+                <Select
+                  id="sub-local-direct"
+                  aria-label={t('pages.settings.subLocalDirect')}
+                  showSearch={{ optionFilterProp: 'label' }}
+                  value={allSetting.subLocalDirect}
+                  onChange={(value: string) => updateSetting({ subLocalDirect: value })}
+                  options={localDirectOptions}
+                />
+              </SettingListItem>
+              {allSetting.subLocalDirect !== '' && (
+                <SettingListItem
+                  paddings="small"
+                  title={t('pages.settings.subLocalDirectProxy')}
+                  description={t('pages.settings.subLocalDirectProxyDesc')}
+                >
+                  <Input.TextArea
+                    aria-label={t('pages.settings.subLocalDirectProxy')}
+                    value={allSetting.subLocalDirectProxy}
+                    rows={8}
+                    onChange={(e) => updateSetting({ subLocalDirectProxy: e.target.value })}
+                  />
+                </SettingListItem>
+              )}
               <SettingListItem
                 paddings="small"
                 title={t('pages.settings.subProbeOrder')}
@@ -348,6 +384,15 @@ export default function SubscriptionGeneralTab({
               </SettingListItem>
             </>
           ),
+        },
+        {
+          key: 'devices',
+          label: catTabLabel(
+            <MobileOutlined aria-hidden />,
+            t('pages.settings.deviceLimit'),
+            isMobile,
+          ),
+          children: <DeviceLimitSettings allSetting={allSetting} updateSetting={updateSetting} />,
         },
         {
           key: '3',

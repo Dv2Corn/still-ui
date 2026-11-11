@@ -22,12 +22,15 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/logger"
+	"github.com/mhsanaei/3x-ui/v3/internal/sub/localdirect"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/service"
 )
 
 const (
 	subMihomoPath      = "/mihomo/"
 	subClashLegacyPath = "/clash-legacy/"
+	// deviceNoticeKey holds, on the request context, what a refused device is told instead of servers.
+	deviceNoticeKey = "sub_device_notice"
 )
 
 // writeSubError translates a service-layer result into an HTTP response.
@@ -66,6 +69,9 @@ type SUBController struct {
 
 	subIncyEnableRouting bool
 	subIncyRoutingRules  string
+
+	localDirect     localdirect.Plan
+	localDirectHapp string
 
 	subPath            string
 	subJsonPath        string
@@ -133,6 +139,8 @@ type subControllerConfig struct {
 
 	subIncyEnableRouting bool
 	subIncyRoutingRules  string
+
+	localDirect localdirect.Plan
 }
 
 type SUBControllerOption func(*subControllerConfig)
@@ -306,6 +314,7 @@ func NewSUBController(g *gin.RouterGroup, options ...SUBControllerOption) *SUBCo
 	subJsonSvc := NewSubJsonService(config.subJsonMux, config.subJsonRules, config.subJsonFinalMask, config.subJsonRoutingRules, sub)
 	subJsonSvc.SetObservatoryConfig(config.subJsonObservatory)
 	subJsonSvc.SetDnsConfig(config.subJsonDns)
+	subJsonSvc.SetLocalDirect(config.localDirect)
 	a := &SUBController{
 		subTitle:            config.subTitle,
 		subSupportUrl:       config.subSupportURL,
@@ -321,6 +330,9 @@ func NewSUBController(g *gin.RouterGroup, options ...SUBControllerOption) *SUBCo
 
 		subIncyEnableRouting: config.subIncyEnableRouting,
 		subIncyRoutingRules:  config.subIncyRoutingRules,
+
+		localDirect:     config.localDirect,
+		localDirectHapp: localDirectHappRouting(config.localDirect),
 
 		subPath:            config.subPath,
 		subJsonPath:        config.subJsonPath,
@@ -343,6 +355,7 @@ func NewSUBController(g *gin.RouterGroup, options ...SUBControllerOption) *SUBCo
 		releaseSettingsCache: releaseSettingsCache,
 	}
 	a.subClashService.autoGroup = config.subClashAutoGroup.normalized()
+	a.subClashService.localDirect = config.localDirect
 	a.initRouter(g)
 	return a
 }
@@ -350,11 +363,20 @@ func NewSUBController(g *gin.RouterGroup, options ...SUBControllerOption) *SUBCo
 // initRouter registers HTTP routes for subscription links and JSON endpoints
 // on the provided router group.
 func (a *SUBController) initRouter(g *gin.RouterGroup) {
-	gLink := g.Group(a.subPath, setNoCacheHeaders)
+	gLink := g.Group(a.subPath, setNoCacheHeaders, resolveLegacySubID)
 	gLink.GET(":subid", a.subs)
 	gLink.HEAD(":subid", a.subs)
 	gLink.GET(":subid/hwid-status", a.hwidStatus)
 	gLink.HEAD(":subid/hwid-status", a.hwidStatus)
+	if a.localDirect.Enabled() {
+		gLink.GET(":subid/"+shadowrocketConfName, a.shadowrocketConf)
+		gLink.HEAD(":subid/"+shadowrocketConfName, a.shadowrocketConf)
+	}
+	if a.configuredSubscriptionPathOwner(subMarzbanPath) == "" {
+		gMarzban := g.Group(subMarzbanPath, setNoCacheHeaders, onlyLegacySubID)
+		gMarzban.GET(":subid", a.subs)
+		gMarzban.HEAD(":subid", a.subs)
+	}
 	if a.jsonEnabled {
 		gJson := g.Group(a.subJsonPath, setNoCacheHeaders)
 		gJson.GET(":subid", a.subJsons)
@@ -435,6 +457,35 @@ func (a *SUBController) maybeServeSubInfo(c *gin.Context) bool {
 	return true
 }
 
+// subMarzbanPath is where Marzban serves subscriptions unless told otherwise.
+const subMarzbanPath = "/sub/"
+
+// resolveLegacySubID lets a subscription link issued by an imported Marzban reach the
+// subscription its user has here, before any handler reads the id.
+func resolveLegacySubID(c *gin.Context) {
+	for i := range c.Params {
+		if c.Params[i].Key == "subid" {
+			c.Params[i].Value, _ = service.ResolveLegacySubID(c.Params[i].Value)
+		}
+	}
+}
+
+// onlyLegacySubID serves Marzban's path to Marzban's links alone: a plain subscription
+// id stays reachable only on the panel's own, usually unguessable, path.
+func onlyLegacySubID(c *gin.Context) {
+	for i := range c.Params {
+		if c.Params[i].Key != "subid" {
+			continue
+		}
+		subID, ok := service.ResolveLegacySubID(c.Params[i].Value)
+		if !ok {
+			c.AbortWithStatus(http.StatusNotFound)
+			return
+		}
+		c.Params[i].Value = subID
+	}
+}
+
 func (a *SUBController) buildSubPageData(c *gin.Context) (PageData, bool) {
 	subId := c.Param("subid")
 	_, host, _, hostHeader := a.subService.ResolveRequest(c)
@@ -460,6 +511,9 @@ func (a *SUBController) buildSubPageData(c *gin.Context) (PageData, bool) {
 	metadata := a.metadataForSubRequest(func() *SubService { return subReq }, subId, "")
 	page := subReq.BuildPageData(subId, hostHeader, traffic, lastOnline, subs, emails, subURL, subJsonURL, subClashURL, basePathStr, metadata.Title, metadata.SupportURL)
 	page.SubAnnounce = metadata.Announce
+	if devices, found, err := a.clientService.HwidSlotStatusForSubID(subId); err == nil && found && devices.Active {
+		page.DeviceLimit, page.DeviceCount = devices.Limit, devices.Registered
+	}
 	return page, true
 }
 
@@ -508,6 +562,7 @@ func (a *SUBController) subs(c *gin.Context) {
 	scheme, host, hostWithPort, _ := a.subService.ResolveRequest(c)
 	subReq := a.subService.ForRequest(host)
 	subReq.subscriptionBody = true
+	subReq.deviceNotice = c.GetString(deviceNoticeKey)
 	subs, _, _, traffic, err := subReq.getSubs(subId)
 	if err != nil || subs == nil {
 		writeSubError(c, err)
@@ -546,6 +601,10 @@ func (a *SUBController) subs(c *gin.Context) {
 
 func (a *SUBController) recordSubscriptionFetch(c *gin.Context) {
 	if c.Request == nil || c.Request.Method != http.MethodGet || c.Writer.Status() != http.StatusOK {
+		return
+	}
+	// A refused device got the notice, not the subscription.
+	if c.GetString(deviceNoticeKey) != "" {
 		return
 	}
 	if err := a.subService.RecordSubscriptionFetch(c.Param("subid")); err != nil {
@@ -692,7 +751,7 @@ func (a *SUBController) subPageContext(page PageData) map[string]any {
 	subUpdates, _ := a.settingService.GetSubUpdates()
 	updateHours, _ := strconv.Atoi(subUpdates)
 
-	return map[string]any{
+	data := map[string]any{
 		"sId":           page.SId,
 		"enabled":       page.Enabled,
 		"isOnline":      page.IsOnline,
@@ -717,6 +776,15 @@ func (a *SUBController) subPageContext(page PageData) map[string]any {
 		"datepicker":    datepicker,
 		"announce":      page.SubAnnounce,
 	}
+	if a.localDirect.Enabled() {
+		data["localDirect"] = a.localDirect.Country
+		data["shadowrocketConfUrl"] = strings.TrimSuffix(page.SubUrl, "/") + "/" + shadowrocketConfName
+	}
+	if page.DeviceLimit > 0 {
+		data["deviceLimit"] = page.DeviceLimit
+		data["deviceCount"] = page.DeviceCount
+	}
+	return data
 }
 
 func (a *SUBController) enforceHwid(c *gin.Context) bool {
@@ -733,10 +801,19 @@ func (a *SUBController) enforceHwid(c *gin.Context) bool {
 	}
 	applyHwidHeaders(c, result)
 	if !result.Allowed {
-		c.Status(http.StatusNotFound)
-		return false
+		c.Set(deviceNoticeKey, a.deviceNotice(result))
 	}
 	return true
+}
+
+// deviceNotice is the text a refused device reads as its only server and as the announcement:
+// an error status would show as a bare failure in the app, or as nothing at all.
+func (a *SUBController) deviceNotice(result service.HwidGateResult) string {
+	limitReached, noID := a.settingService.SubHwidNotices()
+	if result.NotSupported {
+		return noID
+	}
+	return strings.ReplaceAll(limitReached, "{{LIMIT}}", strconv.Itoa(result.Limit))
 }
 
 func applyHwidHeaders(c *gin.Context, result service.HwidGateResult) {
@@ -746,7 +823,8 @@ func applyHwidHeaders(c *gin.Context, result service.HwidGateResult) {
 	if result.NotSupported {
 		c.Header("X-Hwid-Not-Supported", "true")
 	}
-	if result.LimitReached {
+	// Only on a refusal: Happ shows a "limit reached" banner for it, also on a working device.
+	if result.LimitReached && !result.Allowed {
 		c.Header("X-Hwid-Limit", "true")
 	}
 	if result.MaxDevicesReached {
@@ -848,7 +926,7 @@ func (a *SUBController) serveJson(c *gin.Context, alwaysReturnArray bool, conten
 func (a *SUBController) serveJsonBody(c *gin.Context, alwaysReturnArray bool, contentType string, rawDownload bool) bool {
 	subId := c.Param("subid")
 	scheme, host, hostWithPort, _ := a.subService.ResolveRequest(c)
-	jsonSub, header, err := a.subJsonService.GetJson(subId, host, alwaysReturnArray)
+	jsonSub, header, err := a.subJsonService.getJson(subId, host, alwaysReturnArray, c.GetString(deviceNoticeKey))
 	if err != nil {
 		writeSubError(c, err)
 		return true
@@ -906,13 +984,7 @@ func (a *SUBController) subClash(c *gin.Context, legacy bool) {
 func (a *SUBController) serveClashBody(c *gin.Context, rawDownload bool, legacy bool) bool {
 	subId := c.Param("subid")
 	scheme, host, hostWithPort, _ := a.subService.ResolveRequest(c)
-	var clashSub, header string
-	var err error
-	if legacy {
-		clashSub, header, err = a.subClashService.GetClashLegacy(subId, host)
-	} else {
-		clashSub, header, err = a.subClashService.GetClash(subId, host)
-	}
+	clashSub, header, err := a.subClashService.getClash(subId, host, legacy, c.GetString(deviceNoticeKey))
 	if err != nil {
 		if errors.Is(err, errNoLegacyClashProxies) {
 			c.String(http.StatusUnprocessableEntity, err.Error())
@@ -973,6 +1045,9 @@ func (a *SUBController) ApplyCommonHeaders(
 	if profileUrl != "" {
 		c.Writer.Header().Set("Profile-Web-Page-Url", profileUrl)
 	}
+	if notice := c.GetString(deviceNoticeKey); notice != "" {
+		profileAnnounce = notice
+	}
 	if profileAnnounce != "" {
 		c.Writer.Header().Set("Announce", "base64:"+base64.StdEncoding.EncodeToString([]byte(profileAnnounce)))
 	}
@@ -988,6 +1063,10 @@ func (a *SUBController) ApplyCommonHeaders(
 		// Happ/INCY fetch the geo files the baked rules reference through this
 		// header; unlike the documents, it keeps the profile's own DNS servers.
 		rules, remote, routingErr = jsonRoutingHeaderSource(a.subJsonRoutingRules), false, nil
+		if strings.TrimSpace(a.subJsonRoutingRules) == "" && a.localDirectHapp != "" {
+			// Raw links carry no rules of their own, so Happ has to switch this profile on.
+			rules, profileEnableRouting = a.localDirectHapp, !incyClient
+		}
 	}
 	// The off values undo a previously pushed setting, so they ride the same
 	// opt-in as every other Happ header rather than reaching every Happ client.

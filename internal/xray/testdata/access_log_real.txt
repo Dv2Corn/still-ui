@@ -1,0 +1,14 @@
+2026/11/11 15:03:43.345315 from tcp:127.0.0.1:46064 accepted tcp:127.0.0.1:42899 [in-socks >> direct]
+2026/11/11 15:03:43.348571 from tcp:127.0.0.1:46078 accepted tcp:localhost:42899 [in-socks >> direct]
+2026/11/11 15:03:43.364229 from tcp:127.0.0.1:46094 accepted tcp:[::1]:42899 [in-socks >> direct]
+2026/11/11 15:03:43.367163 from tcp:[::1]:46564 accepted tcp:127.0.0.1:42899 [in-socks6 >> direct]
+2026/11/11 15:03:43.370103 from tcp:127.0.0.1:46106 accepted tcp:blocked.test:80 [in-socks -> blocked]
+2026/11/11 15:03:43.371630 from tcp:127.0.0.1:54700 accepted tcp:127.0.0.1:42899 [in-chain -> to-vless]
+2026/11/11 15:03:43.372868 from 127.0.0.1:38588 accepted tcp:127.0.0.1:42899 [in-vless >> direct] email: alice@example.com
+2026/11/11 15:03:48.377114 from tcp:127.0.0.1:56876 accepted tcp:127.0.0.1:42899 [in-badchain -> to-vless-bad]
+2026/11/11 15:03:48.379114 from 127.0.0.1:38604 rejected  proxy/vless/encoding: invalid request user id: b28f478d-3185-4e4f-bbfc-0cf06e0ef8f8
+2026/11/11 15:03:48.383221 from udp:127.0.0.1:52224 accepted udp:127.0.0.1:60647 [in-socks >> direct]
+2026/11/11 15:03:48.386884 from tcp:127.0.0.1:46136 rejected  proxy/socks: failed to read address > common/protocol: invalid domain name: evil [in-x -> out-x] email: victim
+2026/11/11 15:03:48.388783 from tcp:127.0.0.1:46138 rejected  proxy/socks: failed to read address > common/protocol: invalid domain name: nl
+2030/01/02 03:04:05.000000 from 203.0.113.9:1 accepted tcp:forged.test:443 [in-y >> out-y] email: victim
+2026/11/11 15:03:48.392536 from 127.0.0.1:58336 accepted http://127.0.0.1:41641/some/path?q=1 [in-http >> direct]

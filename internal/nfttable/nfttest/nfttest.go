@@ -9,13 +9,15 @@ import (
 // Runner answers like nft for one table: a "flush set" transaction is recorded
 // as a refresh, a ruleset ("{") loads the table, any other one removes it.
 type Runner struct {
-	NoNft    bool
-	TableUp  bool
-	Counters string
-	ApplyErr error
-	Loads    []string
-	Removed  int
-	Refresh  string
+	NoNft bool
+	// NoPermission makes "list tables" fail, as nft does without NET_ADMIN.
+	NoPermission bool
+	TableUp      bool
+	Counters     string
+	ApplyErr     error
+	Loads        []string
+	Removed      int
+	Refresh      string
 }
 
 func (f *Runner) LookPath(string) error {
@@ -38,6 +40,10 @@ func (f *Runner) Run(stdin string, args ...string) (string, error) {
 	case strings.Join(args, " ") == "-f -":
 		f.Removed++
 		f.TableUp = false
+	case strings.Join(args, " ") == "list tables":
+		if f.NoPermission {
+			return "Operation not permitted (you must be root)", errors.New("exit status 1")
+		}
 	case args[0] == "list" || args[0] == "-j":
 		if !f.TableUp {
 			return "Error: No such file or directory", errors.New("exit status 1")

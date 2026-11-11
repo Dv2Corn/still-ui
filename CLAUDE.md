@@ -49,6 +49,8 @@ file locations when it can answer in one hop.
   over a gVisor userspace netstack, per-inbound reconcile manager, TCP/UDP
   relay into a loopback per-peer-auth SOCKS5 Xray inbound, port-forward
   listeners, per-peer IPv6 egress aliases.
+- `internal/connlog/` — connection log: follows Xray's access log, one SQLite file
+  per day beside the panel DB, retention + size cap, paged queries.
 - `internal/pia/` — PIA WireGuard protocol client (auth, signed server list, `/addKey`).
 - `internal/sub/` — subscription server (raw / JSON / Clash).
 - `internal/eventbus/` — in-process pub/sub (outbound/node health, xray.crash,

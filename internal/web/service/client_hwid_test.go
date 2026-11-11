@@ -16,6 +16,13 @@ func initClientHwidTestDB(t *testing.T) {
 	dbtest.InitDB(t, filepath.Join(dbDir, "x-ui.db"))
 }
 
+func setHwidSetting(t *testing.T, key, value string) {
+	t.Helper()
+	if err := (&SettingService{}).saveSetting(key, value); err != nil {
+		t.Fatalf("set %s=%s: %v", key, value, err)
+	}
+}
+
 func seedHwidClient(t *testing.T, limit int) *model.ClientRecord {
 	t.Helper()
 	rec := &model.ClientRecord{
@@ -114,6 +121,7 @@ func TestClientHwidGateRegistersAndBlocks(t *testing.T) {
 	initClientHwidTestDB(t)
 	svc := &ClientService{}
 	rec := seedHwidClient(t, 2)
+	setHwidSetting(t, "subHwidNoIdPolicy", HwidNoIdRefuse)
 
 	res, err := svc.EnforceHwidForSubID(rec.SubID, HwidRequest{})
 	if err != nil {
@@ -279,6 +287,7 @@ func TestClientHwidGateSharedSubIdUsesMaxLimit(t *testing.T) {
 	if err := db.Create(&model.ClientRecord{Email: "b@ex.com", SubID: subID, UUID: "22222222-2222-4333-8444-555555555555", Enable: true, LimitHwid: 2}).Error; err != nil {
 		t.Fatalf("seed second: %v", err)
 	}
+	setHwidSetting(t, "subHwidNoIdPolicy", HwidNoIdRefuse)
 	res, err := svc.EnforceHwidForSubID(subID, HwidRequest{})
 	if err != nil || !res.Active || res.Limit != 2 {
 		t.Fatalf("expected active gate limit 2 from max row, err=%v res=%+v", err, res)

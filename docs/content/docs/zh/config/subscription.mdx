@@ -61,6 +61,48 @@ Clash 格式自动识别保留原有的 `(?i)(clash|mihomo)` 默认匹配器，�
 继续返回 YAML。它不区分旧版客户端与 Mihomo 系客户端；Clash for Windows 用户
 必须使用 `/clash-legacy/<sub-id>` 获取兼容配置。
 
+### 本地网站直连
+
+**设置 → 订阅 → 本地网站直连**（`subLocalDirect`）填写一个国家：ISO 3166-1 alpha-2
+代码，例如 `ru` 或 `ir`，留空为关闭。客户端应用会直接访问该国网站，其余流量走
+VPN，这样拒绝境外地址的银行、政务和电商网站在开着 VPN 时也能正常使用。默认关闭；
+升级后的面板输出与之前完全相同。
+
+规则按以下顺序匹配：
+
+1. 私有和局域网地址直连。
+2. **始终走 VPN** 列表（`subLocalDirectProxy`）走代理。它先于国家规则匹配，因为有些
+   境外服务看起来像本地：Telegram 的地址段在 geoip 库中被标为俄罗斯，Google 会从
+   本地运营商内部的缓存提供视频。内置列表包含 Telegram（域名及其 IPv4/IPv6 地址段）、
+   YouTube、Instagram 和 Facebook、WhatsApp、Discord、OpenAI 和 Anthropic，并随 still-ui
+   版本更新。输入框里填写你自己追加的条目，每行一个域名或 IP 段；整个列表的上限是
+   Happ 路由响应头能容纳的大小，大约可追加 150 条。
+3. 该国的域名后缀直连：`ru` 为 `.ru`、`.su` 和 `.рф`；`by` 为 `.by` 和 `.бел`；
+   `kz` 为 `.kz` 和 `.қаз`；`gb` 为 `.uk`；其他代码为该国自己的两字母后缀。
+4. 面板自己的 `geosite.dat` 中有该国的现成分类时，该分类直连：`category-ru`、
+   `category-ir` 等；中国为 `cn` 或 `geolocation-cn`。
+5. 面板的 `geoip.dat` 中有该国时，该国的 `geoip` 直连。
+6. 其余全部走代理。
+
+| 格式 | 客户端得到什么 |
+| --- | --- |
+| **JSON** | 规则写入 `routing.rules`，位于兜底规则之前，`domainStrategy: IPOnDemand`：只有当没有域名规则认识某个域名时，Xray 才解析它。域名规则（始终走 VPN，然后是国家）在前，地址规则（私有地址、始终走 VPN、`geoip`）在后，因此本地网站不需要 DNS 查询。 |
+| **Clash / Mihomo** | `IP-CIDR`（`no-resolve`）、`DOMAIN-SUFFIX`、`GEOSITE` 和 `GEOIP` 规则，位于 `MATCH,PROXY` 之前。Clash for Windows 配置相同，但没有 `GEOSITE`。配置中没有 `dns` 部分：为匹配 `GEOIP` 规则，应用用自己的 DNS 设置解析域名，可能是运营商的解析器。要为用户指定 DNS，请在 Clash 路由规则字段中加入 `dns:` 块。 |
+| **Happ、INCY** | `Routing` 响应头中的路由配置，代理规则先于直连规则；Happ 还会收到 `Routing-Enable: true`。 |
+| **Shadowrocket** | 规则文件位于 `<订阅地址>/shadowrocket.conf`，订阅页面上有入口：在“配置”页添加该文件，并将全局路由设为“配置”。只有域名后缀和 `GEOIP`，Shadowrocket 没有 `GEOSITE` 规则。 |
+| **原始链接（Base64）** | 没有。链接列表无法携带路由规则；只接受链接的应用需要使用 JSON 订阅或自己的路由设置。 |
+| **AmneziaWG、WireGuard** | 没有。这类隧道只能按 IP 前缀（`AllowedIPs`）路由，而一个国家有数千个不断变化的前缀。 |
+
+你为某种格式自行设置的路由配置在该格式中优先。**JSON 路由配置**（`subJsonRoutingRules`）
+会在 JSON 文档和 `Routing` 响应头中取代这些规则，Happ 路由配置则在响应头中取代它们。
+自定义 Clash 规则排在这些规则之前，如果自带 `MATCH` 则取代它们。旧的 JSON 规则字段
+（`subJsonRules`）仍排在最前。
+
+国家、列表和地理数据库在订阅服务器启动时读取，因此修改后需重启面板才生效。分类会与
+面板的数据库核对，因为客户端内核遇到自己数据库里没有的分类会拒绝整个配置；使用非标准
+数据库的客户端仍可能缺少某个分类。该设置对整个面板生效：没有按客户端设置国家的功能，
+面板也不会根据获取订阅的地址猜测国家，不会调用任何外部地理服务。
+
 ### Base64 与 JSON
 
 **Base64** 内容只是用换行符连接的分享链接，经标准 base64 编码（通过 `subEncrypt` 开关控制）。**JSON** 内容则将每个客户端包装为一份完整的 Xray 客户端配置 —— 一套固定的骨架（绑定到 127.0.0.1 的本地 SOCKS/HTTP 入站、DNS、路由、策略）加上一个指向该入站的 `proxy` 出站。3x-ui **对单个客户端输出单个配置对象，对多个客户端输出数组**，使用扁平的出站 `settings` 形式（`address`/`port`/`id`，`level: 8`），并从 `streamSettings` 中剥离 `sockopt`。

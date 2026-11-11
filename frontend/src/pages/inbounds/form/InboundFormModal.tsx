@@ -1093,6 +1093,7 @@ export default function InboundFormModal({
               network={network}
               protocol={protocol}
               side="server"
+              remoteTarget={typeof wNodeId === 'number'}
             />
           )}
         />

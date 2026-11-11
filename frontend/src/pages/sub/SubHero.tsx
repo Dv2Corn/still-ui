@@ -21,6 +21,9 @@ interface SubHeroProps {
   remained: string;
   datepicker: CalendarKind;
   lang: string;
+  // 0 means the subscription has no device limit, and the page then says nothing about devices.
+  deviceLimit?: number;
+  deviceCount?: number;
 }
 
 const STATUS_TAGS: Record<SubStatus, { color: string; label: string }> = {
@@ -51,6 +54,8 @@ export default function SubHero({
   remained,
   datepicker,
   lang,
+  deviceLimit = 0,
+  deviceCount = 0,
 }: SubHeroProps) {
   const { t } = useTranslation();
   const { token } = theme.useToken();
@@ -85,6 +90,17 @@ export default function SubHero({
       value: lastOnlineMs > 0 ? formatDate(lastOnlineMs) : '-',
     },
   ];
+  if (deviceLimit > 0) {
+    stats.push({
+      key: 'devices',
+      label: t('subscription.devices'),
+      value: (
+        <bdi>
+          {deviceCount} / {deviceLimit}
+        </bdi>
+      ),
+    });
+  }
 
   return (
     <section className={healthy ? 'sub-hero' : 'sub-hero is-alert'}>

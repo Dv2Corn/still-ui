@@ -55,6 +55,7 @@ type SubService struct {
 	calendarExpireLocation     *time.Location
 	subExpiredTemplate         string
 	subTrafficDepletedTemplate string
+	deviceNotice               string
 	inboundService             service.InboundService
 	settingService             service.SettingService
 	// nodesByID is populated per request from the Node table so
@@ -506,6 +507,30 @@ const (
 	infoNodeDepleted
 )
 
+// infoNodeLink is the raw-format entry that only carries a text: a server no app can use.
+func infoNodeLink(remark string) string {
+	return fmt.Sprintf("socks://127.0.0.1:1080#%s", strings.ReplaceAll(url.QueryEscape(remark), "+", "%20"))
+}
+
+// refusedTraffic is the usage a fetch the device gate refused still reports. Every renderer
+// returns right after it: nothing of the client's servers is built for a refused device.
+func (s *SubService) refusedTraffic(subId string, inbounds []*model.Inbound, externalLinks []externalLinkEntry) xray.ClientTraffic {
+	seenEmails := make(map[string]struct{})
+	hasEnabledClient := false
+	for _, inbound := range inbounds {
+		if countHiddenClients(s.matchingClients(inbound, subId), seenEmails) {
+			hasEnabledClient = true
+		}
+	}
+	for _, ext := range externalLinks {
+		seenEmails[ext.Email] = struct{}{}
+		hasEnabledClient = hasEnabledClient || ext.Enable
+	}
+	traffic, _ := s.AggregateTrafficByEmails(slices.Sorted(maps.Keys(seenEmails)))
+	traffic.Enable = hasEnabledClient
+	return traffic
+}
+
 func (s *SubService) resolveInfoNodeRemark(subId string, uniqueEmails []string, traffic xray.ClientTraffic, hasEntries bool) (infoNodeMode, string) {
 	if !s.subInfoNodeEnable || !s.subscriptionBody {
 		return infoNodeNone, ""
@@ -578,6 +603,9 @@ func (s *SubService) getSubs(subId string) ([]string, []string, int64, xray.Clie
 
 	if len(inbounds) == 0 && len(externalLinks) == 0 {
 		return nil, nil, 0, traffic, nil
+	}
+	if s.deviceNotice != "" {
+		return []string{infoNodeLink(s.deviceNotice)}, nil, 0, s.refusedTraffic(subId, inbounds, externalLinks), nil
 	}
 
 	seenEmails := make(map[string]struct{})
@@ -688,7 +716,7 @@ func (s *SubService) getSubs(subId string) ([]string, []string, int64, xray.Clie
 	traffic.Enable = hasEnabledClient
 
 	if mode, remark := s.resolveInfoNodeRemark(subId, uniqueEmails, traffic, len(result) > 0); mode != infoNodeNone {
-		dummyLink := fmt.Sprintf("socks://127.0.0.1:1080#%s", strings.ReplaceAll(url.QueryEscape(remark), "+", "%20"))
+		dummyLink := infoNodeLink(remark)
 		if mode == infoNodeExpired || mode == infoNodeDepleted {
 			return []string{dummyLink}, emails, lastOnline, traffic, nil
 		}
@@ -1787,6 +1815,35 @@ func hysteriaHopPorts(stream map[string]any) string {
 	udpHop, _ := quicParams["udpHop"].(map[string]any)
 	ports, _ := udpHop["ports"].(string)
 	return strings.TrimSpace(ports)
+}
+
+// hysteriaHopIntervalSeconds is the low end of the hop interval, 0 when unset. One integer on
+// purpose: mihomo builds that read hop-interval as a number refuse a "5-10" string.
+func hysteriaHopIntervalSeconds(stream map[string]any) int {
+	finalmask, _ := stream["finalmask"].(map[string]any)
+	quicParams, _ := finalmask["quicParams"].(map[string]any)
+	udpHop, _ := quicParams["udpHop"].(map[string]any)
+	raw := udpHop["interval"]
+	masks, _ := finalmask["udp"].([]any)
+	for _, rawMask := range masks {
+		mask, _ := rawMask.(map[string]any)
+		settings, _ := mask["settings"].(map[string]any)
+		if maskType, _ := mask["type"].(string); maskType == "udphop" && settings["interval"] != nil {
+			raw = settings["interval"]
+			break
+		}
+	}
+	switch v := raw.(type) {
+	case float64:
+		return max(int(v), 0)
+	case string:
+		low, _, _ := strings.Cut(v, "-")
+		seconds, err := strconv.Atoi(strings.TrimSpace(low))
+		if err == nil {
+			return max(seconds, 0)
+		}
+	}
+	return 0
 }
 
 // udpHopMaskPorts reads remotePorts off the first "udphop" UDP mask. xray-core
@@ -3388,6 +3445,9 @@ type PageData struct {
 	SubAnnounce   string
 	Result        []string
 	Emails        []string
+	// DeviceLimit is 0 when the subscription has no device limit; DeviceCount never names a device.
+	DeviceLimit int
+	DeviceCount int
 }
 
 // ResolveRequest extracts scheme, host, and header information from an HTTP request.

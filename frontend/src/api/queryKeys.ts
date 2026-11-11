@@ -4,6 +4,7 @@ export const keys = {
     fail2banStatus: () => ['server', 'fail2banStatus'] as const,
     torrentBlock: () => ['server', 'torrentBlock'] as const,
     egressFilter: () => ['server', 'egressFilter'] as const,
+    portHop: () => ['server', 'portHop'] as const,
   },
   nodes: {
     root: () => ['nodes'] as const,
@@ -21,6 +22,9 @@ export const keys = {
     root: () => ['probes'] as const,
     list: () => ['probes', 'list'] as const,
     history: (id: number) => ['probes', 'history', id] as const,
+  },
+  connlog: {
+    list: (filter: unknown) => ['connlog', 'list', filter] as const,
   },
   subBalancers: {
     root: () => ['sub-balancers'] as const,

@@ -412,10 +412,11 @@ uninstall() {
         systemctl daemon-reload
         systemctl reset-failed
     fi
-    # The nftables tables of the egress filter and the torrent block go with the panel.
+    # The nftables tables of the egress filter, the torrent block and port hopping go with the panel.
     if command -v nft > /dev/null 2>&1; then
         nft delete table inet still_egress_filter > /dev/null 2>&1
         nft delete table inet still_torrent_block > /dev/null 2>&1
+        nft delete table inet still_port_hop > /dev/null 2>&1
     fi
 
     local panel_used_postgres="false"
@@ -3706,6 +3707,26 @@ backup_now() {
     "$bin" backup
 }
 
+# still-ui import marzban|x-ui <database> [-dry-run] [-merge]: bring the inbounds and users of
+# Marzban or an old x-ui into this panel. The panel takes a backup first and writes all or
+# nothing; it is restarted only after a real import, so Xray starts the imported inbounds.
+import_panel() {
+    local bin="${xui_folder}/x-ui" rc=0 arg dry=0
+    if [[ ! -x "$bin" ]] || ! "$bin" import 2>&1 | grep -q -- '-dry-run'; then
+        LOGE "This still-ui build cannot import yet: run still-ui update first."
+        return 1
+    fi
+    for arg in "$@"; do
+        [[ "$arg" == "-dry-run" || "$arg" == "--dry-run" || "$arg" == "forget-links" ]] && dry=1
+    done
+    "$bin" import "$@" || rc=$?
+    # 3: imported, with some inbounds left out and listed above.
+    if [[ $dry -eq 0 && ( $rc -eq 0 || $rc -eq 3 ) ]]; then
+        restart 0
+    fi
+    return $rc
+}
+
 # still-ui restore <file> [key-file]: replace the panel database with a backup. The file is checked
 # (and decrypted, for an .age backup) before anything changes; the panel is stopped for the swap
 # and started again (with the still-xray service, Xray restarts once), and the database it had is
@@ -3795,6 +3816,7 @@ show_usage() {
 │  ${blue}still-ui migrateDB [file]${plain}      - Convert .db <-> .dump (SQLite)   │
 │  ${blue}still-ui backup${plain}                - Take a local backup now          │
 │  ${blue}still-ui restore <file> [key]${plain}  - Restore a local backup           │
+│  ${blue}still-ui import marzban <db>${plain}   - Import from Marzban or x-ui      │
 │  ${blue}still-ui pgclient [ver]${plain}        - Upgrade pg_dump/pg_restore tools │
 │  ${blue}still-ui migrate-rollback${plain}      - Undo a migration from 3x-ui      │
 │  ${blue}still-ui legacy${plain}                - Legacy version                   │
@@ -4006,6 +4028,9 @@ if [[ $# -gt 0 ]]; then
             ;;
         "restore")
             check_install 0 && restore_backup "$2" "$3"
+            ;;
+        "import")
+            check_install 0 && import_panel "${@:2}"
             ;;
         "migrate" | "migrate-rollback")
             still_migrate "$@"

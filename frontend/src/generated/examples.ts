@@ -12,6 +12,11 @@ export const EXAMPLES: Record<string, unknown> = {
     "backupKeep": 1,
     "backupSchedule": "@daily",
     "backupTelegram": false,
+    "connLogDestination": "full",
+    "connLogEnable": false,
+    "connLogMaxSizeMB": 2048,
+    "connLogRetentionDays": 30,
+    "connLogSource": "full",
     "datepicker": "",
     "discordAdminIds": "",
     "discordBotBackup": false,
@@ -117,6 +122,11 @@ export const EXAMPLES: Record<string, unknown> = {
     "subHappTunType": "",
     "subHideSettings": false,
     "subHostSortMode": "inbound-first",
+    "subHwidDefaultLimit": 0,
+    "subHwidExpireDays": 30,
+    "subHwidLimitNotice": "",
+    "subHwidNoIdNotice": "",
+    "subHwidNoIdPolicy": "shared",
     "subIncyAnnounceUrl": "",
     "subIncyAppAutoDetect": false,
     "subIncyBannerBgColor": "",
@@ -162,6 +172,8 @@ export const EXAMPLES: Record<string, unknown> = {
     "subJsonUserAgentRegex": "",
     "subKeyFile": "",
     "subListen": "",
+    "subLocalDirect": "",
+    "subLocalDirectProxy": "",
     "subPath": "",
     "subPort": 1,
     "subProbeMinAgents": 0,
@@ -213,6 +225,11 @@ export const EXAMPLES: Record<string, unknown> = {
     "backupKeep": 1,
     "backupSchedule": "@daily",
     "backupTelegram": false,
+    "connLogDestination": "full",
+    "connLogEnable": false,
+    "connLogMaxSizeMB": 2048,
+    "connLogRetentionDays": 30,
+    "connLogSource": "full",
     "datepicker": "",
     "discordAdminIds": "",
     "discordBotBackup": false,
@@ -326,6 +343,11 @@ export const EXAMPLES: Record<string, unknown> = {
     "subHappTunType": "",
     "subHideSettings": false,
     "subHostSortMode": "inbound-first",
+    "subHwidDefaultLimit": 0,
+    "subHwidExpireDays": 30,
+    "subHwidLimitNotice": "",
+    "subHwidNoIdNotice": "",
+    "subHwidNoIdPolicy": "shared",
     "subIncyAnnounceUrl": "",
     "subIncyAppAutoDetect": false,
     "subIncyBannerBgColor": "",
@@ -371,6 +393,8 @@ export const EXAMPLES: Record<string, unknown> = {
     "subJsonUserAgentRegex": "",
     "subKeyFile": "",
     "subListen": "",
+    "subLocalDirect": "",
+    "subLocalDirectProxy": "",
     "subPath": "",
     "subPort": 1,
     "subProbeMinAgents": 0,
@@ -447,6 +471,9 @@ export const EXAMPLES: Record<string, unknown> = {
     "name": "central-panel-a",
     "scope": "admin",
     "token": "new-token-string"
+  },
+  "AwgSignaturePacketResponse": {
+    "i1": "\u003cr 2\u003e\u003cb 0x010000010000000000000377777706676f6f676c6503636f6d0000010001\u003e"
   },
   "Blocker": {
     "code": "tools",
@@ -665,6 +692,45 @@ export const EXAMPLES: Record<string, unknown> = {
     ],
     "onlineCount": 1,
     "total": 2000
+  },
+  "ConnFilter": {
+    "before": "20250101:4096",
+    "client": "alice@example.com",
+    "from": 1735689600000,
+    "host": "example.com",
+    "inbound": "inbound-443",
+    "limit": 50,
+    "source": "203.0.113.",
+    "to": 1735775999999
+  },
+  "ConnPage": {
+    "enabled": true,
+    "next": "20250101:4046",
+    "rows": [
+      {
+        "client": "alice@example.com",
+        "host": "example.com",
+        "inbound": "inbound-443",
+        "network": "tcp",
+        "outbound": "direct",
+        "port": 443,
+        "source": "203.0.113.9",
+        "sourcePort": 54321,
+        "time": 1735732800000
+      }
+    ],
+    "sizeBytes": 36700160
+  },
+  "ConnRecord": {
+    "client": "alice@example.com",
+    "host": "example.com",
+    "inbound": "inbound-443",
+    "network": "tcp",
+    "outbound": "direct",
+    "port": 443,
+    "source": "203.0.113.9",
+    "sourcePort": 54321,
+    "time": 1735732800000
   },
   "FallbackParentInfo": {
     "masterId": 0,
@@ -1140,6 +1206,38 @@ export const EXAMPLES: Record<string, unknown> = {
     "total": 0,
     "up": 0
   },
+  "PanelImportInbound": {
+    "clients": 12,
+    "hosts": 1,
+    "port": 443,
+    "protocol": "vless",
+    "skipped": "",
+    "tag": "VLESS TCP REALITY"
+  },
+  "PanelImportReport": {
+    "admins": [
+      "admin"
+    ],
+    "applied": false,
+    "backup": "/etc/still-ui/backups/still-ui-host-20261111T101500Z.db",
+    "clients": 12,
+    "inbounds": [
+      {
+        "clients": 12,
+        "hosts": 1,
+        "port": 443,
+        "protocol": "vless",
+        "skipped": "",
+        "tag": "VLESS TCP REALITY"
+      }
+    ],
+    "legacySubLinks": 12,
+    "notEmpty": false,
+    "notes": [
+      "user bob: the yearly traffic reset has no equivalent, set to never"
+    ],
+    "source": "marzban"
+  },
   "PanelUpdateStatus": {
     "exitCode": 0,
     "finishedAt": 1735689612,
@@ -1157,6 +1255,28 @@ export const EXAMPLES: Record<string, unknown> = {
     "online": true,
     "tag": "inbound-51820",
     "up": 1048576
+  },
+  "PortHopRule": {
+    "inboundId": 7,
+    "ports": "20000-50000",
+    "remark": "hy2",
+    "toPort": 443
+  },
+  "PortHopStatus": {
+    "active": true,
+    "error": "",
+    "nftInstalled": true,
+    "packets": 1204,
+    "permitted": true,
+    "rules": [
+      {
+        "inboundId": 7,
+        "ports": "20000-50000",
+        "remark": "hy2",
+        "toPort": 443
+      }
+    ],
+    "supported": true
   },
   "ProbeResultUI": {
     "cpuPct": 12.5,
@@ -1305,6 +1425,8 @@ export const EXAMPLES: Record<string, unknown> = {
     "alpn": "h2",
     "certChainBytes": 3427,
     "certChainValid": true,
+    "certDaysLeft": 61,
+    "certExpiresSoon": false,
     "certIssuer": "Google Trust Services",
     "certSubject": "cloudflare.com",
     "certValid": true,
@@ -1314,9 +1436,11 @@ export const EXAMPLES: Record<string, unknown> = {
     "host": "www.cloudflare.com",
     "ip": "104.16.124.96",
     "latencyMs": 180,
+    "mlkem768": true,
     "notAfter": "2026-08-01T00:00:00Z",
     "port": 443,
     "privateTarget": false,
+    "reachable": true,
     "reason": "",
     "serverNames": [
       ""

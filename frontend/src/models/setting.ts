@@ -4,6 +4,7 @@ import type {
   SubHostSortMode,
   SubClashAutoGroupType,
   SubProbeOrder,
+  SubHwidNoIdPolicy,
 } from '@/schemas/setting';
 
 export class AllSetting {
@@ -33,6 +34,13 @@ export class AllSetting {
   subExpiredTemplate = '⛔ {{EMAIL}} | Expired: {{EXPIRE_DATE}}';
   subTrafficDepletedTemplate =
     '🚫 {{EMAIL}} | Traffic Depleted | {{TRAFFIC_USED}}/{{TRAFFIC_TOTAL}}';
+  subHwidDefaultLimit = 0;
+  subHwidNoIdPolicy: SubHwidNoIdPolicy = 'shared';
+  subHwidExpireDays = 30;
+  subHwidLimitNotice =
+    'Device limit {{LIMIT}} reached. Remove a device in your account or ask the seller.';
+  subHwidNoIdNotice =
+    'This app sends no device ID. Use an app that does (Happ, v2rayTun) or ask the seller.';
   datepicker: 'gregorian' | 'jalalian' = 'gregorian';
   tgBotEnable = false;
   tgBotToken = '';
@@ -89,6 +97,8 @@ export class AllSetting {
   subClashAutoGroupUrl = 'http://www.gstatic.com/generate_204';
   subClashAutoGroupInterval = 300;
   subClashAutoGroupTolerance = 50;
+  subLocalDirect = '';
+  subLocalDirectProxy = '';
   subJsonMux = '';
   subJsonRules = '';
   subJsonRoutingRules = '';
@@ -223,6 +233,11 @@ export class AllSetting {
   alertDisk = 90;
   alertCertDays = 7;
   alertRemindHours = 6;
+  connLogEnable = false;
+  connLogRetentionDays = 30;
+  connLogMaxSizeMB = 2048;
+  connLogDestination = 'full';
+  connLogSource = 'full';
 
   constructor(data?: unknown) {
     if (data != null) {

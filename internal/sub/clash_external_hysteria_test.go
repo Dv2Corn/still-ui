@@ -184,3 +184,42 @@ func TestClashHysteriaV1RetainsAuthAndInsecureOverride(t *testing.T) {
 		}
 	}
 }
+
+func TestClashHysteriaInboundHopInterval(t *testing.T) {
+	tests := []struct {
+		name string
+		mask string
+		want any
+	}{
+		{
+			name: "a range becomes its low end, an integer every mihomo build reads",
+			mask: `{"quicParams":{"udpHop":{"ports":"20000-30000","interval":"7-12","redirect":true}}}`,
+			want: 7,
+		},
+		{
+			name: "the interval of a udphop mask wins and may be a number",
+			mask: `{"udp":[{"type":"udphop","settings":{"remotePorts":"20000-30000","interval":15}}],"quicParams":{"udpHop":{"ports":"1-2","interval":"7-12"}}}`,
+			want: 15,
+		},
+		{
+			name: "no hop range, no interval",
+			mask: `{"quicParams":{"udpHop":{"interval":"7-12"}}}`,
+		},
+		{
+			name: "an unreadable interval leaves mihomo's default",
+			mask: `{"quicParams":{"udpHop":{"ports":"20000-30000","interval":"fast"}}}`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			inbound := &model.Inbound{
+				Protocol: model.Hysteria, Listen: "192.0.2.1", Port: 443, Settings: `{"version":2}`,
+				StreamSettings: `{"tlsSettings":{"serverName":"tls.example","alpn":["h3"]},"finalmask":` + tt.mask + `}`,
+			}
+			proxy := (&SubClashService{}).buildHysteriaProxy(&SubService{}, inbound, model.Client{Email: "user", Auth: "secret"}, nil)
+			if got := proxy["hop-interval"]; got != tt.want {
+				t.Errorf("hop-interval = %#v, want %#v", got, tt.want)
+			}
+		})
+	}
+}

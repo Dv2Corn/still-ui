@@ -37,6 +37,34 @@ function LocationProbe() {
 }
 
 describe('SubscriptionGeneralTab', () => {
+  it('picks the local-direct country and shows the always-VPN list only while it is on', () => {
+    const updateSetting = vi.fn();
+    const { unmount } = renderWithProviders(
+      <MemoryRouter>
+        <SubscriptionGeneralTab allSetting={new AllSetting()} updateSetting={updateSetting} />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByRole('textbox', { name: 'Always through the VPN' })).toBeNull();
+    fireEvent.change(document.getElementById('sub-local-direct') as HTMLInputElement, {
+      target: { value: 'Russia' },
+    });
+    chooseSelectOption('sub-local-direct', 'Russia (RU)');
+    expect(updateSetting).toHaveBeenCalledWith({ subLocalDirect: 'ru' });
+    unmount();
+    renderWithProviders(
+      <MemoryRouter>
+        <SubscriptionGeneralTab
+          allSetting={new AllSetting({ subLocalDirect: 'ir', subLocalDirectProxy: 'telegram.org' })}
+          updateSetting={updateSetting}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('Iran (IR)')).toBeTruthy();
+    const list = screen.getByRole('textbox', { name: 'Always through the VPN' });
+    expect((list as HTMLTextAreaElement).value).toBe('telegram.org');
+    fireEvent.change(list, { target: { value: 't.me' } });
+    expect(updateSetting).toHaveBeenCalledWith({ subLocalDirectProxy: 't.me' });
+  });
   it('selects and reloads the saved subscription node ordering mode', () => {
     const updateSetting = vi.fn();
     const { unmount } = renderWithProviders(

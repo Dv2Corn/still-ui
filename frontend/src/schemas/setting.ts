@@ -16,6 +16,9 @@ export type SubClashAutoGroupType = z.infer<typeof SubClashAutoGroupTypeSchema>;
 export const SubProbeOrderSchema = z.enum(['off', 'reorder', 'hide']);
 export type SubProbeOrder = z.infer<typeof SubProbeOrderSchema>;
 
+export const SubHwidNoIdPolicySchema = z.enum(['shared', 'allow', 'refuse']);
+export type SubHwidNoIdPolicy = z.infer<typeof SubHwidNoIdPolicySchema>;
+
 export const AllSettingSchema = z
   .object({
     webListen: z.string().optional(),
@@ -42,6 +45,11 @@ export const AllSettingSchema = z
     subCalendarExpireInclusive: z.boolean().optional(),
     subExpiredTemplate: z.string().optional(),
     subTrafficDepletedTemplate: z.string().optional(),
+    subHwidDefaultLimit: z.number().int().min(0).max(1000).optional(),
+    subHwidNoIdPolicy: SubHwidNoIdPolicySchema.optional(),
+    subHwidExpireDays: z.number().int().min(0).max(3650).optional(),
+    subHwidLimitNotice: z.string().max(256).optional(),
+    subHwidNoIdNotice: z.string().max(256).optional(),
     datepicker: z.enum(['gregorian', 'jalalian']).optional(),
     tgBotEnable: z.boolean().optional(),
     tgBotToken: z.string().optional(),
@@ -100,6 +108,8 @@ export const AllSettingSchema = z
     subClashAutoGroupUrl: z.string().max(2048).optional(),
     subClashAutoGroupInterval: z.number().int().min(10).max(86400).optional(),
     subClashAutoGroupTolerance: z.number().int().min(0).max(10000).optional(),
+    subLocalDirect: z.string().optional(),
+    subLocalDirectProxy: z.string().optional(),
     subJsonMux: z.string().optional(),
     subJsonRules: z.string().optional(),
     subJsonRoutingRules: z.string().optional(),
@@ -210,6 +220,11 @@ export const AllSettingSchema = z
     alertDisk: z.number().int().min(1).max(100).optional(),
     alertCertDays: z.number().int().min(1).max(365).optional(),
     alertRemindHours: z.number().int().min(0).max(720).optional(),
+    connLogEnable: z.boolean().optional(),
+    connLogRetentionDays: z.number().int().min(1).max(3650).optional(),
+    connLogMaxSizeMB: z.number().int().min(16).max(1048576).optional(),
+    connLogDestination: z.enum(['full', 'domain', 'none']).optional(),
+    connLogSource: z.enum(['full', 'masked', 'none']).optional(),
   })
   .loose();
 

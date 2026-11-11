@@ -44,6 +44,11 @@ type AllSetting struct {
 	SubCalendarExpireInclusive bool   `json:"subCalendarExpireInclusive" form:"subCalendarExpireInclusive"`
 	SubExpiredTemplate         string `json:"subExpiredTemplate" form:"subExpiredTemplate"`
 	SubTrafficDepletedTemplate string `json:"subTrafficDepletedTemplate" form:"subTrafficDepletedTemplate"`
+	SubHwidDefaultLimit        int    `json:"subHwidDefaultLimit" form:"subHwidDefaultLimit" validate:"gte=0,lte=1000" example:"0"`
+	SubHwidNoIdPolicy          string `json:"subHwidNoIdPolicy" form:"subHwidNoIdPolicy" example:"shared"`
+	SubHwidExpireDays          int    `json:"subHwidExpireDays" form:"subHwidExpireDays" validate:"gte=0,lte=3650" example:"30"`
+	SubHwidLimitNotice         string `json:"subHwidLimitNotice" form:"subHwidLimitNotice"`
+	SubHwidNoIdNotice          string `json:"subHwidNoIdNotice" form:"subHwidNoIdNotice"`
 	SubProbeOrder              string `json:"subProbeOrder" form:"subProbeOrder" example:"off"`
 	SubProbeMinAgents          int    `json:"subProbeMinAgents" form:"subProbeMinAgents" validate:"gte=0,lte=10" example:"0"`
 	SubProbeStaleMinutes       int    `json:"subProbeStaleMinutes" form:"subProbeStaleMinutes" validate:"gte=5,lte=1440" example:"30"`
@@ -92,6 +97,14 @@ type AllSetting struct {
 	BackupKeep          int    `json:"backupKeep" form:"backupKeep" validate:"gte=1,lte=1000"`
 	BackupAgeRecipients string `json:"backupAgeRecipients" form:"backupAgeRecipients"`
 	BackupTelegram      bool   `json:"backupTelegram" form:"backupTelegram"`
+
+	// Connection log (still-ui), off by default: how long and how much is kept, and what is
+	// stored of a destination (full, domain, none) and of a client address (full, masked, none).
+	ConnLogEnable        bool   `json:"connLogEnable" form:"connLogEnable"`
+	ConnLogRetentionDays int    `json:"connLogRetentionDays" form:"connLogRetentionDays" validate:"omitempty,gte=1,lte=3650" example:"30"`
+	ConnLogMaxSizeMB     int    `json:"connLogMaxSizeMB" form:"connLogMaxSizeMB" validate:"omitempty,gte=16,lte=1048576" example:"2048"`
+	ConnLogDestination   string `json:"connLogDestination" form:"connLogDestination" validate:"omitempty,oneof=full domain none" example:"full"`
+	ConnLogSource        string `json:"connLogSource" form:"connLogSource" validate:"omitempty,oneof=full masked none" example:"full"`
 
 	// Server health alert thresholds (events xray.down, xray.flapping, process.memory,
 	// disk.high, cert.expiring, backup.failed); a reminder repeats every alertRemindHours, 0 = never.
@@ -152,6 +165,8 @@ type AllSetting struct {
 	SubClashAutoGroupUrl        string `json:"subClashAutoGroupUrl" form:"subClashAutoGroupUrl"`
 	SubClashAutoGroupInterval   int    `json:"subClashAutoGroupInterval" form:"subClashAutoGroupInterval" validate:"gte=0,lte=86400"`
 	SubClashAutoGroupTolerance  int    `json:"subClashAutoGroupTolerance" form:"subClashAutoGroupTolerance" validate:"gte=0,lte=10000"`
+	SubLocalDirect              string `json:"subLocalDirect" form:"subLocalDirect"`
+	SubLocalDirectProxy         string `json:"subLocalDirectProxy" form:"subLocalDirectProxy"`
 	SubJsonMux                  string `json:"subJsonMux" form:"subJsonMux"`
 	SubJsonRules                string `json:"subJsonRules" form:"subJsonRules"`
 	SubJsonRoutingRules         string `json:"subJsonRoutingRules" form:"subJsonRoutingRules"`

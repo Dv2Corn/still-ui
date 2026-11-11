@@ -3,6 +3,7 @@ package controller
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"regexp"
 	"slices"
@@ -16,6 +17,7 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/web/global"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/service"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/service/panel"
+	"github.com/mhsanaei/3x-ui/v3/internal/web/session"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/websocket"
 
 	"github.com/gin-gonic/gin"
@@ -33,6 +35,7 @@ type ServerController struct {
 	xrayMetricsService service.XrayMetricsService
 	torrentBlock       service.TorrentBlockService
 	egressFilter       service.EgressFilterService
+	portHop            service.PortHopService
 	xrayService        service.XrayService
 }
 
@@ -68,10 +71,12 @@ func (a *ServerController) initRouter(g *gin.RouterGroup) {
 	g.GET("/getNewmldsa65", a.getNewmldsa65)
 	g.GET("/getNewmlkem768", a.getNewmlkem768)
 	g.GET("/getNewVlessEnc", a.getNewVlessEnc)
+	g.GET("/getNewAwgSignaturePacket", a.getNewAwgSignaturePacket)
 	g.GET("/clientIps", a.getClientIps)
 	g.GET("/fail2banStatus", a.getFail2banStatus)
 	g.GET("/torrentBlock", a.getTorrentBlock)
 	g.GET("/egressFilter", a.getEgressFilter)
+	g.GET("/portHop", a.getPortHop)
 
 	g.POST("/stopXrayService", a.stopXrayService)
 	g.POST("/restartXrayService", a.restartXrayService)
@@ -87,6 +92,7 @@ func (a *ServerController) initRouter(g *gin.RouterGroup) {
 	g.POST("/xraylogs/:count", a.getXrayLogs)
 	g.POST("/amneziawglogs/:count", a.getAmneziaWGLogs)
 	g.POST("/importDB", a.importDB)
+	g.POST("/importPanel", a.importPanel)
 	g.POST("/localBackup", a.runLocalBackup)
 	g.POST("/getNewEchCert", a.getNewEchCert)
 	g.POST("/getCertHash", a.getCertHash)
@@ -122,6 +128,11 @@ func (a *ServerController) status(c *gin.Context) { jsonObj(c, a.serverService.C
 
 func (a *ServerController) getFail2banStatus(c *gin.Context) {
 	jsonObj(c, a.serverService.GetFail2banStatus(), nil)
+}
+
+// getPortHop reports whether this host can redirect Hysteria2 hop ranges and what it redirects now.
+func (a *ServerController) getPortHop(c *gin.Context) {
+	jsonObj(c, a.portHop.Status(), nil)
 }
 
 func (a *ServerController) getTorrentBlock(c *gin.Context) {
@@ -498,6 +509,44 @@ func (a *ServerController) importDB(c *gin.Context) {
 	jsonObj(c, I18nWeb(c, "pages.index.importDatabaseSuccess"), nil)
 }
 
+// maxPanelImportBytes bounds the uploaded source database and Xray config together.
+const maxPanelImportBytes = 512 << 20
+
+// importPanel reports what an uploaded Marzban or x-ui database would bring into this
+// panel and, with apply=true, imports it; the upload itself is only read.
+func (a *ServerController) importPanel(c *gin.Context) {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxPanelImportBytes)
+	file, _, err := c.Request.FormFile("db")
+	if err != nil {
+		jsonMsg(c, I18nWeb(c, "pages.index.readDatabaseError"), err)
+		return
+	}
+	defer file.Close()
+	var xrayConfig []byte
+	if cfg, _, err := c.Request.FormFile("config"); err == nil {
+		xrayConfig, err = io.ReadAll(cfg)
+		cfg.Close()
+		if err != nil {
+			jsonMsg(c, I18nWeb(c, "pages.index.readDatabaseError"), err)
+			return
+		}
+	}
+	apply := c.Request.FormValue("apply") == "true"
+	opts := service.PanelImportOptions{
+		DryRun: !apply, Merge: c.Request.FormValue("merge") == "true", UserId: session.GetLoginUser(c).Id,
+	}
+	report, err := (&service.PanelImportService{}).RunUpload(c.Request.FormValue("source"), file, xrayConfig, opts)
+	if err != nil {
+		jsonMsg(c, I18nWeb(c, "pages.settings.importFailed"), err)
+		return
+	}
+	if report.Applied {
+		a.xrayService.SetToNeedRestart()
+		notifyClientsChanged()
+	}
+	jsonObj(c, report, nil)
+}
+
 // descendants publishes read-only summaries of the nodes this panel manages so
 // a parent panel can surface them as transitive sub-nodes in a chained
 // topology. Called by the parent via the node's API token (#4983).
@@ -595,9 +644,9 @@ func (a *ServerController) scanRealityTarget(c *gin.Context) {
 }
 
 // scanRealityTargets probes the supplied comma-separated targets, or the
-// realityScanCandidates setting when empty, ranked by feasibility then latency.
+// realityScanCandidates setting when empty; neighbours adds the server's own /24.
 func (a *ServerController) scanRealityTargets(c *gin.Context) {
-	res, err := a.serverService.ScanRealityTargets(c.PostForm("targets"))
+	res, err := a.serverService.ScanRealityTargets(c.PostForm("targets"), c.PostForm("neighbours") == "true")
 	if err != nil {
 		jsonMsg(c, I18nWeb(c, "pages.inbounds.toasts.scanRealityTargetError"), err)
 		return
@@ -610,6 +659,16 @@ func (a *ServerController) getNewVlessEnc(c *gin.Context) {
 	out, err := a.serverService.GetNewVlessEnc()
 	if err != nil {
 		jsonMsg(c, I18nWeb(c, "pages.inbounds.toasts.getNewVlessEncError"), err)
+		return
+	}
+	jsonObj(c, out, nil)
+}
+
+// getNewAwgSignaturePacket builds an AmneziaWG I1 packet shaped like the preset's protocol.
+func (a *ServerController) getNewAwgSignaturePacket(c *gin.Context) {
+	out, err := a.serverService.GetNewAwgSignaturePacket(c.Query("preset"))
+	if err != nil {
+		jsonMsg(c, I18nWeb(c, "pages.inbounds.toasts.getNewAwgSignaturePacketError"), err)
 		return
 	}
 	jsonObj(c, out, nil)

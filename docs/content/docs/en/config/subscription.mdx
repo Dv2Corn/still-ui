@@ -152,6 +152,60 @@ Eligibility, exclusions, credentials and protocol settings are unchanged.
 Standalone share-link and QR previews retain their existing behavior. Client apps
 may apply their own sorting after importing a subscription.
 
+### Local sites direct
+
+**Settings → Subscription → Panel settings → Local sites direct**
+(`subLocalDirect`) takes a country: an ISO 3166-1 alpha-2 code such as `ru` or
+`ir`, empty for off. Client apps then open that country's sites directly and
+send everything else through the VPN, so banks, government portals and
+marketplaces that refuse foreign addresses keep working with the VPN on. Off by
+default; a panel that upgrades serves exactly what it served before.
+
+The rules, in match order:
+
+1. Private and LAN addresses go direct.
+2. The **Always through the VPN** list (`subLocalDirectProxy`) goes through the
+   proxy. It is checked before the country because some foreign services look
+   local: Telegram's address ranges are registered as Russian in geoip
+   databases, and Google serves video from caches inside local providers. The
+   built-in list covers Telegram (domains and its IPv4/IPv6 ranges), YouTube,
+   Instagram and Facebook, WhatsApp, Discord, OpenAI and Anthropic, and is
+   updated with still-ui releases. The field holds your additions to it, one
+   domain or IP range per line; the whole list is capped at what fits Happ's
+   routing header, roughly 150 additions.
+3. The country's domain zones go direct: `.ru`, `.su` and `.рф` for `ru`;
+   `.by` and `.бел` for `by`; `.kz` and `.қаз` for `kz`; `.uk` for `gb`; the
+   country's own two-letter zone for any other code.
+4. The country's curated `geosite` category goes direct when the panel's own
+   `geosite.dat` has one: `category-ru`, `category-ir` and so on; `cn` or
+   `geolocation-cn` for China.
+5. `geoip` of the country goes direct when the panel's `geoip.dat` has it.
+6. Everything else goes through the proxy.
+
+| Format | What the client gets |
+| --- | --- |
+| **JSON** | The rules in `routing.rules` ahead of the catch-all rule, with `domainStrategy: IPOnDemand`: Xray resolves a name only when no domain rule knows it. The domain rules (always-VPN, then the country) come first and the address rules (private, always-VPN, `geoip`) after them, so a local site costs no DNS lookup. |
+| **Clash / Mihomo** | `IP-CIDR` (`no-resolve`), `DOMAIN-SUFFIX`, `GEOSITE` and `GEOIP` rules ahead of `MATCH,PROXY`. The Clash for Windows profile gets the same without `GEOSITE`. The profile has no `dns` section: for the `GEOIP` rule the app resolves names with its own DNS settings, which may be the provider's resolver. To set DNS for your users, put a `dns:` block into the Clash routing rules field. |
+| **Happ, INCY** | A routing profile in the `Routing` response header, proxy rules ahead of direct ones; Happ also gets `Routing-Enable: true`. |
+| **Shadowrocket** | A rules file at `<subscription URL>/shadowrocket.conf`, offered on the subscription page: add it on the Config tab and set Global Routing to Config. Zones and `GEOIP` only, Shadowrocket has no `GEOSITE` rule. |
+| **Raw links (Base64)** | Nothing. A list of links cannot carry routing rules; apps that only take links need the JSON subscription or their own routing settings. |
+| **AmneziaWG, WireGuard** | Nothing. These tunnels route only by IP prefixes (`AllowedIPs`), and a whole country is thousands of prefixes that keep changing. |
+
+A routing profile you set for a format yourself wins in that format. A **JSON
+routing profile** (`subJsonRoutingRules`) replaces these rules in JSON
+documents and in the `Routing` header, and so does a Happ routing profile for
+the header. Custom Clash rules are placed ahead of these rules and replace them
+when they bring their own `MATCH`. The older JSON rules field (`subJsonRules`)
+stays in front of them.
+
+The country, the list and the geo databases are read when the subscription
+server starts, so a change takes effect after a panel restart. The categories
+are checked against the panel's databases because a client core refuses a whole
+profile that names a category it cannot find; a client with an unusual database
+of its own can still miss one. The setting is one for the whole panel: there is
+no per-client country, and the panel does not guess a country from the address
+that fetches the subscription or call any outside geo service.
+
 ### Base64 vs JSON
 
 The **Base64** body is just the newline-joined share links, standard-base64

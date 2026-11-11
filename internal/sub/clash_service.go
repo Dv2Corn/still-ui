@@ -15,6 +15,7 @@ import (
 
 	"github.com/mhsanaei/3x-ui/v3/internal/amneziawg"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
+	"github.com/mhsanaei/3x-ui/v3/internal/sub/localdirect"
 	wgutil "github.com/mhsanaei/3x-ui/v3/internal/util/wireguard"
 )
 
@@ -23,6 +24,7 @@ type SubClashService struct {
 	clashRules     string
 	clashRemoteDNS bool
 	autoGroup      ClashAutoGroup
+	localDirect    localdirect.Plan
 	SubService     *SubService
 }
 
@@ -33,16 +35,17 @@ func NewSubClashService(enableRouting bool, clashRules string, clashRemoteDNS bo
 }
 
 func (s *SubClashService) GetClash(subId string, host string) (string, string, error) {
-	return s.getClash(subId, host, false)
+	return s.getClash(subId, host, false, "")
 }
 
 func (s *SubClashService) GetClashLegacy(subId string, host string) (string, string, error) {
-	return s.getClash(subId, host, true)
+	return s.getClash(subId, host, true, "")
 }
 
-func (s *SubClashService) getClash(subId string, host string, legacy bool) (string, string, error) {
+func (s *SubClashService) getClash(subId string, host string, legacy bool, deviceNotice string) (string, string, error) {
 	subReq := s.SubService.ForRequest(host)
 	subReq.subscriptionBody = true
+	subReq.deviceNotice = deviceNotice
 	return s.renderClash(subReq, subId, host, legacy)
 }
 
@@ -57,6 +60,15 @@ func (s *SubClashService) renderClash(subReq *SubService, subId string, host str
 	}
 	if len(inbounds) == 0 && len(externalLinks) == 0 {
 		return "", "", nil
+	}
+	if subReq.deviceNotice != "" {
+		// No routing template either: it may name the client's proxies, and they are not in this answer.
+		notice, err := marshalClashYAML(map[string]any{
+			"proxies":      []map[string]any{clashInfoProxy(subReq.deviceNotice)},
+			"proxy-groups": s.autoGroup.clashProxyGroups([]string{subReq.deviceNotice}, nil, false),
+			"rules":        []string{"MATCH,PROXY"},
+		})
+		return string(notice), subReq.subscriptionUserinfo(subReq.refusedTraffic(subId, inbounds, externalLinks)), err
 	}
 
 	var panelProxies []clashProxy
@@ -183,12 +195,7 @@ func (s *SubClashService) renderClash(subReq *SubService, subId string, host str
 	header := subReq.subscriptionUserinfo(traffic)
 
 	if mode, remark := subReq.resolveInfoNodeRemark(subId, emails, traffic, len(proxies) > 0); mode != infoNodeNone {
-		dummyProxy := map[string]any{
-			"name":   remark,
-			"type":   "socks5",
-			"server": "127.0.0.1",
-			"port":   1080,
-		}
+		dummyProxy := clashInfoProxy(remark)
 		if mode == infoNodeExpired || mode == infoNodeDepleted {
 			proxies = []map[string]any{dummyProxy}
 		} else {
@@ -236,7 +243,7 @@ func (s *SubClashService) renderClash(subReq *SubService, subId string, host str
 	config := map[string]any{
 		"proxies":      proxies,
 		"proxy-groups": s.autoGroup.clashProxyGroups(proxyNames, autoMembers, templateMentionsAuto),
-		"rules":        []string{"MATCH,PROXY"},
+		"rules":        append(s.localDirect.ClashRules(!legacy), "MATCH,PROXY"),
 	}
 
 	if applyRouting {
@@ -257,6 +264,16 @@ func (s *SubClashService) renderClash(subReq *SubService, subId string, host str
 	}
 
 	return string(finalYAML), header, nil
+}
+
+// clashInfoProxy is the Clash entry that only carries a text: a server no app can use.
+func clashInfoProxy(remark string) map[string]any {
+	return map[string]any{
+		"name":   remark,
+		"type":   "socks5",
+		"server": "127.0.0.1",
+		"port":   1080,
+	}
 }
 
 func legacyClashProxies(proxies []map[string]any) []map[string]any {
@@ -602,6 +619,10 @@ func (s *SubClashService) buildHysteriaProxy(subReq *SubService, inbound *model.
 	}
 
 	applyHysteriaFinalMask(proxy, rawStream)
+	// Only the inbound's own interval: an imported link carries none, and mihomo's default stays.
+	if seconds := hysteriaHopIntervalSeconds(rawStream); seconds > 0 && proxy["ports"] != nil {
+		proxy["hop-interval"] = seconds
+	}
 
 	return proxy
 }

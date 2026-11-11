@@ -105,6 +105,9 @@ func run(root, outDir string) error {
 				"LogEntry",
 				"NewUUIDResponse",
 				"MLDSA65Response",
+				"AwgSignaturePacketResponse",
+				"PortHopRule",
+				"PortHopStatus",
 				"MLKEM768Response",
 				"NodeMutationRequest",
 				"NodeView",
@@ -122,6 +125,8 @@ func run(root, outDir string) error {
 				"NodeInviteInput",
 				"NodeInviteView",
 				"NodeInviteCreated",
+				"PanelImportInbound",
+				"PanelImportReport",
 			),
 		},
 		{
@@ -131,6 +136,10 @@ func run(root, outDir string) error {
 		{
 			Path:        resolveRel(root, "internal/web/controller"),
 			StructAllow: setOf("TgBotCapabilities"),
+		},
+		{
+			Path:        resolveRel(root, "internal/connlog"),
+			StructAllow: setOf("ConnRecord", "ConnFilter", "ConnPage"),
 		},
 		{
 			Path:        resolveRel(root, "internal/amneziawg"),

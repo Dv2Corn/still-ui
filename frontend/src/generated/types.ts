@@ -22,6 +22,11 @@ export interface AllSetting {
   backupKeep: number;
   backupSchedule: string;
   backupTelegram: boolean;
+  connLogDestination: string;
+  connLogEnable: boolean;
+  connLogMaxSizeMB: number;
+  connLogRetentionDays: number;
+  connLogSource: string;
   datepicker: string;
   discordAdminIds: string;
   discordBotBackup: boolean;
@@ -127,6 +132,11 @@ export interface AllSetting {
   subHappTunType: string;
   subHideSettings: boolean;
   subHostSortMode: string;
+  subHwidDefaultLimit: number;
+  subHwidExpireDays: number;
+  subHwidLimitNotice: string;
+  subHwidNoIdNotice: string;
+  subHwidNoIdPolicy: string;
   subIncyAnnounceUrl: string;
   subIncyAppAutoDetect: boolean;
   subIncyBannerBgColor: string;
@@ -172,6 +182,8 @@ export interface AllSetting {
   subJsonUserAgentRegex: string;
   subKeyFile: string;
   subListen: string;
+  subLocalDirect: string;
+  subLocalDirectProxy: string;
   subPath: string;
   subPort: number;
   subProbeMinAgents: number;
@@ -224,6 +236,11 @@ export interface AllSettingView {
   backupKeep: number;
   backupSchedule: string;
   backupTelegram: boolean;
+  connLogDestination: string;
+  connLogEnable: boolean;
+  connLogMaxSizeMB: number;
+  connLogRetentionDays: number;
+  connLogSource: string;
   datepicker: string;
   discordAdminIds: string;
   discordBotBackup: boolean;
@@ -337,6 +354,11 @@ export interface AllSettingView {
   subHappTunType: string;
   subHideSettings: boolean;
   subHostSortMode: string;
+  subHwidDefaultLimit: number;
+  subHwidExpireDays: number;
+  subHwidLimitNotice: string;
+  subHwidNoIdNotice: string;
+  subHwidNoIdPolicy: string;
   subIncyAnnounceUrl: string;
   subIncyAppAutoDetect: boolean;
   subIncyBannerBgColor: string;
@@ -382,6 +404,8 @@ export interface AllSettingView {
   subJsonUserAgentRegex: string;
   subKeyFile: string;
   subListen: string;
+  subLocalDirect: string;
+  subLocalDirectProxy: string;
   subPath: string;
   subPort: number;
   subProbeMinAgents: number;
@@ -446,6 +470,10 @@ export interface ApiTokenView {
   name: string;
   scope: string;
   token?: string;
+}
+
+export interface AwgSignaturePacketResponse {
+  i1: string;
 }
 
 export interface Blocker {
@@ -619,6 +647,36 @@ export interface ClientsSummary {
   online: string[];
   onlineCount: number;
   total: number;
+}
+
+export interface ConnFilter {
+  before: string;
+  client: string;
+  from: number;
+  host: string;
+  inbound: string;
+  limit: number;
+  source: string;
+  to: number;
+}
+
+export interface ConnPage {
+  enabled: boolean;
+  next: string;
+  rows: ConnRecord[];
+  sizeBytes: number;
+}
+
+export interface ConnRecord {
+  client: string;
+  host: string;
+  inbound: string;
+  network: string;
+  outbound: string;
+  port: number;
+  source: string;
+  sourcePort: number;
+  time: number;
 }
 
 export interface FallbackParentInfo {
@@ -1033,6 +1091,27 @@ export interface OutboundTraffics {
   up: number;
 }
 
+export interface PanelImportInbound {
+  clients: number;
+  hosts: number;
+  port: number;
+  protocol: string;
+  skipped: string;
+  tag: string;
+}
+
+export interface PanelImportReport {
+  admins: string[];
+  applied: boolean;
+  backup: string;
+  clients: number;
+  inbounds: PanelImportInbound[];
+  legacySubLinks: number;
+  notEmpty: boolean;
+  notes: string[];
+  source: string;
+}
+
 export interface PanelUpdateStatus {
   exitCode: number;
   finishedAt: number;
@@ -1051,6 +1130,23 @@ export interface PeerActivity {
   online: boolean;
   tag: string;
   up: number;
+}
+
+export interface PortHopRule {
+  inboundId: number;
+  ports: string;
+  remark: string;
+  toPort: number;
+}
+
+export interface PortHopStatus {
+  active: boolean;
+  error: string;
+  nftInstalled: boolean;
+  packets: number;
+  permitted: boolean;
+  rules: PortHopRule[];
+  supported: boolean;
 }
 
 export interface ProbeResultUI {
@@ -1136,6 +1232,8 @@ export interface RealityScanResult {
   alpn: string;
   certChainBytes: number;
   certChainValid: boolean;
+  certDaysLeft: number;
+  certExpiresSoon: boolean;
   certIssuer: string;
   certSubject: string;
   certValid: boolean;
@@ -1145,9 +1243,11 @@ export interface RealityScanResult {
   host: string;
   ip: string;
   latencyMs: number;
+  mlkem768: boolean;
   notAfter: string;
   port: number;
   privateTarget: boolean;
+  reachable: boolean;
   reason: string;
   serverNames: string[];
   target: string;

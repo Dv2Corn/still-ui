@@ -407,6 +407,20 @@ type MLDSA65Response struct {
 	Verify string `json:"verify" example:"mldsa65-verify"`
 }
 
+// AwgSignaturePacketResponse is an AmneziaWG I1 spec built from a preset.
+type AwgSignaturePacketResponse struct {
+	I1 string `json:"i1" example:"<r 2><b 0x010000010000000000000377777706676f6f676c6503636f6d0000010001>"`
+}
+
+// GetNewAwgSignaturePacket builds the I1 packet of a preset ("quic" or "dns").
+func (s *ServerService) GetNewAwgSignaturePacket(preset string) (*AwgSignaturePacketResponse, error) {
+	spec, err := amneziawg.SignaturePacket(preset)
+	if err != nil {
+		return nil, err
+	}
+	return &AwgSignaturePacketResponse{I1: spec}, nil
+}
+
 type MLKEM768Response struct {
 	Seed   string `json:"seed" example:"mlkem768-seed"`
 	Client string `json:"client" example:"mlkem768-client"`
@@ -1303,38 +1317,17 @@ func (s *ServerService) GetLogs(count string, level string, syslog string) []str
 	return lines
 }
 
-// parseAccessLogFields extracts the structured fields from one Xray access-log
-// line. Lines are attacker-influenced (a client's requested destination lands in
-// the log verbatim) and may be truncated, so every positional lookup is length
-// guarded: a malformed line yields a partial entry rather than panicking.
+// parseAccessLogFields maps one Xray access-log line onto the log viewer's entry.
 func parseAccessLogFields(line string) LogEntry {
-	var entry LogEntry
-	parts := strings.Fields(line)
-
-	for i, part := range parts {
-
-		if i == 0 && len(parts) > 1 {
-			dateTime, err := time.ParseInLocation("2006/01/02 15:04:05.999999", parts[0]+" "+parts[1], time.Local)
-			if err != nil {
-				continue
-			}
-			entry.DateTime = dateTime.UTC()
-		}
-
-		if part == "from" && i+1 < len(parts) {
-			entry.FromAddress = strings.TrimLeft(parts[i+1], "/")
-		} else if part == "accepted" && i+1 < len(parts) {
-			entry.ToAddress = strings.TrimLeft(parts[i+1], "/")
-		} else if strings.HasPrefix(part, "[") {
-			entry.Inbound = part[1:]
-		} else if strings.HasSuffix(part, "]") {
-			entry.Outbound = part[:len(part)-1]
-		} else if part == "email:" && i+1 < len(parts) {
-			entry.Email = parts[i+1]
-		}
+	parsed := xray.ParseAccessLogLine(line)
+	return LogEntry{
+		DateTime:    parsed.Time,
+		FromAddress: parsed.From,
+		ToAddress:   parsed.To,
+		Inbound:     parsed.Inbound,
+		Outbound:    parsed.Outbound,
+		Email:       parsed.Email,
 	}
-
-	return entry
 }
 
 // PeerActivity is one peer's live embedded-Device-reported state, the
@@ -1479,35 +1472,14 @@ func (s *ServerService) GetAmneziaWGLogs(count string, filter string) *AmneziaWG
 	return logs
 }
 
-// Xray's HTTP inbound logs the requested URL whole, so an access-log line has
-// no length bound; GetXrayLogs keeps this much of a line's start and of its end.
 const (
-	maxAccessLogLineBytes = 64 << 10
-	accessLogLineEndBytes = 1 << 10
+	maxAccessLogLineBytes = xray.AccessLogLineBytes
+	accessLogLineEndBytes = xray.AccessLogLineEndBytes
 )
 
-// readAccessLogLine returns the next line of r. A line longer than r's buffer
-// loses its middle and keeps its end (route, email) instead of failing the read.
 func readAccessLogLine(r *bufio.Reader) (string, error) {
-	chunk, more, err := r.ReadLine()
-	if err != nil {
-		return "", err
-	}
-	line := string(chunk)
-
-	var end []byte
-	for more {
-		chunk, more, err = r.ReadLine()
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if err != nil {
-			return "", err
-		}
-		end = append(end, chunk...)
-		end = end[max(0, len(end)-accessLogLineEndBytes):]
-	}
-	return line + string(end), nil
+	line, _, _, err := xray.ReadAccessLogLine(r)
+	return line, err
 }
 
 func (s *ServerService) GetXrayLogs(

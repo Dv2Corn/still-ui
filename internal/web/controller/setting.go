@@ -131,6 +131,7 @@ func (a *SettingController) updateSetting(c *gin.Context) {
 	allSetting := &form.AllSetting
 	oldTwoFactor, twoFactorErr := a.settingService.GetTwoFactorEnable()
 	oldPanelOutbound, _ := a.settingService.GetPanelOutbound()
+	oldConnLog := a.settingService.GetConnLogEnable()
 	oldTgEnable, _ := a.settingService.GetTgbotEnabled()
 	oldTgToken, _ := a.settingService.GetTgBotToken()
 	oldTgChatId, _ := a.settingService.GetTgBotChatId()
@@ -160,6 +161,13 @@ func (a *SettingController) updateSetting(c *gin.Context) {
 	if err == nil && twoFactorErr == nil && !oldTwoFactor && allSetting.TwoFactorEnable {
 		if bumpErr := a.userService.BumpLoginEpoch(); bumpErr != nil {
 			err = bumpErr
+		}
+	}
+	if err == nil && form.ConnLogEnable != oldConnLog {
+		// The connection log reads Xray's access log, which the generated config turns on with
+		// it. Nothing changes, and nothing restarts, when the operator's own access log is on.
+		if applyErr := a.xrayService.RestartXray(false); applyErr != nil {
+			logger.Warning("apply connection log change failed:", applyErr)
 		}
 	}
 	if err == nil && form.PanelOutbound != oldPanelOutbound {

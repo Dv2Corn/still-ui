@@ -1300,8 +1300,42 @@ func (s *InboundService) AddInbound(inbound *model.Inbound) (*model.Inbound, boo
 	if err := normalizeVlessFallbacks(inbound); err != nil {
 		return nil, false, err
 	}
-	if err := normalizeTuicSettings(inbound); err != nil {
+	clients, legacyShareAddr, err := s.prepareInboundAdd(inbound)
+	if err != nil {
 		return inbound, false, err
+	}
+
+	out := &inboundAddOutcome{}
+	err = runSerializedTx(func(tx *gorm.DB) error {
+		return s.addInboundTx(tx, inbound, clients, legacyShareAddr, out)
+	})
+	if err != nil {
+		return inbound, false, err
+	}
+	if out.postCommit != nil {
+		out.postCommit()
+	}
+
+	// A routed mtproto inbound is not an Xray inbound itself, so the runtime
+	// push above only (re)starts the mtg sidecar. The egress SOCKS bridge lives
+	// in the generated config, so force a regen to wire it in.
+	if mtprotoRoutesThroughXray(inbound) {
+		out.needRestart = true
+	}
+
+	return inbound, out.needRestart, err
+}
+
+// inboundAddOutcome is what addInboundTx leaves for after the commit.
+type inboundAddOutcome struct {
+	needRestart bool
+	postCommit  func()
+}
+
+// prepareInboundAdd normalizes and validates a new inbound before any write.
+func (s *InboundService) prepareInboundAdd(inbound *model.Inbound) ([]model.Client, string, error) {
+	if err := normalizeTuicSettings(inbound); err != nil {
+		return nil, "", err
 	}
 	legacyShareAddr := legacyMtprotoShareAddr(inbound)
 	inbound.TrafficResetDay = normalizeTrafficResetDay(inbound.TrafficResetDay)
@@ -1309,89 +1343,92 @@ func (s *InboundService) AddInbound(inbound *model.Inbound) (*model.Inbound, boo
 	s.normalizeStreamSettings(inbound)
 	if !s.FromNodeSync {
 		if err := validateInboundTLSCertificates(inbound.StreamSettings); err != nil {
-			return inbound, false, err
+			return nil, "", err
 		}
 	} else if err := validatePushedInbound(inbound, nil); err != nil {
-		return inbound, false, err
+		return nil, "", err
 	}
 	if err := validateInboundEnvRefs(inbound); err != nil {
-		return inbound, false, err
+		return nil, "", err
 	}
 	if err := validateInboundBuildInput(inbound); err != nil {
-		return inbound, false, err
+		return nil, "", err
 	}
 	if err := validateFinalMaskRealityCombo(inbound.StreamSettings); err != nil {
-		return inbound, false, err
+		return nil, "", err
 	}
 	if err := validateFinalMaskXmcProfiles(inbound.StreamSettings); err != nil {
-		return inbound, false, err
+		return nil, "", err
 	}
 	if err := validateFinalMaskSalamander(inbound.StreamSettings); err != nil {
-		return inbound, false, err
+		return nil, "", err
+	}
+	if err := validatePortHop(inbound); err != nil {
+		return nil, "", err
 	}
 	if err := validateXDriveStorage(inbound.StreamSettings); err != nil {
-		return inbound, false, err
+		return nil, "", err
 	}
 	if err := validateXDriveInbound(string(inbound.Protocol), inbound.Settings, inbound.StreamSettings); err != nil {
-		return inbound, false, err
+		return nil, "", err
 	}
 	if err := validateShadowsocks2022Inbound(inbound.Protocol, inbound.Settings); err != nil {
-		return inbound, false, err
+		return nil, "", err
 	}
 	if err := validateTunWfpBlockLeak(string(inbound.Protocol), inbound.Settings); err != nil {
-		return inbound, false, err
+		return nil, "", err
 	}
 	s.normalizeMtprotoSecret(inbound)
 	if err := s.normalizeMtprotoXrayPort(inbound, ""); err != nil {
-		return inbound, false, err
+		return nil, "", err
 	}
 	if err := s.normalizeAmneziaWGSettings(inbound, nil); err != nil {
-		return inbound, false, err
+		return nil, "", err
 	}
 	if inbound.NodeID != nil {
 		if err := checkNodeCanHostProtocol(database.GetDB(), *inbound.NodeID, inbound.Protocol); err != nil {
-			return inbound, false, err
+			return nil, "", err
 		}
 	}
 	inbound.SubSortIndex = normalizeSubSortIndex(inbound.SubSortIndex)
 	if err := normalizeInboundShareAddressStrict(inbound); err != nil {
-		return inbound, false, err
+		return nil, "", err
 	}
 
 	tag, err := s.resolveInboundTag(inbound, 0)
 	if err != nil {
-		return inbound, false, err
+		return nil, "", err
 	}
 	inbound.Tag = tag
 
 	normalizeLegacyClientSettings(inbound)
 	clients, err := s.GetClients(inbound)
 	if err != nil {
-		return inbound, false, err
+		return nil, "", err
 	}
 	if err := validateClientsRenewal(clients); err != nil {
-		return inbound, false, err
+		return nil, "", err
 	}
 	if err := validateClientsKeepAlive(inbound.Protocol, clients); err != nil {
-		return inbound, false, err
+		return nil, "", err
 	}
 	// The names the client API refuses; a master's push may carry a legacy one.
 	if !s.FromNodeSync {
 		if err := validateClientsNames(clients); err != nil {
-			return inbound, false, err
+			return nil, "", err
 		}
 	}
 	for _, traffic := range inbound.ClientStats {
 		if err := validateClientRenewal(model.Client{Reset: traffic.Reset, ResetDay: traffic.ResetDay, ResetWeekday: traffic.ResetWeekday}); err != nil {
-			return inbound, false, err
+			return nil, "", err
 		}
 	}
 	existEmail, err := s.clientService.checkEmailsExistForClients(s, clients)
 	if err != nil {
-		return inbound, false, err
+		return nil, "", err
 	}
 	if existEmail != "" {
-		return inbound, false, common.NewError("Duplicate email:", existEmail)
+		return nil, "", common.NewError("Duplicate email:", existEmail)
 	}
 
 	if inbound.DisableFlow {
@@ -1438,206 +1475,191 @@ func (s *InboundService) AddInbound(inbound *model.Inbound) (*model.Inbound, boo
 		switch inbound.Protocol {
 		case "trojan", "masque":
 			if client.Password == "" {
-				return inbound, false, common.NewError("empty client ID")
+				return nil, "", common.NewError("empty client ID")
 			}
 		case "shadowsocks":
 			if client.Email == "" {
-				return inbound, false, common.NewError("empty client ID")
+				return nil, "", common.NewError("empty client ID")
 			}
 		case "hysteria":
 			if client.Auth == "" {
-				return inbound, false, common.NewError("empty client ID")
+				return nil, "", common.NewError("empty client ID")
 			}
 		case "wireguard", "amneziawg":
 			if client.PublicKey == "" {
-				return inbound, false, common.NewError("wireguard client requires a key")
+				return nil, "", common.NewError("wireguard client requires a key")
 			}
 			if _, err := normalizeWireguardAllowedIPs(client.AllowedIPs); err != nil {
-				return inbound, false, err
+				return nil, "", err
 			}
 		case "mtproto":
 			if client.Secret == "" {
-				return inbound, false, common.NewError("mtproto client requires a secret")
+				return nil, "", common.NewError("mtproto client requires a secret")
 			}
 			if client.AdTag != "" && !model.ValidMtprotoAdTag(client.AdTag) {
-				return inbound, false, common.NewError("mtproto client ad tag must be 32 hex characters")
+				return nil, "", common.NewError("mtproto client ad tag must be 32 hex characters")
 			}
 		case "tuic":
 			if client.ID == "" {
-				return inbound, false, common.NewError("empty client ID")
+				return nil, "", common.NewError("empty client ID")
 			}
 			if client.Password == "" {
-				return inbound, false, common.NewError("tuic client requires a password")
+				return nil, "", common.NewError("tuic client requires a password")
 			}
 			if client.Email == "" {
-				return inbound, false, common.NewError("empty client email")
+				return nil, "", common.NewError("empty client email")
 			}
 		default:
 			if client.ID == "" {
-				return inbound, false, common.NewError("empty client ID")
+				return nil, "", common.NewError("empty client ID")
 			}
 		}
 	}
 
 	if err := validateTuicClientEmails(inbound.Protocol, clients); err != nil {
-		return inbound, false, err
+		return nil, "", err
 	}
+	return clients, legacyShareAddr, nil
+}
 
-	needRestart := false
-	var postCommitApply func()
-	err = runSerializedTx(func(tx *gorm.DB) error {
-		conflict, cErr := checkPortConflictTx(tx, inbound, 0)
+// addInboundTx writes a prepared inbound with its clients, stats and hosts inside tx.
+func (s *InboundService) addInboundTx(tx *gorm.DB, inbound *model.Inbound, clients []model.Client, legacyShareAddr string, out *inboundAddOutcome) error {
+	conflict, cErr := checkPortConflictTx(tx, inbound, 0)
+	if cErr != nil {
+		return cErr
+	}
+	if conflict != nil {
+		return common.NewError(conflict.String())
+	}
+	markDirty := false
+	if err := tx.Omit("ClientStats").Save(inbound).Error; err != nil {
+		return err
+	}
+	// Embedded AmneziaWG owns a relay port derived from its local row id.
+	if inbound.NodeID == nil && inbound.Protocol == model.AmneziaWG && !amneziawgKernelMode(inbound) {
+		if self := amneziawgnetSocksSelfConflict(inbound, inbound.Id); self != "" {
+			return common.NewError(self)
+		}
+		conflict, cErr := checkAmneziawgnetSocksRelayCollision(tx, inbound.Id)
 		if cErr != nil {
 			return cErr
 		}
 		if conflict != nil {
 			return common.NewError(conflict.String())
 		}
-		markDirty := false
-		if err := tx.Omit("ClientStats").Save(inbound).Error; err != nil {
+		conflict, cErr = checkAmneziawgnetSocksReverseConflict(tx, inbound.Id)
+		if cErr != nil {
+			return cErr
+		}
+		if conflict != nil {
+			return common.NewError(conflict.String())
+		}
+		// The clients' forward specs were validated while this row had no id,
+		// so the ports it now derives were never in the guard's context.
+		if aErr := s.checkAmneziaWGForwardedPorts(tx, inbound.Settings); aErr != nil {
+			return aErr
+		}
+	}
+	if inbound.NodeID == nil && inbound.Protocol == model.TUIC {
+		if self := tuicSocksSelfConflict(inbound, inbound.Id); self != "" {
+			return common.NewError(self)
+		}
+		conflict, cErr := checkTuicSocksRelayCollision(tx, inbound.Id)
+		if cErr != nil {
+			return cErr
+		}
+		if conflict != nil {
+			return common.NewError(conflict.String())
+		}
+		conflict, cErr = checkTuicSocksReverseConflict(tx, inbound.Id)
+		if cErr != nil {
+			return cErr
+		}
+		if conflict != nil {
+			return common.NewError(conflict.String())
+		}
+	}
+	// Emails seeded here (import's ClientStats, e.g. the controller's forced
+	// Enable=true on every imported stat row) are authoritative for this call
+	// and must not be clobbered by the AddClientStat loop below, which derives
+	// its enable/total/expiry/reset from Settings.clients[] instead — a second,
+	// possibly-stale source for the same columns on a plain (non-import) create.
+	statEmails := make(map[string]bool, len(inbound.ClientStats))
+	for i := range inbound.ClientStats {
+		if inbound.ClientStats[i].Email == "" {
+			continue
+		}
+		statEmails[inbound.ClientStats[i].Email] = true
+		inbound.ClientStats[i].Id = 0
+		inbound.ClientStats[i].InboundId = inbound.Id
+		if err := tx.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "email"}},
+			DoNothing: true,
+		}).Create(&inbound.ClientStats[i]).Error; err != nil {
 			return err
 		}
-		// Embedded AmneziaWG owns a relay port derived from its local row id.
-		if inbound.NodeID == nil && inbound.Protocol == model.AmneziaWG && !amneziawgKernelMode(inbound) {
-			if self := amneziawgnetSocksSelfConflict(inbound, inbound.Id); self != "" {
-				return common.NewError(self)
-			}
-			conflict, cErr := checkAmneziawgnetSocksRelayCollision(tx, inbound.Id)
-			if cErr != nil {
-				return cErr
-			}
-			if conflict != nil {
-				return common.NewError(conflict.String())
-			}
-			conflict, cErr = checkAmneziawgnetSocksReverseConflict(tx, inbound.Id)
-			if cErr != nil {
-				return cErr
-			}
-			if conflict != nil {
-				return common.NewError(conflict.String())
-			}
-			// The clients' forward specs were validated while this row had no id,
-			// so the ports it now derives were never in the guard's context.
-			if aErr := s.checkAmneziaWGForwardedPorts(tx, inbound.Settings); aErr != nil {
-				return aErr
-			}
+	}
+	for _, client := range clients {
+		if statEmails[client.Email] {
+			continue
 		}
-		if inbound.NodeID == nil && inbound.Protocol == model.TUIC {
-			if self := tuicSocksSelfConflict(inbound, inbound.Id); self != "" {
-				return common.NewError(self)
-			}
-			conflict, cErr := checkTuicSocksRelayCollision(tx, inbound.Id)
-			if cErr != nil {
-				return cErr
-			}
-			if conflict != nil {
-				return common.NewError(conflict.String())
-			}
-			conflict, cErr = checkTuicSocksReverseConflict(tx, inbound.Id)
-			if cErr != nil {
-				return cErr
-			}
-			if conflict != nil {
-				return common.NewError(conflict.String())
-			}
-		}
-		// Emails seeded here (import's ClientStats, e.g. the controller's forced
-		// Enable=true on every imported stat row) are authoritative for this call
-		// and must not be clobbered by the AddClientStat loop below, which derives
-		// its enable/total/expiry/reset from Settings.clients[] instead — a second,
-		// possibly-stale source for the same columns on a plain (non-import) create.
-		statEmails := make(map[string]bool, len(inbound.ClientStats))
-		for i := range inbound.ClientStats {
-			if inbound.ClientStats[i].Email == "" {
-				continue
-			}
-			statEmails[inbound.ClientStats[i].Email] = true
-			inbound.ClientStats[i].Id = 0
-			inbound.ClientStats[i].InboundId = inbound.Id
-			if err := tx.Clauses(clause.OnConflict{
-				Columns:   []clause.Column{{Name: "email"}},
-				DoNothing: true,
-			}).Create(&inbound.ClientStats[i]).Error; err != nil {
-				return err
-			}
-		}
-		for _, client := range clients {
-			if statEmails[client.Email] {
-				continue
-			}
-			if err := s.AddClientStat(tx, inbound.Id, &client); err != nil {
-				return err
-			}
-		}
-		if err := s.clientService.SyncInbound(tx, inbound.Id, clients); err != nil {
+		if err := s.AddClientStat(tx, inbound.Id, &client); err != nil {
 			return err
 		}
-		if _, err := database.CreateHostsFromExternalProxy(tx, inbound.Id, inbound.StreamSettings); err != nil {
+	}
+	if err := s.clientService.SyncInbound(tx, inbound.Id, clients); err != nil {
+		return err
+	}
+	if _, err := database.CreateHostsFromExternalProxy(tx, inbound.Id, inbound.StreamSettings); err != nil {
+		return err
+	}
+	if err := database.CreateHostFromMtprotoCustomShareAddr(tx, inbound.Id, legacyShareAddr); err != nil {
+		return err
+	}
+	if inbound.NodeID != nil {
+		nodeID := *inbound.NodeID
+		if err := (&NodeService{}).EnsureInboundTagAllowedTx(tx, nodeID, inbound.Tag); err != nil {
 			return err
 		}
-		if err := database.CreateHostFromMtprotoCustomShareAddr(tx, inbound.Id, legacyShareAddr); err != nil {
-			return err
-		}
+	}
+	if inbound.Enable {
 		if inbound.NodeID != nil {
-			nodeID := *inbound.NodeID
-			if err := (&NodeService{}).EnsureInboundTagAllowedTx(tx, nodeID, inbound.Tag); err != nil {
-				return err
+			markDirty = true
+		} else {
+			rt, push, _, perr := s.nodePushPlan(inbound)
+			if perr != nil {
+				return perr
 			}
-		}
-		if inbound.Enable {
-			if inbound.NodeID != nil {
-				markDirty = true
-			} else {
-				rt, push, _, perr := s.nodePushPlan(inbound)
-				if perr != nil {
-					return perr
-				}
-				if push {
-					// An imported or master-pushed row lists its disabled and depleted clients too.
-					payload, bErr := s.buildInboundForLocalRuntime(tx, inbound)
-					if bErr != nil {
-						logger.Debug("Unable to prepare runtime inbound config:", bErr)
-						if inbound.Protocol != model.MTProto && inbound.Protocol != model.TUIC {
-							needRestart = true
-						}
-					} else if !servedOutsideXray(inbound.Protocol) && hotSwapRefused(nil, payload) {
-						// RestartXray adds it from the generated config.
-						needRestart = true
-					} else {
-						postCommitApply = func() {
-							if err1 := rt.AddInbound(context.Background(), payload); err1 == nil {
-								logger.Debug("New inbound added on", rt.Name(), ":", inbound.Tag)
-							} else {
-								logger.Debug("Unable to add inbound on", rt.Name(), ":", err1)
-								if inbound.Protocol != model.MTProto && inbound.Protocol != model.TUIC {
-									needRestart = true
-								}
+			if push {
+				// An imported or master-pushed row lists its disabled and depleted clients too.
+				payload, bErr := s.buildInboundForLocalRuntime(tx, inbound)
+				if bErr != nil {
+					logger.Debug("Unable to prepare runtime inbound config:", bErr)
+					if inbound.Protocol != model.MTProto && inbound.Protocol != model.TUIC {
+						out.needRestart = true
+					}
+				} else if !servedOutsideXray(inbound.Protocol) && hotSwapRefused(nil, payload) {
+					// RestartXray adds it from the generated config.
+					out.needRestart = true
+				} else {
+					out.postCommit = func() {
+						if err1 := rt.AddInbound(context.Background(), payload); err1 == nil {
+							logger.Debug("New inbound added on", rt.Name(), ":", inbound.Tag)
+						} else {
+							logger.Debug("Unable to add inbound on", rt.Name(), ":", err1)
+							if inbound.Protocol != model.MTProto && inbound.Protocol != model.TUIC {
+								out.needRestart = true
 							}
 						}
 					}
 				}
 			}
 		}
-		if markDirty && inbound.NodeID != nil {
-			return (&NodeService{}).MarkNodeDirtyTx(tx, *inbound.NodeID)
-		}
-		return nil
-	})
-	if err != nil {
-		return inbound, false, err
 	}
-	if postCommitApply != nil {
-		postCommitApply()
+	if markDirty && inbound.NodeID != nil {
+		return (&NodeService{}).MarkNodeDirtyTx(tx, *inbound.NodeID)
 	}
-
-	// A routed mtproto inbound is not an Xray inbound itself, so the runtime
-	// push above only (re)starts the mtg sidecar. The egress SOCKS bridge lives
-	// in the generated config, so force a regen to wire it in.
-	if mtprotoRoutesThroughXray(inbound) {
-		needRestart = true
-	}
-
-	return inbound, needRestart, err
+	return nil
 }
 
 func (s *InboundService) DelInbound(id int) (bool, error) {
@@ -2078,6 +2100,9 @@ func (s *InboundService) UpdateInbound(inbound *model.Inbound) (*model.Inbound, 
 	// Restore the stored NodeID before any host-scoped check so a node inbound
 	// stays scoped to its own node (the payload's nodeId is unreliable, often absent).
 	inbound.NodeID = oldInbound.NodeID
+	if err := validatePortHop(inbound); err != nil {
+		return inbound, false, err
+	}
 	if err := normalizeVlessFallbacks(inbound); err != nil {
 		return nil, false, err
 	}

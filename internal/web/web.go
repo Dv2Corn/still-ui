@@ -184,7 +184,7 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 	// large backups and streams them to disk, so only its exact route suffix is
 	// exempt. Follow-up: make the limit a setting.
 	const maxRequestBodyBytes = 10 << 20 // 10 MiB
-	engine.Use(middleware.MaxBodyBytes(maxRequestBodyBytes, "/panel/api/server/importDB"))
+	engine.Use(middleware.MaxBodyBytes(maxRequestBodyBytes, "/panel/api/server/importDB", "/panel/api/server/importPanel"))
 
 	webDomain, err := s.settingService.GetWebDomain()
 	if err != nil {
@@ -318,6 +318,7 @@ const (
 	cadenceCertWatch     = "@every 1m"
 	cadenceTorrentBlock  = "@every 1m"
 	cadenceEgressFilter  = "@every 1m"
+	cadencePortHop       = "@every 10s"
 	cadenceCheckHash     = "@every 2m"
 	cadenceReachStale    = "@every 1m"
 	// cpu.Percent samples over a full minute (blocking), so a finer cadence just
@@ -326,6 +327,8 @@ const (
 	cadenceMemoryAlarm = "@every 1m"
 	// Server health alerts: Xray down/restarts, memory, disk, certificates, backups.
 	cadenceHealthAlerts = "@every 1m"
+	// Connection log: read the access log's new lines, prune once a minute inside the step.
+	cadenceConnLog = "@every 5s"
 )
 
 // startTask schedules background jobs (Xray checks, traffic jobs, cron
@@ -349,6 +352,11 @@ func (s *Server) startTask(restartXray, forceXrayRestart bool, loc *time.Locatio
 	torrentBlock := service.TorrentBlockService{}
 	go torrentBlock.EnsureHostFilter()
 	_, _ = s.cron.AddFunc(cadenceTorrentBlock, torrentBlock.EnsureHostFilter)
+
+	// Hysteria2 port hopping: keep the nftables redirect in step with the inbounds.
+	portHop := service.PortHopService{}
+	go portHop.EnsureHost()
+	_, _ = s.cron.AddFunc(cadencePortHop, portHop.EnsureHost)
 
 	// "Egress filter": reload its nftables table after a reboot or a ruleset flush, and
 	// hand the filter to nodes that missed it (offline, restarted, refused).
@@ -408,6 +416,11 @@ func (s *Server) startTask(restartXray, forceXrayRestart bool, loc *time.Locatio
 
 	// check client ips from log file every day
 	_, _ = s.cron.AddJob("@daily", job.NewClearLogsJob())
+	_, _ = s.cron.AddFunc("@daily", func() {
+		if err := (&service.ClientService{}).PurgeExpiredClientHwids(); err != nil {
+			logger.Warning("purge expired subscription devices failed:", err)
+		}
+	})
 	_, _ = s.cron.AddJob(cadenceXrayLogPrune, job.NewPruneXrayLogsJob())
 	_, _ = s.cron.AddJob("@hourly", job.NewWarpIpJob())
 
@@ -432,6 +445,10 @@ func (s *Server) startTask(restartXray, forceXrayRestart bool, loc *time.Locatio
 	_, _ = s.cron.AddFunc(cadenceHealthAlerts, func() {
 		(&service.HealthAlertService{}).Run()
 	})
+
+	// Connection log (still-ui): the step reads the setting itself, so on/off needs no restart.
+	connLog := service.ConnLogService{}
+	_, _ = s.cron.AddFunc(cadenceConnLog, connLog.Tick)
 
 	// Scheduled local backups (still-ui): snapshot, encrypt, rotate, optionally send to Telegram.
 	if on, _ := s.settingService.GetBackupEnable(); on {

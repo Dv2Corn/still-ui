@@ -52,6 +52,40 @@ export const SCHEMAS: Record<string, unknown> = {
       "backupTelegram": {
         "type": "boolean"
       },
+      "connLogDestination": {
+        "enum": [
+          "full",
+          "domain",
+          "none"
+        ],
+        "example": "full",
+        "type": "string"
+      },
+      "connLogEnable": {
+        "description": "Connection log (still-ui), off by default: how long and how much is kept, and what is\nstored of a destination (full, domain, none) and of a client address (full, masked, none).",
+        "type": "boolean"
+      },
+      "connLogMaxSizeMB": {
+        "example": 2048,
+        "maximum": 1048576,
+        "minimum": 16,
+        "type": "integer"
+      },
+      "connLogRetentionDays": {
+        "example": 30,
+        "maximum": 3650,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "connLogSource": {
+        "enum": [
+          "full",
+          "masked",
+          "none"
+        ],
+        "example": "full",
+        "type": "string"
+      },
       "datepicker": {
         "type": "string"
       },
@@ -397,6 +431,28 @@ export const SCHEMAS: Record<string, unknown> = {
         "example": "inbound-first",
         "type": "string"
       },
+      "subHwidDefaultLimit": {
+        "example": 0,
+        "maximum": 1000,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "subHwidExpireDays": {
+        "example": 30,
+        "maximum": 3650,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "subHwidLimitNotice": {
+        "type": "string"
+      },
+      "subHwidNoIdNotice": {
+        "type": "string"
+      },
+      "subHwidNoIdPolicy": {
+        "example": "shared",
+        "type": "string"
+      },
       "subIncyAnnounceUrl": {
         "type": "string"
       },
@@ -531,6 +587,12 @@ export const SCHEMAS: Record<string, unknown> = {
         "type": "string"
       },
       "subListen": {
+        "type": "string"
+      },
+      "subLocalDirect": {
+        "type": "string"
+      },
+      "subLocalDirectProxy": {
         "type": "string"
       },
       "subPath": {
@@ -680,6 +742,11 @@ export const SCHEMAS: Record<string, unknown> = {
       "backupKeep",
       "backupSchedule",
       "backupTelegram",
+      "connLogDestination",
+      "connLogEnable",
+      "connLogMaxSizeMB",
+      "connLogRetentionDays",
+      "connLogSource",
       "datepicker",
       "discordAdminIds",
       "discordBotBackup",
@@ -785,6 +852,11 @@ export const SCHEMAS: Record<string, unknown> = {
       "subHappTunType",
       "subHideSettings",
       "subHostSortMode",
+      "subHwidDefaultLimit",
+      "subHwidExpireDays",
+      "subHwidLimitNotice",
+      "subHwidNoIdNotice",
+      "subHwidNoIdPolicy",
       "subIncyAnnounceUrl",
       "subIncyAppAutoDetect",
       "subIncyBannerBgColor",
@@ -830,6 +902,8 @@ export const SCHEMAS: Record<string, unknown> = {
       "subJsonUserAgentRegex",
       "subKeyFile",
       "subListen",
+      "subLocalDirect",
+      "subLocalDirectProxy",
       "subPath",
       "subPort",
       "subProbeMinAgents",
@@ -922,6 +996,40 @@ export const SCHEMAS: Record<string, unknown> = {
       },
       "backupTelegram": {
         "type": "boolean"
+      },
+      "connLogDestination": {
+        "enum": [
+          "full",
+          "domain",
+          "none"
+        ],
+        "example": "full",
+        "type": "string"
+      },
+      "connLogEnable": {
+        "description": "Connection log (still-ui), off by default: how long and how much is kept, and what is\nstored of a destination (full, domain, none) and of a client address (full, masked, none).",
+        "type": "boolean"
+      },
+      "connLogMaxSizeMB": {
+        "example": 2048,
+        "maximum": 1048576,
+        "minimum": 16,
+        "type": "integer"
+      },
+      "connLogRetentionDays": {
+        "example": 30,
+        "maximum": 3650,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "connLogSource": {
+        "enum": [
+          "full",
+          "masked",
+          "none"
+        ],
+        "example": "full",
+        "type": "string"
       },
       "datepicker": {
         "type": "string"
@@ -1292,6 +1400,28 @@ export const SCHEMAS: Record<string, unknown> = {
         "example": "inbound-first",
         "type": "string"
       },
+      "subHwidDefaultLimit": {
+        "example": 0,
+        "maximum": 1000,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "subHwidExpireDays": {
+        "example": 30,
+        "maximum": 3650,
+        "minimum": 0,
+        "type": "integer"
+      },
+      "subHwidLimitNotice": {
+        "type": "string"
+      },
+      "subHwidNoIdNotice": {
+        "type": "string"
+      },
+      "subHwidNoIdPolicy": {
+        "example": "shared",
+        "type": "string"
+      },
       "subIncyAnnounceUrl": {
         "type": "string"
       },
@@ -1426,6 +1556,12 @@ export const SCHEMAS: Record<string, unknown> = {
         "type": "string"
       },
       "subListen": {
+        "type": "string"
+      },
+      "subLocalDirect": {
+        "type": "string"
+      },
+      "subLocalDirectProxy": {
         "type": "string"
       },
       "subPath": {
@@ -1575,6 +1711,11 @@ export const SCHEMAS: Record<string, unknown> = {
       "backupKeep",
       "backupSchedule",
       "backupTelegram",
+      "connLogDestination",
+      "connLogEnable",
+      "connLogMaxSizeMB",
+      "connLogRetentionDays",
+      "connLogSource",
       "datepicker",
       "discordAdminIds",
       "discordBotBackup",
@@ -1688,6 +1829,11 @@ export const SCHEMAS: Record<string, unknown> = {
       "subHappTunType",
       "subHideSettings",
       "subHostSortMode",
+      "subHwidDefaultLimit",
+      "subHwidExpireDays",
+      "subHwidLimitNotice",
+      "subHwidNoIdNotice",
+      "subHwidNoIdPolicy",
       "subIncyAnnounceUrl",
       "subIncyAppAutoDetect",
       "subIncyBannerBgColor",
@@ -1733,6 +1879,8 @@ export const SCHEMAS: Record<string, unknown> = {
       "subJsonUserAgentRegex",
       "subKeyFile",
       "subListen",
+      "subLocalDirect",
+      "subLocalDirectProxy",
       "subPath",
       "subPort",
       "subProbeMinAgents",
@@ -1882,6 +2030,19 @@ export const SCHEMAS: Record<string, unknown> = {
       "id",
       "name",
       "scope"
+    ],
+    "type": "object"
+  },
+  "AwgSignaturePacketResponse": {
+    "description": "AwgSignaturePacketResponse is an AmneziaWG I1 spec built from a preset.",
+    "properties": {
+      "i1": {
+        "example": "\u003cr 2\u003e\u003cb 0x010000010000000000000377777706676f6f676c6503636f6d0000010001\u003e",
+        "type": "string"
+      }
+    },
+    "required": [
+      "i1"
     ],
     "type": "object"
   },
@@ -2707,6 +2868,147 @@ export const SCHEMAS: Record<string, unknown> = {
       "online",
       "onlineCount",
       "total"
+    ],
+    "type": "object"
+  },
+  "ConnFilter": {
+    "description": "ConnFilter narrows a query; an empty field does not filter. Client and Inbound match\nexactly, Host and Source match any part of the stored text, ignoring ASCII case.",
+    "properties": {
+      "before": {
+        "description": "Before is the Next of the previous page; empty starts at the newest row.",
+        "example": "20250101:4096",
+        "type": "string"
+      },
+      "client": {
+        "example": "alice@example.com",
+        "type": "string"
+      },
+      "from": {
+        "description": "From and To are unix milliseconds, both inclusive; 0 leaves that side open.",
+        "example": 1735689600000,
+        "format": "int64",
+        "type": "integer"
+      },
+      "host": {
+        "example": "example.com",
+        "type": "string"
+      },
+      "inbound": {
+        "example": "inbound-443",
+        "type": "string"
+      },
+      "limit": {
+        "example": 50,
+        "type": "integer"
+      },
+      "source": {
+        "example": "203.0.113.",
+        "type": "string"
+      },
+      "to": {
+        "example": 1735775999999,
+        "format": "int64",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "before",
+      "client",
+      "from",
+      "host",
+      "inbound",
+      "limit",
+      "source",
+      "to"
+    ],
+    "type": "object"
+  },
+  "ConnPage": {
+    "description": "ConnPage is one page of connections, newest first.",
+    "properties": {
+      "enabled": {
+        "description": "Enabled tells whether connections are being recorded now; SizeBytes is the log on disk.",
+        "example": true,
+        "type": "boolean"
+      },
+      "next": {
+        "description": "Next goes into ConnFilter.Before to read the following page; empty on the last one.",
+        "example": "20250101:4046",
+        "type": "string"
+      },
+      "rows": {
+        "items": {
+          "$ref": "#/components/schemas/ConnRecord"
+        },
+        "type": "array"
+      },
+      "sizeBytes": {
+        "example": 36700160,
+        "format": "int64",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "enabled",
+      "next",
+      "rows",
+      "sizeBytes"
+    ],
+    "type": "object"
+  },
+  "ConnRecord": {
+    "description": "ConnRecord is one accepted connection.",
+    "properties": {
+      "client": {
+        "example": "alice@example.com",
+        "type": "string"
+      },
+      "host": {
+        "example": "example.com",
+        "type": "string"
+      },
+      "inbound": {
+        "example": "inbound-443",
+        "type": "string"
+      },
+      "network": {
+        "example": "tcp",
+        "type": "string"
+      },
+      "outbound": {
+        "example": "direct",
+        "type": "string"
+      },
+      "port": {
+        "example": 443,
+        "type": "integer"
+      },
+      "source": {
+        "description": "Source is the client's address, or its /24 (IPv4) or /48 (IPv6) network when masked.",
+        "example": "203.0.113.9",
+        "type": "string"
+      },
+      "sourcePort": {
+        "example": 54321,
+        "type": "integer"
+      },
+      "time": {
+        "description": "Time is unix milliseconds.",
+        "example": 1735732800000,
+        "format": "int64",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "client",
+      "host",
+      "inbound",
+      "network",
+      "outbound",
+      "port",
+      "source",
+      "sourcePort",
+      "time"
     ],
     "type": "object"
   },
@@ -4610,6 +4912,110 @@ export const SCHEMAS: Record<string, unknown> = {
     ],
     "type": "object"
   },
+  "PanelImportInbound": {
+    "description": "PanelImportInbound is one source inbound and what the import does with it.",
+    "properties": {
+      "clients": {
+        "example": 12,
+        "type": "integer"
+      },
+      "hosts": {
+        "example": 1,
+        "type": "integer"
+      },
+      "port": {
+        "example": 443,
+        "type": "integer"
+      },
+      "protocol": {
+        "example": "vless",
+        "type": "string"
+      },
+      "skipped": {
+        "description": "Skipped is why the inbound is left out; empty when it is imported.",
+        "type": "string"
+      },
+      "tag": {
+        "example": "VLESS TCP REALITY",
+        "type": "string"
+      }
+    },
+    "required": [
+      "clients",
+      "hosts",
+      "port",
+      "protocol",
+      "skipped",
+      "tag"
+    ],
+    "type": "object"
+  },
+  "PanelImportReport": {
+    "description": "PanelImportReport is the dry-run answer and, with Applied, the record of a real import.",
+    "properties": {
+      "admins": {
+        "example": [
+          "admin"
+        ],
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "applied": {
+        "example": false,
+        "type": "boolean"
+      },
+      "backup": {
+        "example": "/etc/still-ui/backups/still-ui-host-20261111T101500Z.db",
+        "type": "string"
+      },
+      "clients": {
+        "example": 12,
+        "type": "integer"
+      },
+      "inbounds": {
+        "items": {
+          "$ref": "#/components/schemas/PanelImportInbound"
+        },
+        "type": "array"
+      },
+      "legacySubLinks": {
+        "description": "LegacySubLinks counts the users whose subscription links from the source keep working.",
+        "example": 12,
+        "type": "integer"
+      },
+      "notEmpty": {
+        "example": false,
+        "type": "boolean"
+      },
+      "notes": {
+        "example": [
+          "user bob: the yearly traffic reset has no equivalent, set to never"
+        ],
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "source": {
+        "example": "marzban",
+        "type": "string"
+      }
+    },
+    "required": [
+      "admins",
+      "applied",
+      "backup",
+      "clients",
+      "inbounds",
+      "legacySubLinks",
+      "notEmpty",
+      "notes",
+      "source"
+    ],
+    "type": "object"
+  },
   "PanelUpdateStatus": {
     "description": "PanelUpdateStatus reports the outcome of the most recently launched panel\nself-update. RunID lets the caller confirm this status belongs to the\nupdate it started rather than a stale result left over from an earlier\nrun; State is one of \"pending\", \"success\", or \"failed\". RunID is a decimal\nstring, not a JSON number: it's a formatted UnixNano timestamp, and\nJavaScript's number type can't represent that precisely (it exceeds\nNumber.MAX_SAFE_INTEGER), which would let two different runs round to the\nsame value on the wire and defeat the whole point of this field.",
     "properties": {
@@ -4698,6 +5104,80 @@ export const SCHEMAS: Record<string, unknown> = {
       "online",
       "tag",
       "up"
+    ],
+    "type": "object"
+  },
+  "PortHopRule": {
+    "description": "PortHopRule is the redirect one inbound asks for.",
+    "properties": {
+      "inboundId": {
+        "example": 7,
+        "type": "integer"
+      },
+      "ports": {
+        "example": "20000-50000",
+        "type": "string"
+      },
+      "remark": {
+        "example": "hy2",
+        "type": "string"
+      },
+      "toPort": {
+        "example": 443,
+        "type": "integer"
+      }
+    },
+    "required": [
+      "inboundId",
+      "ports",
+      "remark",
+      "toPort"
+    ],
+    "type": "object"
+  },
+  "PortHopStatus": {
+    "description": "PortHopStatus is what this host does for Hysteria2 port hopping.",
+    "properties": {
+      "active": {
+        "example": true,
+        "type": "boolean"
+      },
+      "error": {
+        "type": "string"
+      },
+      "nftInstalled": {
+        "example": true,
+        "type": "boolean"
+      },
+      "packets": {
+        "example": 1204,
+        "format": "int64",
+        "type": "integer"
+      },
+      "permitted": {
+        "description": "Permitted is false when nft runs but may not change rules (no NET_ADMIN).",
+        "example": true,
+        "type": "boolean"
+      },
+      "rules": {
+        "items": {
+          "$ref": "#/components/schemas/PortHopRule"
+        },
+        "type": "array"
+      },
+      "supported": {
+        "example": true,
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "active",
+      "error",
+      "nftInstalled",
+      "packets",
+      "permitted",
+      "rules",
+      "supported"
     ],
     "type": "object"
   },
@@ -5085,6 +5565,15 @@ export const SCHEMAS: Record<string, unknown> = {
         "example": true,
         "type": "boolean"
       },
+      "certDaysLeft": {
+        "example": 61,
+        "type": "integer"
+      },
+      "certExpiresSoon": {
+        "description": "CertExpiresSoon marks a certificate with under 14 days left; it does not change Feasible.",
+        "example": false,
+        "type": "boolean"
+      },
       "certIssuer": {
         "example": "Google Trust Services",
         "type": "string"
@@ -5121,6 +5610,11 @@ export const SCHEMAS: Record<string, unknown> = {
         "example": 180,
         "type": "integer"
       },
+      "mlkem768": {
+        "description": "MLKEM768 reports that a second handshake offering only X25519MLKEM768 succeeded.",
+        "example": true,
+        "type": "boolean"
+      },
       "notAfter": {
         "example": "2026-08-01T00:00:00Z",
         "type": "string"
@@ -5132,6 +5626,11 @@ export const SCHEMAS: Record<string, unknown> = {
       "privateTarget": {
         "description": "PrivateTarget marks a target that resolves to a loopback/private/link-local\naddress: blocked before the probe unless the caller opted in, then flagged.",
         "example": false,
+        "type": "boolean"
+      },
+      "reachable": {
+        "description": "Reachable is false when the name did not resolve or TCP did not connect.",
+        "example": true,
         "type": "boolean"
       },
       "reason": {
@@ -5164,6 +5663,8 @@ export const SCHEMAS: Record<string, unknown> = {
       "alpn",
       "certChainBytes",
       "certChainValid",
+      "certDaysLeft",
+      "certExpiresSoon",
       "certIssuer",
       "certSubject",
       "certValid",
@@ -5173,9 +5674,11 @@ export const SCHEMAS: Record<string, unknown> = {
       "host",
       "ip",
       "latencyMs",
+      "mlkem768",
       "notAfter",
       "port",
       "privateTarget",
+      "reachable",
       "reason",
       "serverNames",
       "target",

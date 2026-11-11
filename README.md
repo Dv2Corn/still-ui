@@ -55,10 +55,17 @@ still-ui migrate-rollback
 - **AmneziaWG relay buffers are reused.** Every TCP connection through the embedded AmneziaWG allocated two fresh 32 KiB copy buffers; they now come from a pool. The relay alone: about 69 KB → 2.9 KB allocated per connection. The whole panel on a 2 vCPU / 2 GiB test server, 100 short connections per second through AmneziaWG for 5 minutes, 3 runs each, 3x-ui v3.11.0 vs still-ui: panel memory under load 403 → 176 MiB on average, peak 525 → 211 MiB, the same at rest. Method, limits and raw data: [bench/awg-relay-churn](bench/awg-relay-churn/README.md).
 - **An Auto group in Clash/Mihomo subscriptions.** With two or more servers, the Clash/Mihomo profile gets an `Auto` group: the app tests every server through the tunnel and moves to a working one by itself (fastest with a 50 ms tolerance, checked every 300 s, or the first that answers). `Auto` is the default choice in `PROXY`; picking a server by hand still works. On for new installs; on a panel that existed before, turn on **Auto group** in the subscription settings.
 - **Subscriptions follow the reachability probes.** A link whose endpoint the [probes](#check-reachability-from-russia) report down (two failed checks in a row) can be moved to the end of the subscription or left out, in every format: links, JSON and Clash. A user always keeps at least one link, and without fresh probe results nothing changes. Off by default.
+- **Local sites open directly, with one setting.** Pick a country in **Settings → Subscription → Local sites direct** and client apps open that country's sites directly (its domain zones, the curated `geosite` list and `geoip`) and send everything else through the VPN, so banks, government portals and marketplaces that refuse foreign addresses keep working with the VPN on. A short always-VPN list is checked first — Telegram (its address ranges are listed as Russian), YouTube, Instagram, WhatsApp, Discord, ChatGPT, Claude — and you can add your own entries. Works in JSON, Clash/Mihomo and Happ/INCY subscriptions, plus a Shadowrocket rules file on the subscription page; a plain list of links and AmneziaWG configs cannot carry such rules. Off by default. [Details](docs/content/docs/en/config/subscription.mdx)
 - **An egress filter for clients.** Clients can be kept from sending mail on port 25 (on by default for new installs), from reaching private networks behind the server and the server's own panel and SSH ports, and from addresses and ports you list. It applies to every client inbound through Xray and, with `nft`, to AmneziaWG kernel-mode clients; a master can hand it to its nodes. [Details](#mobile-networks-in-russia).
 - **A monthly traffic limit for each node.** The master counts the traffic of a node's own inbounds per month (from the reset day you pick), sends a Telegram alert at 80% (adjustable) and at the limit, and can turn the node's inbounds off until the next period. An accounting multiplier from 0.1 to 100 scales that node's traffic in client totals, from the moment it is set (earlier traffic keeps its old rate). The node checks each client's quota by its own master's count, so masters with different multipliers can share a node. No limit by default.
 - **Adding a node takes one command.** **Nodes → Add with a command** makes a one-time invitation (valid 30 minutes by default, can be revoked); running the command it shows as root on a new server installs still-ui from the release, sets it up as a node and adds it to the master. No API tokens or certificate pins to copy by hand; the node checks the master's key before it changes anything. [Guide](docs/content/docs/en/operations/multi-node.mdx).
+- **The device limit tells the person what happened, has a panel default and forgets old devices.** 3x-ui v3.11.0 can cap the devices of a subscription (a client's **HWID Limit**; unlike **IP limit** it needs no Fail2ban and does not trip when a phone moves between Wi-Fi and mobile data), but a device over the limit gets a bare 404, an app that sends no device ID is always refused, there is no panel-wide default and a device holds its slot until an admin removes it. In still-ui a new device over the limit gets a valid answer for its app whose only server is a notice — "Device limit 3 reached. Remove a device in your account or ask the seller." (the text is yours; Happ also shows it as the announcement) — and never an error; devices registered before keep getting the servers. **Settings → Subscription → Device limit** adds one default limit for every client without its own (off until you set it; a subscription that already has more devices keeps the most recently seen ones), a choice for apps that send no device ID — all of them share one slot of the subscription (the default on a new panel), they are refused with a notice, or they are served and not counted (what an upgraded panel without limits keeps; with it the limit can be bypassed by an app that leaves the ID out, and the panel warns about that) — and expiry: a device that has not fetched the subscription for 30 days (adjustable; off on an upgraded panel until you set it) frees its slot. The subscription page shows the person "2 / 3" devices and nothing about them; the admin sees and removes devices in the client's card, the API lists and deletes them (`/panel/api/clients/hwids/:email`). The panel stores a hash of the device ID, never the ID. The limit is on fetching the subscription: servers already imported into an app keep working, and links copied by hand are not counted.
+- **Moving from Marzban or an old x-ui takes one command.** `still-ui import marzban /var/lib/marzban` brings inbounds, users and hosts over with the same UUIDs and passwords, the same REALITY key and short IDs, ports, traffic used, limits, expiry dates and states, so the links users already have keep connecting, and the subscription links Marzban issued keep working. `-dry-run` shows what would be imported and what cannot be; a real import takes a backup first and writes all or nothing. The same is in **Settings → Import**. See [Moving from Marzban or x-ui](#moving-from-marzban-or-x-ui).
 - **Panel memory over several days: checked.** 72 hours under mixed load (200 users; a client change every 5 s; UI and API calls; subscriptions; VLESS, VMess and AmneziaWG traffic), still-ui v1.6.0 next to 3x-ui v3.11.0 with the same data and the same load: no growth in either (+0.1 MB/h over the last 24 h, goroutines and file descriptors flat, no restarts). Many *slow* AmneziaWG clients can still hold kernel socket buffers (about 12 MB per slow stream) that count against the panel; the memory cap the installer sets for the service keeps that in check (with Docker, set `mem_limit`).
+- **A connection log in the panel.** The **Connections** page shows who connected, when, through which inbound and where to, with filters by client, inbound, time, destination and source address, and a CSV export; the icon in a client's row opens that client's connections. An abuse complaint ("who reached this host at that time") is answered without shell access. Off by default. You choose how long it is kept (30 days by default), a size limit, and what is stored: the full destination, only its registered domain or nothing; the client's full address, only its network or nothing. Old days delete themselves. [How it works](#connection-log).
+- **A REALITY target picker that shows every check.** **Find Targets** on a REALITY inbound tests each candidate from your server and marks what passed: reachable, TLS 1.3, X25519 (and whether X25519MLKEM768 is accepted too), HTTP/2, a trusted certificate for the name, more than 14 days left on it, latency. Candidates are a short list you can edit, anything you type and, if you tick the box, the other addresses in your server's own /24. **Use** fills the target and the SNI. No list in the panel is a recommendation: which site to imitate is your choice. [Details](#mobile-networks-in-russia)
+- **Hysteria2 port hopping that the panel sets up itself.** In 3x-ui the hop range is only told to clients, and the redirect on the server is yours to write. **UDP Hop → Redirect on this server** loads an nftables rule that sends the range to the inbound's port, restores it after a reboot and removes it with the inbound. Where it cannot work (no `nft`, a container without `NET_ADMIN`) the panel refuses the option instead of handing clients dead ports. Off by default. [Details](#mobile-networks-in-russia)
+- **AmneziaWG: a first packet that looks like QUIC or DNS, and MTU 1280 in one click.** Two buttons build an `I1` signature packet shaped like a QUIC Initial or a DNS query; the random parts differ on every handshake. Each preset completes a handshake between a real amneziawg-go client and server in the test suite. The buttons change only `I1`–`I5`, so clients you already have keep working. **Set 1280** next to the MTU: on Russian mobile networks AmneziaWG measured 4–5 times faster at 1280 than at the default. [Details](#mobile-networks-in-russia)
 
 ### In progress
 
@@ -98,7 +105,7 @@ STILL_UI_ARCHIVE=/path/still-ui-linux-amd64.tar.gz bash install.sh
 
 The installer generates a random username, password and panel path and prints them at the end — save them. After that, run `still-ui` to open the management menu: start and stop the service, show or reset the login, change the port, manage certificates and so on. The subcommands are the same as in 3x-ui's `x-ui` script (`still-ui start`, `stop`, `restart`, `status`, `log`, `update`, `legacy`, `uninstall` and others).
 
-Release builds exist for **Linux amd64 and arm64** only. The current release is still-ui **1.6.1**, based on 3x-ui 3.11.0 and the fixes merged after it, with **Xray v26.10.31** in still-ui's own build ([what differs](scripts/xray-build/README.md)).
+Release builds exist for **Linux amd64 and arm64** only. The current release is still-ui **1.7.0**, based on 3x-ui 3.11.0 and the fixes merged after it, with **Xray v26.10.31** in still-ui's own build ([what differs](scripts/xray-build/README.md)).
 
 ### Where things live
 
@@ -111,6 +118,7 @@ Release builds exist for **Linux amd64 and arm64** only. The current release is 
 | Settings | `/etc/default/still-ui` |
 | Xray | service `still-xray`, config `/etc/still-xray`, logs `/var/log/still-xray` |
 | Backups | `/etc/still-ui/backups` (`XUI_BACKUP_FOLDER` in the settings file moves them) |
+| Connection log | `/etc/still-ui/connlog` (one file per day; not part of the backups) |
 
 ### Memory cap
 
@@ -173,6 +181,18 @@ You can also decrypt elsewhere: `age -d -i key.txt backup.db.age > x-ui.db`.
 
 Checks run every minute. An alert is sent once when the problem starts, again every **Remind every** hours while it lasts (6 by default, 0 = never), and once more when it is fixed. The state lives in memory: after a panel restart a problem that is still there is reported once again.
 
+### Connection log
+
+**Settings → Connection log** in the panel, then the **Connections** page:
+
+- **Record connections** — off by default. While it is on, the panel reads Xray's access log every five seconds. If that log is set to `none`, the panel turns it on for as long as the switch is on (`access-connlog.log` in Xray's log folder), which restarts Xray once; an access log you set yourself is used as it is, with no restart. Turning the switch off puts the Xray config back and empties that file.
+- **Keep for (days)** (30) and **Size limit (MB)** (2048). Each day is one file in `/etc/still-ui/connlog`, outside the panel database and its backups. Days past the retention are deleted; when the folder grows past the limit, the oldest day goes first, and if a single day is larger than the limit, its oldest connections go. A million connections take about 75 MB and about half a minute of one CPU core to store.
+- **Destination**: the full host name or IP address, only the registered domain (`maps.example.co.uk` becomes `example.co.uk`; an IP address stays as it is), or nothing. **Client address**: the full address and port, only the network (/24 for IPv4, /48 for IPv6, no port), or nothing. A change applies to new connections; what is already stored stays as it is until it expires.
+- **Connections** — filter by client (exact name), inbound, time range, part of the destination and part of the source address. Newest first, 50 per page. **Export CSV** saves up to 100 000 rows of the current filter, times in UTC.
+- Only an admin can read it: the page and its API (`/panel/api/connlog/list` and `/export`) need a panel login or an admin API token; monitor and node tokens are refused. Every query and export is written to the panel log with the user, their address and the filter.
+
+Limits. The log holds what passes through Xray: AmneziaWG and TUIC connections are logged with their client and destination, but with a local source address, because the panel hands them to Xray on the same machine; MTProto connections are not attributed to a client. With `maskAddress` set in Xray's log settings, Xray hides part of the client address before the panel sees it. Each node keeps its own log, which you read in that node's panel; the master does not collect it. When the panel empties a large access log, it stores the lines it has not read yet first. The storage setting below covers what the panel keeps, not Xray's access log itself: that file holds whole lines until the panel empties it, once a day or when it passes 64 MiB. The log is as trustworthy as Xray's access log, and no more: Xray writes a refused request's text into it as it came, line breaks included, so someone who can send a request to an inbound can add a line of their choice, with any client name, address and destination. The panel leaves out such a line when its date is ahead of the clock, and says so in the panel log; it cannot tell one dated now from Xray's own. Treat a row as a lead, not as proof.
+
 ## Update, roll back, remove
 
 Update to the latest release — from the command line or with the update button in the panel:
@@ -204,12 +224,29 @@ This removes the program, both services, the `still-xray` user and the menu, and
 
 ## Mobile networks in Russia
 
-Russian mobile operators inspect traffic (DPI), and in "whitelist" mode they cut most foreign TCP connections after the first 12–16 KB. Two things in still-ui help.
+Russian mobile operators inspect traffic (DPI), and in "whitelist" mode they cut most foreign TCP connections after the first 12–16 KB. still-ui has several things for this.
 
 **Presets for new inbounds.** In **Add Inbound**, pick a **Preset**:
 
 - **Mobile networks (Russia): VLESS REALITY** — VLESS on TCP 443 with REALITY, a fresh key pair and short IDs, and the `ios` fingerprint in the links and subscriptions of this inbound only (other new inbounds still start with `chrome`). The `ios` ClientHello is about 517 bytes and fits in one TCP segment; longer ones lose their second segment on some networks. still-ui's Xray accepts `ios`; official Xray 26.9.9 and newer refuses it. Then pick a target on the **Security** tab. **Find Targets** checks candidate sites from your server; prefer a site that is popular and not blocked in your clients' country over one well-known foreign site. Give clients the `xtls-rprx-vision` flow.
 - **Mobile networks (Russia): Hysteria2 (UDP)** — Hysteria2 on UDP 443 with the `h3` ALPN and no Salamander obfuscation, so that most clients can connect. UDP often keeps working in whitelist mode when TCP is cut. Set the certificate on the **Security** tab.
+
+**Find a REALITY target.** **Find Targets** (next to the target on the **Security** tab) checks candidates from the server itself and shows each check as passed or failed: the name resolves and TCP connects, TLS 1.3, X25519 key exchange (an **ML-KEM** tag when the site also accepts X25519MLKEM768), HTTP/2, a certificate that is trusted for the name, and latency. A certificate with less than 14 days left gets a warning and such targets are listed after the others. The candidates are the **Reality scan candidates** list in **Settings** (ten large sites by default; none of them is a recommendation), any domain, address or network you type, and, only if you tick **Also check my server's neighbours**, port 443 of the other addresses in the /24 around each public IPv4 address of the server, with the names taken from their certificates. The neighbour scan opens one connection per address, about 25 a second, one scan at a time; some hosting providers treat that as a port scan. A scan stops starting new checks after 17 seconds and says how many targets it did not reach. Private, loopback, link-local and carrier-NAT addresses are never probed in these scans, and a name is checked after it is resolved, on the address the panel then connects to. **Use** fills the target and the SNI.
+
+**Hysteria2 port hopping.** Clients that hop send to a different UDP port every few seconds, which keeps a connection alive where a single long UDP flow gets throttled. On a Hysteria inbound, on the **Stream** tab turn on **QUIC Params** and **UDP Hop**, set the range (for example `20000-30000`) and turn on **Redirect on this server**. Then:
+
+- The panel loads the nftables table `inet still_port_hop`: UDP that arrives for this server on the range is redirected to the inbound's port, for IPv4 and IPv6. Forwarded traffic is not touched, and a UDP port of another inbound is never redirected. The table is loaded on start, restored within a minute if something flushes it, and removed within 10 seconds after the option is turned off or the inbound is disabled or deleted; `still-ui uninstall` removes it too.
+- The range must lie in 1024–65535, must not contain the UDP port of another inbound or a port forwarded to an AmneziaWG client, or overlap another inbound's range, and the inbound must listen on all addresses. The panel cannot see UDP services it does not manage (a separate WireGuard or a UDP port published by Docker, for example): keep them out of the range. Prefer a range below 32768: Linux takes the ports of the server's own outgoing connections from 32768–60999, and a late reply to one of them would be redirected too. Open the range in your hosting provider's firewall; a firewall on the server itself needs only the inbound's own port.
+- Without `nft`, outside Linux, or in a container without the `NET_ADMIN` capability the option is refused with the reason, so clients are never given ports that lead nowhere. In Docker the hop ports must also reach the container (host networking or published ports).
+- Clients get the range in the form they read: `mport` in `hysteria2://` links, `ports` and `hop-interval` in Clash/Mihomo, a `udphop` mask in the Xray JSON subscription. The panel has no sing-box format.
+- With nodes, the node's own panel installs the redirect. A node that has not been updated to this version ignores the switch and only advertises the range, as before.
+
+The switch is off for every inbound that exists today; a range entered earlier is still only advertised until you turn it on.
+
+**AmneziaWG on mobile networks.** In an AmneziaWG inbound, next to **Regenerate**:
+
+- **QUIC-like I1** and **DNS-like I1** replace the signature packets: `I1` becomes a packet that starts like a QUIC v1 connection (1200–1232 bytes) or a DNS query for a well-known name, and `I2`–`I5` are cleared. The connection id, the query id and the payload are random on every handshake. The receiving side ignores these packets, so clients that already have a config keep connecting, and new configs carry the new packet. It is a disguise of the first packet only, not a real QUIC or DNS exchange.
+- **Set 1280** under **MTU** puts 1280 into the inbound; every client config the panel generates then carries `MTU = 1280`. On Russian mobile networks AmneziaWG measured 4–5 times faster at 1280 than at the default.
 
 **Block torrents for clients.** **Xray Configs → Routing → Basic Routing → Block torrents for clients.** It is off by default, and clients get no notice. When it is on:
 
@@ -243,10 +280,10 @@ Release archives are built by GitHub Actions from the tagged commit ([release wo
 | `install.sh`, `update.sh`, `x-ui.sh`, `migrate.sh` | the installer, the updater, the `still-ui` menu and the 3x-ui migration of this release (the same files are inside the archive); the panel's update button and `still-ui update` run `update.sh` only when its sum is in `SHA256SUMS` |
 | `SHA256SUMS` | checksums of the archives, SBOMs, probe archives and scripts |
 
-Download and check the checksums (replace `v1.6.1` with the release you install):
+Download and check the checksums (replace `v1.7.0` with the release you install):
 
 ```bash
-gh release download v1.6.1 -R Dv2Corn/still-ui -p 'still-ui-linux-amd64.tar.gz*' -p SHA256SUMS
+gh release download v1.7.0 -R Dv2Corn/still-ui -p 'still-ui-linux-amd64.tar.gz*' -p SHA256SUMS
 sha256sum -c SHA256SUMS --ignore-missing
 ```
 
@@ -254,7 +291,7 @@ Check that the archive was built by this repository's release workflow from that
 
 ```bash
 gh attestation verify still-ui-linux-amd64.tar.gz -R Dv2Corn/still-ui \
-  --signer-workflow Dv2Corn/still-ui/.github/workflows/release.yml --source-ref refs/tags/v1.6.1
+  --signer-workflow Dv2Corn/still-ui/.github/workflows/release.yml --source-ref refs/tags/v1.7.0
 ```
 
 The SBOM is attested too:
@@ -268,7 +305,7 @@ The Xray core inside the archive can be rebuilt bit for bit. On a Linux host wit
 ```bash
 tar -xzf still-ui-linux-amd64.tar.gz still-ui/bin/xray-linux-amd64
 sha256sum still-ui/bin/xray-linux-amd64
-git clone https://github.com/Dv2Corn/still-ui && cd still-ui && git checkout v1.6.1
+git clone https://github.com/Dv2Corn/still-ui && cd still-ui && git checkout v1.7.0
 scripts/xray-build/build.sh /tmp/xray-out amd64 arm64
 ```
 
@@ -306,6 +343,37 @@ Changes made in still-ui after the migration (new clients, traffic counters) do 
 A plain install also offers to take over `/etc/x-ui/x-ui.db` (non-interactive: `STILL_UI_IMPORT_3XUI=yes`), without the checks and the backup above. It stops 3x-ui, moves its unit to `/root/still-ui-3x-ui-retired/` and points acme.sh renewals at still-ui too; `bash /root/still-ui-3x-ui-retired/migrate.sh restore-import /root/still-ui-3x-ui-retired` puts both back (`still-ui uninstall --purge` runs it; an uninstall that keeps the data for a reinstall leaves 3x-ui retired).
 
 The panel and the subscription server pick up a renewed certificate file within half a minute, without a restart.
+
+## Moving from Marzban or x-ui
+
+Install still-ui (on the Marzban server or on a new one with Marzban's data folder copied to it), then:
+
+```bash
+still-ui import marzban /var/lib/marzban -dry-run   # report only, writes nothing
+still-ui import marzban /var/lib/marzban            # backup, import, restart
+```
+
+The argument is Marzban's data folder or its `db.sqlite3`; the inbounds are read from `xray_config.json` beside it (`-config FILE` names another one). Both files are only read. **Settings → Import** in the panel does the same: upload the two files, read the report, confirm.
+
+What comes over:
+
+- **Inbounds** — VLESS, VMess, Trojan and Shadowsocks on any transport, with TLS or REALITY, as Xray had them: port, REALITY private key and short IDs, paths. Certificate files must be readable at the same paths on this server; an inbound whose certificate is missing is listed and left out.
+- **Users** — UUIDs and passwords, flow, traffic used and limit, expiry, note and state: a disabled user stays disabled, a limited or expired one stays blocked until renewed, a user on hold starts counting on the first connection. Daily, weekly and monthly traffic resets carry over onto still-ui's calendar — daily at midnight, weekly on Sunday, monthly on the day of the month the user's next Marzban reset was due (Marzban counted 1, 7 and 30 days from each user's own last reset); a yearly one does not.
+- **Hosts** — address, port, SNI, host header, path, ALPN and fingerprint, as the hosts of the inbound. A host whose address is `{SERVER_IP}` uses the address the subscription is fetched from.
+- **Subscription links** — Marzban's `/sub/<token>` links are accepted as they are, each user's revoke date included. They are served at `/sub/` whatever still-ui's own subscription path is, and only they: a plain subscription ID still needs the panel's own path. Point the address users have (host and port) at still-ui's subscription server; if Marzban had another `XRAY_SUBSCRIPTION_PATH`, set that as the subscription path in **Settings → Subscription**. To check these links still-ui keeps Marzban's signing secret in its own database. Whoever has that secret — an old Marzban backup, a former admin — can open imported users' subscriptions through such links, so once users have moved to the links from still-ui, run `still-ui import forget-links`: it stops accepting the old links and deletes the secret. Each imported user's own still-ui subscription ID is random and cannot be worked out from the secret.
+
+What does not:
+
+- Admins (the report lists them), nodes, user templates, and the `/info`, `/usage` and client-type paths under a subscription link.
+- A client here has one UUID and one password, while Marzban gives each protocol its own. A user with both VLESS and VMess inbounds, or both Trojan and Shadowsocks, becomes two clients in one subscription (`name` and `name.vmess` or `name.ss`), each with the full limit and its own traffic counter.
+- Link names: still-ui names links by its own remark template, not by the host remark. Every connection setting is the same.
+- Marzban on MySQL or MariaDB: only the SQLite file is read.
+
+`still-ui import x-ui /etc/x-ui/x-ui.db` does the same for x-ui (vaxilu/x-ui and its forks) and 3x-ui before v3: inbounds with their clients and traffic; a client without an email gets a name. For 3x-ui 2.0 and later prefer [the migration above](#moving-from-3x-ui), which also keeps the settings and the panel login.
+
+A panel that already has inbounds needs `-merge`: inbounds whose port or tag is taken and clients whose email exists or whose subscription ID belongs to another client here are skipped and listed. To undo an import, restore the backup it printed: `still-ui restore <file>`.
+
+Tested end to end in Docker (`scripts/test-import-marzban.sh`): Marzban v0.8.4 from its official image with VLESS REALITY, VMess WebSocket and Shadowsocks inbounds, then still-ui in its place; an Xray client connects with the links and the subscription link Marzban gave, unchanged.
 
 ## Check reachability from Russia
 
