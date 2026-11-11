@@ -1,0 +1,11 @@
+2026/11/11 12:48:43.521430 from tcp:127.0.0.1:46638 accepted tcp:127.0.0.1:40877 [in-socks >> direct]
+2026/11/11 12:48:43.523429 from tcp:127.0.0.1:46648 accepted tcp:localhost:40877 [in-socks >> direct]
+2026/11/11 12:48:43.526360 from tcp:127.0.0.1:46656 accepted tcp:[::1]:40877 [in-socks >> direct]
+2026/11/11 12:48:43.527804 from tcp:[::1]:34158 accepted tcp:127.0.0.1:40877 [in-socks6 >> direct]
+2026/11/11 12:48:43.529021 from tcp:127.0.0.1:46662 accepted tcp:blocked.test:80 [in-socks -> blocked]
+2026/11/11 12:48:43.529665 from tcp:127.0.0.1:46754 accepted tcp:127.0.0.1:40877 [in-chain -> to-vless]
+2026/11/11 12:48:43.530447 from 127.0.0.1:38290 accepted tcp:127.0.0.1:40877 [in-vless >> direct] email: alice@example.com
+2026/11/11 12:48:48.530442 from tcp:127.0.0.1:45742 accepted tcp:127.0.0.1:40877 [in-badchain -> to-vless-bad]
+2026/11/11 12:48:48.530634 from 127.0.0.1:38306 rejected  proxy/vless/encoding: invalid request user id: b28f478d-3185-4e4f-bbfc-0cf06e0ef8f8
+2026/11/11 12:48:48.531383 from udp:127.0.0.1:35883 accepted udp:127.0.0.1:42496 [in-socks >> direct]
+2026/11/11 12:48:48.532190 from 127.0.0.1:41708 accepted http://127.0.0.1:37345/some/path?q=1 [in-http >> direct]
