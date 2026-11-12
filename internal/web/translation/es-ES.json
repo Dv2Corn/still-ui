@@ -814,10 +814,12 @@
         "presetHelp": "Valores para clientes en redes móviles rusas con DPI y modo de lista blanca. VLESS REALITY usa la huella ios: su ClientHello (unos 517 bytes) cabe en un segmento TCP, mientras que en algunas redes los más largos pierden el segundo segmento. El Xray de still-ui acepta ios; el Xray oficial 26.9.9 y posteriores lo rechazan. Hysteria2 usa UDP, que a menudo sigue funcionando cuando TCP se corta.",
         "presetOptions": {
           "ruMobileReality": "Redes móviles (Rusia): VLESS REALITY",
+          "ruMobileXhttp": "Redes móviles (Rusia): VLESS XHTTP REALITY",
           "ruMobileHysteria": "Redes móviles (Rusia): Hysteria2 (UDP)"
         },
         "presetHints": {
           "ruMobileReality": "Elija un destino abajo: Buscar objetivos comprueba sitios candidatos desde este servidor. Prefiera un sitio popular y no bloqueado en el país de sus clientes en lugar de un único sitio extranjero conocido. Asigne a los clientes el flow xtls-rprx-vision.",
+          "ruMobileXhttp": "Elija un destino abajo: Buscar objetivos comprueba sitios candidatos desde este servidor. Deje vacío el flow de los clientes: XTLS Vision no funciona sobre XHTTP. El cliente necesita soporte de XHTTP: aplicaciones basadas en Xray-core o mihomo 1.19.22 y posteriores. Una descarga sigue siendo una sola respuesta HTTP sobre una sola conexión TCP, así que XHTTP por sí solo no evita el corte tras los primeros 12–16 KB.",
           "ruMobileHysteria": "Configure el certificado abajo. UDP 443 suele funcionar en modo de lista blanca, cuando TCP se corta tras los primeros 12–16 KB. La ofuscación está desactivada para la mayor compatibilidad con clientes."
         }
       },

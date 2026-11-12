@@ -814,10 +814,12 @@
         "presetHelp": "DPI ve beyaz liste modu olan Rusya mobil ağlarındaki istemciler için değerler. VLESS REALITY ios parmak izini kullanır: ClientHello'su (yaklaşık 517 bayt) tek bir TCP segmentine sığar; daha büyükleri bazı ağlarda ikinci segmentini kaybeder. still-ui'nin Xray'i ios'u kabul eder; resmi Xray 26.9.9 ve sonrası reddeder. Hysteria2 UDP üzerinden çalışır ve TCP kesildiğinde bile çoğu zaman çalışmaya devam eder.",
         "presetOptions": {
           "ruMobileReality": "Mobil ağlar (Rusya): VLESS REALITY",
+          "ruMobileXhttp": "Mobil ağlar (Rusya): VLESS XHTTP REALITY",
           "ruMobileHysteria": "Mobil ağlar (Rusya): Hysteria2 (UDP)"
         },
         "presetHints": {
           "ruMobileReality": "Aşağıdan bir hedef seçin: Hedef bul, aday siteleri bu sunucudan denetler. Tek bir bilinen yabancı site yerine istemcilerinizin ülkesinde popüler ve engellenmemiş bir site tercih edin. İstemcilere xtls-rprx-vision flow'unu verin.",
+          "ruMobileXhttp": "Aşağıdan bir hedef seçin: Hedef bul, aday siteleri bu sunucudan denetler. İstemcilerin flow alanını boş bırakın: XTLS Vision XHTTP üzerinde çalışmaz. İstemcinin XHTTP desteği olmalı: Xray-core tabanlı uygulamalar veya mihomo 1.19.22 ve sonrası. Tek bir indirme yine tek bir TCP bağlantısı üzerinden tek bir HTTP yanıtı olarak gider; bu yüzden XHTTP tek başına ilk 12–16 KB'tan sonraki kesintiyi aşmaz.",
           "ruMobileHysteria": "Sertifikayı aşağıda ayarlayın. UDP 443, TCP ilk 12–16 KB'tan sonra kesildiğinde beyaz liste modunda çoğu zaman çalışır. En geniş istemci desteği için gizleme kapalıdır."
         }
       },

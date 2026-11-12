@@ -815,10 +815,12 @@
         "presetHelp": "Values for clients on Russian mobile networks with DPI and whitelist mode. VLESS REALITY uses the ios fingerprint: its ClientHello (about 517 bytes) fits in one TCP segment, while larger ones lose their second segment on some networks. still-ui's Xray accepts ios; official Xray 26.9.9 and newer rejects it. Hysteria2 runs over UDP, which often keeps working when TCP is cut.",
         "presetOptions": {
           "ruMobileReality": "Mobile networks (Russia): VLESS REALITY",
+          "ruMobileXhttp": "Mobile networks (Russia): VLESS XHTTP REALITY",
           "ruMobileHysteria": "Mobile networks (Russia): Hysteria2 (UDP)"
         },
         "presetHints": {
           "ruMobileReality": "Pick a target below: Find Targets checks candidate sites from this server. Prefer a site that is popular and not blocked in your clients' country instead of one well-known foreign site. Give clients the xtls-rprx-vision flow.",
+          "ruMobileXhttp": "Pick a target below: Find Targets checks candidate sites from this server. Leave the clients' flow empty: XTLS Vision does not work over XHTTP. Clients need XHTTP support: apps built on Xray-core, or mihomo 1.19.22 and newer. One download still travels as one HTTP response over one TCP connection, so XHTTP alone does not get past a cut after the first 12–16 KB.",
           "ruMobileHysteria": "Set the certificate below. UDP 443 often keeps working in whitelist mode, when TCP is cut after the first 12–16 KB. Obfuscation is off for the widest client support."
         }
       },

@@ -612,11 +612,14 @@ export default function InboundFormModal({
   // A preset replaces the whole draft; the tag follows the new port and protocol.
   const applyPreset = (preset: InboundPreset) => {
     autoTagRef.current = true;
-    methods.reset(rawInboundToFormValues(buildPresetInbound(preset)));
+    const raw = buildPresetInbound(preset);
+    methods.reset(rawInboundToFormValues(raw));
     setScanResult(null);
     setAppliedPreset(preset);
     setActiveTab('security');
-    if (preset === 'ruMobileReality') void genRealityKeypair();
+    if ((raw.streamSettings as { security?: string }).security === 'reality') {
+      void genRealityKeypair();
+    }
   };
 
   const saveValues = async () => {

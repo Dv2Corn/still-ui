@@ -814,10 +814,12 @@
         "presetHelp": "Giá trị cho người dùng trên mạng di động Nga có DPI và chế độ danh sách trắng. VLESS REALITY dùng dấu vân tay ios: ClientHello của nó (khoảng 517 byte) nằm gọn trong một đoạn TCP, còn các ClientHello lớn hơn bị mất đoạn thứ hai trên một số mạng. Xray của still-ui chấp nhận ios; Xray chính thức 26.9.9 trở lên từ chối nó. Hysteria2 chạy trên UDP, thường vẫn hoạt động khi TCP bị cắt.",
         "presetOptions": {
           "ruMobileReality": "Mạng di động (Nga): VLESS REALITY",
+          "ruMobileXhttp": "Mạng di động (Nga): VLESS XHTTP REALITY",
           "ruMobileHysteria": "Mạng di động (Nga): Hysteria2 (UDP)"
         },
         "presetHints": {
           "ruMobileReality": "Chọn đích bên dưới: Tìm mục tiêu kiểm tra các trang ứng viên từ máy chủ này. Nên chọn trang phổ biến và không bị chặn ở quốc gia của người dùng thay vì một trang nước ngoài nổi tiếng. Đặt flow xtls-rprx-vision cho người dùng.",
+          "ruMobileXhttp": "Chọn đích bên dưới: Tìm mục tiêu kiểm tra các trang ứng viên từ máy chủ này. Để trống flow của người dùng: XTLS Vision không hoạt động trên XHTTP. Ứng dụng cần hỗ trợ XHTTP: ứng dụng dựa trên Xray-core hoặc mihomo 1.19.22 trở lên. Một lượt tải vẫn là một phản hồi HTTP trên một kết nối TCP, nên riêng XHTTP không vượt qua việc bị cắt sau 12–16 KB đầu tiên.",
           "ruMobileHysteria": "Đặt chứng chỉ bên dưới. UDP 443 thường vẫn hoạt động ở chế độ danh sách trắng, khi TCP bị cắt sau 12–16 KB đầu tiên. Làm rối bị tắt để hỗ trợ nhiều ứng dụng nhất."
         }
       },
