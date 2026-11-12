@@ -95,7 +95,7 @@ STILL_UI_ARCHIVE=/path/still-ui-linux-amd64.tar.gz bash install.sh
 
 نصب‌کننده نام کاربری، رمز عبور و مسیر پنل را به‌صورت تصادفی می‌سازد و در پایان نشان می‌دهد؛ آن‌ها را جایی نگه دارید. پس از آن، دستور `still-ui` منوی مدیریت را باز می‌کند: روشن و خاموش کردن سرویس، دیدن یا بازنشانی اطلاعات ورود، تغییر پورت، مدیریت گواهی‌ها و غیره. زیردستورها همان‌هایی هستند که اسکریپت `x-ui` در 3x-ui دارد: `still-ui start`، `stop`، `restart`، `status`، `log`، `update`، `legacy`، `uninstall` و موارد دیگر.
 
-بسته‌های آمادهٔ هر نسخه فقط برای **Linux amd64 و arm64** ساخته می‌شوند. نسخهٔ فعلی: still-ui **1.7.0** بر پایهٔ 3x-ui 3.11.0 و اصلاحاتی که پس از آن پذیرفته شده‌اند، همراه با **Xray v26.10.31** در ساخت خود still-ui ([چه فرقی دارد](scripts/xray-build/README.md)).
+بسته‌های آمادهٔ هر نسخه فقط برای **Linux amd64 و arm64** ساخته می‌شوند. نسخهٔ فعلی: still-ui **1.7.1** بر پایهٔ 3x-ui 3.11.0 و اصلاحاتی که پس از آن پذیرفته شده‌اند، همراه با **Xray v26.10.31** در ساخت خود still-ui ([چه فرقی دارد](scripts/xray-build/README.md)).
 
 ### چه چیزی کجاست
 
@@ -226,10 +226,10 @@ still-ui uninstall
 | `still-probe-linux-<arch>.tar.gz` (+ `.sha256`) | عامل بررسی دسترس‌پذیری که `scripts/still-probe-install.sh` دانلودش می‌کند؛ مانند آرشیوهای پنل attestation دارد |
 | `SHA256SUMS` | checksum آرشیوها، SBOMها و آرشیوهای عامل بررسی |
 
-دانلود و بررسی checksumها (به‌جای `v1.7.0` نسخه‌ای را بگذارید که نصب می‌کنید):
+دانلود و بررسی checksumها (به‌جای `v1.7.1` نسخه‌ای را بگذارید که نصب می‌کنید):
 
 ```bash
-gh release download v1.7.0 -R Dv2Corn/still-ui -p 'still-ui-linux-amd64.tar.gz*' -p SHA256SUMS
+gh release download v1.7.1 -R Dv2Corn/still-ui -p 'still-ui-linux-amd64.tar.gz*' -p SHA256SUMS
 sha256sum -c SHA256SUMS --ignore-missing
 ```
 
@@ -237,7 +237,7 @@ sha256sum -c SHA256SUMS --ignore-missing
 
 ```bash
 gh attestation verify still-ui-linux-amd64.tar.gz -R Dv2Corn/still-ui \
-  --signer-workflow Dv2Corn/still-ui/.github/workflows/release.yml --source-ref refs/tags/v1.7.0
+  --signer-workflow Dv2Corn/still-ui/.github/workflows/release.yml --source-ref refs/tags/v1.7.1
 ```
 
 برای SBOM هم گواهی صادر شده است:
@@ -251,7 +251,7 @@ gh attestation verify still-ui-linux-amd64.tar.gz -R Dv2Corn/still-ui --predicat
 ```bash
 tar -xzf still-ui-linux-amd64.tar.gz still-ui/bin/xray-linux-amd64
 sha256sum still-ui/bin/xray-linux-amd64
-git clone https://github.com/Dv2Corn/still-ui && cd still-ui && git checkout v1.7.0
+git clone https://github.com/Dv2Corn/still-ui && cd still-ui && git checkout v1.7.1
 scripts/xray-build/build.sh /tmp/xray-out amd64 arm64
 ```
 
