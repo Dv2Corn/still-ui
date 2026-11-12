@@ -30,6 +30,8 @@ func writeLogConfig(t *testing.T, accessPath string, errorPath string) {
 }
 
 func TestWipeXrayLogs_TruncatesEnabledLogs(t *testing.T) {
+	// Emptying the access log reads the connection log settings, so it needs a database.
+	dbtest.InitDB(t, filepath.Join(t.TempDir(), "x-ui.db"))
 	accessLog := filepath.Join(t.TempDir(), "access.log")
 	errorLog := filepath.Join(t.TempDir(), "error.log")
 	if err := os.WriteFile(accessLog, []byte("2026/06/23 12:00:00 from tcp:203.0.113.10:443 accepted\n"), 0o644); err != nil {
