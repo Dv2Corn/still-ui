@@ -586,6 +586,19 @@ export const SCHEMAS: Record<string, unknown> = {
       "subKeyFile": {
         "type": "string"
       },
+      "subLeakNetworks": {
+        "description": "Subscription leak alert (event sub.leak): this many client networks (IPv4 /24, IPv6 /48)\nfetching one subscription within subLeakWindowHours.",
+        "example": 6,
+        "maximum": 64,
+        "minimum": 2,
+        "type": "integer"
+      },
+      "subLeakWindowHours": {
+        "example": 24,
+        "maximum": 168,
+        "minimum": 1,
+        "type": "integer"
+      },
       "subListen": {
         "type": "string"
       },
@@ -901,6 +914,8 @@ export const SCHEMAS: Record<string, unknown> = {
       "subJsonURI",
       "subJsonUserAgentRegex",
       "subKeyFile",
+      "subLeakNetworks",
+      "subLeakWindowHours",
       "subListen",
       "subLocalDirect",
       "subLocalDirectProxy",
@@ -1555,6 +1570,19 @@ export const SCHEMAS: Record<string, unknown> = {
       "subKeyFile": {
         "type": "string"
       },
+      "subLeakNetworks": {
+        "description": "Subscription leak alert (event sub.leak): this many client networks (IPv4 /24, IPv6 /48)\nfetching one subscription within subLeakWindowHours.",
+        "example": 6,
+        "maximum": 64,
+        "minimum": 2,
+        "type": "integer"
+      },
+      "subLeakWindowHours": {
+        "example": 24,
+        "maximum": 168,
+        "minimum": 1,
+        "type": "integer"
+      },
       "subListen": {
         "type": "string"
       },
@@ -1878,6 +1906,8 @@ export const SCHEMAS: Record<string, unknown> = {
       "subJsonURI",
       "subJsonUserAgentRegex",
       "subKeyFile",
+      "subLeakNetworks",
+      "subLeakWindowHours",
       "subListen",
       "subLocalDirect",
       "subLocalDirectProxy",

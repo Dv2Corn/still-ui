@@ -115,6 +115,11 @@ type AllSetting struct {
 	AlertCertDays          int `json:"alertCertDays" form:"alertCertDays" validate:"gte=1,lte=365"`
 	AlertRemindHours       int `json:"alertRemindHours" form:"alertRemindHours" validate:"gte=0,lte=720"`
 
+	// Subscription leak alert (event sub.leak): this many client networks (IPv4 /24, IPv6 /48)
+	// fetching one subscription within subLeakWindowHours.
+	SubLeakNetworks    int `json:"subLeakNetworks" form:"subLeakNetworks" validate:"gte=2,lte=64" example:"6"`
+	SubLeakWindowHours int `json:"subLeakWindowHours" form:"subLeakWindowHours" validate:"gte=1,lte=168" example:"24"`
+
 	OutboundDownThreshold int `json:"outboundDownThreshold" form:"outboundDownThreshold" validate:"gte=1,lte=100"`
 	NodeDownThreshold     int `json:"nodeDownThreshold" form:"nodeDownThreshold" validate:"gte=1,lte=100"`
 

@@ -116,7 +116,38 @@ const GROUPS: NotificationGroupConfig[] = [
   {
     icon: <SafetyOutlined aria-hidden />,
     title: 'eventGroupSecurity',
-    events: [{ key: 'login.attempt', label: 'eventLoginAttempt', settingKey: '' }],
+    events: [
+      { key: 'login.attempt', label: 'eventLoginAttempt', settingKey: '' },
+      // One subscription fetched from this many client networks within the hours next to it.
+      {
+        key: 'sub.leak',
+        label: 'eventSubLeak',
+        settingKey: 'subLeakNetworks',
+        hint: 'eventSubLeakHint',
+        extra: ({ value, onChange, ariaLabel, settingValue, setSetting }) => (
+          <>
+            <InputNumber
+              size="small"
+              min={2}
+              max={64}
+              value={value}
+              onChange={onChange}
+              aria-label={ariaLabel}
+              style={{ width: 70 }}
+            />
+            <InputNumber
+              size="small"
+              min={1}
+              max={168}
+              value={settingValue('subLeakWindowHours')}
+              onChange={onNumber((v) => setSetting('subLeakWindowHours', v))}
+              aria-label={`${ariaLabel} (h)`}
+              style={{ width: 80 }}
+            />
+          </>
+        ),
+      },
+    ],
   },
   {
     icon: <RadarChartOutlined aria-hidden />,

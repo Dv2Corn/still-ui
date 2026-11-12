@@ -36,6 +36,10 @@ const (
 	EventCertExpiring  EventType = "cert.expiring"
 	EventBackupFailed  EventType = "backup.failed"
 
+	// EventSubLeak is one subscription fetched from more client networks than its threshold in
+	// a window (still-ui). Raised once, quiet for a week unless the count doubles; *HealthAlertData.
+	EventSubLeak EventType = "sub.leak"
+
 	// External reachability probes (reports from an agent inside a censored network)
 	EventProbeDown  EventType = "probe.down"
 	EventProbeUp    EventType = "probe.up"

@@ -10,6 +10,7 @@ import (
 	"os"
 	"reflect"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -21,6 +22,7 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/config"
 	"github.com/mhsanaei/3x-ui/v3/internal/database"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
+	"github.com/mhsanaei/3x-ui/v3/internal/eventbus"
 	"github.com/mhsanaei/3x-ui/v3/internal/logger"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/common"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/netproxy"
@@ -251,7 +253,7 @@ var defaultValueMap = map[string]string{
 	"ldapDefaultLimitIP":     "0",
 
 	// Event bus — per-subscriber event filtering (empty = all disabled)
-	"tgEnabledEvents":   "login.attempt,cpu.high," + DefaultHealthAlertEvents + ",node.traffic",
+	"tgEnabledEvents":   "login.attempt,cpu.high," + DefaultHealthAlertEvents + ",node.traffic,sub.leak",
 	"smtpEnabledEvents": "login.attempt,cpu.high",
 	"smtpCpu":           "80",
 	"smtpMemory":        "80",
@@ -307,6 +309,10 @@ var defaultValueMap = map[string]string{
 	"alertDisk":              "90",
 	"alertCertDays":          "7",
 	"alertRemindHours":       "6",
+
+	// Subscription leak alert (still-ui): networks in hours that make one subscription suspect
+	"subLeakNetworks":    "6",
+	"subLeakWindowHours": "24",
 }
 
 // DefaultHealthAlertEvents are the server health alerts a new panel sends to Telegram.
@@ -791,6 +797,32 @@ func (s *SettingService) GetHealthAlertThresholds() HealthAlertThresholds {
 		CertDays:          read("alertCertDays"),
 		RemindHours:       read("alertRemindHours"),
 	}
+}
+
+// SubLeakAlert is when one subscription counts as leaked: fetched from Networks client networks
+// within Window.
+type SubLeakAlert struct {
+	Networks int
+	Window   time.Duration
+}
+
+// GetSubLeakAlert reads the sub.leak alert; on is false while the bot or the event is off.
+func (s *SettingService) GetSubLeakAlert() (cfg SubLeakAlert, on bool) {
+	if enabled, err := s.GetTgbotEnabled(); err != nil || !enabled {
+		return cfg, false
+	}
+	events, err := s.GetTgEnabledEvents()
+	if err != nil || !slices.Contains(strings.Split(strings.ReplaceAll(events, " ", ""), ","), string(eventbus.EventSubLeak)) {
+		return cfg, false
+	}
+	read := func(key string) int {
+		if v, err := s.getInt(key); err == nil && v > 0 {
+			return v
+		}
+		v, _ := strconv.Atoi(defaultValueMap[key])
+		return v
+	}
+	return SubLeakAlert{Networks: read("subLeakNetworks"), Window: time.Duration(read("subLeakWindowHours")) * time.Hour}, true
 }
 
 func (s *SettingService) GetTgBotBackup() (bool, error) {

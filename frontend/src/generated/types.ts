@@ -181,6 +181,8 @@ export interface AllSetting {
   subJsonURI: string;
   subJsonUserAgentRegex: string;
   subKeyFile: string;
+  subLeakNetworks: number;
+  subLeakWindowHours: number;
   subListen: string;
   subLocalDirect: string;
   subLocalDirectProxy: string;
@@ -403,6 +405,8 @@ export interface AllSettingView {
   subJsonURI: string;
   subJsonUserAgentRegex: string;
   subKeyFile: string;
+  subLeakNetworks: number;
+  subLeakWindowHours: number;
   subListen: string;
   subLocalDirect: string;
   subLocalDirectProxy: string;
