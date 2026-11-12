@@ -22,8 +22,8 @@ set -euo pipefail
 XRAY_TAG=v26.10.31
 XRAY_COMMIT=a4a3dff5b20c2faae567b742c172c7b95e75c083
 REALITY_COMMIT=83f621788ca88b83179810b12baa7ae518aacb83
-GO_VERSION=go1.27.3
-GO_IMAGE=golang:1.27.3@sha256:2920bb124f1a2e12a1d39f0cab756ae0068441ee1da7655dec7f5e374944095b
+GO_VERSION=go1.27.4
+GO_IMAGE=golang:1.27.4@sha256:08bcb99a38f85a265f9a93d1d3323e2440eec333380f3ea26ee0dec9264bb41c
 # The version string `xray version` prints after the codename. It is part of the
 # binary, so changing it changes the sums below.
 XRAY_BUILD_NAME=sp-ios
@@ -31,9 +31,9 @@ LDFLAGS="-s -w -buildid= -X github.com/xtls/xray-core/core.build=${XRAY_BUILD_NA
 
 # Pinned sums of xray-linux-<arch>, read below through ${!want_var}.
 # shellcheck disable=SC2034
-SHA256_amd64=67dfd3a25b349adc128112864973a9f1c9f3f4b58a3541d4d447374b9e6301aa
+SHA256_amd64=5f6a61e29c54e744c896eba4d9dabe36d86a64ca96fde1f3a5994d9525da6690
 # shellcheck disable=SC2034
-SHA256_arm64=7c5be31d6ec2a65c8d902eebf382d050c5a84d28d12325a8c0cd3da310c6af6d
+SHA256_arm64=897d58df8382027670352ba8afea21a36da0243a5537c60e52f839843cd8490a
 
 die() { echo "xray-build: $*" >&2; exit 1; }
 

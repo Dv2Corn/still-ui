@@ -40,7 +40,7 @@ that do send X25519MLKEM768 are served exactly as before.
 | --- | --- |
 | Xray-core | tag `v26.10.31`, commit `a4a3dff5b20c2faae567b742c172c7b95e75c083` |
 | REALITY | commit `83f621788ca88b83179810b12baa7ae518aacb83` + the patch |
-| Go | 1.27.3, image `golang:1.27.3@sha256:2920bb124f1a2e12a1d39f0cab756ae0068441ee1da7655dec7f5e374944095b` |
+| Go | 1.27.4, image `golang:1.27.4@sha256:08bcb99a38f85a265f9a93d1d3323e2440eec333380f3ea26ee0dec9264bb41c` |
 | Flags | `CGO_ENABLED=0`, `-trimpath -ldflags "-s -w -buildid= -X github.com/xtls/xray-core/core.build=sp-ios"` |
 
 The `-X …core.build=sp-ios` part only sets the build name that `xray version`
@@ -58,13 +58,13 @@ Expected sha256:
 
 | File | sha256 |
 | --- | --- |
-| `xray-linux-amd64` | `67dfd3a25b349adc128112864973a9f1c9f3f4b58a3541d4d447374b9e6301aa` |
-| `xray-linux-arm64` | `7c5be31d6ec2a65c8d902eebf382d050c5a84d28d12325a8c0cd3da310c6af6d` |
+| `xray-linux-amd64` | `5f6a61e29c54e744c896eba4d9dabe36d86a64ca96fde1f3a5994d9525da6690` |
+| `xray-linux-arm64` | `897d58df8382027670352ba8afea21a36da0243a5537c60e52f839843cd8490a` |
 
 The script fails if a build gives another sum. The arm64 binary is
 cross-compiled with the same amd64 Go image, so the host does not change it.
 `xray version` prints `Xray 26.10.31 (Xray, Penetrates Everything.) sp-ios
-(go1.27.3 linux/amd64)`.
+(go1.27.4 linux/amd64)`.
 
 `scripts/still-release.sh` runs `build.sh` for every arch it packages, and the
 Dockerfile runs it in its `xray` stage (armv7, armv6 and 386 images get the same

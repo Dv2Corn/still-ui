@@ -69,7 +69,7 @@ func fakeXrayBuild(t *testing.T, version, build string) {
 	t.Helper()
 	dir := t.TempDir()
 	t.Setenv("XUI_BIN_FOLDER", dir)
-	script := "#!/bin/sh\necho \"Xray " + version + " (Xray, Penetrates Everything.) " + build + " (go1.27.3 linux/amd64)\"\n"
+	script := "#!/bin/sh\necho \"Xray " + version + " (Xray, Penetrates Everything.) " + build + " (go1.27.4 linux/amd64)\"\n"
 	if err := os.WriteFile(filepath.Join(dir, GetBinaryName()), []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}

@@ -13,7 +13,7 @@ func TestParseXrayVersionTellsStillBuildFromOfficial(t *testing.T) {
 		name, out, version string
 		still              bool
 	}{
-		{"still-ui build", "Xray 26.10.31 (Xray, Penetrates Everything.) sp-ios (go1.27.3 linux/amd64)\nA unified platform for anti-censorship.\n", "26.10.31", true},
+		{"still-ui build", "Xray 26.10.31 (Xray, Penetrates Everything.) sp-ios (go1.27.4 linux/amd64)\nA unified platform for anti-censorship.\n", "26.10.31", true},
 		{"official release", "Xray 26.10.31 (Xray, Penetrates Everything.) a4a3dff (go1.26.2 linux/amd64)\nA unified platform for anti-censorship.\n", "26.10.31", false},
 		{"custom build", "Xray 26.9.9 (Xray, Penetrates Everything.) Custom (go1.26.1 linux/amd64)\n", "26.9.9", false},
 		{"name only in a later line", "Xray 26.9.9 (Xray, Penetrates Everything.) Custom (go1.26.1 linux/amd64)\nsp-ios (x)\n", "26.9.9", false},
@@ -53,7 +53,7 @@ func TestRefreshVersionRecordsStillBuild(t *testing.T) {
 	t.Setenv("XUI_BIN_FOLDER", dir)
 	binaryPath := filepath.Join(dir, GetBinaryName())
 	write := func(build string) {
-		script := "#!/bin/sh\necho 'Xray 26.10.31 (Xray, Penetrates Everything.) " + build + " (go1.27.3 linux/amd64)'\n"
+		script := "#!/bin/sh\necho 'Xray 26.10.31 (Xray, Penetrates Everything.) " + build + " (go1.27.4 linux/amd64)'\n"
 		if err := os.WriteFile(binaryPath, []byte(script), 0o700); err != nil {
 			t.Fatalf("write xray fixture: %v", err)
 		}
