@@ -75,4 +75,18 @@ describe('i18next nesting', () => {
       "Read-only: a downstream node reached through $t(pages.nodes.subNode). Manage it from $t(pages.nodes.subNode)'s own panel.",
     );
   });
+
+  it('stays fast on long interpolated values full of unclosed nesting prefixes', async () => {
+    const utils = await import('@/utils');
+    vi.spyOn(utils.LanguageManager, 'getLanguage').mockReturnValue('en-US');
+    const { readyI18n } = await import('@/i18n/react');
+    const i18n = await readyI18n();
+    const prefixes = '$t('.repeat(40000);
+    const nulPayload = '\u0000'.repeat(40000) + 'a"b('.repeat(40000);
+
+    const started = performance.now();
+    expect(i18n.t('pages.nodes.subNodeTip', { parent: prefixes })).toContain(prefixes);
+    expect(i18n.t('pages.nodes.subNodeTip', { parent: nulPayload })).toContain(nulPayload);
+    expect(performance.now() - started).toBeLessThan(1000);
+  });
 });
