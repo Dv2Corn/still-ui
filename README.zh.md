@@ -95,7 +95,7 @@ STILL_UI_ARCHIVE=/path/still-ui-linux-amd64.tar.gz bash install.sh
 
 安装脚本会随机生成用户名、密码和面板访问路径，并在结束时显示出来，请妥善保存。之后运行 `still-ui` 即可打开管理菜单：启动和停止服务、查看或重置登录信息、修改端口、管理证书等。子命令与 3x-ui 的 `x-ui` 脚本相同：`still-ui start`、`stop`、`restart`、`status`、`log`、`update`、`legacy`、`uninstall` 等。
 
-发行版只提供 **Linux amd64 和 arm64** 的构建。当前版本：still-ui **1.7.1**（基于 3x-ui 3.11.0 及其后合并的修复），内置 still-ui 自行构建的 **Xray v26.10.31**（[有何不同](scripts/xray-build/README.md)）。
+发行版只提供 **Linux amd64 和 arm64** 的构建。当前版本：still-ui **1.8.0**（基于 3x-ui 3.11.0 及其后合并的修复），内置 still-ui 自行构建的 **Xray v26.10.31**（[有何不同](scripts/xray-build/README.md)）。
 
 ### 文件位置
 
@@ -226,10 +226,10 @@ still-ui uninstall
 | `still-probe-linux-<arch>.tar.gz`（及 `.sha256`） | 可达性检查代理程序，由 `scripts/still-probe-install.sh` 下载；与面板压缩包一样带有来源证明 |
 | `SHA256SUMS` | 压缩包、SBOM 和检查代理压缩包的校验和 |
 
-下载并核对校验和（把 `v1.7.1` 换成你要安装的版本）：
+下载并核对校验和（把 `v1.8.0` 换成你要安装的版本）：
 
 ```bash
-gh release download v1.7.1 -R Dv2Corn/still-ui -p 'still-ui-linux-amd64.tar.gz*' -p SHA256SUMS
+gh release download v1.8.0 -R Dv2Corn/still-ui -p 'still-ui-linux-amd64.tar.gz*' -p SHA256SUMS
 sha256sum -c SHA256SUMS --ignore-missing
 ```
 
@@ -237,7 +237,7 @@ sha256sum -c SHA256SUMS --ignore-missing
 
 ```bash
 gh attestation verify still-ui-linux-amd64.tar.gz -R Dv2Corn/still-ui \
-  --signer-workflow Dv2Corn/still-ui/.github/workflows/release.yml --source-ref refs/tags/v1.7.1
+  --signer-workflow Dv2Corn/still-ui/.github/workflows/release.yml --source-ref refs/tags/v1.8.0
 ```
 
 SBOM 同样附有证明：
@@ -251,7 +251,7 @@ gh attestation verify still-ui-linux-amd64.tar.gz -R Dv2Corn/still-ui --predicat
 ```bash
 tar -xzf still-ui-linux-amd64.tar.gz still-ui/bin/xray-linux-amd64
 sha256sum still-ui/bin/xray-linux-amd64
-git clone https://github.com/Dv2Corn/still-ui && cd still-ui && git checkout v1.7.1
+git clone https://github.com/Dv2Corn/still-ui && cd still-ui && git checkout v1.8.0
 scripts/xray-build/build.sh /tmp/xray-out amd64 arm64
 ```
 
