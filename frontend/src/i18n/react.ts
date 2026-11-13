@@ -1,5 +1,5 @@
 import i18next from 'i18next';
-import type { InterpolationOptions } from 'i18next';
+import type { InterpolationOptions, Interpolator } from 'i18next';
 import { initReactI18next } from 'react-i18next';
 
 import { LanguageManager } from '@/utils';
@@ -9,15 +9,24 @@ import enUS from '../../../internal/web/translation/en-US.json';
 
 const FALLBACK = 'en-US';
 
-// No locale uses $t(...) nesting, and its regex backtracks exponentially on an unclosed
-// "$t(" in untrusted text (node-reported names, remarks); no off switch, so never match.
 export const INTERPOLATION: InterpolationOptions = {
   escapeValue: false,
   prefix: '{',
   suffix: '}',
-  nestingPrefix: '',
-  nestingPrefixEscaped: '(?!)',
 };
+
+// No locale uses $t(...) nesting, i18next has no off switch, and its scan is quadratic on
+// untrusted text full of "$t(" (node names, remarks), so the nesting regexp never matches.
+function disableNesting(interpolator: Interpolator) {
+  const target = interpolator as Interpolator & { nestingRegexp: RegExp };
+  const resetRegExp = target.resetRegExp.bind(target);
+  target.resetRegExp = () => {
+    resetRegExp();
+    target.nestingRegexp = /(?!)/g;
+    return undefined;
+  };
+  target.resetRegExp();
+}
 
 const lazyModules = import.meta.glob([
   '../../../internal/web/translation/*.json',
@@ -44,6 +53,7 @@ export async function readyI18n(scope: LanguageScope = 'panel') {
     interpolation: INTERPOLATION,
     returnNull: false,
   });
+  disableNesting(i18next.services.interpolator);
   if (active !== FALLBACK) {
     const loader = lazyModules[moduleKeyFor(active)] as
       | (() => Promise<{ default: Record<string, unknown> }>)

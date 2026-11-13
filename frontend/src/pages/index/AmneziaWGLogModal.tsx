@@ -42,17 +42,18 @@ export default function AmneziaWGLogModal({ open, onClose }: AmneziaWGLogModalPr
   const peers = useMemo(() => logs.peers ?? [], [logs.peers]);
   const events = useMemo(() => logs.events ?? [], [logs.events]);
 
-  const runRefresh = useCallback(async () => {
-    try {
-      const msg = await HttpUtil.post<AmneziaWGLogs>(`/panel/api/server/amneziawglogs/${rows}`, {
-        filter,
-      });
-      if (msg?.success) setLogs(msg.obj || {});
-      await PromiseUtil.sleep(300);
-    } finally {
-      setLoading(false);
-    }
-  }, [rows, filter]);
+  // State is set only in promise callbacks, so the fetch effect starts the
+  // request without a synchronous setState.
+  const runRefresh = useCallback(
+    () =>
+      HttpUtil.post<AmneziaWGLogs>(`/panel/api/server/amneziawglogs/${rows}`, { filter })
+        .then((msg) => {
+          if (msg?.success) setLogs(msg.obj || {});
+          return PromiseUtil.sleep(300);
+        })
+        .finally(() => setLoading(false)),
+    [rows, filter],
+  );
 
   const refresh = useCallback(() => {
     setLoading(true);
