@@ -122,7 +122,7 @@ func (t *Tgbot) backupFailureText(err error) string {
 	return t.I18nBot("tgbot.messages.backupFailed")
 }
 
-// deliverBackup, the only caller of sendDocumentWithCaption (TestBackupBytesLeaveOnlyThroughDeliverBackup),
+// deliverBackup, the only caller of sendBackupFile (TestBackupBytesLeaveOnlyThroughDeliverBackup),
 // posts a backup that passes CheckChatBackup to an admin chat; it reports whether the database landed.
 func (t *Tgbot) deliverBackup(chatID int64, b *service.ChatBackup, caption string) bool {
 	if !checkAdmin(chatID) {
@@ -135,13 +135,13 @@ func (t *Tgbot) deliverBackup(chatID int64, b *service.ChatBackup, caption strin
 	}
 	for i, f := range b.Files {
 		if i == 0 {
-			if !t.sendDocumentWithCaption(chatID, f.Data, f.Name, caption) {
+			if !t.sendBackupFile(chatID, f.Data, f.Name, caption) {
 				return false
 			}
 			continue
 		}
 		time.Sleep(backupFileGap)
-		t.sendDocumentWithCaption(chatID, f.Data, f.Name, "")
+		t.sendBackupFile(chatID, f.Data, f.Name, "")
 	}
 	return true
 }

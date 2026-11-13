@@ -147,14 +147,18 @@ export default function SecurityTab({ allSetting, updateSetting, saveSetting }: 
     }
   }
 
-  const fetchApiTokens = useCallback(async () => {
-    try {
-      const msg = (await HttpUtil.get('/panel/api/setting/apiTokens')) as ApiMsg<ApiTokenRow[]>;
-      if (msg?.success) setApiTokens(Array.isArray(msg.obj) ? msg.obj : []);
-    } finally {
-      setApiTokensLoading(false);
-    }
-  }, []);
+  // State is set only in promise callbacks, so the mount effect below starts the
+  // request without a synchronous setState.
+  const fetchApiTokens = useCallback(
+    () =>
+      HttpUtil.get('/panel/api/setting/apiTokens')
+        .then((res) => {
+          const msg = res as ApiMsg<ApiTokenRow[]>;
+          if (msg?.success) setApiTokens(Array.isArray(msg.obj) ? msg.obj : []);
+        })
+        .finally(() => setApiTokensLoading(false)),
+    [],
+  );
 
   const loadApiTokens = useCallback(async () => {
     setApiTokensLoading(true);

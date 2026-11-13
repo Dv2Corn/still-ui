@@ -564,6 +564,7 @@ func (a *SUBController) subs(c *gin.Context) {
 	subReq := a.subService.ForRequest(host)
 	subReq.subscriptionBody = true
 	subReq.deviceNotice = c.GetString(deviceNoticeKey)
+	subReq.omitServerDescription = !IsHappClient(userAgent) && !IsIncyClient(userAgent)
 	subs, _, _, traffic, err := subReq.getSubs(subId)
 	if err != nil || subs == nil {
 		writeSubError(c, err)

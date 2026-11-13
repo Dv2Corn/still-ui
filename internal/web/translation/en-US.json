@@ -158,6 +158,11 @@
       "xrayStatus": "Xray",
       "stopXray": "Stop",
       "restartXray": "Restart",
+      "startXray": "Start",
+      "stopXrayDisabledHint": "Xray is not running",
+      "stopXrayConfirmTitle": "Stop Xray?",
+      "stopXrayConfirmContent": "Stopping Xray will immediately interrupt all proxy connections. Are you sure you want to continue?",
+      "stopXrayConfirmOk": "Stop Xray",
       "xraySwitch": "Version",
       "xrayUpdates": "Xray Updates",
       "xraySwitchClickDesk": "Choose carefully, as older versions may not be compatible with current configurations.",
@@ -1379,7 +1384,7 @@
       "tlsPin": "Pin certificate (SHA-256)",
       "tlsSkip": "Skip verification",
       "tlsMtls": "Mutual TLS (client certificate)",
-      "mtlsFormHint": "This node authenticates the panel with a client certificate. Copy this panel's CA from the Node mTLS section onto the node, set its Trusted parent CA, then restart it.",
+      "mtlsFormHint": "This node authenticates the panel with a client certificate. Copy this panel's CA from the Node mTLS section onto the node, set its Trusted parent CA, then restart it. Updating this node's panel from here still needs an API token with the node-admin scope.",
       "mtls": {
         "title": "Node mTLS",
         "intro": "Mutual TLS adds a client-certificate factor on top of the API token for node-to-node calls. It is opt-in: leave it empty to keep token-only auth.",
@@ -1667,6 +1672,7 @@
         "applyTo": "Apply to",
         "addNoise": "+ Noise",
         "concurrency": "Concurrency",
+        "concurrencyHint": "Streams per connection. xray-core 26.11.9 and newer raise any value from 0 to 128 to 128; older cores use the number as written (0 means 8). -1 turns TCP mux off.",
         "xudpConcurrency": "xudp concurrency",
         "xudpUdp443": "xudp UDP 443"
       },

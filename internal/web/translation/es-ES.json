@@ -158,6 +158,11 @@
       "xrayStatus": "Xray",
       "stopXray": "Detener",
       "restartXray": "Reiniciar",
+      "startXray": "Iniciar",
+      "stopXrayDisabledHint": "Xray no se está ejecutando",
+      "stopXrayConfirmTitle": "¿Detener Xray?",
+      "stopXrayConfirmContent": "Detener Xray interrumpirá de inmediato todas las conexiones proxy. ¿Seguro que quieres continuar?",
+      "stopXrayConfirmOk": "Detener Xray",
       "xraySwitch": "Versión",
       "xrayUpdates": "Actualizaciones de Xray",
       "xraySwitchClickDesk": "Elige sabiamente, ya que las versiones anteriores pueden no ser compatibles con las configuraciones actuales.",
@@ -1258,7 +1263,7 @@
       "tlsPin": "Fijar certificado (SHA-256)",
       "tlsSkip": "Omitir verificación",
       "tlsMtls": "TLS mutuo (certificado de cliente)",
-      "mtlsFormHint": "Este nodo autentica al panel con un certificado de cliente. Copia el CA de este panel desde la sección mTLS del nodo al nodo, configura su CA de confianza y luego reinícialo.",
+      "mtlsFormHint": "Este nodo autentica al panel con un certificado de cliente. Copia el CA de este panel desde la sección mTLS del nodo al nodo, configura su CA de confianza y luego reinícialo. Actualizar el panel de este nodo desde aquí sigue requiriendo un token de API con el alcance node-admin.",
       "mtls": {
         "title": "mTLS del nodo",
         "intro": "TLS mutuo añade un factor de certificado de cliente además del token de API para las llamadas entre nodos. Es opcional: déjalo vacío para mantener solo la autenticación por token.",
@@ -1542,6 +1547,7 @@
         "applyTo": "Aplicar a",
         "addNoise": "+ Ruido",
         "concurrency": "Concurrencia",
+        "concurrencyHint": "Flujos por conexión. xray-core 26.11.9 y posteriores elevan a 128 cualquier valor entre 0 y 128; los núcleos anteriores usan el número tal cual (0 significa 8). -1 desactiva el mux TCP.",
         "xudpConcurrency": "Concurrencia xudp",
         "xudpUdp443": "xudp UDP 443"
       },
