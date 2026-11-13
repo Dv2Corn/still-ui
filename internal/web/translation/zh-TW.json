@@ -819,10 +819,12 @@
         "presetHelp": "適用於俄羅斯行動網路（有 DPI 與白名單模式）用戶端的參數。VLESS REALITY 使用 ios 指紋：其 ClientHello（約 517 位元組）可放入一個 TCP 分段，較大的在部分網路中第二個分段會被丟棄。still-ui 的 Xray 接受 ios；官方 Xray 26.9.9 及更新版本會拒絕。Hysteria2 走 UDP，在 TCP 被切斷時往往仍可使用。",
         "presetOptions": {
           "ruMobileReality": "行動網路（俄羅斯）：VLESS REALITY",
+          "ruMobileXhttp": "行動網路（俄羅斯）：VLESS XHTTP REALITY",
           "ruMobileHysteria": "行動網路（俄羅斯）：Hysteria2（UDP）"
         },
         "presetHints": {
           "ruMobileReality": "請在下方選擇目標：「尋找目標」會從本伺服器檢測候選網站。優先選擇在用戶所在國家熱門且未被封鎖的網站，而非某個知名的境外網站。為用戶端設定 xtls-rprx-vision 流控。",
+          "ruMobileXhttp": "請在下方選擇目標：「尋找目標」會從本伺服器檢測候選網站。用戶端的流控請留空：XTLS Vision 無法在 XHTTP 上使用。用戶端需要支援 XHTTP：基於 Xray-core 的應用程式，或 mihomo 1.19.22 及更新版本。一次下載仍是同一個 TCP 連線上的一個 HTTP 回應，因此單靠 XHTTP 無法繞過前 12–16 KB 後的切斷。",
           "ruMobileHysteria": "請在下方設定憑證。在白名單模式下，TCP 在前 12–16 KB 後被切斷時，UDP 443 往往仍可用。為相容更多用戶端，混淆已關閉。"
         }
       },

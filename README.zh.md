@@ -66,6 +66,7 @@ still-ui migrate-rollback
 - **逐项显示检查结果的 REALITY 目标选择器。** REALITY 入站中的 **查找目标** 从你的服务器测试每个候选，并标出哪些通过：可达、TLS 1.3、X25519（以及是否同时接受 X25519MLKEM768）、HTTP/2、对该域名受信任的证书、证书剩余超过 14 天、延迟。候选来源：一份可编辑的短列表、你输入的任何内容，以及在勾选后服务器自身 /24 网段中的其他地址。**使用** 会填入目标和 SNI。面板中的任何列表都不是推荐：伪装成哪个网站由你决定。
 - **由面板自行配置的 Hysteria2 端口跳跃。** 在 3x-ui 中，跳跃端口范围只是告知客户端，服务器上的重定向要自己写。**UDP Hop → 在本服务器上重定向** 会加载一条 nftables 规则，把该范围转到入站端口，重启后自动恢复，并随入站一起移除。在无法生效的环境（没有 `nft`、容器没有 `NET_ADMIN`）面板会拒绝该选项，而不是把无法连通的端口发给客户端。默认关闭。
 - **AmneziaWG：首包伪装成 QUIC 或 DNS，一键设置 MTU 1280。** 两个按钮生成形似 QUIC Initial 或 DNS 查询的 `I1` 签名包；随机部分每次握手都不同。每个预设都在测试中由真实的 amneziawg-go 客户端和服务器完成握手。按钮只修改 `I1`–`I5`，已有客户端可继续使用。MTU 旁的 **设为 1280**：在俄罗斯移动网络上实测，AmneziaWG 在 1280 时比默认值快 4–5 倍。
+- **基于 XHTTP 与 REALITY 的 VLESS 预设。** **添加入站 → 预设 → 移动网络（俄罗斯）：VLESS XHTTP REALITY** 会填好 TCP 443 上使用 XHTTP 传输和 REALITY 的 VLESS：新的密钥对和 short ID、`ios` 指纹、随机路径、`auto` 模式以及 100–1000 字节的填充；与另一个 REALITY 预设一样，在 **安全** 标签页选择目标。客户端不设流控：XTLS Vision 不能在 XHTTP 上使用。分享链接、JSON 订阅和 Clash/Mihomo 配置都带上了传输设置；在测试中，使用其中每一种的 Xray 客户端以及 mihomo 1.19.22 和 1.19.33 都能通过 still-ui 的 Xray 取回页面。XHTTP 不会拆分下载：50 MB 以一个 HTTP 响应经一个 TCP 连接传输，因此无法绕过连接在最初几 KB 后被切断的情况。
 
 ### 进行中
 
@@ -212,7 +213,7 @@ still-ui uninstall
 
 ## 移动网络
 
-**添加入站** → **预设** 中有两个面向移动网络的预设：TCP 443 上使用 `ios` 指纹的 VLESS REALITY，以及 UDP 443 上的 Hysteria2。**Xray 配置 → 路由 → 基本路由 → 阻止客户端使用种子下载** 选项（默认关闭）会在 Xray 中阻止客户端的 BitTorrent 流量，在装有 nftables 的 Linux 上还会在服务器本身进行阻止。REALITY 入站中的 **查找目标** 从服务器本身检查候选，并显示每项检查的结果。Hysteria 入站中的 **UDP Hop → 在本服务器上重定向**（默认关闭）用 nftables 把跳跃端口范围重定向到入站端口。AmneziaWG 入站中有 **类 QUIC 的 I1**、**类 DNS 的 I1** 按钮和 MTU 1280 快捷按钮。完整说明（英文）：[Mobile networks in Russia](README.md#mobile-networks-in-russia)。
+**添加入站** → **预设** 中有三个面向移动网络的预设：TCP 443 上使用 `ios` 指纹的 VLESS REALITY，同样配置但使用 XHTTP 传输的版本（不会拆分单个下载），以及 UDP 443 上的 Hysteria2。**Xray 配置 → 路由 → 基本路由 → 阻止客户端使用种子下载** 选项（默认关闭）会在 Xray 中阻止客户端的 BitTorrent 流量，在装有 nftables 的 Linux 上还会在服务器本身进行阻止。REALITY 入站中的 **查找目标** 从服务器本身检查候选，并显示每项检查的结果。Hysteria 入站中的 **UDP Hop → 在本服务器上重定向**（默认关闭）用 nftables 把跳跃端口范围重定向到入站端口。AmneziaWG 入站中有 **类 QUIC 的 I1**、**类 DNS 的 I1** 按钮和 MTU 1280 快捷按钮。完整说明（英文）：[Mobile networks in Russia](README.md#mobile-networks-in-russia)。
 
 ## 验证发行版
 

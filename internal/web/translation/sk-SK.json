@@ -820,10 +820,12 @@
         "presetHelp": "Hodnoty pre klientov v ruských mobilných sieťach s DPI a režimom bieleho zoznamu. VLESS REALITY používa odtlačok ios: jeho ClientHello (asi 517 bajtov) sa zmestí do jedného segmentu TCP, kým väčším v niektorých sieťach stratí druhý segment. Xray v still-ui ios prijíma; oficiálny Xray 26.9.9 a novší ho odmieta. Hysteria2 beží cez UDP, ktoré často funguje aj vtedy, keď sa TCP preruší.",
         "presetOptions": {
           "ruMobileReality": "Mobilné siete (Rusko): VLESS REALITY",
+          "ruMobileXhttp": "Mobilné siete (Rusko): VLESS XHTTP REALITY",
           "ruMobileHysteria": "Mobilné siete (Rusko): Hysteria2 (UDP)"
         },
         "presetHints": {
           "ruMobileReality": "Nižšie vyberte cieľ: Nájsť ciele overí kandidátske stránky z tohto servera. Namiesto jednej známej zahraničnej stránky uprednostnite stránku populárnu a neblokovanú v krajine vašich klientov. Klientom nastavte flow xtls-rprx-vision.",
+          "ruMobileXhttp": "Nižšie vyberte cieľ: Nájsť ciele overí kandidátske stránky z tohto servera. Flow klientov nechajte prázdny: XTLS Vision cez XHTTP nefunguje. Klient potrebuje podporu XHTTP: aplikácie na Xray-core alebo mihomo 1.19.22 a novší. Jedno sťahovanie stále ide ako jedna odpoveď HTTP cez jedno spojenie TCP, takže samotný XHTTP neobíde prerušenie po prvých 12–16 KB.",
           "ruMobileHysteria": "Nižšie nastavte certifikát. UDP 443 často funguje v režime bieleho zoznamu, keď sa TCP preruší po prvých 12–16 KB. Zahmlievanie je vypnuté pre čo najširšiu podporu klientov."
         }
       },

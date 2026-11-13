@@ -819,10 +819,12 @@
         "presetHelp": "Nilai untuk klien di jaringan seluler Rusia dengan DPI dan mode daftar putih. VLESS REALITY memakai sidik jari ios: ClientHello-nya (sekitar 517 byte) muat dalam satu segmen TCP, sedangkan yang lebih besar kehilangan segmen keduanya di beberapa jaringan. Xray milik still-ui menerima ios; Xray resmi 26.9.9 dan yang lebih baru menolaknya. Hysteria2 berjalan di atas UDP, yang sering tetap berfungsi saat TCP diputus.",
         "presetOptions": {
           "ruMobileReality": "Jaringan seluler (Rusia): VLESS REALITY",
+          "ruMobileXhttp": "Jaringan seluler (Rusia): VLESS XHTTP REALITY",
           "ruMobileHysteria": "Jaringan seluler (Rusia): Hysteria2 (UDP)"
         },
         "presetHints": {
           "ruMobileReality": "Pilih target di bawah: Cari Target memeriksa situs kandidat dari server ini. Utamakan situs yang populer dan tidak diblokir di negara klien Anda, bukan satu situs asing terkenal. Beri klien flow xtls-rprx-vision.",
+          "ruMobileXhttp": "Pilih target di bawah: Cari Target memeriksa situs kandidat dari server ini. Biarkan flow klien kosong: XTLS Vision tidak berfungsi di atas XHTTP. Klien perlu dukungan XHTTP: aplikasi berbasis Xray-core atau mihomo 1.19.22 dan yang lebih baru. Satu unduhan tetap berjalan sebagai satu respons HTTP lewat satu koneksi TCP, jadi XHTTP saja tidak melewati pemutusan setelah 12–16 KB pertama.",
           "ruMobileHysteria": "Atur sertifikat di bawah. UDP 443 sering tetap berfungsi dalam mode daftar putih, saat TCP diputus setelah 12–16 KB pertama. Obfuskasi dimatikan agar didukung lebih banyak klien."
         }
       },
