@@ -77,15 +77,15 @@ func onlyFrom(t *testing.T, sites map[string][]string, callee string, allowed ..
 // STILL-BKP-1: a new path posting the database or Xray config past PrepareChatBackup/CheckChatBackup
 // fails here; the raw upload is reachable only through deliverBackup, and no bot reads them itself.
 func TestBackupBytesLeaveOnlyThroughDeliverBackup(t *testing.T) {
-	tg := callSites(t, ".", "sendDocumentWithCaption", "SendDocument", "GetDb", "GetConfigPath", "FileFromBytes")
-	onlyFrom(t, tg, "sendDocumentWithCaption", "deliverBackup")
+	tg := callSites(t, ".", "sendBackupFile", "SendDocument", "GetDb", "GetConfigPath", "FileFromBytes")
+	onlyFrom(t, tg, "sendBackupFile", "deliverBackup")
 	// The ban log is the one other file the bot uploads; it never carries the DB.
-	onlyFrom(t, tg, "SendDocument", "sendDocumentWithCaption", "sendBanLogsFile")
+	onlyFrom(t, tg, "SendDocument", "sendBackupFile", "sendBanLogsFile")
 	// Bytes uploads: the backup (through deliverBackup), the QR sheet and the screen artwork.
-	onlyFrom(t, tg, "FileFromBytes", "sendDocumentWithCaption", "qrSheetPicture", "artUpload")
+	onlyFrom(t, tg, "FileFromBytes", "sendBackupFile", "qrSheetPicture", "artUpload")
 	onlyFrom(t, tg, "GetDb")
 	onlyFrom(t, tg, "GetConfigPath")
-	if len(tg["sendDocumentWithCaption"]) == 0 || len(tg["SendDocument"]) == 0 {
+	if len(tg["sendBackupFile"]) == 0 || len(tg["SendDocument"]) == 0 {
 		t.Fatal("the guard found no upload calls at all: it no longer looks at the right code")
 	}
 
