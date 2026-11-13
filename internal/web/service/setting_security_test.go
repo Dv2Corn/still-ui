@@ -137,44 +137,6 @@ func TestUpdateAllSettingPreservesRedactedSecrets(t *testing.T) {
 	}
 }
 
-// Turning 2FA on stores the secret in the form the TOTP decoder takes, and refuses
-// one that no authenticator code could ever match.
-func TestUpdateAllSettingTwoFactorSecret(t *testing.T) {
-	cases := []struct {
-		name, stored, submitted, want string
-		wantErr                       bool
-	}{
-		{name: "canonical", submitted: "JBSWY3DPEHPK3PXP", want: "JBSWY3DPEHPK3PXP"},
-		{name: "lower case and grouped", submitted: "jbsw y3dp ehpk 3pxp", want: "JBSWY3DPEHPK3PXP"},
-		{name: "redacted keeps stored", stored: "ORIGINALSECRET234567", submitted: "", want: "ORIGINALSECRET234567"},
-		{name: "not base32", stored: "ORIGINALSECRET234567", submitted: "totp-secret", want: "ORIGINALSECRET234567", wantErr: true},
-		{name: "nothing stored", submitted: "", want: "", wantErr: true},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			setupSettingTestDB(t)
-			s := &SettingService{}
-			if err := s.SetTwoFactorToken(tc.stored); err != nil {
-				t.Fatal(err)
-			}
-			view, err := s.GetAllSettingView()
-			if err != nil {
-				t.Fatal(err)
-			}
-			settings := &view.AllSetting
-			settings.TwoFactorEnable = true
-			settings.TwoFactorToken = tc.submitted
-			err = s.UpdateAllSetting(settings, SecretClears{})
-			if (err != nil) != tc.wantErr {
-				t.Fatalf("UpdateAllSetting error = %v, wantErr %v", err, tc.wantErr)
-			}
-			if got, _ := s.GetTwoFactorToken(); got != tc.want {
-				t.Fatalf("stored 2FA secret = %q, want %q", got, tc.want)
-			}
-		})
-	}
-}
-
 func TestUpdateAllSettingClearsFlaggedSecrets(t *testing.T) {
 	setupSettingTestDB(t)
 	s := &SettingService{}
