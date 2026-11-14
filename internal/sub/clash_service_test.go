@@ -1542,8 +1542,7 @@ func TestGetProxies_CustomIPv6ShareAddrIsUnbracketed(t *testing.T) {
 }
 
 // TestBuildAmneziaWGProxyForClashClientMTU pins the Clash mtu to the same
-// amneziawg.ClientMTU the vpn:// .conf and both TS builders use. Omitting the
-// key leaves mihomo on its own 1408 default.
+// amneziawg.ClientMTU the vpn:// .conf and both TS builders use.
 func TestBuildAmneziaWGProxyForClashClientMTU(t *testing.T) {
 	serverPriv, serverPub, err := wgutil.GenerateWireguardKeypair()
 	if err != nil {

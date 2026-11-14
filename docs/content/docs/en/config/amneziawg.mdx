@@ -41,8 +41,9 @@ tunnels often have less, and large packets are then fragmented or dropped.
 1280 is the IPv6 minimum MTU, so it fits almost any path. In our test from a
 Russian home ISP to a server in Sweden, a 767 KB download took 24–29 s with the
 client default and 2.6–8.4 s with 1280. The server interface keeps 1420 minus
-S4: the client's smaller MTU also lowers its TCP MSS, so traffic sent back to
-the client already fits.
+S4. For TCP that is enough: the client's smaller MTU also lowers its TCP MSS,
+so data sent back to it fits. UDP sent to the client (QUIC, games) still uses
+the server's MTU; set the inbound's MTU to 1280 if that traffic suffers too.
 
 ### Obfuscation (AmneziaWG 3.1)
 

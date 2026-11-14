@@ -279,9 +279,8 @@ func TestAmneziaWGConfigTextRejectsLineBreakInAnyValue(t *testing.T) {
 	}
 }
 
-// A config with no MTU line leaves the client at its own ~1420 default, which is
-// several times slower on paths below a 1500-byte MTU; blank MTU gives 1280,
-// whatever the server interface derives from S4.
+// Blank MTU gives clients 1280 whatever the server derives from S4; an explicit
+// MTU goes to both ends.
 func TestAmneziaWGConfigTextAlwaysCarriesTheClientMTU(t *testing.T) {
 	t.Parallel()
 

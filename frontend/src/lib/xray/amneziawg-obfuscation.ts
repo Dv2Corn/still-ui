@@ -40,9 +40,8 @@ export type AwgObfuscation = Pick<
 
 const randInt = (min: number, max: number) => min + Math.floor(Math.random() * (max - min + 1));
 
-// MTU written into issued client configs when the inbound's MTU is blank: paths
-// below a 1500-byte MTU (mobile, PPPoE, tunnels) are several times faster at 1280.
-// The server interface keeps its own 1420-S4 default. Mirrors Go's ClientMTU.
+// Client-config MTU when the inbound's MTU is blank; the server keeps 1420-S4.
+// Mirrors Go's ClientMTU.
 export const CLIENT_DEFAULT_MTU = 1280;
 
 export function clientMtu(configuredMtu: number | undefined): number {

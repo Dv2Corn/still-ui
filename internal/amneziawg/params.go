@@ -58,12 +58,8 @@ func EffectiveMTU(configuredMTU, s4 int) int {
 	return max(DefaultMTU-max(s4, 0), 1280)
 }
 
-// ClientDefaultMTU is the MTU written into issued client configs when the
-// admin left MTU blank. Paths with a smaller MTU than 1500 (mobile, PPPoE,
-// other tunnels) drop or fragment full-size packets; measured from a Russian
-// home ISP, a 767 KB download took 24-29 s at the client's own default and
-// 2.6-8.4 s at 1280. The server interface keeps EffectiveMTU: the client's
-// smaller MTU (and so its TCP MSS) already caps what the server sends back.
+// ClientDefaultMTU goes into issued client configs when MTU is blank: paths below
+// 1500 (mobile, PPPoE, tunnels) were several times faster at 1280 than at ~1420.
 const ClientDefaultMTU = 1280
 
 // ClientMTU is the MTU for issued client configs: the admin's value when set
