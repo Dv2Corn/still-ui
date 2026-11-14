@@ -49,3 +49,33 @@ func TestPushedRelayTargetNameOnThisNodesOwnPortIsRefused(t *testing.T) {
 		t.Errorf("public REALITY target refused: %v", err)
 	}
 }
+
+// A local fallback dest passes only as the address an enabled inbound here listens on: a
+// row on the same port (a disabled decoy the master pushed itself) must not open any host.
+func TestPushedFallbackDestMustBeAnEnabledLocalInboundsAddress(t *testing.T) {
+	push := pushGuardTestService(t)
+	if _, _, err := push.AddInbound(&model.Inbound{Enable: false, Port: 45432, Protocol: model.VLESS, Settings: `{"clients":[]}`}); err != nil {
+		t.Fatalf("push a disabled decoy: %v", err)
+	}
+	seedInboundConflict(t, "wildcard", "", 45433, model.VLESS, `{"network":"tcp"}`, `{"clients":[]}`)
+	seedInboundConflict(t, "private", "10.0.0.5", 45434, model.VLESS, `{"network":"tcp"}`, `{"clients":[]}`)
+	seedInboundConflict(t, "socket", "/dev/shm/in.sock,0666", 0, model.VLESS, `{"network":"tcp"}`, `{"clients":[]}`)
+
+	port := 44440
+	fallback := func(dest string) error {
+		port++
+		_, _, err := push.AddInbound(&model.Inbound{Enable: true, Port: port, Protocol: model.VLESS,
+			Settings: `{"clients":[],"fallbacks":[{"dest":` + dest + `}]}`, StreamSettings: `{"network":"tcp"}`})
+		return err
+	}
+	for _, dest := range []string{`"169.254.169.254:45432"`, `"127.0.0.1:45432"`, `45432`, `"10.0.0.5:45433"`, `"127.0.0.1:45434"`, `"192.168.1.1:45434"`} {
+		if err := fallback(dest); err == nil || !strings.Contains(err.Error(), "may not set fallback dest") {
+			t.Errorf("fallback dest %s = %v, want refused by the push guard", dest, err)
+		}
+	}
+	for _, dest := range []string{`45433`, `"127.0.0.1:45433"`, `"10.0.0.5:45434"`, `"/dev/shm/in.sock"`} {
+		if err := fallback(dest); err != nil {
+			t.Errorf("fallback dest %s refused: %v", dest, err)
+		}
+	}
+}

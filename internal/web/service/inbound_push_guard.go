@@ -213,26 +213,24 @@ func nodeOwnPorts() []string {
 	return ports
 }
 
-// normalizeRelayTarget reduces a fallback dest to the form localRelayTargets lists.
+// normalizeRelayTarget reduces a fallback dest to the form localRelayTargets lists: a bare
+// port, a socket path, or host:port rejoined so every spelling of an address meets.
 func normalizeRelayTarget(target string) string {
 	target = strings.TrimSpace(target)
 	if strings.HasPrefix(target, "/") || strings.HasPrefix(target, "@") {
 		return target
 	}
-	if _, err := strconv.Atoi(target); err == nil {
-		return target
-	}
-	if _, port, err := net.SplitHostPort(target); err == nil {
-		return port
+	if host, port, err := net.SplitHostPort(target); err == nil {
+		return net.JoinHostPort(host, port)
 	}
 	return target
 }
 
-// localRelayTargets lists what this node's other inbounds listen on, the only local
-// fallback dests a master generates; the core's own listeners are never among them.
+// localRelayTargets lists the addresses this node's other enabled inbounds listen on, the
+// only local fallback dests a master generates; the core's own listeners are never among them.
 func localRelayTargets(selfID int) ([]string, error) {
 	var rows []model.Inbound
-	if err := database.GetDB().Select("id", "listen", "port").Where("node_id IS NULL AND id <> ?", selfID).Find(&rows).Error; err != nil {
+	if err := database.GetDB().Select("id", "listen", "port").Where("node_id IS NULL AND enable = ? AND id <> ?", true, selfID).Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	reserved := map[string]bool{strconv.Itoa(reservedAPIPort()): true}
@@ -241,13 +239,22 @@ func localRelayTargets(selfID int) ([]string, error) {
 	}
 	var targets []string
 	for _, ib := range rows {
+		listen := strings.TrimSpace(ib.Listen)
+		if strings.HasPrefix(listen, "/") || strings.HasPrefix(listen, "@") {
+			targets = append(targets, strings.SplitN(listen, ",", 2)[0])
+			continue
+		}
 		port := strconv.Itoa(ib.Port)
 		if reserved[port] {
 			continue
 		}
-		targets = append(targets, port)
-		if listen := strings.TrimSpace(ib.Listen); strings.HasPrefix(listen, "/") || strings.HasPrefix(listen, "@") {
-			targets = append(targets, strings.SplitN(listen, ",", 2)[0])
+		// The core dials a bare port on localhost; BuildFallbacksJSON derives 127.0.0.1 for a wildcard.
+		ip := net.ParseIP(listen)
+		if listen == "" || ip.IsUnspecified() || ip.IsLoopback() {
+			targets = append(targets, port, net.JoinHostPort("127.0.0.1", port))
+		}
+		if listen != "" && !ip.IsUnspecified() {
+			targets = append(targets, net.JoinHostPort(listen, port))
 		}
 	}
 	return targets, nil
