@@ -2589,7 +2589,7 @@
         "presetQuic": "I1 ako QUIC",
         "presetDns": "I1 ako DNS",
         "presetHint": "Vygenerovať znova nahradí všetky parametre novými náhodnými hodnotami, takže existujúci klienti musia znova importovať konfiguráciu. Tlačidlá I1 menia iba podpisové pakety (I1 sa nastaví, I2–I5 sa vymažú): paket odoslaný pred každým handshakom vyzerá ako začiatok spojenia QUIC alebo ako dopyt DNS. Existujúci klienti fungujú ďalej a nový paket dostanú s ďalšou konfiguráciou.",
-        "mtuMobileHint": "Zapíše sa do každej klientskej konfigurácie, ktorú panel vytvorí. V mobilných sieťach, ktoré zahadzujú veľké pakety, môže byť 1280 niekoľkonásobne rýchlejšie než predvolená hodnota.",
+        "mtuMobileHint": "Prázdne: server ostáva na 1420 mínus S4 a klientske konfigurácie dostanú 1280, čo je na cestách zahadzujúcich veľké pakety (mobilné siete, PPPoE, iné tunely) niekoľkonásobne rýchlejšie. Hodnota zadaná tu platí pre server aj pre každú klientsku konfiguráciu.",
         "mtuMobile": "Nastaviť {mtu}",
         "jc": "Jc (počet šumových paketov)",
         "jmin": "Jmin (najmenšia veľkosť šumového paketu)",

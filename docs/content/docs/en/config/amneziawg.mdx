@@ -28,9 +28,21 @@ fingerprint gets through.
 | Field                    | What it is                                                              |
 | ------------------------ | ------------------------------------------------------------------------ |
 | **Subnet**                | The tunnel's IPv4 subnet (e.g. `10.8.1.0/24`); each client gets an address from it. |
-| **MTU**                   | Interface MTU, also written into every client config the panel generates. Leave at the default unless you have a reason to change it; on mobile networks that drop large packets, **Set 1280** can be several times faster. |
+| **MTU**                   | Leave blank: the server interface uses 1420 minus S4, and every client config the panel issues (`.conf`, QR, `vpn://`, Clash) gets `MTU = 1280`. A value set here goes to both the server and the client configs. See [Client MTU](#client-mtu). |
 | **DNS (primary/secondary)** | Seeded into downloadable client configs; the server's own interface doesn't need one. |
 | **External interface**    | The host NIC a peer's IPv6 address gets aliased onto when IPv6 is enabled (see below). Leave blank to auto-detect. |
+
+### Client MTU
+
+Issued client configs carry `MTU = 1280` unless the inbound sets its own MTU.
+Without an MTU line a client uses its own default of about 1420, which only
+fits a path with a full 1500-byte MTU. Mobile networks, PPPoE and other
+tunnels often have less, and large packets are then fragmented or dropped.
+1280 is the IPv6 minimum MTU, so it fits almost any path. In our test from a
+Russian home ISP to a server in Sweden, a 767 KB download took 24–29 s with the
+client default and 2.6–8.4 s with 1280. The server interface keeps 1420 minus
+S4: the client's smaller MTU also lowers its TCP MSS, so traffic sent back to
+the client already fits.
 
 ### Obfuscation (AmneziaWG 3.1)
 

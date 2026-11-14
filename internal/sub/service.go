@@ -1220,8 +1220,8 @@ func amneziaWGConfigText(server *amneziawg.ServerSettings, client *model.Client,
 		lines = append(lines, "DNS = "+strings.Join(dns, ", "))
 	}
 	// Always emitted: a missing MTU line leaves the client on its own 1420
-	// default and fragments the client-to-server direction once S4 passes 20.
-	lines = append(lines, fmt.Sprintf("MTU = %d", amneziawg.EffectiveMTU(server.MTU, server.S4)))
+	// default, which is slow on paths below a 1500-byte MTU (see ClientMTU).
+	lines = append(lines, fmt.Sprintf("MTU = %d", amneziawg.ClientMTU(server.MTU)))
 
 	lines = append(lines,
 		fmt.Sprintf("Jc = %d", server.Jc),

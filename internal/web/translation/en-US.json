@@ -2589,7 +2589,7 @@
         "presetQuic": "QUIC-like I1",
         "presetDns": "DNS-like I1",
         "presetHint": "Regenerate replaces every parameter with new random values, so existing clients must import their config again. The I1 buttons change only the signature packets (I1 is set, I2–I5 are cleared): the packet sent before each handshake then looks like the start of a QUIC connection or like a DNS query. Existing clients keep working and get the new packet with their next config.",
-        "mtuMobileHint": "Goes into every client config the panel generates. On mobile networks that drop large packets, 1280 can be several times faster than the default.",
+        "mtuMobileHint": "Blank: the server keeps 1420 minus S4 and client configs get 1280, which is several times faster on paths that drop large packets (mobile, PPPoE, other tunnels). A value set here goes to the server and to every client config.",
         "mtuMobile": "Set {mtu}",
         "jc": "Jc (junk packet count)",
         "jmin": "Jmin (junk packet min size)",

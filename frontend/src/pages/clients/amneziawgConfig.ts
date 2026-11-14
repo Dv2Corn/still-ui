@@ -1,7 +1,7 @@
 import type { HostEndpoint } from '@/lib/hosts/host-link';
 import { formatInboundLabel } from '@/lib/inbounds/label';
 import { preferPublicHost, resolveShareHost } from '@/lib/xray/inbound-link';
-import { effectiveMtu } from '@/lib/xray/amneziawg-obfuscation';
+import { clientMtu } from '@/lib/xray/amneziawg-obfuscation';
 import { joinConfLines } from '@/lib/xray/conf-lines';
 import { AmneziaWGKeepAliveRangeSchema } from '@/schemas/primitives/keepalive';
 import type { ClientRecord, InboundOption } from '@/hooks/useClients';
@@ -64,7 +64,7 @@ export function buildAmneziaWGClientConfig(
   const dnsParts = [server?.primaryDns, server?.secondaryDns].filter((v) => !!v && v.trim() !== '');
   const lines = ['[Interface]', `PrivateKey = ${privateKey}`, `Address = ${address}`];
   if (dnsParts.length > 0) lines.push(`DNS = ${dnsParts.join(', ')}`);
-  lines.push(`MTU = ${effectiveMtu(server?.mtu, server?.s4)}`);
+  lines.push(`MTU = ${clientMtu(server?.mtu)}`);
 
   // AmneziaWG obfuscation parameters — must match the server's values.
   lines.push(`Jc = ${server?.jc ?? 5}`);

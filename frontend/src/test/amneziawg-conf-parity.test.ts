@@ -169,12 +169,12 @@ describe('AmneziaWG .conf emitters agree on MTU', () => {
     return conf.split('\n').find((l) => l.startsWith('MTU = '));
   }
 
-  it('always emits an MTU, even when the inbound has none set', () => {
+  it('always emits an MTU, 1280 when the inbound has none set', () => {
     const { link, download } = build(undefined, 27);
-    // 1420 - 27: without this the client stays on its own 1420 default and
-    // fragments every full-size packet it sends.
-    expect(mtuLine(link)).toBe('MTU = 1393');
-    expect(mtuLine(download)).toBe('MTU = 1393');
+    // Without this line the client stays on its own ~1420 default, several
+    // times slower on paths below a 1500-byte MTU.
+    expect(mtuLine(link)).toBe('MTU = 1280');
+    expect(mtuLine(download)).toBe('MTU = 1280');
   });
 
   it('keeps an explicit MTU untouched', () => {
@@ -183,9 +183,9 @@ describe('AmneziaWG .conf emitters agree on MTU', () => {
     expect(mtuLine(download)).toBe('MTU = 1380');
   });
 
-  it('falls back to the plain default when there is no s4', () => {
+  it('gives 1280 regardless of s4 when unset', () => {
     const { link, download } = build(undefined, 0);
-    expect(mtuLine(link)).toBe('MTU = 1420');
-    expect(mtuLine(download)).toBe('MTU = 1420');
+    expect(mtuLine(link)).toBe('MTU = 1280');
+    expect(mtuLine(download)).toBe('MTU = 1280');
   });
 });

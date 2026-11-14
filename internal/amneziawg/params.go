@@ -58,6 +58,23 @@ func EffectiveMTU(configuredMTU, s4 int) int {
 	return max(DefaultMTU-max(s4, 0), 1280)
 }
 
+// ClientDefaultMTU is the MTU written into issued client configs when the
+// admin left MTU blank. Paths with a smaller MTU than 1500 (mobile, PPPoE,
+// other tunnels) drop or fragment full-size packets; measured from a Russian
+// home ISP, a 767 KB download took 24-29 s at the client's own default and
+// 2.6-8.4 s at 1280. The server interface keeps EffectiveMTU: the client's
+// smaller MTU (and so its TCP MSS) already caps what the server sends back.
+const ClientDefaultMTU = 1280
+
+// ClientMTU is the MTU for issued client configs: the admin's value when set
+// (it applies to both ends), else ClientDefaultMTU.
+func ClientMTU(configuredMTU int) int {
+	if configuredMTU > 0 {
+		return min(configuredMTU, MaxMTU)
+	}
+	return ClientDefaultMTU
+}
+
 // GenerateObfuscation31 produces a randomized AmneziaWG 3.1 parameter set: a
 // static value gets profiled by DPI, defeating the point.
 func GenerateObfuscation31() Obfuscation31 {

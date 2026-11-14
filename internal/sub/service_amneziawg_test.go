@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -280,9 +279,10 @@ func TestAmneziaWGConfigTextRejectsLineBreakInAnyValue(t *testing.T) {
 	}
 }
 
-// Guards an asymmetry: the server derives its MTU from S4, but a config with no
-// MTU line leaves the client at 1420 and fragments client-to-server only.
-func TestAmneziaWGConfigTextAlwaysCarriesTheServerMTU(t *testing.T) {
+// A config with no MTU line leaves the client at its own ~1420 default, which is
+// several times slower on paths below a 1500-byte MTU; blank MTU gives 1280,
+// whatever the server interface derives from S4.
+func TestAmneziaWGConfigTextAlwaysCarriesTheClientMTU(t *testing.T) {
 	t.Parallel()
 
 	client := &model.Client{
@@ -296,8 +296,8 @@ func TestAmneziaWGConfigTextAlwaysCarriesTheServerMTU(t *testing.T) {
 		s4        int
 		want      string
 	}{
-		{"unset falls back to the S4-aware default", 0, 27, "MTU = 1393"},
-		{"unset with no S4 keeps the plain default", 0, 0, "MTU = 1420"},
+		{"unset gives the 1280 client default", 0, 27, "MTU = 1280"},
+		{"unset with no S4 gives the 1280 client default", 0, 0, "MTU = 1280"},
 		{"an explicit MTU wins", 1380, 27, "MTU = 1380"},
 	}
 	for _, tc := range cases {
@@ -311,9 +311,8 @@ func TestAmneziaWGConfigTextAlwaysCarriesTheServerMTU(t *testing.T) {
 			if !strings.Contains(got, tc.want+"\n") {
 				t.Errorf("expected %q in the client config\n%s", tc.want, got)
 			}
-			want := "MTU = " + strconv.Itoa(amneziawg.EffectiveMTU(tc.serverMTU, tc.s4))
-			if !strings.Contains(got, want+"\n") {
-				t.Errorf("client MTU must equal the server's effective MTU (%s)", want)
+			if n := strings.Count(got, "MTU = "); n != 1 {
+				t.Errorf("want exactly one MTU line, got %d", n)
 			}
 		})
 	}

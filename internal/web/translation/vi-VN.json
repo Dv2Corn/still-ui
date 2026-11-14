@@ -2468,7 +2468,7 @@
         "presetQuic": "I1 giống QUIC",
         "presetDns": "I1 giống DNS",
         "presetHint": "Tạo lại sẽ thay mọi tham số bằng giá trị ngẫu nhiên mới, nên các máy khách hiện có phải nhập lại cấu hình. Các nút I1 chỉ thay đổi gói chữ ký (đặt I1, xóa I2–I5): gói gửi trước mỗi lần bắt tay trông giống phần mở đầu của kết nối QUIC hoặc một truy vấn DNS. Máy khách hiện có vẫn hoạt động và nhận gói mới ở cấu hình tiếp theo.",
-        "mtuMobileHint": "Được ghi vào mọi cấu hình máy khách do bảng điều khiển tạo. Trên mạng di động làm rơi gói lớn, 1280 có thể nhanh hơn mặc định vài lần.",
+        "mtuMobileHint": "Để trống: máy chủ giữ 1420 trừ S4, còn cấu hình máy khách nhận 1280, nhanh hơn vài lần trên các đường truyền làm rơi gói lớn (di động, PPPoE, đường hầm khác). Giá trị nhập ở đây áp dụng cho máy chủ và mọi cấu hình máy khách.",
         "mtuMobile": "Đặt {mtu}",
         "jc": "Jc (số lượng gói rác)",
         "jmin": "Jmin (kích thước tối thiểu gói rác)",
