@@ -47,8 +47,10 @@ func TestPushedRelayTargetNameOnThisNodesOwnPortIsRefused(t *testing.T) {
 			t.Errorf("AddInbound = %v, want %q", err, tc.want)
 		}
 	}
-	public := &model.Inbound{Enable: true, Port: 44430, Protocol: model.VLESS, Settings: `{"clients":[]}`,
-		StreamSettings: `{"network":"tcp","security":"reality","realitySettings":{"target":"www.example.com:443"}}`}
+	public := &model.Inbound{
+		Enable: true, Port: 44430, Protocol: model.VLESS, Settings: `{"clients":[]}`,
+		StreamSettings: `{"network":"tcp","security":"reality","realitySettings":{"target":"www.example.com:443"}}`,
+	}
 	if _, _, err := push.AddInbound(public); err != nil && strings.Contains(err.Error(), "may not set") {
 		t.Errorf("public REALITY target refused: %v", err)
 	}
@@ -73,8 +75,10 @@ func TestPushedFallbackDestMustBeAnEnabledLocalInboundsAddress(t *testing.T) {
 	port := 44440
 	fallback := func(dest string) error {
 		port++
-		_, _, err := push.AddInbound(&model.Inbound{Enable: true, Port: port, Protocol: model.VLESS,
-			Settings: `{"clients":[],"fallbacks":[{"dest":` + dest + `}]}`, StreamSettings: `{"network":"tcp"}`})
+		_, _, err := push.AddInbound(&model.Inbound{
+			Enable: true, Port: port, Protocol: model.VLESS,
+			Settings: `{"clients":[],"fallbacks":[{"dest":` + dest + `}]}`, StreamSettings: `{"network":"tcp"}`,
+		})
 		return err
 	}
 	for _, dest := range []string{
@@ -138,8 +142,10 @@ func TestPushedCertificatePathMustBeTheNodesOwn(t *testing.T) {
 		t.Fatal(err)
 	}
 	tls := func(port int, file string) *model.Inbound {
-		return &model.Inbound{Enable: true, Port: port, Protocol: model.VLESS, Settings: `{"clients":[]}`,
-			StreamSettings: `{"network":"tcp","security":"tls","tlsSettings":{"certificates":[{"certificateFile":"` + file + `","keyFile":"` + file + `"}]}}`}
+		return &model.Inbound{
+			Enable: true, Port: port, Protocol: model.VLESS, Settings: `{"clients":[]}`,
+			StreamSettings: `{"network":"tcp","security":"tls","tlsSettings":{"certificates":[{"certificateFile":"` + file + `","keyFile":"` + file + `"}]}}`,
+		}
 	}
 	for i, file := range []string{"/etc/shadow", "/root/cert/../.ssh/id_ed25519", "cert/../../etc/shadow"} {
 		want := fmt.Sprintf("may not set certificate file to %q", file)

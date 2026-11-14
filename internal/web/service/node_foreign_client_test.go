@@ -233,6 +233,26 @@ func TestNodeRefusedClaimIsNotStoredOrCounted(t *testing.T) {
 	}
 }
 
+// A node that serves the same client on its own (same email and subId) still adds its usage
+// to the master's row: cross-panel totals, without taking the record or its lifecycle.
+func TestNodeSameSubscriptionUsageCountsAcrossPanels(t *testing.T) {
+	db := initTrafficTestDB(t)
+	svc := &InboundService{}
+	seedNodeRow(t, db, &model.Node{Id: 1, Name: "n1", Address: "127.0.0.1", Port: 2096, ApiToken: "tok", Enable: true})
+	master := seedMasterInbound(t, db, "master-in", 40001, `{"email":"shared@x","id":"11111111-1111-4111-8111-111111111111","subId":"shared-sub","enable":true}`)
+	if err := db.Create(&xray.ClientTraffic{InboundId: master.Id, Email: "shared@x", Enable: true}).Error; err != nil {
+		t.Fatalf("seed traffic: %v", err)
+	}
+	createNodeInbound(t, db, 1, "n1-in", 41001)
+	own := `{"clients":[{"email":"shared@x","id":"","subId":"shared-sub","enable":true}]}`
+	for _, up := range []int64{0, 500} {
+		syncNodeWithSettings(t, svc, 1, "n1-in", own, xray.ClientTraffic{Email: "shared@x", Up: up, Enable: false, ExpiryTime: 1})
+	}
+	if got := readTraffic(t, db, "shared@x"); got.Up != 500 || !got.Enable || got.ExpiryTime != 0 {
+		t.Fatalf("shared traffic up=%d enable=%v expiry=%d, want the node's 500 and the master's lifecycle (true, 0)", got.Up, got.Enable, got.ExpiryTime)
+	}
+}
+
 // A record with no inbound is the admin's (detached, or its inbound deleted), not a
 // node's; only a node whose own merge orphaned it may take it back.
 func TestNodeCannotAdoptDetachedClient(t *testing.T) {
