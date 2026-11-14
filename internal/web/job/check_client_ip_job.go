@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -772,22 +773,11 @@ func (j *CheckClientIpJob) disconnectClientTemporarily(inbound *model.Inbound, c
 	}
 	defer xrayAPI.Close()
 
-	// Find the client config
-	var clientConfig map[string]any
-	var reverseClient bool
-	for _, client := range clients {
-		if client.Email == clientEmail {
-			// Convert client to map for API
-			clientBytes, _ := json.Marshal(client)
-			_ = json.Unmarshal(clientBytes, &clientConfig)
-			reverseClient = client.Reverse != nil
-			break
-		}
-	}
-
-	if clientConfig == nil {
+	idx := slices.IndexFunc(clients, func(c model.Client) bool { return c.Email == clientEmail })
+	if idx < 0 {
 		return
 	}
+	reverseClient := clients[idx].Reverse != nil
 
 	// Protocols XrayAPI can remove and re-add from a marshaled model.Client.
 	// wireguard stays out: keepAlive marshals as a number, AddUser wants a string.
@@ -807,19 +797,6 @@ func (j *CheckClientIpJob) disconnectClientTemporarily(inbound *model.Inbound, c
 		return
 	}
 
-	// For Shadowsocks, ensure the required "cipher" field is present by
-	// reading it from the inbound settings (e.g., settings["method"]).
-	if string(inbound.Protocol) == "shadowsocks" {
-		var inboundSettings map[string]any
-		if err := json.Unmarshal([]byte(inbound.Settings), &inboundSettings); err != nil {
-			logger.Warningf("[LIMIT_IP] Failed to parse inbound settings for shadowsocks cipher: %v", err)
-		} else {
-			if method, ok := inboundSettings["method"].(string); ok && method != "" {
-				clientConfig["cipher"] = method
-			}
-		}
-	}
-
 	// The core's RemoveUser clears its validator: a session already up keeps
 	// running, except a reverse vless client, which is skipped above.
 	err = xrayAPI.RemoveUser(inbound.Tag, clientEmail)
@@ -832,10 +809,17 @@ func (j *CheckClientIpJob) disconnectClientTemporarily(inbound *model.Inbound, c
 	// only widens the window in which new handshakes fail.
 	time.Sleep(100 * time.Millisecond)
 
-	// clientConfig is the scan's snapshot: a disable or delete committed since then
-	// found no user to remove (or restarted the core) and will not come back for it.
+	// A disable or delete committed since the scan found no user to remove (or restarted
+	// the core) and will not come back for it.
 	if !j.clientStillServed(inbound.Id, clientEmail) {
 		logger.Infof("[LIMIT_IP] Not restoring %s: disabled or removed during its temporary disconnect", clientEmail)
+		return
+	}
+	// Read after the removal, not from the scan: a credential rotated since then is already
+	// in the core, and the scan's copy would put the retired one back.
+	clientConfig, err := storedClientConfig(inbound.Id, clientEmail)
+	if err != nil || clientConfig == nil {
+		logger.Warningf("[LIMIT_IP] Not restoring %s: reading its stored settings: %v", clientEmail, err)
 		return
 	}
 
@@ -854,6 +838,39 @@ func (j *CheckClientIpJob) disconnectClientTemporarily(inbound *model.Inbound, c
 			logger.Warningf("[LIMIT_IP] Failed to remove user %s again: %v", clientEmail, err)
 		}
 	}
+}
+
+// storedClientConfig is the client's entry in the inbound as stored now, as an AddUser
+// config; nil when the inbound no longer lists it.
+func storedClientConfig(inboundId int, clientEmail string) (map[string]any, error) {
+	var inbound model.Inbound
+	if err := database.GetDB().Select("protocol", "settings").First(&inbound, inboundId).Error; err != nil {
+		return nil, err
+	}
+	clients, err := service.ParseInboundSettingsClients(inbound.Settings)
+	if err != nil {
+		return nil, err
+	}
+	idx := slices.IndexFunc(clients, func(c model.Client) bool { return c.Email == clientEmail })
+	if idx < 0 {
+		return nil, nil
+	}
+	var clientConfig map[string]any
+	clientBytes, _ := json.Marshal(clients[idx])
+	if err := json.Unmarshal(clientBytes, &clientConfig); err != nil {
+		return nil, err
+	}
+	// Shadowsocks AddUser needs the cipher, which the inbound keeps as settings.method.
+	if inbound.Protocol == model.Shadowsocks {
+		var inboundSettings map[string]any
+		if err := json.Unmarshal([]byte(inbound.Settings), &inboundSettings); err != nil {
+			return nil, err
+		}
+		if method, ok := inboundSettings["method"].(string); ok && method != "" {
+			clientConfig["cipher"] = method
+		}
+	}
+	return clientConfig, nil
 }
 
 // clientStillServed is GetXrayConfig's rule for handing a client to the core: linked to

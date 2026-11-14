@@ -191,8 +191,8 @@ func TestNodeCannotRewriteClientSharedWithMaster(t *testing.T) {
 	}
 }
 
-// A refused claim must not be stored (auto-renew re-syncs the settings later) nor move the
-// client's lifecycle; usage under an email the master also serves still adds up across panels.
+// A refused claim must not be stored (auto-renew re-syncs the settings later), move the
+// client's lifecycle, or bill usage to a client the master never put on this node.
 func TestNodeRefusedClaimIsNotStoredOrCounted(t *testing.T) {
 	db := initTrafficTestDB(t)
 	svc := &InboundService{}
@@ -220,8 +220,8 @@ func TestNodeRefusedClaimIsNotStoredOrCounted(t *testing.T) {
 	if n := countClientsWhere(t, db, "LOWER(email) LIKE ?", "victim%"); n != 1 {
 		t.Fatalf("a padded or case-variant claim created a look-alike record: %d victim rows", n)
 	}
-	if got := readTraffic(t, db, "victim@x"); got.Up != 500 || !got.Enable || got.ExpiryTime != 0 {
-		t.Fatalf("victim traffic up=%d enable=%v expiry=%d, want the node's usage (500) and the master's lifecycle (true, 0)", got.Up, got.Enable, got.ExpiryTime)
+	if got := readTraffic(t, db, "victim@x"); got.Up != 0 || !got.Enable || got.ExpiryTime != 0 {
+		t.Fatalf("victim traffic up=%d enable=%v expiry=%d, want no usage from a node that does not host it and the master's lifecycle (true, 0)", got.Up, got.Enable, got.ExpiryTime)
 	}
 	var lookalike int64
 	db.Model(xray.ClientTraffic{}).Where("email <> ? AND LOWER(email) LIKE ?", "victim@x", "victim%").Count(&lookalike)

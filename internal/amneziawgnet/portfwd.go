@@ -270,26 +270,73 @@ func openPortForwardListener(gstack *stack.Stack, inboundID int, key portForward
 
 const portForwardDialTimeout = 10 * time.Second
 
-// portForwardMaxFlows caps live TCP relays, and separately UDP sessions, over every
-// listener: senders are unauthenticated, and each flow pins a goroutine and a buffer.
-const portForwardMaxFlows = 2048
-
-// Process-wide on purpose: a per-listener cap still multiplies by the forwarded ports
-// and by the number of forwarding peers.
-var (
-	portForwardTCPSlots = make(chan struct{}, portForwardMaxFlows)
-	portForwardUDPSlots = make(chan struct{}, portForwardMaxFlows)
+// Unauthenticated senders each pin a goroutine and a buffer, so live TCP relays and UDP
+// sessions are capped per kind over every listener, per forwarding peer and per source.
+const (
+	portForwardMaxFlows          = 2048
+	portForwardMaxFlowsPerPeer   = portForwardMaxFlows / 4
+	portForwardMaxFlowsPerSource = 64
 )
 
-// acquirePortForwardSlot never blocks the accept or read loop; false means the flow is
-// refused. The owner gives the slot back by receiving from slots.
-func acquirePortForwardSlot(slots chan struct{}) bool {
-	select {
-	case slots <- struct{}{}:
-		return true
-	default:
+// portForwardTCPIdle ends a forwarded TCP relay once neither side has sent anything for it,
+// so idle or dead connections give their slot back.
+var portForwardTCPIdle = 10 * time.Minute
+
+// portForwardSlots counts live flows over every listener, per forwarding peer and per external
+// source (an IPv4 address or IPv6 /64); process-wide, since per-listener caps multiply.
+type portForwardSlots struct {
+	mu       sync.Mutex
+	total    int
+	byPeer   map[string]int
+	bySource map[netip.Prefix]int
+}
+
+var (
+	portForwardTCPSlots = newPortForwardSlots()
+	portForwardUDPSlots = newPortForwardSlots()
+)
+
+func newPortForwardSlots() *portForwardSlots {
+	return &portForwardSlots{byPeer: map[string]int{}, bySource: map[netip.Prefix]int{}}
+}
+
+// acquire never blocks the accept or read loop; false means the flow is refused. Each
+// successful acquire needs one release with the same peer and source.
+func (s *portForwardSlots) acquire(peer string, source netip.Addr) bool {
+	prefix := portForwardSource(source)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.total >= portForwardMaxFlows || s.byPeer[peer] >= portForwardMaxFlowsPerPeer || s.bySource[prefix] >= portForwardMaxFlowsPerSource {
 		return false
 	}
+	s.total++
+	s.byPeer[peer]++
+	s.bySource[prefix]++
+	return true
+}
+
+func (s *portForwardSlots) release(peer string, source netip.Addr) {
+	prefix := portForwardSource(source)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.total--
+	if s.byPeer[peer]--; s.byPeer[peer] <= 0 {
+		delete(s.byPeer, peer)
+	}
+	if s.bySource[prefix]--; s.bySource[prefix] <= 0 {
+		delete(s.bySource, prefix)
+	}
+}
+
+// portForwardSource is a source's bucket: its IPv4 address, or the IPv6 /64 one host holds.
+func portForwardSource(addr netip.Addr) netip.Prefix {
+	addr = addr.Unmap()
+	bits := 32
+	if addr.Is6() {
+		bits = 64
+	}
+	prefix, _ := addr.Prefix(bits)
+	return prefix
 }
 
 // acceptRetryDelay paces an accept loop's retries, so an error that lasts
@@ -371,12 +418,16 @@ func (l *tcpForwardListener) acceptLoop(gstack *stack.Stack, inboundID int, key 
 			}
 			continue
 		}
-		if !acquirePortForwardSlot(portForwardTCPSlots) {
+		var source netip.Addr
+		if addr, ok := conn.RemoteAddr().(*net.TCPAddr); ok {
+			source = addr.AddrPort().Addr()
+		}
+		if !portForwardTCPSlots.acquire(key.email, source) {
 			conn.Close()
 			continue
 		}
 		go func() {
-			defer func() { <-portForwardTCPSlots }()
+			defer portForwardTCPSlots.release(key.email, source)
 			l.relayTCPForward(gstack, conn, inboundID, key, target)
 		}()
 	}
@@ -402,7 +453,7 @@ func (l *tcpForwardListener) relayTCPForward(gstack *stack.Stack, conn net.Conn,
 		tunnelConn.Close()
 	})
 	defer stop()
-	pipeBothWays(conn, tunnelConn)
+	pipeBothWaysIdle(conn, tunnelConn, portForwardTCPIdle)
 }
 
 // Close stops accepting and cuts the connections already relaying, as

@@ -465,6 +465,39 @@ func TestDoFetchSubscriptionLinksUsesTheHostProxy(t *testing.T) {
 	}
 }
 
+// The proxied client has no SSRF guard, so a provider redirecting to a host the proxy skips
+// (loopback, NO_PROXY) must be refused rather than dialled directly from the panel.
+func TestProxiedFetchRefusesARedirectThatLeavesTheProxy(t *testing.T) {
+	var internalHits atomic.Int32
+	internal := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		internalHits.Add(1)
+		_, _ = w.Write([]byte("vless://uuid@example.com:443#internal"))
+	}))
+	defer internal.Close()
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, internal.URL+"/secret", http.StatusFound)
+	}))
+	defer proxy.Close()
+	proxyURL, _ := url.Parse(proxy.URL)
+	previous := subscriptionProxy
+	// As http.ProxyFromEnvironment does, the proxy covers the provider but not loopback.
+	subscriptionProxy = func(r *http.Request) (*url.URL, error) {
+		if r.URL.Hostname() == "provider.example" {
+			return proxyURL, nil
+		}
+		return nil, nil
+	}
+	t.Cleanup(func() { subscriptionProxy = previous })
+
+	links, err := doFetchSubscriptionLinks("http://provider.example/sub")
+	if !errors.Is(err, errRedirectBypassesProxy) || links != nil {
+		t.Fatalf("fetch = %v, %v; want %v", links, err, errRedirectBypassesProxy)
+	}
+	if got := internalHits.Load(); got != 0 {
+		t.Fatalf("loopback service got %d requests through the provider's redirect, want 0", got)
+	}
+}
+
 // A dead provider is asked again only after a backoff: each fetch can take the
 // whole client timeout, and every subscription request of its clients would wait.
 func TestFetchSubscriptionLinksBacksOffAfterFailure(t *testing.T) {
