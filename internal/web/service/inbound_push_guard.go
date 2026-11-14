@@ -249,6 +249,23 @@ func isNodeOwnCertFile(path string, ownCerts []string) bool {
 	return slices.Contains(ownCerts, path) || (err == nil && filepath.IsLocal(rel))
 }
 
+// isLocalInterfaceIP reports whether ip is assigned to one of this host's interfaces.
+func isLocalInterfaceIP(ip net.IP) bool {
+	if ip.IsLoopback() {
+		return true
+	}
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return false
+	}
+	for _, addr := range addrs {
+		if ipNet, ok := addr.(*net.IPNet); ok && ipNet.IP.Equal(ip) {
+			return true
+		}
+	}
+	return false
+}
+
 // normalizeRelayTarget reduces a fallback dest to the form localRelayTargets lists: a bare
 // port, a socket path, or host:port rejoined so every spelling of an address meets.
 func normalizeRelayTarget(target string) string {
@@ -269,8 +286,8 @@ func localRelayTargets(selfID int) ([]string, error) {
 	if err := database.GetDB().Select("id", "listen", "port").Where("node_id IS NULL AND enable = ? AND id <> ?", true, selfID).Find(&rows).Error; err != nil {
 		return nil, err
 	}
-	reserved := map[string]bool{strconv.Itoa(reservedAPIPort()): true}
-	for _, port := range xrayOwnPorts() {
+	reserved := map[string]bool{}
+	for _, port := range nodeOwnPorts() {
 		reserved[port] = true
 	}
 	var targets []string
@@ -289,7 +306,8 @@ func localRelayTargets(selfID int) ([]string, error) {
 		if listen == "" || ip.IsUnspecified() || ip.IsLoopback() {
 			targets = append(targets, port, net.JoinHostPort("127.0.0.1", port))
 		}
-		if listen != "" && !ip.IsUnspecified() {
+		// A pushed row can carry any listen, so only an address of this host's own interfaces counts.
+		if ip != nil && !ip.IsUnspecified() && isLocalInterfaceIP(ip) {
 			targets = append(targets, net.JoinHostPort(listen, port))
 		}
 	}
