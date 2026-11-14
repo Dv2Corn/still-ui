@@ -530,20 +530,24 @@ func TestNodeGlobalTrafficHeartbeatChain(t *testing.T) {
 	middle := newPanel(t, bin, "traffic-middle")
 	leaf := newPanel(t, bin, "traffic-leaf")
 	const email = "chain-usage"
-	localIDs := make(map[*panel]int)
 	makeClient := func() map[string]any {
 		client := vlessClient(email)
 		client["subId"] = "chain-sub"
 		return client
 	}
+	// The client lives on the leaf only: each panel above reaches it through the node it
+	// adopted, the one way a panel credits node usage to a client (no email-only totals).
 	for _, p := range []*panel{root, middle, leaf} {
 		p.start()
+		var clients []map[string]any
+		if p == leaf {
+			clients = []map[string]any{makeClient()}
+		}
 		var ib inboundView
-		obj := p.call(http.MethodPost, "/panel/api/inbounds/add", vlessInbound(p.name, freePort(t), nil, makeClient()))
+		obj := p.call(http.MethodPost, "/panel/api/inbounds/add", vlessInbound(p.name, freePort(t), nil, clients...))
 		if err := json.Unmarshal(obj, &ib); err != nil || ib.Id == 0 {
 			t.Fatalf("%s local inbound=%s err=%v", p.name, obj, err)
 		}
-		localIDs[p] = ib.Id
 	}
 	enrollTrafficNode(t, middle, leaf)
 	enrollTrafficNode(t, root, middle)
@@ -558,11 +562,9 @@ func TestNodeGlobalTrafficHeartbeatChain(t *testing.T) {
 			return gotUp == up && gotDown == down, fmt.Sprintf("%s usage=%d/%d want %d/%d", p.name, gotUp, gotDown, up, down)
 		})
 	}
-	root.call(http.MethodPost, "/panel/api/clients/updateTraffic/"+email, map[string]any{"upload": 100, "download": 200})
-	middle.call(http.MethodPost, "/panel/api/clients/updateTraffic/"+email, map[string]any{"upload": 10, "download": 20})
 	leaf.call(http.MethodPost, "/panel/api/clients/updateTraffic/"+email, map[string]any{"upload": 1, "download": 2})
 	for _, p := range []*panel{root, middle, leaf} {
-		waitUsage(p, 111, 222)
+		waitUsage(p, 1, 2)
 	}
 	pushRoot := func(up, down int64) {
 		root.call(http.MethodPost, "/panel/api/inbounds/pushClientTraffics", map[string]any{
@@ -575,8 +577,8 @@ func TestNodeGlobalTrafficHeartbeatChain(t *testing.T) {
 	pushRoot(500, 400)
 	waitUsage(middle, 500, 400)
 	waitUsage(leaf, 500, 400)
-	// Each panel independently produced local usage; resetting an overlay cannot erase it.
-	// Reset those producers through their real API before testing forwarded zero counters.
+	// The leaf's local usage is not an overlay a forwarded zero can erase: reset it (and each
+	// panel's view of it) through the real API before testing forwarded zero counters.
 	for _, p := range []*panel{leaf, middle, root} {
 		p.call(http.MethodPost, "/panel/api/clients/resetTraffic/"+email, nil)
 	}
@@ -589,9 +591,10 @@ func TestNodeGlobalTrafficHeartbeatChain(t *testing.T) {
 	waitUsage(middle, 77, 88)
 	leaf.start()
 	waitUsage(leaf, 77, 88)
-	for _, p := range []*panel{leaf, middle, root} {
-		p.call(http.MethodPost, "/panel/api/clients/del/"+email, nil)
-	}
+	// The top master is the authority over the chain: a deletion or a new client there is
+	// pushed down through middle to leaf. (A deletion made on leaf itself is undone by the
+	// next push of middle's stored settings, on main as well.)
+	root.call(http.MethodPost, "/panel/api/clients/del/"+email, nil)
 	for _, p := range []*panel{root, middle, leaf} {
 		eventually(t, 90*time.Second, p.name+" deletes chain client", func() (bool, string) {
 			for _, ib := range p.inbounds() {
@@ -602,11 +605,18 @@ func TestNodeGlobalTrafficHeartbeatChain(t *testing.T) {
 			return true, ""
 		})
 	}
-	for _, p := range []*panel{leaf, middle, root} {
-		p.call(http.MethodPost, "/panel/api/clients/add", map[string]any{
-			"client": makeClient(), "inboundIds": []int{localIDs[p]},
-		})
+	leafOnRoot := 0
+	for _, ib := range root.inbounds() {
+		if ib.Remark == leaf.name {
+			leafOnRoot = ib.Id
+		}
 	}
+	if leafOnRoot == 0 {
+		t.Fatal("root has no copy of the leaf inbound")
+	}
+	root.call(http.MethodPost, "/panel/api/clients/add", map[string]any{
+		"client": makeClient(), "inboundIds": []int{leafOnRoot},
+	})
 	for _, p := range []*panel{root, middle, leaf} {
 		eventually(t, 90*time.Second, p.name+" recreates chain client", func() (bool, string) {
 			for _, ib := range p.inbounds() {

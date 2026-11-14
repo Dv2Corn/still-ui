@@ -233,23 +233,38 @@ func TestNodeRefusedClaimIsNotStoredOrCounted(t *testing.T) {
 	}
 }
 
-// A node that serves the same client on its own (same email and subId) still adds its usage
-// to the master's row: cross-panel totals, without taking the record or its lifecycle.
-func TestNodeSameSubscriptionUsageCountsAcrossPanels(t *testing.T) {
+// A node's own copy of a master-only client bills nothing, even under the client's real
+// subId (the node may have read it from any share link) or the email in another case, and
+// creates no traffic row the master never had.
+func TestNodeCopyOfMasterOnlyClientBillsNothing(t *testing.T) {
 	db := initTrafficTestDB(t)
 	svc := &InboundService{}
 	seedNodeRow(t, db, &model.Node{Id: 1, Name: "n1", Address: "127.0.0.1", Port: 2096, ApiToken: "tok", Enable: true})
-	master := seedMasterInbound(t, db, "master-in", 40001, `{"email":"shared@x","id":"11111111-1111-4111-8111-111111111111","subId":"shared-sub","enable":true}`)
+	master := seedMasterInbound(t, db, "master-in", 40001,
+		`{"email":"shared@x","id":"11111111-1111-4111-8111-111111111111","subId":"shared-sub","enable":true},`+
+			`{"email":"rowless@x","id":"22222222-2222-4222-8222-222222222222","subId":"rowless-sub","enable":true}`)
 	if err := db.Create(&xray.ClientTraffic{InboundId: master.Id, Email: "shared@x", Enable: true}).Error; err != nil {
 		t.Fatalf("seed traffic: %v", err)
 	}
-	createNodeInbound(t, db, 1, "n1-in", 41001)
-	own := `{"clients":[{"email":"shared@x","id":"","subId":"shared-sub","enable":true}]}`
-	for _, up := range []int64{0, 500} {
-		syncNodeWithSettings(t, svc, 1, "n1-in", own, xray.ClientTraffic{Email: "shared@x", Up: up, Enable: false, ExpiryTime: 1})
+	if err := db.Where("email = ?", "rowless@x").Delete(&xray.ClientTraffic{}).Error; err != nil {
+		t.Fatalf("drop rowless traffic: %v", err)
 	}
-	if got := readTraffic(t, db, "shared@x"); got.Up != 500 || !got.Enable || got.ExpiryTime != 0 {
-		t.Fatalf("shared traffic up=%d enable=%v expiry=%d, want the node's 500 and the master's lifecycle (true, 0)", got.Up, got.Enable, got.ExpiryTime)
+	createNodeInbound(t, db, 1, "n1-in", 41001)
+	copied := `{"clients":[{"email":"shared@x","id":"","subId":"shared-sub","enable":true},` +
+		`{"email":"SHARED@X","subId":"shared-sub","enable":true},{"email":"rowless@x","subId":"rowless-sub","enable":true}]}`
+	for _, up := range []int64{0, 500} {
+		syncNodeWithSettings(t, svc, 1, "n1-in", copied,
+			xray.ClientTraffic{Email: "shared@x", Up: up, Enable: false, ExpiryTime: 1},
+			xray.ClientTraffic{Email: "SHARED@X", Up: up, Enable: true},
+			xray.ClientTraffic{Email: "rowless@x", Up: up, Enable: true, Total: 1})
+	}
+	if got := readTraffic(t, db, "shared@x"); got.Up != 0 || !got.Enable || got.ExpiryTime != 0 {
+		t.Fatalf("shared traffic up=%d enable=%v expiry=%d, want nothing from a node the master never put it on", got.Up, got.Enable, got.ExpiryTime)
+	}
+	var rows int64
+	db.Model(xray.ClientTraffic{}).Where("LOWER(email) IN ?", []string{"shared@x", "rowless@x"}).Count(&rows)
+	if rows != 1 {
+		t.Fatalf("traffic rows for shared/rowless = %d, want only the master's one", rows)
 	}
 }
 
