@@ -167,8 +167,8 @@ func hostReaches(inbound *model.Inbound) ([]pushReach, error) {
 			}
 		}
 	}
-	// The core creates "<path>.lock" and binds the socket wherever a unix listen points.
-	if listen := strings.TrimSpace(inbound.Listen); strings.HasPrefix(listen, "/") || strings.HasPrefix(listen, "@") {
+	// Anything but an IP is a unix socket to the core, which creates "<path>.lock" and binds there.
+	if listen := xrayListenHost(inbound.Listen); listen != "" && net.ParseIP(listen) == nil {
 		reaches = append(reaches, pushReach{field: "listen", value: strings.SplitN(listen, ",", 2)[0]})
 	}
 	for _, leaf := range jsonLeaves(inbound.Settings) {
@@ -249,6 +249,15 @@ func isNodeOwnCertFile(path string, ownCerts []string) bool {
 	return slices.Contains(ownCerts, path) || (err == nil && filepath.IsLocal(rel))
 }
 
+// xrayListenHost reads a listen value as xray-core's net.ParseAddress does: one pair of
+// surrounding brackets stripped, then surrounding spaces.
+func xrayListenHost(listen string) string {
+	if len(listen) > 1 && listen[0] == '[' && listen[len(listen)-1] == ']' {
+		listen = listen[1 : len(listen)-1]
+	}
+	return strings.TrimSpace(listen)
+}
+
 // isLocalInterfaceIP reports whether ip is assigned to one of this host's interfaces.
 func isLocalInterfaceIP(ip net.IP) bool {
 	if ip.IsLoopback() {
@@ -292,7 +301,7 @@ func localRelayTargets(selfID int) ([]string, error) {
 	}
 	var targets []string
 	for _, ib := range rows {
-		listen := strings.TrimSpace(ib.Listen)
+		listen := xrayListenHost(ib.Listen)
 		if strings.HasPrefix(listen, "/") || strings.HasPrefix(listen, "@") {
 			targets = append(targets, strings.SplitN(listen, ",", 2)[0])
 			continue

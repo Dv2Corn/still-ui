@@ -61,11 +61,10 @@ func TestPushedFallbackDestMustBeAnEnabledLocalInboundsAddress(t *testing.T) {
 	if _, _, err := push.AddInbound(&model.Inbound{Enable: false, Port: 45432, Protocol: model.VLESS, Settings: `{"clients":[]}`}); err != nil {
 		t.Fatalf("push a disabled decoy: %v", err)
 	}
-	for i, listen := range []string{"10.0.0.5", "metadata"} {
-		if _, _, err := push.AddInbound(&model.Inbound{Enable: true, Listen: listen, Port: 45435 + i, Protocol: model.VLESS, Settings: `{"clients":[]}`}); err != nil {
-			t.Fatalf("push a decoy listening on %s: %v", listen, err)
-		}
+	if _, _, err := push.AddInbound(&model.Inbound{Enable: true, Listen: "10.0.0.5", Port: 45435, Protocol: model.VLESS, Settings: `{"clients":[]}`}); err != nil {
+		t.Fatalf("push a decoy listening on a foreign address: %v", err)
 	}
+	seedInboundConflict(t, "named", "metadata", 45436, model.VLESS, `{"network":"tcp"}`, `{"clients":[]}`)
 	seedInboundConflict(t, "wildcard", "", 45433, model.VLESS, `{"network":"tcp"}`, `{"clients":[]}`)
 	seedInboundConflict(t, "loopback", "127.0.0.1", 45434, model.VLESS, `{"network":"tcp"}`, `{"clients":[]}`)
 	seedInboundConflict(t, "socket", "/dev/shm/in.sock,0666", 0, model.VLESS, `{"network":"tcp"}`, `{"clients":[]}`)
@@ -97,10 +96,16 @@ func TestPushedFallbackDestMustBeAnEnabledLocalInboundsAddress(t *testing.T) {
 // path, so a push may only keep the socket this node stores; its ",mode" may change.
 func TestPushedUnixListenMustBeTheStoredOne(t *testing.T) {
 	push := pushGuardTestService(t)
-	for i, listen := range []string{"/etc/x-ui/victim,0666", "@abstract-name"} {
+	for i, listen := range []string{"/etc/x-ui/victim,0666", "@abstract-name", "[/etc/x-ui/victim,0666]", "[ @abstract-name ]", " /tmp/x.sock"} {
 		_, _, err := push.AddInbound(&model.Inbound{Enable: true, Port: 44450 + i, Listen: listen, Protocol: model.VLESS, Settings: `{"clients":[]}`})
 		if want := "may not set listen to"; err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("pushed listen %q = %v, want %q", listen, err, want)
+		}
+	}
+
+	for i, listen := range []string{"[::1]", " 0.0.0.0 "} {
+		if _, _, err := push.AddInbound(&model.Inbound{Enable: true, Port: 44455 + i, Listen: listen, Protocol: model.VLESS, Settings: `{"clients":[]}`}); err != nil {
+			t.Errorf("pushed IP listen %q refused: %v", listen, err)
 		}
 	}
 
