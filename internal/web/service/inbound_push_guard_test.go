@@ -1,6 +1,9 @@
 package service
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -106,5 +109,33 @@ func TestPushedUnixListenMustBeTheStoredOne(t *testing.T) {
 	moved.Listen = "/dev/shm/other.sock"
 	if _, _, err := push.UpdateInbound(&moved); err == nil || !strings.Contains(err.Error(), `may not set listen to "/dev/shm/other.sock"`) {
 		t.Fatalf("a push moved the socket: %v", err)
+	}
+}
+
+// The panel reads every certificate path when it builds the core config (and in unit mode
+// copies it for the core), so a push may name only this node's own certificates.
+func TestPushedCertificatePathMustBeTheNodesOwn(t *testing.T) {
+	push := pushGuardTestService(t)
+	own := filepath.Join(t.TempDir(), "panel.pem")
+	if err := os.WriteFile(own, []byte("cert"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := (&SettingService{}).SetCertFile(own); err != nil {
+		t.Fatal(err)
+	}
+	tls := func(port int, file string) *model.Inbound {
+		return &model.Inbound{Enable: true, Port: port, Protocol: model.VLESS, Settings: `{"clients":[]}`,
+			StreamSettings: `{"network":"tcp","security":"tls","tlsSettings":{"certificates":[{"certificateFile":"` + file + `","keyFile":"` + file + `"}]}}`}
+	}
+	for i, file := range []string{"/etc/shadow", "/root/cert/../.ssh/id_ed25519", "cert/../../etc/shadow"} {
+		want := fmt.Sprintf("may not set certificate file to %q", file)
+		if _, _, err := push.AddInbound(tls(44460+i, file)); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("pushed %q = %v, want %q", file, err, want)
+		}
+	}
+	for i, file := range []string{own, "/root/cert/vpn.example.com/fullchain.pem"} {
+		if _, _, err := push.AddInbound(tls(44470+i, file)); err != nil {
+			t.Errorf("pushed node certificate %q refused: %v", file, err)
+		}
 	}
 }

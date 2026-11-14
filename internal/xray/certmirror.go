@@ -103,6 +103,10 @@ func mirrorCertificatePair(cert map[string]any) bool {
 
 // syncCertMirror refreshes mirror from source and reports whether its content changed.
 func syncCertMirror(source, mirror string) (bool, error) {
+	// The source is re-read on every certificate check and may have changed since it was saved.
+	if err := CheckCertFile(source); err != nil {
+		return false, err
+	}
 	data, err := os.ReadFile(source)
 	if err != nil {
 		return false, err

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -127,6 +128,7 @@ func hostReaches(inbound *model.Inbound) ([]pushReach, error) {
 		return nil, err
 	}
 	ownPorts := nodeOwnPorts()
+	ownCerts := nodeOwnCertFiles()
 	var reaches []pushReach
 	add := func(field string, leaf jsonLeaf) {
 		reaches = append(reaches, pushReach{field: field, value: leaf.value})
@@ -157,6 +159,8 @@ func hostReaches(inbound *model.Inbound) ([]pushReach, error) {
 			add("echConfigList", leaf)
 		case slices.Contains(leaf.path, "finalmask") && leaf.endsWith("type") && lower == "realm":
 			add("finalmask", leaf)
+		case (leaf.endsWith("certificatefile") || leaf.endsWith("keyfile")) && lower != "" && !isNodeOwnCertFile(leaf.value, ownCerts):
+			add("certificate file", leaf)
 		case leaf.endsWith("realitysettings", "target") || leaf.endsWith("realitysettings", "dest"):
 			if !isPublicRelayTarget(leaf.value, ownPorts) {
 				add("REALITY target", leaf)
@@ -215,6 +219,34 @@ func nodeOwnPorts() []string {
 		}
 	}
 	return ports
+}
+
+// nodeOwnCertFiles lists the certificate and key files of this node's panel and subscription
+// server, the paths "Set Cert from Panel" sends to a node.
+func nodeOwnCertFiles() []string {
+	settings := &SettingService{}
+	var files []string
+	for _, get := range []func() (string, error){settings.GetCertFile, settings.GetKeyFile, settings.GetSubCertFile, settings.GetSubKeyFile} {
+		if file, err := get(); err == nil && filepath.IsAbs(file) {
+			files = append(files, filepath.Clean(file))
+		}
+	}
+	return files
+}
+
+// nodeCertStore is where x-ui.sh's acme flows install this node's certificates.
+const nodeCertStore = "/root/cert"
+
+// isNodeOwnCertFile reports whether a pushed certificateFile or keyFile names one of this
+// node's own certificates; any other path would have the panel read a file the master picks.
+func isNodeOwnCertFile(path string, ownCerts []string) bool {
+	path = strings.TrimSpace(path)
+	if !filepath.IsAbs(path) {
+		return false
+	}
+	path = filepath.Clean(path)
+	rel, err := filepath.Rel(nodeCertStore, path)
+	return slices.Contains(ownCerts, path) || (err == nil && filepath.IsLocal(rel))
 }
 
 // normalizeRelayTarget reduces a fallback dest to the form localRelayTargets lists: a bare
