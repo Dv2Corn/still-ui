@@ -1,5 +1,5 @@
 import { Base64, Wireguard } from '@/utils';
-import { effectiveMtu } from '@/lib/xray/amneziawg-obfuscation';
+import { clientMtu } from '@/lib/xray/amneziawg-obfuscation';
 import { AmneziaWGKeepAliveRangeSchema } from '@/schemas/primitives/keepalive';
 
 import type { Inbound } from '@/schemas/api/inbound';
@@ -1124,7 +1124,7 @@ export function genAmneziaWGConfig(input: GenAmneziaWGLinkInput): string {
   ];
   const dns = [server.primaryDns, server.secondaryDns].filter((v) => !!v && v.trim() !== '');
   if (dns.length > 0) lines.push(`DNS = ${dns.join(', ')}`);
-  lines.push(`MTU = ${effectiveMtu(server.mtu, server.s4)}`);
+  lines.push(`MTU = ${clientMtu(server.mtu)}`);
   lines.push(`Jc = ${server.jc}`, `Jmin = ${server.jmin}`, `Jmax = ${server.jmax}`);
   lines.push(`S1 = ${server.s1}`, `S2 = ${server.s2}`);
   if (server.s3) lines.push(`S3 = ${server.s3}`);

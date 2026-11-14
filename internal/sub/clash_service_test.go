@@ -1541,11 +1541,9 @@ func TestGetProxies_CustomIPv6ShareAddrIsUnbracketed(t *testing.T) {
 	}
 }
 
-// TestBuildAmneziaWGProxyForClashEffectiveMTU pins the Clash mtu to the same
-// amneziawg.EffectiveMTU every other emitter uses -- the running interface
-// (amneziawgnet), the vpn:// .conf and both TS builders. Omitting the key
-// leaves mihomo on its own 1408 default, above the tunnel once s4 > 12.
-func TestBuildAmneziaWGProxyForClashEffectiveMTU(t *testing.T) {
+// TestBuildAmneziaWGProxyForClashClientMTU pins the Clash mtu to the same
+// amneziawg.ClientMTU the vpn:// .conf and both TS builders use.
+func TestBuildAmneziaWGProxyForClashClientMTU(t *testing.T) {
 	serverPriv, serverPub, err := wgutil.GenerateWireguardKeypair()
 	if err != nil {
 		t.Fatalf("server keypair: %v", err)
@@ -1575,11 +1573,10 @@ func TestBuildAmneziaWGProxyForClashEffectiveMTU(t *testing.T) {
 		return proxy
 	}
 
-	t.Run("unset MTU falls back to 1420-s4", func(t *testing.T) {
+	t.Run("unset MTU gives the 1280 client default", func(t *testing.T) {
 		proxy := build(t, 0, 27)
-		want := amneziawg.EffectiveMTU(0, 27)
-		if proxy["mtu"] != want {
-			t.Fatalf("mtu = %v, want %d (amneziawg.EffectiveMTU)", proxy["mtu"], want)
+		if proxy["mtu"] != amneziawg.ClientDefaultMTU {
+			t.Fatalf("mtu = %v, want %d (amneziawg.ClientMTU)", proxy["mtu"], amneziawg.ClientDefaultMTU)
 		}
 	})
 

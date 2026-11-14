@@ -2470,7 +2470,7 @@
         "presetQuic": "QUIC benzeri I1",
         "presetDns": "DNS benzeri I1",
         "presetHint": "Yeniden oluştur, tüm parametreleri yeni rastgele değerlerle değiştirir; mevcut istemcilerin yapılandırmalarını yeniden içe aktarması gerekir. I1 düğmeleri yalnızca imza paketlerini değiştirir (I1 ayarlanır, I2–I5 temizlenir): her el sıkışmadan önce gönderilen paket bir QUIC bağlantısının başlangıcına veya bir DNS sorgusuna benzer. Mevcut istemciler çalışmaya devam eder ve yeni paketi sonraki yapılandırmalarıyla alır.",
-        "mtuMobileHint": "Panelin oluşturduğu her istemci yapılandırmasına yazılır. Büyük paketleri düşüren mobil ağlarda 1280, varsayılandan birkaç kat hızlı olabilir.",
+        "mtuMobileHint": "Boş: sunucu 1420 eksi S4'te kalır, istemci yapılandırmalarına 1280 yazılır; büyük paketleri düşüren yollarda (mobil, PPPoE, diğer tüneller) birkaç kat daha hızlıdır. Buraya girilen değer hem sunucuya hem her istemci yapılandırmasına uygulanır.",
         "mtuMobile": "{mtu} yap",
         "jc": "Jc (gereksiz paket sayısı)",
         "jmin": "Jmin (min gereksiz paket boyutu)",

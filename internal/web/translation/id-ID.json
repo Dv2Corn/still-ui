@@ -2470,7 +2470,7 @@
         "presetQuic": "I1 mirip QUIC",
         "presetDns": "I1 mirip DNS",
         "presetHint": "Buat ulang mengganti semua parameter dengan nilai acak baru, sehingga klien yang ada harus mengimpor konfigurasinya lagi. Tombol I1 hanya mengubah paket tanda tangan (I1 diisi, I2–I5 dikosongkan): paket yang dikirim sebelum setiap handshake tampak seperti awal koneksi QUIC atau kueri DNS. Klien yang ada tetap berfungsi dan mendapat paket baru pada konfigurasi berikutnya.",
-        "mtuMobileHint": "Masuk ke setiap konfigurasi klien yang dibuat panel. Pada jaringan seluler yang membuang paket besar, 1280 bisa beberapa kali lebih cepat daripada nilai bawaan.",
+        "mtuMobileHint": "Kosong: server tetap 1420 dikurangi S4 dan konfigurasi klien mendapat 1280, beberapa kali lebih cepat di jalur yang membuang paket besar (seluler, PPPoE, terowongan lain). Nilai yang diisi di sini berlaku untuk server dan setiap konfigurasi klien.",
         "mtuMobile": "Atur ke {mtu}",
         "jc": "Jc (jumlah paket sampah)",
         "jmin": "Jmin (ukuran min paket sampah)",

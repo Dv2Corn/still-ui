@@ -562,3 +562,15 @@ func TestMTUIsBoundedWhereItIsSavedAndWhereItIsRead(t *testing.T) {
 		t.Fatalf("EffectiveMTU(2^31) = %d, want a stored oversized value capped at %d", got, MaxMTU)
 	}
 }
+
+// Blank MTU must not reach clients as the server's 1420-S4: issued configs get
+// 1280, an explicit admin value goes to both ends, and wrap-around stays capped.
+func TestClientMTU(t *testing.T) {
+	for _, tc := range []struct{ in, want int }{
+		{0, 1280}, {-1, 1280}, {1420, 1420}, {1380, 1380}, {MaxMTU + 1, MaxMTU},
+	} {
+		if got := ClientMTU(tc.in); got != tc.want {
+			t.Errorf("ClientMTU(%d) = %d, want %d", tc.in, got, tc.want)
+		}
+	}
+}

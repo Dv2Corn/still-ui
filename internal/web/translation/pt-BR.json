@@ -2470,7 +2470,7 @@
         "presetQuic": "I1 tipo QUIC",
         "presetDns": "I1 tipo DNS",
         "presetHint": "Regenerar substitui todos os parâmetros por novos valores aleatórios, então os clientes existentes precisam importar a configuração novamente. Os botões I1 alteram apenas os pacotes de assinatura (I1 é definido e I2–I5 são limpos): o pacote enviado antes de cada handshake parece o início de uma conexão QUIC ou uma consulta DNS. Os clientes existentes continuam funcionando e recebem o novo pacote na próxima configuração.",
-        "mtuMobileHint": "Entra em cada configuração de cliente gerada pelo painel. Em redes móveis que descartam pacotes grandes, 1280 pode ser várias vezes mais rápido que o padrão.",
+        "mtuMobileHint": "Vazio: o servidor mantém 1420 menos S4 e as configurações de cliente recebem 1280, várias vezes mais rápido em caminhos que descartam pacotes grandes (redes móveis, PPPoE, outros túneis). Um valor definido aqui vale para o servidor e para cada configuração de cliente.",
         "mtuMobile": "Usar {mtu}",
         "jc": "Jc (quantidade de pacotes de lixo)",
         "jmin": "Jmin (tamanho mínimo do pacote de lixo)",
