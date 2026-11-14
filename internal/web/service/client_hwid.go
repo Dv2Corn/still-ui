@@ -358,6 +358,33 @@ func trackUnlimitedHwid(db *gorm.DB, subID string, req HwidRequest, policy hwidP
 	return !limited
 }
 
+// HwidDeviceHoldsSlotForSubID is SELECT-only: EnforceHwidForSubID's verdict for a device that
+// takes no new slot, so a page view never registers the browser as a device.
+func (s *ClientService) HwidDeviceHoldsSlotForSubID(subID string, hwid string) (bool, error) {
+	subID = strings.TrimSpace(subID)
+	if subID == "" {
+		return true, nil
+	}
+	db := database.GetDB()
+	policy, err := loadHwidPolicy(db)
+	if err != nil {
+		return false, err
+	}
+	limit, err := effectiveHwidLimitForSubID(db, subID, policy.defaultLimit)
+	if err != nil || limit <= 0 {
+		return err == nil, err
+	}
+	hwidHash := noIDHwidHash
+	if hwid = strings.TrimSpace(hwid); len(hwid) >= minHwidLength {
+		hwidHash = hashHwid(hwid)
+	} else if policy.noID != HwidNoIdShared {
+		return policy.noID == HwidNoIdAllow, nil
+	}
+	var held int64
+	err = policy.liveHwids(db).Model(&model.ClientHwid{}).Where("sub_id = ? AND hwid_hash = ?", subID, hwidHash).Count(&held).Error
+	return held > 0, err
+}
+
 // HwidSlotStatusForSubID is SELECT-only: it must never write client_hwids or
 // last_seen. It shares the gate's limit query, so limit == limit enforced.
 func (s *ClientService) HwidSlotStatusForSubID(subID string) (status HwidSlotStatus, found bool, err error) {

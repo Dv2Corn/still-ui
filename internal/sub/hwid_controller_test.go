@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -94,6 +95,32 @@ func TestSubscriptionHwidGateSkipsHtmlInfoPage(t *testing.T) {
 	if rec.Header().Get("X-Hwid-Not-Supported") != "" {
 		t.Fatalf("HTML sub page should not be HWID-gated: %#v", rec.Header())
 	}
+}
+
+// The page's share links are the credentials the gate guards on the body routes: only a
+// device that already holds a slot sees them, and viewing the page registers no device.
+func TestSubPageCarriesLinksOnlyForRegisteredDevice(t *testing.T) {
+	router, subID := initHwidSubRouter(t, 2)
+	assertServesRealServers(t, "/sub/"+subID, requestSub(t, router, http.MethodGet, "/sub/"+subID, "device-one", ""))
+
+	pages := []struct{ path, accept string }{
+		{"/sub/" + subID + "?html=1", ""},
+		{"/sub/" + subID, "text/html"},
+		{"/json/" + subID + "?view=html", ""},
+		{"/clash/" + subID + "?html=1", ""},
+	}
+	for _, page := range pages {
+		for _, hwid := range []string{"device-one", "device-two", ""} {
+			rec := requestSub(t, router, http.MethodGet, page.path, hwid, page.accept)
+			if rec.Code != http.StatusOK || !strings.HasPrefix(rec.Header().Get("Content-Type"), "text/html") {
+				t.Fatalf("%s (accept %q) for %q = %d %q, want the HTML page", page.path, page.accept, hwid, rec.Code, rec.Header().Get("Content-Type"))
+			}
+			if got, want := strings.Contains(rec.Body.String(), hwidTestClientUUID), hwid == "device-one"; got != want {
+				t.Fatalf("%s (accept %q) for %q carries the client's credentials = %v, want %v", page.path, page.accept, hwid, got, want)
+			}
+		}
+	}
+	assertHwidStatus(t, requestSub(t, router, http.MethodGet, "/sub/"+subID+"/hwid-status", "", ""), true, 2, 1, 1, false)
 }
 
 // Decoding into a map rather than the service struct keeps the exact field set
