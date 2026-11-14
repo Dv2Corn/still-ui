@@ -185,7 +185,7 @@ export class AllSetting {
   ldapDefaultExpiryDays = 0;
   ldapDefaultLimitIP = 0;
   tgEnabledEvents =
-    'login.attempt,cpu.high,xray.down,xray.flapping,process.memory,disk.high,cert.expiring,backup.failed,node.traffic';
+    'login.attempt,cpu.high,xray.down,xray.flapping,process.memory,disk.high,cert.expiring,backup.failed,node.traffic,sub.leak';
   smtpEnable = false;
   smtpHost = '';
   smtpPort = 587;
@@ -233,6 +233,8 @@ export class AllSetting {
   alertDisk = 90;
   alertCertDays = 7;
   alertRemindHours = 6;
+  subLeakNetworks = 6;
+  subLeakWindowHours = 24;
   connLogEnable = false;
   connLogRetentionDays = 30;
   connLogMaxSizeMB = 2048;

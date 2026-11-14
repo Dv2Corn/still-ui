@@ -220,6 +220,8 @@ export const AllSettingSchema = z
     alertDisk: z.number().int().min(1).max(100).optional(),
     alertCertDays: z.number().int().min(1).max(365).optional(),
     alertRemindHours: z.number().int().min(0).max(720).optional(),
+    subLeakNetworks: z.number().int().min(2).max(64).optional(),
+    subLeakWindowHours: z.number().int().min(1).max(168).optional(),
     connLogEnable: z.boolean().optional(),
     connLogRetentionDays: z.number().int().min(1).max(3650).optional(),
     connLogMaxSizeMB: z.number().int().min(16).max(1048576).optional(),

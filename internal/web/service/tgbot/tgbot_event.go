@@ -216,6 +216,9 @@ func healthAlertMessage(eventType eventbus.EventType, data *eventbus.HealthAlert
 	if eventType == eventbus.EventNodeTraffic && data != nil {
 		return nodeTrafficAlertMessage(data)
 	}
+	if eventType == eventbus.EventSubLeak && data != nil {
+		return "alertSubLeak", "⚠️ "
+	}
 	keys, ok := healthAlertKeys[eventType]
 	if !ok || data == nil {
 		return "", ""

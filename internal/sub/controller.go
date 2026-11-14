@@ -439,6 +439,7 @@ func (a *SUBController) maybeServeSubPage(c *gin.Context) bool {
 		return true
 	}
 	a.serveSubPage(c, page.BasePath, page)
+	countFetchNetwork(c)
 	return true
 }
 
@@ -601,7 +602,7 @@ func (a *SUBController) subs(c *gin.Context) {
 }
 
 func (a *SUBController) recordSubscriptionFetch(c *gin.Context) {
-	if c.Request == nil || c.Request.Method != http.MethodGet || c.Writer.Status() != http.StatusOK {
+	if !countFetchNetwork(c) {
 		return
 	}
 	// A refused device got the notice, not the subscription.
@@ -611,6 +612,16 @@ func (a *SUBController) recordSubscriptionFetch(c *gin.Context) {
 	if err := a.subService.RecordSubscriptionFetch(c.Param("subid")); err != nil {
 		logger.Warning("Failed to record subscription fetch:", err)
 	}
+}
+
+// countFetchNetwork feeds the leak alert with the client network of a GET that got the subscription,
+// its page or a device notice: a refused device is someone else holding the link too.
+func countFetchNetwork(c *gin.Context) bool {
+	if c.Request == nil || c.Request.Method != http.MethodGet || c.Writer.Status() != http.StatusOK {
+		return false
+	}
+	service.RecordSubscriptionNetwork(c.Param("subid"), service.RemoteIP(c.Request))
+	return true
 }
 
 func shouldAutoServeClash(autoDetect, clashEnabled, wantsHTML bool, userAgent string, userAgentRegex *regexp.Regexp) bool {
