@@ -6,11 +6,11 @@ import (
 	"sync"
 )
 
-// Every open panel connection holds buffers and a goroutine before any login, so their
-// number is bounded overall and per source; a loopback reverse proxy counts only overall.
+// Every open panel or subscription connection holds buffers and a goroutine before any login,
+// so their number is bounded overall and per source; a loopback reverse proxy counts only overall.
 const (
-	MaxPanelConns          = 2048
-	MaxPanelConnsPerSource = 256
+	MaxConns          = 2048
+	MaxConnsPerSource = 256
 )
 
 type limitListener struct {

@@ -431,6 +431,8 @@ func (s *Server) Start() (err error) {
 	if err != nil {
 		return err
 	}
+	// Counted before TLS: a handshake left open holds the same buffers as a request.
+	listener = network.NewLimitListener(listener, network.MaxConns, network.MaxConnsPerSource)
 
 	certreload.Register("subscription", nil)
 	if certFile != "" || keyFile != "" {
