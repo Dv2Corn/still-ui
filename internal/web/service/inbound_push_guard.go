@@ -163,6 +163,10 @@ func hostReaches(inbound *model.Inbound) ([]pushReach, error) {
 			}
 		}
 	}
+	// The core creates "<path>.lock" and binds the socket wherever a unix listen points.
+	if listen := strings.TrimSpace(inbound.Listen); strings.HasPrefix(listen, "/") || strings.HasPrefix(listen, "@") {
+		reaches = append(reaches, pushReach{field: "listen", value: strings.SplitN(listen, ",", 2)[0]})
+	}
 	for _, leaf := range jsonLeaves(inbound.Settings) {
 		switch {
 		case leaf.endsWith("fallbacks", "[]", "dest"):

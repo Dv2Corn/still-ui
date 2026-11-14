@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/mhsanaei/3x-ui/v3/internal/database"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 )
 
@@ -77,5 +78,33 @@ func TestPushedFallbackDestMustBeAnEnabledLocalInboundsAddress(t *testing.T) {
 		if err := fallback(dest); err != nil {
 			t.Errorf("fallback dest %s refused: %v", dest, err)
 		}
+	}
+}
+
+// A unix listen makes the core create and remove "<path>.lock" and bind a socket at that
+// path, so a push may only keep the socket this node stores; its ",mode" may change.
+func TestPushedUnixListenMustBeTheStoredOne(t *testing.T) {
+	push := pushGuardTestService(t)
+	for i, listen := range []string{"/etc/x-ui/victim,0666", "@abstract-name"} {
+		_, _, err := push.AddInbound(&model.Inbound{Enable: true, Port: 44450 + i, Listen: listen, Protocol: model.VLESS, Settings: `{"clients":[]}`})
+		if want := "may not set listen to"; err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("pushed listen %q = %v, want %q", listen, err, want)
+		}
+	}
+
+	seedInboundConflict(t, "socket", "/dev/shm/in.sock,0600", 0, model.VLESS, `{"network":"tcp"}`, `{"clients":[]}`)
+	var stored model.Inbound
+	if err := database.GetDB().Where("tag = ?", "socket").First(&stored).Error; err != nil {
+		t.Fatalf("load the stored socket inbound: %v", err)
+	}
+	keep := stored
+	keep.Listen = "/dev/shm/in.sock,0666"
+	if _, _, err := push.UpdateInbound(&keep); err != nil {
+		t.Fatalf("pushing the stored socket with another mode: %v", err)
+	}
+	moved := stored
+	moved.Listen = "/dev/shm/other.sock"
+	if _, _, err := push.UpdateInbound(&moved); err == nil || !strings.Contains(err.Error(), `may not set listen to "/dev/shm/other.sock"`) {
+		t.Fatalf("a push moved the socket: %v", err)
 	}
 }
