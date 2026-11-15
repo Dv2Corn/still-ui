@@ -136,6 +136,19 @@ func TestSubPageSaysWhenTheDeviceLimitHidesItsLinks(t *testing.T) {
 	}
 }
 
+// A failed device lookup is not the device limit: the page answers with an error, not with
+// the notice that the limit hides its links.
+func TestSubPageDoesNotBlameTheDeviceLimitForADatabaseError(t *testing.T) {
+	router, subID := initHwidSubRouter(t, 2)
+	if err := database.GetDB().Exec("ALTER TABLE client_hwids RENAME TO client_hwids_gone").Error; err != nil {
+		t.Fatal(err)
+	}
+	rec := requestSub(t, router, http.MethodGet, "/sub/"+subID+"?html=1", "device-one", "")
+	if rec.Code != http.StatusInternalServerError || strings.Contains(rec.Body.String(), "linksHidden") || strings.Contains(rec.Body.String(), hwidTestClientUUID) {
+		t.Fatalf("page on a failed device lookup = %d %q, want a bare 500", rec.Code, rec.Body.String())
+	}
+}
+
 // Decoding into a map rather than the service struct keeps the exact field set
 // asserted, so an extra field leaking into the response fails the test.
 func assertHwidStatus(t *testing.T, rec *httptest.ResponseRecorder, active bool, limit, registered, remaining int, full bool) {

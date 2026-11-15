@@ -46,14 +46,22 @@ func TestSubIDRotationEndsTheTelegramBindingOnEveryPath(t *testing.T) {
 			if got := lookupClientRecord(t, email).TgID; got != tc.wantTgID {
 				t.Fatalf("record tg_id = %d, want %d", got, tc.wantTgID)
 			}
-			// The stored entry too: the next sync of this inbound reads it back into the record.
-			var stored model.Inbound
-			if err := database.GetDB().First(&stored, ib.Id).Error; err != nil {
-				t.Fatal(err)
-			}
-			clients, err := ParseInboundSettingsClients(stored.Settings)
-			if err != nil || len(clients) != 1 || clients[0].TgID != tc.wantTgID {
-				t.Fatalf("stored entry = %+v, %v; want tgId %d", clients, err, tc.wantTgID)
+			// The stored entry too: syncing the inbound again reads it back into the record.
+			for range 2 {
+				var stored model.Inbound
+				if err := database.GetDB().First(&stored, ib.Id).Error; err != nil {
+					t.Fatal(err)
+				}
+				clients, err := ParseInboundSettingsClients(stored.Settings)
+				if err != nil || len(clients) != 1 || clients[0].TgID != tc.wantTgID {
+					t.Fatalf("stored entry = %+v, %v; want tgId %d", clients, err, tc.wantTgID)
+				}
+				if err := svc.SyncInbound(nil, ib.Id, clients); err != nil {
+					t.Fatalf("sync from the stored entry: %v", err)
+				}
+				if got := lookupClientRecord(t, email).TgID; got != tc.wantTgID {
+					t.Fatalf("record tg_id after a sync from the stored entry = %d, want %d", got, tc.wantTgID)
+				}
 			}
 		})
 		t.Run("inbound client sync: "+tc.name, func(t *testing.T) {

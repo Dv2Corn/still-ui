@@ -516,7 +516,13 @@ func (a *SUBController) buildSubPageData(c *gin.Context) (PageData, bool) {
 		page.DeviceLimit, page.DeviceCount = devices.Limit, devices.Registered
 	}
 	// The links are the credentials the device gate guards on the body routes.
-	if held, err := a.clientService.HwidDeviceHoldsSlotForSubID(subId, c.GetHeader("X-HWID")); err != nil || !held {
+	held, err := a.clientService.HwidDeviceHoldsSlotForSubID(subId, c.GetHeader("X-HWID"))
+	if err != nil {
+		// Not the device limit's doing, so the page must not say it is.
+		writeSubError(c, err)
+		return PageData{}, false
+	}
+	if !held {
 		page.Result = []string{}
 		page.LinksHidden = true
 	}

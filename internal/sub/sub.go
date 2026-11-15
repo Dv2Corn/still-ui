@@ -433,11 +433,7 @@ func (s *Server) Start() (err error) {
 		return err
 	}
 	// Counted before TLS: a handshake left open holds the same buffers as a request.
-	// A front proxy named in trustedProxyCIDRs carries every subscriber on its one address.
-	trustedProxies, _ := s.settingService.GetTrustedProxyCIDRs()
-	listener = network.NewLimitListener(listener, network.MaxConns, network.MaxSubConnsPerSource, func(addr netip.Addr) bool {
-		return remoteAddrInCIDRs(addr.String(), trustedProxies)
-	})
+	listener = network.NewLimitListener(listener, network.MaxConns, network.MaxSubConnsPerSource, s.trustedFront())
 
 	certreload.Register("subscription", nil)
 	if certFile != "" || keyFile != "" {
@@ -465,13 +461,22 @@ func (s *Server) Start() (err error) {
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
-		// Short: a subscription is one request, and an idle connection still holds a slot.
-		IdleTimeout: 15 * time.Second,
+		IdleTimeout:       subIdleTimeout,
 	}
 
 	go network.ServeHTTP(s.httpServer, listener, "Subscription server")
 
 	return nil
+}
+
+// Short: a subscription is one request, and an idle connection still holds a slot.
+const subIdleTimeout = 15 * time.Second
+
+// trustedFront matches a front proxy named in trustedProxyCIDRs: it carries every subscriber
+// on its one address, so the listener gives it no per-source share.
+func (s *Server) trustedFront() func(netip.Addr) bool {
+	trusted, _ := s.settingService.GetTrustedProxyCIDRs()
+	return func(addr netip.Addr) bool { return remoteAddrInCIDRs(addr.String(), trusted) }
 }
 
 // Stop gracefully shuts down the subscription server and closes the listener.
