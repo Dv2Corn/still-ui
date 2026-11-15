@@ -451,6 +451,10 @@ func TestDisconnectClientTemporarilyStoresTheRestoreBeforeRemoving(t *testing.T)
 	if err := db.Model(&model.ClientRecord{}).Where("email = ?", email).Update("enable", true).Error; err != nil {
 		t.Fatal(err)
 	}
+	settings := `{"clients":[{"email":"` + email + `","id":"33333333-3333-3333-3333-333333333333","enable":true}]}`
+	if err := db.Model(&model.Inbound{}).Where("id = ?", inbound.Id).Update("settings", settings).Error; err != nil {
+		t.Fatal(err)
+	}
 	stored := func() string {
 		var row model.Setting
 		if err := db.Where("key = ?", owedRestoresKey).Limit(1).Find(&row).Error; err != nil {
