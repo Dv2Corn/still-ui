@@ -22,10 +22,14 @@ func TestPushGuardChecksKeysSpelledWithFoldingRunes(t *testing.T) {
 	}
 	cases := map[string]*model.Inbound{
 		"realitySettingſ": {Port: 44902, Protocol: model.VLESS, Settings: vlessSettings, StreamSettings: realityStream("realitySettingſ", "")},
-		"fallbackſ": {Port: 44905, Protocol: model.VLESS, StreamSettings: `{"network":"tcp"}`,
-			Settings: `{"clients":[],"decryption":"none","fallbackſ":[{"dest":"127.0.0.1:62789"}]}`},
-		"maſterKeyLog": {Port: 44904, Protocol: model.VLESS, Settings: vlessSettings,
-			StreamSettings: `{"network":"tcp","security":"reality","realitySettings":{"target":"1.1.1.1:443","maſterKeyLog":"/etc/cron.d/zz","serverNames":["a.com"],"privateKey":"` + pk + `","shortIds":[""]}}`},
+		"fallbackſ": {
+			Port: 44905, Protocol: model.VLESS, StreamSettings: `{"network":"tcp"}`,
+			Settings: `{"clients":[],"decryption":"none","fallbackſ":[{"dest":"127.0.0.1:62789"}]}`,
+		},
+		"maſterKeyLog": {
+			Port: 44904, Protocol: model.VLESS, Settings: vlessSettings,
+			StreamSettings: `{"network":"tcp","security":"reality","realitySettings":{"target":"1.1.1.1:443","maſterKeyLog":"/etc/cron.d/zz","serverNames":["a.com"],"privateKey":"` + pk + `","shortIds":[""]}}`,
+		},
 	}
 	for name, ib := range cases {
 		if err := validatePushedInbound(ib, nil); err == nil {
