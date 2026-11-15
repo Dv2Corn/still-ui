@@ -797,13 +797,22 @@ func (j *CheckClientIpJob) disconnectClientTemporarily(inbound *model.Inbound, c
 		return
 	}
 
+	// The local core never hosts a node's inbound: nothing to remove here, and nothing to owe.
+	if inbound.NodeID != nil {
+		return
+	}
+
 	// Owed before RemoveUser and stored: a panel killed between the removal and the re-add
 	// leaves a core that outlives it without the client, and only the stored entry brings it back.
 	owed := owedRestore{InboundID: inbound.Id, Email: clientEmail}
 	if !slices.Contains(j.owedRestores, owed) {
 		j.owedRestores = append(j.owedRestores, owed)
 	}
-	j.saveOwedRestores()
+	if j.saveOwedRestores(); j.owedUnsaved {
+		// Not removed while the debt is only in memory; the fail2ban ban still ends live traffic.
+		logger.Warningf("[LIMIT_IP] Not disconnecting %s: its restore could not be stored", clientEmail)
+		return
+	}
 
 	// The core's RemoveUser clears its validator: a session already up keeps
 	// running, except a reverse vless client, which is skipped above.

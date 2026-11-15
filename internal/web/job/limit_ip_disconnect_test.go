@@ -505,3 +505,32 @@ func TestDisconnectClientTemporarilyKeepsTheRestoreOwedWhenRemoveFails(t *testin
 		t.Fatalf("owed after a failed remove: in memory %v, stored %v; want %v in both", job.owedRestores, next.owedRestores, owed)
 	}
 }
+
+// A client resolved to a node's inbound is not in the local core: the job neither removes it
+// nor owes its restore, so no run keeps retrying an AddUser the core cannot take.
+func TestDisconnectClientTemporarilyLeavesNodeInboundsAlone(t *testing.T) {
+	const email = "node-probe"
+	setupIntegrationDB(t)
+	db := database.GetDB()
+	inbound := seedLinkedInboundWithClient(t, "node-probe-tag", email, 1)
+	nodeID := 7
+	settings := `{"clients":[{"email":"` + email + `","id":"44444444-4444-4444-4444-444444444444","enable":true}]}`
+	if err := db.Model(&model.Inbound{}).Where("id = ?", inbound.Id).Updates(map[string]any{"settings": settings, "node_id": nodeID}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Model(&model.ClientRecord{}).Where("email = ?", email).Update("enable", true).Error; err != nil {
+		t.Fatal(err)
+	}
+	inbound.NodeID = &nodeID
+	core := &fakeCoreAPI{failRemove: true, failAdd: true}
+	core.onOp = func(string) {}
+	startFakeCoreAPI(t, core)
+	job := &CheckClientIpJob{}
+	job.disconnectClientTemporarily(inbound, email, []model.Client{{Email: email, Enable: true}})
+	for i := 0; i < 3; i++ {
+		job.settleOwedRestores()
+	}
+	if len(job.owedRestores) != 0 || len(core.ops) != 0 {
+		t.Errorf("owed after 3 runs = %v, core ops %v; want nothing owed and the core untouched", job.owedRestores, core.ops)
+	}
+}

@@ -18,6 +18,8 @@ func TestSubLeakIPs(t *testing.T) {
 		// nginx appends the peer to X-Forwarded-For and passes the client's own X-Real-IP through:
 		// RemoteIP falls back to the proxy, but the leak count must still see the real network.
 		{"client X-Real-IP beside the proxy's X-Forwarded-For", "127.0.0.1:4000", "1.1.1.1", "203.0.113.5", []string{"1.1.1.1", "203.0.113.5"}},
+		// Two hops: nginx on loopback behind a trusted front at ::1 sets X-Real-IP to that front.
+		{"trusted front in X-Real-IP is no network", "127.0.0.1:4000", "::1", "203.0.113.5, ::1", []string{"203.0.113.5"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
