@@ -809,46 +809,60 @@ func (j *CheckClientIpJob) disconnectClientTemporarily(inbound *model.Inbound, c
 	// only widens the window in which new handshakes fail.
 	time.Sleep(100 * time.Millisecond)
 
-	// A disable or delete committed since the scan found no user to remove (or restarted
-	// the core) and will not come back for it.
-	if !j.clientStillServed(inbound.Id, clientEmail) {
-		logger.Infof("[LIMIT_IP] Not restoring %s: disabled or removed during its temporary disconnect", clientEmail)
-		return
+	// The client is out of the core now, so no failure below may simply return: a restart
+	// rebuilds the core's users from the database, whatever state that is.
+	restart := func(doing string, err error) {
+		logger.Warningf("[LIMIT_IP] Cannot restore %s, restarting Xray to settle it: %s: %v", clientEmail, doing, err)
+		(&service.XrayService{}).SetToNeedRestart()
 	}
 	// Read after the removal, not from the scan: a credential rotated since then is already
 	// in the core, and the scan's copy would put the retired one back.
-	clientConfig, err := storedClientConfig(inbound.Id, clientEmail)
+	read := func() (served bool, config map[string]any, err error) {
+		if served, err = j.clientStillServed(inbound.Id, clientEmail); err != nil || !served {
+			return served, nil, err
+		}
+		config, err = storedClientConfig(inbound.Id, clientEmail)
+		return served, config, err
+	}
+	served, clientConfig, err := read()
 	for attempt := 0; err != nil && attempt < 2; attempt++ {
-		time.Sleep(100 * time.Millisecond)
-		clientConfig, err = storedClientConfig(inbound.Id, clientEmail)
+		limitIPRetryPause()
+		served, clientConfig, err = read()
 	}
 	if err != nil {
-		// The client is still served but out of the core: a restart rebuilds its users from the database.
-		logger.Warningf("[LIMIT_IP] Cannot restore %s, restarting Xray to bring it back: reading its stored settings: %v", clientEmail, err)
-		(&service.XrayService{}).SetToNeedRestart()
+		restart("reading its stored state", err)
 		return
 	}
-	if clientConfig == nil {
-		logger.Infof("[LIMIT_IP] Not restoring %s: its inbound no longer lists it", clientEmail)
+	// A disable or delete committed since the scan found no user to remove (or restarted
+	// the core) and will not come back for it.
+	if !served || clientConfig == nil {
+		logger.Infof("[LIMIT_IP] Not restoring %s: disabled or removed during its temporary disconnect", clientEmail)
 		return
 	}
 
 	// Re-add user to allow new connections
-	err = xrayAPI.AddUser(protocol, inbound.Tag, clientConfig)
-	if err != nil {
-		logger.Warningf("[LIMIT_IP] Failed to re-add user %s: %v", clientEmail, err)
+	if err := xrayAPI.AddUser(protocol, inbound.Tag, clientConfig); err != nil {
+		restart("re-adding it", err)
 		return
 	}
 
 	// Asked again: a commit can land between the check and the re-add. Writers touch
 	// the core only after they commit, so one this check misses removes the user itself.
-	if !j.clientStillServed(inbound.Id, clientEmail) {
+	served, err = j.clientStillServed(inbound.Id, clientEmail)
+	if err != nil {
+		restart("checking it is still served", err)
+		return
+	}
+	if !served {
 		logger.Infof("[LIMIT_IP] Removing %s again: disabled or removed during its temporary disconnect", clientEmail)
 		if err := xrayAPI.RemoveUser(inbound.Tag, clientEmail); err != nil {
 			logger.Warningf("[LIMIT_IP] Failed to remove user %s again: %v", clientEmail, err)
 		}
 	}
 }
+
+// limitIPRetryPause separates the retries of a failed read; tests replace it.
+var limitIPRetryPause = func() { time.Sleep(100 * time.Millisecond) }
 
 // storedClientConfig is the client's entry in the inbound as stored now, as an AddUser
 // config; nil when the inbound no longer lists it.
@@ -885,7 +899,7 @@ func storedClientConfig(inboundId int, clientEmail string) (map[string]any, erro
 
 // clientStillServed is GetXrayConfig's rule for handing a client to the core: linked to
 // the enabled inbound, enabled, not depleted per client_traffics. A failed read is "no".
-func (j *CheckClientIpJob) clientStillServed(inboundId int, clientEmail string) bool {
+func (j *CheckClientIpJob) clientStillServed(inboundId int, clientEmail string) (bool, error) {
 	var served int64
 	err := database.GetDB().Table("client_inbounds").
 		Joins("JOIN clients ON clients.id = client_inbounds.client_id").
@@ -894,8 +908,7 @@ func (j *CheckClientIpJob) clientStillServed(inboundId int, clientEmail string) 
 		Where("clients.email = ? AND clients.enable = ?", clientEmail, true).
 		Where("NOT EXISTS (SELECT 1 FROM client_traffics WHERE client_traffics.email = clients.email AND client_traffics.enable = ?)", false).
 		Count(&served).Error
-	j.checkError(err)
-	return err == nil && served > 0
+	return served > 0, err
 }
 
 // resolveXrayAPIPort returns the API inbound port from running config, then template config, then default.

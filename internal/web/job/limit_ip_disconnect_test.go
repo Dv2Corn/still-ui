@@ -2,6 +2,7 @@ package job
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -10,7 +11,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/database"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
@@ -98,6 +98,8 @@ type fakeCoreAPI struct {
 	ops   []string
 	onOp  func(op string)
 	onAdd func(vlessID string)
+	// failAdd makes the core refuse every AddUser.
+	failAdd bool
 }
 
 func (f *fakeCoreAPI) AlterInbound(_ context.Context, req *command.AlterInboundRequest) (*command.AlterInboundResponse, error) {
@@ -122,6 +124,9 @@ func (f *fakeCoreAPI) AlterInbound(_ context.Context, req *command.AlterInboundR
 		}
 	}
 	f.onOp(op)
+	if op == "add" && f.failAdd {
+		return nil, errors.New("core refuses the user")
+	}
 	return &command.AlterInboundResponse{}, nil
 }
 
@@ -237,19 +242,25 @@ func TestDisconnectClientTemporarilyRestoresTheStoredCredential(t *testing.T) {
 	}
 }
 
-// After RemoveUser a failed read of the stored settings must not leave the client out of the
-// core: a passing failure is retried, a lasting one asks for a restart.
-func TestDisconnectClientTemporarilyDoesNotStrandTheClientOnAReadFailure(t *testing.T) {
+// After RemoveUser no failure may leave the client out of the core for good: a passing
+// read failure is retried, and a lasting one or a failed re-add asks for a restart.
+func TestDisconnectClientTemporarilyDoesNotStrandTheClient(t *testing.T) {
 	const email = "strand-probe"
 	const stored = `{"clients":[{"email":"` + email + `","id":"11111111-1111-1111-1111-111111111111","enable":true}]}`
 	for _, tc := range []struct {
 		name        string
-		healAfter   time.Duration
+		breakIt     func(db *gorm.DB, inbound *model.Inbound) error
+		heals       bool
+		failAdd     bool
 		wantOps     []string
 		wantRestart bool
 	}{
-		{name: "the read fails once", healAfter: 50 * time.Millisecond, wantOps: []string{"remove", "add"}},
-		{name: "the read keeps failing", wantOps: []string{"remove"}, wantRestart: true},
+		{name: "the settings read fails once", heals: true, wantOps: []string{"remove", "add"}},
+		{name: "the settings read keeps failing", wantOps: []string{"remove"}, wantRestart: true},
+		{name: "the served check keeps failing", wantOps: []string{"remove"}, wantRestart: true, breakIt: func(db *gorm.DB, _ *model.Inbound) error {
+			return db.Exec("ALTER TABLE client_inbounds RENAME TO client_inbounds_gone").Error
+		}},
+		{name: "the re-add fails", failAdd: true, wantOps: []string{"remove", "add"}, wantRestart: true, breakIt: func(*gorm.DB, *model.Inbound) error { return nil }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			setupIntegrationDB(t)
@@ -258,34 +269,39 @@ func TestDisconnectClientTemporarilyDoesNotStrandTheClientOnAReadFailure(t *test
 			if err := db.Model(&model.ClientRecord{}).Where("email = ?", email).Update("enable", true).Error; err != nil {
 				t.Fatal(err)
 			}
-			setSettings := func(settings string) {
-				if err := db.Model(&model.Inbound{}).Where("id = ?", inbound.Id).Update("settings", settings).Error; err != nil {
-					t.Error(err)
-				}
+			setSettings := func(settings string) error {
+				return db.Model(&model.Inbound{}).Where("id = ?", inbound.Id).Update("settings", settings).Error
 			}
-			setSettings(stored)
+			if err := setSettings(stored); err != nil {
+				t.Fatal(err)
+			}
+			if tc.breakIt == nil {
+				tc.breakIt = func(*gorm.DB, *model.Inbound) error { return setSettings(`{"clients":[{"email":`) }
+			}
 			xrayService := &service.XrayService{}
 			xrayService.IsNeedRestartAndSetFalse()
-
-			healed := make(chan struct{})
-			core := &fakeCoreAPI{}
-			core.onOp = func(op string) {
-				if op != "remove" {
-					return
+			oldPause := limitIPRetryPause
+			limitIPRetryPause = func() {
+				if tc.heals {
+					if err := setSettings(stored); err != nil {
+						t.Error(err)
+					}
 				}
-				setSettings(`{"clients":[{"email":`)
-				if tc.healAfter > 0 {
-					// The job sleeps 100ms after the removal before its first read.
-					time.AfterFunc(100*time.Millisecond+tc.healAfter, func() { setSettings(stored); close(healed) })
+			}
+			t.Cleanup(func() { limitIPRetryPause = oldPause })
+
+			core := &fakeCoreAPI{failAdd: tc.failAdd}
+			core.onOp = func(op string) {
+				if op == "remove" {
+					if err := tc.breakIt(db, inbound); err != nil {
+						t.Error(err)
+					}
 				}
 			}
 			startFakeCoreAPI(t, core)
 
 			clients := []model.Client{{Email: email, ID: "11111111-1111-1111-1111-111111111111", Enable: true}}
 			(&CheckClientIpJob{}).disconnectClientTemporarily(inbound, email, clients)
-			if tc.healAfter > 0 {
-				<-healed
-			}
 
 			core.mu.Lock()
 			defer core.mu.Unlock()
