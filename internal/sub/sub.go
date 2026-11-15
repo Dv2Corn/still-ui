@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"strconv"
 	"strings"
@@ -432,7 +433,11 @@ func (s *Server) Start() (err error) {
 		return err
 	}
 	// Counted before TLS: a handshake left open holds the same buffers as a request.
-	listener = network.NewLimitListener(listener, network.MaxConns, network.MaxConnsPerSource)
+	// A front proxy named in trustedProxyCIDRs carries every subscriber on its one address.
+	trustedProxies, _ := s.settingService.GetTrustedProxyCIDRs()
+	listener = network.NewLimitListener(listener, network.MaxConns, network.MaxSubConnsPerSource, func(addr netip.Addr) bool {
+		return remoteAddrInCIDRs(addr.String(), trustedProxies)
+	})
 
 	certreload.Register("subscription", nil)
 	if certFile != "" || keyFile != "" {
@@ -460,7 +465,8 @@ func (s *Server) Start() (err error) {
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
-		IdleTimeout:       120 * time.Second,
+		// Short: a subscription is one request, and an idle connection still holds a slot.
+		IdleTimeout: 15 * time.Second,
 	}
 
 	go network.ServeHTTP(s.httpServer, listener, "Subscription server")

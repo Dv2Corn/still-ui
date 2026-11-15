@@ -30,7 +30,7 @@ func TestSubServerCapsConnectionsPerSource(t *testing.T) {
 	t.Cleanup(func() { _ = server.Stop() })
 	target := net.JoinHostPort(source.String(), strconv.Itoa(server.listener.Addr().(*net.TCPAddr).Port))
 
-	for range network.MaxConnsPerSource {
+	for range network.MaxSubConnsPerSource {
 		conn, err := net.Dial("tcp", target)
 		if err != nil {
 			t.Fatalf("dial within the cap: %v", err)
@@ -45,7 +45,7 @@ func TestSubServerCapsConnectionsPerSource(t *testing.T) {
 	// An accepted connection waits up to ReadHeaderTimeout (5s) for a request; a refused one ends now.
 	_ = extra.SetReadDeadline(time.Now().Add(2 * time.Second))
 	if _, err := extra.Read(make([]byte, 1)); errors.Is(err, os.ErrDeadlineExceeded) {
-		t.Fatalf("connection %d from one source was held open, want it closed at once", network.MaxConnsPerSource+1)
+		t.Fatalf("connection %d from one source was held open, want it closed at once", network.MaxSubConnsPerSource+1)
 	}
 }
 
