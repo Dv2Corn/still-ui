@@ -226,6 +226,7 @@ func TestAddInboundRefusesPushedFieldsThatReachThisHost(t *testing.T) {
 	setupConflictDB(t)
 	mgr := useTestRuntimeManager(t)
 	mgr.SetLocalRuntimeOverride(&fakeNodeRuntime{})
+	stubPushGuardLookup(t, map[string]string{"www.example.com": "93.184.215.14"})
 	push := &InboundService{FromNodeSync: true}
 	if _, _, err := push.AddInbound(&model.Inbound{Tag: "web", Enable: true, Port: 44400, Protocol: model.VLESS, Settings: `{"clients":[]}`}); err != nil {
 		t.Fatalf("seed a local inbound: %v", err)

@@ -106,15 +106,21 @@ func validatePushedInbound(inbound, stored *model.Inbound) error {
 	if (stored == nil || stored.Protocol != inbound.Protocol) && !nodeEligibleProtocols[inbound.Protocol] {
 		return common.NewErrorf("%s inbounds cannot be pushed to a node", inbound.Protocol)
 	}
-	reaches, err := hostReaches(inbound)
-	if err != nil {
-		return err
-	}
+	// The stored row's relay targets were judged when they were set: a name among them is
+	// neither resolved again (a flapping resolver must not refuse an unchanged inbound) nor
+	// resolved for the stored side at all.
 	var allowed []pushReach
+	var kept map[pushReach]bool
 	if stored != nil {
-		if allowed, err = hostReaches(stored); err != nil {
+		var err error
+		if allowed, err = hostReaches(stored, nil, false); err != nil {
 			return err
 		}
+		kept = relayTargets(stored)
+	}
+	reaches, err := hostReaches(inbound, kept, true)
+	if err != nil {
+		return err
 	}
 	for _, r := range reaches {
 		if !slices.Contains(allowed, r) {
@@ -124,7 +130,25 @@ func validatePushedInbound(inbound, stored *model.Inbound) error {
 	return nil
 }
 
-func hostReaches(inbound *model.Inbound) ([]pushReach, error) {
+// relayTargets lists an inbound's REALITY targets and fallback dests as written.
+func relayTargets(inbound *model.Inbound) map[pushReach]bool {
+	targets := map[pushReach]bool{}
+	for _, leaf := range jsonLeaves(inbound.StreamSettings) {
+		if leaf.endsWith("realitysettings", "target") || leaf.endsWith("realitysettings", "dest") {
+			targets[pushReach{field: "REALITY target", value: leaf.value}] = true
+		}
+	}
+	for _, leaf := range jsonLeaves(inbound.Settings) {
+		if leaf.endsWith("fallbacks", "[]", "dest") {
+			targets[pushReach{field: "fallback dest", value: leaf.value}] = true
+		}
+	}
+	return targets
+}
+
+// hostReaches lists what an inbound reaches on this host. A relay target in kept is left
+// out unjudged; lookup resolves the names of the others.
+func hostReaches(inbound *model.Inbound, kept map[pushReach]bool, lookup bool) ([]pushReach, error) {
 	local, err := localRelayTargets(inbound.Id)
 	if err != nil {
 		return nil, err
@@ -164,7 +188,10 @@ func hostReaches(inbound *model.Inbound) ([]pushReach, error) {
 		case (leaf.endsWith("certificatefile") || leaf.endsWith("keyfile")) && lower != "" && !isNodeOwnCertFile(leaf.value, ownCerts):
 			add("certificate file", leaf)
 		case leaf.endsWith("realitysettings", "target") || leaf.endsWith("realitysettings", "dest"):
-			switch public, resolved := isPublicRealityTarget(leaf.value, ownPorts); {
+			if kept[pushReach{field: "REALITY target", value: leaf.value}] {
+				continue
+			}
+			switch public, resolved := isPublicRelayTarget(leaf.value, ownPorts, true, lookup); {
 			case !resolved:
 				add("REALITY target (its name does not resolve)", leaf)
 			case !public:
@@ -179,7 +206,13 @@ func hostReaches(inbound *model.Inbound) ([]pushReach, error) {
 	for _, leaf := range jsonLeaves(inbound.Settings) {
 		switch {
 		case leaf.endsWith("fallbacks", "[]", "dest"):
-			if !isPublicRelayTarget(leaf.value, ownPorts) && !slices.Contains(local, normalizeRelayTarget(leaf.value)) {
+			if kept[pushReach{field: "fallback dest", value: leaf.value}] || slices.Contains(local, normalizeRelayTarget(leaf.value)) {
+				continue
+			}
+			switch public, resolved := isPublicRelayTarget(leaf.value, ownPorts, false, lookup); {
+			case !resolved:
+				add("fallback dest (its name does not resolve)", leaf)
+			case !public:
 				add("fallback dest", leaf)
 			}
 		case leaf.endsWith("domainfronting", "ip"):
@@ -192,34 +225,28 @@ func hostReaches(inbound *model.Inbound) ([]pushReach, error) {
 }
 
 // isPublicRelayTarget reports whether a relay target dials a public host, not this one: a
-// bare port, a unix socket, a loopback or private host, this host's own addresses, and any
-// name on one of this node's own ports (it may resolve to loopback by dial time) stay here.
-func isPublicRelayTarget(target string, ownPorts []string) bool {
-	host, port, ok := splitRelayTarget(target)
-	if !ok {
-		return false
-	}
-	if ip := net.ParseIP(strings.Trim(host, "[]")); ip != nil {
-		return !isBlockedIP(ip) && !isLocalInterfaceIP(ip)
-	}
-	return !slices.Contains(ownPorts, port) && !namesInternalHost(host)
-}
-
-// isPublicRealityTarget is isPublicRelayTarget for a REALITY target, with one exception: a
-// name on 443, the usual REALITY target, may share the port with this node's panel or
-// subscription server. Such a name is resolved now and passes only when every address is
-// public; resolved is false when it does not resolve.
+// bare port, a unix socket, a loopback or private host, this host's own addresses, a zoned
+// address and any name on one of this node's own ports stay here. The one name allowed on
+// an own port is a REALITY target on 443, its usual port, which the panel or subscription
+// server may share. With lookup a name is resolved now and passes only when every address
+// is public; resolved is false when it does not resolve.
 // shortcut: the name may resolve elsewhere when Xray dials it (DNS rebinding); closing that
 // needs Xray to pin the address it was checked against.
-func isPublicRealityTarget(target string, ownPorts []string) (public, resolved bool) {
+func isPublicRelayTarget(target string, ownPorts []string, reality, lookup bool) (public, resolved bool) {
 	host, port, ok := splitRelayTarget(target)
-	if !ok || port != "443" || net.ParseIP(strings.Trim(host, "[]")) != nil || !slices.Contains(ownPorts, port) {
-		return isPublicRelayTarget(target, ownPorts), true
-	}
-	if namesInternalHost(host) {
+	if !ok || strings.Contains(host, "%") {
 		return false, true
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	if ip := net.ParseIP(strings.Trim(host, "[]")); ip != nil {
+		return !isBlockedIP(ip) && !isLocalInterfaceIP(ip), true
+	}
+	if (slices.Contains(ownPorts, port) && !(reality && port == "443")) || namesInternalHost(host) {
+		return false, true
+	}
+	if !lookup {
+		return true, true
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), pushGuardLookupTimeout)
 	defer cancel()
 	addrs, err := pushGuardLookup(ctx, host)
 	if err != nil || len(addrs) == 0 {
@@ -233,7 +260,10 @@ func isPublicRealityTarget(target string, ownPorts []string) (public, resolved b
 	return true, true
 }
 
-// pushGuardLookup resolves a pushed REALITY target name; tests replace it.
+// A push waits this long, per new target name, for the node's resolver.
+const pushGuardLookupTimeout = 2 * time.Second
+
+// pushGuardLookup resolves a pushed relay target name; tests replace it.
 var pushGuardLookup = net.DefaultResolver.LookupIPAddr
 
 // splitRelayTarget reads host:port as Go's dialer would, refusing a socket path and any port
@@ -279,8 +309,9 @@ func nodeOwnCertFiles() []string {
 	return files
 }
 
-// nodeCertStore is where x-ui.sh's acme flows install this node's certificates.
-const nodeCertStore = "/root/cert"
+// nodeCertStores are where this node's certificates are installed: by x-ui.sh's acme flows
+// and by certbot. ~/.acme.sh stays out: it also holds account keys and DNS API credentials.
+var nodeCertStores = []string{"/root/cert", "/etc/letsencrypt/live"}
 
 // isNodeOwnCertFile reports whether a pushed certificateFile or keyFile names one of this
 // node's own certificates; any other path would have the panel read a file the master picks.
@@ -290,8 +321,10 @@ func isNodeOwnCertFile(path string, ownCerts []string) bool {
 		return false
 	}
 	path = filepath.Clean(path)
-	rel, err := filepath.Rel(nodeCertStore, path)
-	return slices.Contains(ownCerts, path) || (err == nil && filepath.IsLocal(rel))
+	return slices.Contains(ownCerts, path) || slices.ContainsFunc(nodeCertStores, func(store string) bool {
+		rel, err := filepath.Rel(store, path)
+		return err == nil && filepath.IsLocal(rel)
+	})
 }
 
 // xrayListenHost reads a listen value as xray-core's net.ParseAddress does: one pair of
@@ -357,7 +390,8 @@ func localRelayTargets(selfID int) ([]string, error) {
 		}
 		// The core dials a bare port on localhost; BuildFallbacksJSON derives 127.0.0.1 for a wildcard.
 		ip := net.ParseIP(listen)
-		if listen == "" || ip.IsUnspecified() || ip.IsLoopback() {
+		// Another loopback address (127.0.0.2, ::1) leaves 127.0.0.1:port to whatever else binds it.
+		if listen == "" || ip.IsUnspecified() || ip.Equal(net.IPv4(127, 0, 0, 1)) {
 			targets = append(targets, port, net.JoinHostPort("127.0.0.1", port))
 		}
 		// A pushed row can carry any listen, so only an address of this host's own interfaces counts.

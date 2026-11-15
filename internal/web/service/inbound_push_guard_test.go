@@ -34,7 +34,7 @@ func TestPushedRelayTargetsOnTheNodesOwnPorts(t *testing.T) {
 	if err := settings.setInt("subPort", 443); err != nil {
 		t.Fatal(err)
 	}
-	resolved := map[string]string{"www.nvidia.com": "23.215.0.136", "rebind.example.com": "127.0.0.1", "lan.example.com": "192.168.1.10"}
+	resolved := map[string]string{"www.nvidia.com": "23.215.0.136", "sub.example.com": "93.184.215.14", "rebind.example.com": "127.0.0.1", "lan.example.com": "192.168.1.10"}
 	old := pushGuardLookup
 	pushGuardLookup = func(_ context.Context, host string) ([]net.IPAddr, error) {
 		if ip, ok := resolved[host]; ok {
