@@ -198,9 +198,8 @@ func readSettingsClient(entry json.RawMessage) (settingsClientEntry, bool) {
 	return c, true
 }
 
-// canonicalNodeSettings drops the top-level keys that only fold to "clients". Go binds
-// them to a struct's clients field while the raw-key readers see none, so a node could
-// list a client for crediting that the claim check never saw.
+// canonicalNodeSettings drops the keys Go would bind to a clients field but the exact-key
+// claim check does not see, so a node cannot list a client past that check.
 func canonicalNodeSettings(settings string) string {
 	var members map[string]json.RawMessage
 	if json.Unmarshal([]byte(settings), &members) != nil {
@@ -208,7 +207,7 @@ func canonicalNodeSettings(settings string) string {
 	}
 	folded := false
 	for key := range members {
-		if key != "clients" && strings.EqualFold(key, "clients") {
+		if key != "clients" && bindsAsClientsKey(key) {
 			delete(members, key)
 			folded = true
 		}
@@ -223,10 +222,18 @@ func canonicalNodeSettings(settings string) string {
 	return string(out)
 }
 
-// snapshotAttachedEmails lowercases the emails a snapshot inbound's settings list, read
-// entry by entry as the claim check reads them, so one odd entry hides no other client.
-// unreadable counts the entries without a readable email; ok is false when the settings
-// or their client list cannot be parsed, so membership is unknown.
+// bindsAsClientsKey asks the decoder itself whether it would bind key to a clients field,
+// so this never rests on a second idea of case folding.
+func bindsAsClientsKey(key string) bool {
+	var probe struct {
+		Clients json.RawMessage `json:"clients"`
+	}
+	raw, err := json.Marshal(map[string]int{key: 1})
+	return err == nil && json.Unmarshal(raw, &probe) == nil && len(probe.Clients) > 0
+}
+
+// snapshotAttachedEmails lowercases the emails a snapshot's settings list, read entry by entry
+// as the claim check does; ok is false when the list cannot be parsed (membership unknown).
 func snapshotAttachedEmails(settings string) (emails map[string]struct{}, unreadable int, ok bool) {
 	var members map[string]json.RawMessage
 	if json.Unmarshal([]byte(settings), &members) != nil || members == nil {

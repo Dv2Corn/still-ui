@@ -237,9 +237,8 @@ func TestDisconnectClientTemporarilyRestoresTheStoredCredential(t *testing.T) {
 	}
 }
 
-// The client is out of the core once RemoveUser returns. A read of its stored settings that
-// fails then must not leave it out for good: a passing failure is retried, and a lasting
-// one asks for the restart that rebuilds the core's users from the database.
+// After RemoveUser a failed read of the stored settings must not leave the client out of the
+// core: a passing failure is retried, a lasting one asks for a restart.
 func TestDisconnectClientTemporarilyDoesNotStrandTheClientOnAReadFailure(t *testing.T) {
 	const email = "strand-probe"
 	const stored = `{"clients":[{"email":"` + email + `","id":"11111111-1111-1111-1111-111111111111","enable":true}]}`

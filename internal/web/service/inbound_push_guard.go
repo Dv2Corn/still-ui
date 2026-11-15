@@ -106,9 +106,8 @@ func validatePushedInbound(inbound, stored *model.Inbound) error {
 	if (stored == nil || stored.Protocol != inbound.Protocol) && !nodeEligibleProtocols[inbound.Protocol] {
 		return common.NewErrorf("%s inbounds cannot be pushed to a node", inbound.Protocol)
 	}
-	// The stored row's relay targets were judged when they were set: a name among them is
-	// neither resolved again (a flapping resolver must not refuse an unchanged inbound) nor
-	// resolved for the stored side at all.
+	// The stored row's relay targets were judged when set and are not resolved again: a
+	// flapping resolver must not refuse an unchanged inbound.
 	var allowed []pushReach
 	var kept map[pushReach]bool
 	if stored != nil {
@@ -224,14 +223,8 @@ func hostReaches(inbound *model.Inbound, kept map[pushReach]bool, lookup bool) (
 	return reaches, nil
 }
 
-// isPublicRelayTarget reports whether a relay target dials a public host, not this one: a
-// bare port, a unix socket, a loopback or private host, this host's own addresses, a zoned
-// address and any name on one of this node's own ports stay here. The one name allowed on
-// an own port is a REALITY target on 443, its usual port, which the panel or subscription
-// server may share. With lookup a name is resolved now and passes only when every address
-// is public; resolved is false when it does not resolve.
-// shortcut: the name may resolve elsewhere when Xray dials it (DNS rebinding); closing that
-// needs Xray to pin the address it was checked against.
+// isPublicRelayTarget reports whether a relay target dials a public host, not this one; a
+// name on an own port passes only as a REALITY target on 443. resolved is false for a dead name.
 func isPublicRelayTarget(target string, ownPorts []string, reality, lookup bool) (public, resolved bool) {
 	host, port, ok := splitRelayTarget(target)
 	if !ok || strings.Contains(host, "%") {
@@ -240,12 +233,14 @@ func isPublicRelayTarget(target string, ownPorts []string, reality, lookup bool)
 	if ip := net.ParseIP(strings.Trim(host, "[]")); ip != nil {
 		return !isBlockedIP(ip) && !isLocalInterfaceIP(ip), true
 	}
-	if (slices.Contains(ownPorts, port) && !(reality && port == "443")) || namesInternalHost(host) {
+	if (slices.Contains(ownPorts, port) && (!reality || port != "443")) || namesInternalHost(host) {
 		return false, true
 	}
 	if !lookup {
 		return true, true
 	}
+	// shortcut: the name may resolve elsewhere when Xray dials it (DNS rebinding); closing that
+	// needs Xray to pin the address it was checked against.
 	ctx, cancel := context.WithTimeout(context.Background(), pushGuardLookupTimeout)
 	defer cancel()
 	addrs, err := pushGuardLookup(ctx, host)

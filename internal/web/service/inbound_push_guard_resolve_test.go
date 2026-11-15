@@ -22,9 +22,8 @@ func stubPushGuardLookup(t *testing.T, resolved map[string]string) {
 	t.Cleanup(func() { pushGuardLookup = old })
 }
 
-// An inbound listening on another loopback address binds next to a foreign service on
-// 127.0.0.1 without a conflict; it must not make "<port>" or "127.0.0.1:<port>" a local
-// fallback dest, only its own address.
+// An inbound on another loopback address binds next to a foreign service on 127.0.0.1, so it
+// makes only its own address a local fallback dest, not "<port>" or "127.0.0.1:<port>".
 func TestPushedFallbackToAnotherLoopbackAddressOpensOnlyThatAddress(t *testing.T) {
 	push := pushGuardTestService(t)
 	seedInboundConflict(t, "loop2", "127.0.0.2", 45441, model.VLESS, `{"network":"tcp"}`, `{"clients":[]}`)
@@ -50,9 +49,8 @@ func TestPushedFallbackToAnotherLoopbackAddressOpensOnlyThatAddress(t *testing.T
 	}
 }
 
-// Every relay target name is resolved when it is pushed, on any port: a public-looking name
-// for loopback or the LAN, a name that does not resolve and a zoned address are refused for
-// a fallback and for REALITY alike; a name with only public addresses passes.
+// Every pushed relay target name is resolved, on any port: a name for loopback or the LAN,
+// a dead name and a zoned address are refused for a fallback and for REALITY alike.
 func TestPushedRelayTargetNamesAreResolved(t *testing.T) {
 	push := pushGuardTestService(t)
 	stubPushGuardLookup(t, map[string]string{"www.nvidia.com": "23.215.0.136", "rebind.example.com": "127.0.0.1", "lan.example.com": "192.168.1.10", "meta.example.com": "169.254.169.254"})

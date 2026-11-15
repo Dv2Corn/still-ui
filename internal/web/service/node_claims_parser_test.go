@@ -7,9 +7,8 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/xray"
 )
 
-// Go binds "Clients" (any spelling that folds to "clients") to a struct's clients field,
-// while the claim check reads the exact key: a node listing a master-only client under the
-// folded key must neither bill it nor move its lifecycle, nor adopt it.
+// Go binds any key that folds to "clients", the claim check reads the exact one: a node
+// listing a master-only client under a folded key must not bill, change or adopt it.
 func TestNodeCannotListMasterOnlyClientUnderAFoldedKey(t *testing.T) {
 	const victim = `{"email":"victim@x","id":"99999999-9999-4999-8999-999999999999","subId":"victim-sub","enable":false,"expiryTime":1,"totalGB":1}`
 	for _, hostile := range []string{
@@ -17,8 +16,11 @@ func TestNodeCannotListMasterOnlyClientUnderAFoldedKey(t *testing.T) {
 		`{"clients":[],"Clients":[` + victim + `]}`,
 		`{"CLIENTS":[` + victim + `],"clients":[]}`,
 		`{"clientſ":[` + victim + `]}`,
+		`{"clıents":[` + victim + `]}`,
+		`{"clİents":[` + victim + `]}`,
+		`{"\u0043lients":[` + victim + `]}`,
 	} {
-		t.Run(hostile[:14], func(t *testing.T) {
+		t.Run(hostile[:12], func(t *testing.T) {
 			db := initTrafficTestDB(t)
 			svc := &InboundService{}
 			seedNodeRow(t, db, &model.Node{Id: 1, Name: "n1", Address: "127.0.0.1", Port: 2096, ApiToken: "tok", Enable: true})
@@ -45,9 +47,8 @@ func TestNodeCannotListMasterOnlyClientUnderAFoldedKey(t *testing.T) {
 	}
 }
 
-// One entry the client model cannot decode (a 2.x-style string limitIp, an empty-string
-// tgId) or that names no email must not stop the other clients of the inbound from being
-// billed; the odd entry's own client still counts by its email.
+// One entry the client model cannot decode (a string limitIp, an empty-string tgId) or
+// without an email must not stop the inbound's other clients from being billed.
 func TestOneOddNodeClientEntryKeepsTheOthersCredited(t *testing.T) {
 	db := initTrafficTestDB(t)
 	svc := &InboundService{}
@@ -82,10 +83,8 @@ func TestNodeStatsWithoutASettingsEntryCreditNothing(t *testing.T) {
 	}
 }
 
-// A tier's usage reaches the master only through an inbound the master attached the client
-// to. The same email on the master's own inbound and, independently, on a node's inbound is
-// two clients to the node: its usage is not summed into the master's row. (Until #101 it
-// was, by email alone, which let any node bill any client.)
+// The same email on the master's own inbound and, separately, on a node's inbound is two
+// clients: summing by email alone, as before #101, let any node bill any client.
 func TestSameEmailOnMasterAndNodeIsNotSummedAcrossTiers(t *testing.T) {
 	db := initTrafficTestDB(t)
 	svc := &InboundService{}
