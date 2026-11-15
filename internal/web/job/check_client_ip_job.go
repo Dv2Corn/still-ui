@@ -900,14 +900,17 @@ func (j *CheckClientIpJob) restoreRemovedClient(xrayAPI *xray.XrayAPI, owed owed
 		return nil
 	}
 	// Already there: a restart or an edit since the removal put the user back.
-	if err := xrayAPI.AddUser(string(stored.Protocol), stored.Tag, clientConfig); err != nil && !xray.IsUserExistsErr(err) {
-		return fmt.Errorf("re-adding it: %w", err)
+	addErr := xrayAPI.AddUser(string(stored.Protocol), stored.Tag, clientConfig)
+	if addErr != nil && !xray.IsUserExistsErr(addErr) {
+		return fmt.Errorf("re-adding it: %w", addErr)
 	}
 	// Asked again: a writer that commits after this check removes the user itself. With no
-	// answer it is taken out again, the restore stays owed and a later run re-adds it.
+	// answer this re-add is taken back (one it did not make is left), the restore stays owed.
 	if served, err = j.clientStillServed(owed.InboundID, owed.Email); err != nil {
-		if removeErr := xrayAPI.RemoveUser(stored.Tag, owed.Email); removeErr != nil {
-			logger.Warningf("[LIMIT_IP] Failed to remove user %s again: %v", owed.Email, removeErr)
+		if addErr == nil {
+			if removeErr := xrayAPI.RemoveUser(stored.Tag, owed.Email); removeErr != nil {
+				logger.Warningf("[LIMIT_IP] Failed to remove user %s again: %v", owed.Email, removeErr)
+			}
 		}
 		return fmt.Errorf("checking it is still served after the re-add: %w", err)
 	}

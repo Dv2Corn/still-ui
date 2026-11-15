@@ -98,8 +98,9 @@ type fakeCoreAPI struct {
 	tags  []string
 	onOp  func(op string)
 	onAdd func(vlessID string)
-	// failAdd makes the core refuse every AddUser.
-	failAdd bool
+	// failAdd makes the core refuse every AddUser; addExists answers it "already exists".
+	failAdd   bool
+	addExists bool
 }
 
 func (f *fakeCoreAPI) AlterInbound(_ context.Context, req *command.AlterInboundRequest) (*command.AlterInboundResponse, error) {
@@ -127,6 +128,9 @@ func (f *fakeCoreAPI) AlterInbound(_ context.Context, req *command.AlterInboundR
 	f.onOp(op)
 	if op == "add" && f.failAdd {
 		return nil, errors.New("core refuses the user")
+	}
+	if op == "add" && f.addExists {
+		return nil, errors.New("user already exists")
 	}
 	return &command.AlterInboundResponse{}, nil
 }
@@ -390,37 +394,49 @@ func TestOwedRestoresAreNotOverwrittenWhileTheStoredListIsUnread(t *testing.T) {
 // When the served check fails right after the re-add, a commit may have removed the client
 // meanwhile, so the restore is not done: it stays owed and the next run asks again.
 func TestRestoreStaysOwedWhenTheCheckAfterTheReAddFails(t *testing.T) {
-	const email = "after-add-probe"
-	setupIntegrationDB(t)
-	db := database.GetDB()
-	inbound := seedLinkedInboundWithClient(t, "after-add-probe-tag", email, 1)
-	if err := db.Model(&model.ClientRecord{}).Where("email = ?", email).Update("enable", true).Error; err != nil {
-		t.Fatal(err)
-	}
-	if err := db.Model(&model.Inbound{}).Where("id = ?", inbound.Id).Update("settings", `{"clients":[{"email":"`+email+`","id":"11111111-1111-1111-1111-111111111111","enable":true}]}`).Error; err != nil {
-		t.Fatal(err)
-	}
-	core := &fakeCoreAPI{}
-	core.onOp = func(op string) {
-		if op == "add" {
-			if err := db.Exec("ALTER TABLE client_inbounds RENAME TO client_inbounds_gone").Error; err != nil {
-				t.Error(err)
+	for _, tc := range []struct {
+		name      string
+		addExists bool
+		want      []string
+	}{
+		// Not known to be served: the user this re-add put back comes out until a later run can check.
+		{"re-added", false, []string{"add", "remove"}},
+		// A user something else put back is not this restore's to take out.
+		{"already there", true, []string{"add"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			const email = "after-add-probe"
+			setupIntegrationDB(t)
+			db := database.GetDB()
+			inbound := seedLinkedInboundWithClient(t, "after-add-probe-tag", email, 1)
+			if err := db.Model(&model.ClientRecord{}).Where("email = ?", email).Update("enable", true).Error; err != nil {
+				t.Fatal(err)
 			}
-		}
-	}
-	startFakeCoreAPI(t, core)
-	var xrayAPI xray.XrayAPI
-	if err := xrayAPI.Init((&CheckClientIpJob{}).resolveXrayAPIPort()); err != nil {
-		t.Fatal(err)
-	}
-	defer xrayAPI.Close()
-	if err := (&CheckClientIpJob{}).restoreRemovedClient(&xrayAPI, owedRestore{InboundID: inbound.Id, Email: email}); err == nil {
-		t.Fatal("the restore counted as done though the check after the re-add failed")
-	}
-	// Not known to be served: the re-added user comes out until a later run can check.
-	core.mu.Lock()
-	defer core.mu.Unlock()
-	if !slices.Equal(core.ops, []string{"add", "remove"}) {
-		t.Fatalf("core operations = %v, want the re-add taken back", core.ops)
+			if err := db.Model(&model.Inbound{}).Where("id = ?", inbound.Id).Update("settings", `{"clients":[{"email":"`+email+`","id":"11111111-1111-1111-1111-111111111111","enable":true}]}`).Error; err != nil {
+				t.Fatal(err)
+			}
+			core := &fakeCoreAPI{addExists: tc.addExists}
+			core.onOp = func(op string) {
+				if op == "add" {
+					if err := db.Exec("ALTER TABLE client_inbounds RENAME TO client_inbounds_gone").Error; err != nil {
+						t.Error(err)
+					}
+				}
+			}
+			startFakeCoreAPI(t, core)
+			var xrayAPI xray.XrayAPI
+			if err := xrayAPI.Init((&CheckClientIpJob{}).resolveXrayAPIPort()); err != nil {
+				t.Fatal(err)
+			}
+			defer xrayAPI.Close()
+			if err := (&CheckClientIpJob{}).restoreRemovedClient(&xrayAPI, owedRestore{InboundID: inbound.Id, Email: email}); err == nil {
+				t.Fatal("the restore counted as done though the check after the re-add failed")
+			}
+			core.mu.Lock()
+			defer core.mu.Unlock()
+			if !slices.Equal(core.ops, tc.want) {
+				t.Fatalf("core operations = %v, want %v", core.ops, tc.want)
+			}
+		})
 	}
 }

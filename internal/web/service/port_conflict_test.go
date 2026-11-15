@@ -2,6 +2,7 @@ package service
 
 import (
 	"net"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -9,6 +10,8 @@ import (
 	"testing"
 
 	"github.com/op/go-logging"
+	"github.com/xtls/xray-core/common/geodata"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/amneziawgnet"
 	"github.com/mhsanaei/3x-ui/v3/internal/database"
@@ -1126,5 +1129,47 @@ func TestCheckPortConflict_V6OnlyWildcardLeavesIPv4AddressFree(t *testing.T) {
 				t.Fatalf("conflict = %v, want %v", got, tc.want)
 			}
 		})
+	}
+}
+
+// The loader panics on a REALITY client block with a bad spiderX; a port check must not
+// take the panel down with it (bindConflicts runs on every restart).
+func TestConfigTransportsSurvivesALoaderPanic(t *testing.T) {
+	stream := `{"network":"tcp","security":"reality","realitySettings":{"password":"aGVsbG9oZWxsb2hlbGxvaGVsbG9oZWxsb2hlbGxvMTI","spiderX":"/%zz"}}`
+	if got, ok := transportsOf(model.VLESS, stream, vlessSettings); ok || got != 0 {
+		t.Fatalf("got %#b ok %v, want an inbound the core cannot build", got, ok)
+	}
+	cfg := configFromInbounds(t, `{"listen":"0.0.0.0","port":443,"protocol":"vless","tag":"a","settings":`+vlessSettings+`,"streamSettings":`+stream+`},
+		{"listen":"0.0.0.0","port":443,"protocol":"vless","tag":"b","settings":`+vlessSettings+`}`)
+	if got := bindConflicts(cfg, nil); len(got) != 1 {
+		t.Fatalf("bindConflicts = %v, want the unbuildable inbound to hold the port", got)
+	}
+}
+
+// Sniffing exclusions load geoip.dat from the core's asset folder; without it a valid
+// inbound reads as unbuildable and blocks a UDP neighbour on its port.
+func TestCheckPortConflict_GeoIPSniffingInboundCoexistsWithHysteria(t *testing.T) {
+	bin := t.TempDir()
+	list, err := proto.Marshal(&geodata.GeoIPList{Entry: []*geodata.GeoIP{{Code: "TEST", Cidr: []*geodata.CIDR{{Ip: []byte{10, 0, 0, 0}, Prefix: 8}}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(bin, "geoip.dat"), list, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("XUI_BIN_FOLDER", bin)
+	t.Setenv("XRAY_LOCATION_ASSET", "")
+	setupConflictDB(t)
+	seedInboundConflict(t, "hyst-443", "0.0.0.0", 443, model.Hysteria, hysteriaStream, hysteriaSettings)
+	vless := &model.Inbound{
+		Tag: "vless-443", Listen: "0.0.0.0", Port: 443, Protocol: model.VLESS,
+		StreamSettings: `{"network":"tcp"}`, Settings: vlessSettings,
+		Sniffing: `{"enabled":true,"destOverride":["http","tls"],"ipsExcluded":["geoip:test"]}`,
+	}
+	if bits, ok := inboundTransports(vless); !ok || bits != transportTCP {
+		t.Fatalf("got %#b ok %v, want tcp", bits, ok)
+	}
+	if exist, err := (&InboundService{}).checkPortConflict(vless, 0); err != nil || exist != nil {
+		t.Fatalf("a tcp inbound with geoip sniffing must share the port with hysteria; exist=%v err=%v", exist, err)
 	}
 }

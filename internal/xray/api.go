@@ -32,6 +32,7 @@ import (
 	"github.com/xtls/xray-core/common/platform/filesystem"
 	"github.com/xtls/xray-core/common/protocol"
 	"github.com/xtls/xray-core/common/serial"
+	"github.com/xtls/xray-core/core"
 	"github.com/xtls/xray-core/infra/conf"
 	hysteriaAccount "github.com/xtls/xray-core/proxy/hysteria/account"
 	"github.com/xtls/xray-core/proxy/masque"
@@ -161,17 +162,12 @@ func (x *XrayAPI) AddInbound(inbound []byte) error {
 	}
 	client := *x.HandlerServiceClient
 
-	conf := new(conf.InboundDetourConfig)
-	err := json.Unmarshal(inbound, conf)
-	if err != nil {
+	detour := new(conf.InboundDetourConfig)
+	if err := json.Unmarshal(inbound, detour); err != nil {
 		logger.Debug("Failed to unmarshal inbound:", err)
 		return err
 	}
-	if err := checkUntrustedBuildInput(conf.StreamSetting, inbound); err != nil {
-		return err
-	}
-	localizeNoiseScripts(conf.StreamSetting)
-	config, err := conf.Build()
+	config, err := BuildInboundDetour(detour, inbound)
 	if err != nil {
 		logger.Debug("Failed to build inbound Detur:", err)
 		return err
@@ -204,23 +200,8 @@ func (x *XrayAPI) DelInbound(tag string) error {
 // startup — notably v26.7.11's refusal of unencrypted vless/trojan outbounds
 // whose server address is a public IP or domain.
 func ValidateOutboundConfig(outbound []byte) (err error) {
-	ensureXrayAssetLocation()
-	// The loader panics on some third-party values (a short vless encryption, a bad spiderX).
-	defer func() {
-		if r := recover(); r != nil {
-			err = common.NewErrorf("xray-core config loader panicked: %v", r)
-		}
-	}()
-
-	detour := new(conf.OutboundDetourConfig)
-	if err := json.Unmarshal(outbound, detour); err != nil {
-		return err
-	}
-	if err := checkUntrustedBuildInput(detour.StreamSetting, outbound); err != nil {
-		return err
-	}
-	localizeNoiseScripts(detour.StreamSetting)
-	built, err := detour.Build()
+	defer recoverLoaderPanic(&err)
+	built, err := buildOutbound(outbound)
 	if err != nil {
 		return err
 	}
@@ -228,6 +209,42 @@ func ValidateOutboundConfig(outbound []byte) (err error) {
 		return err
 	}
 	return validateHandlerSettings(built.ProxySettings)
+}
+
+// BuildInboundDetour runs conf.Build() inside the panel the one safe way: assets and noise
+// scripts resolved as the core sees them, untrusted input checked, a loader panic returned.
+func BuildInboundDetour(detour *conf.InboundDetourConfig, raw []byte) (built *core.InboundHandlerConfig, err error) {
+	ensureXrayAssetLocation()
+	defer recoverLoaderPanic(&err)
+	if err := checkUntrustedBuildInput(detour.StreamSetting, raw); err != nil {
+		return nil, err
+	}
+	localizeNoiseScripts(detour.StreamSetting)
+	return detour.Build()
+}
+
+// buildOutbound is BuildInboundDetour for an outbound JSON object.
+func buildOutbound(raw []byte) (built *core.OutboundHandlerConfig, err error) {
+	ensureXrayAssetLocation()
+	defer recoverLoaderPanic(&err)
+	detour := new(conf.OutboundDetourConfig)
+	if err := json.Unmarshal(raw, detour); err != nil {
+		logger.Debug("Failed to unmarshal outbound:", err)
+		return nil, err
+	}
+	if err := checkUntrustedBuildInput(detour.StreamSetting, raw); err != nil {
+		return nil, err
+	}
+	localizeNoiseScripts(detour.StreamSetting)
+	return detour.Build()
+}
+
+// recoverLoaderPanic turns a panic of the config loader into err: it panics on some
+// values (a short vless encryption, a bad spiderX) and runs in the panel process.
+func recoverLoaderPanic(err *error) {
+	if r := recover(); r != nil {
+		*err = common.NewErrorf("xray-core config loader panicked: %v", r)
+	}
 }
 
 // ValidateTunWfpBlockLeak runs the core's own check of a TUN inbound's autoSystemWfpBlockLeak,
@@ -383,18 +400,7 @@ func (x *XrayAPI) AddOutbound(outbound []byte) error {
 	}
 	client := *x.HandlerServiceClient
 
-	ensureXrayAssetLocation()
-
-	conf := new(conf.OutboundDetourConfig)
-	if err := json.Unmarshal(outbound, conf); err != nil {
-		logger.Debug("Failed to unmarshal outbound:", err)
-		return err
-	}
-	if err := checkUntrustedBuildInput(conf.StreamSetting, outbound); err != nil {
-		return err
-	}
-	localizeNoiseScripts(conf.StreamSetting)
-	config, err := conf.Build()
+	config, err := buildOutbound(outbound)
 	if err != nil {
 		logger.Debug("Failed to build outbound detour:", err)
 		return err

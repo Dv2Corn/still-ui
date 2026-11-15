@@ -71,14 +71,14 @@ func configTransports(ib *xray.InboundConfig) (transportBits, bool) {
 		return 0, false
 	}
 	detour := new(conf.InboundDetourConfig)
-	if json.Unmarshal(raw, detour) != nil || xray.CheckStreamBuildCost(ib.StreamSettings) != nil {
+	if json.Unmarshal(raw, detour) != nil {
 		return 0, false
 	}
-	// Certificate files live on the host that runs the inbound and choose no socket.
+	// A node's certificate files are not on the master and choose no socket; raw keeps them for the checks.
 	if detour.StreamSetting != nil && detour.StreamSetting.TLSSettings != nil {
 		detour.StreamSetting.TLSSettings.Certs = nil
 	}
-	built, err := detour.Build()
+	built, err := xray.BuildInboundDetour(detour, raw)
 	if err != nil {
 		return 0, false
 	}

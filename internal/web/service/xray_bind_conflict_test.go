@@ -38,7 +38,7 @@ func TestBindConflicts(t *testing.T) {
 		{
 			"same listen, port and tcp",
 			`{"listen":"0.0.0.0","port":443,"protocol":"vless","settings":{"clients":[],"decryption":"none"},"tag":"a"},
-			 {"listen":"0.0.0.0","port":443,"protocol":"vmess","tag":"b"}`,
+			 {"listen":"0.0.0.0","port":443,"protocol":"vmess","settings":{"clients":[]},"tag":"b"}`,
 			``, 1,
 		},
 		{
@@ -80,13 +80,13 @@ func TestBindConflicts(t *testing.T) {
 		{
 			"wildcard listen overlaps a loopback one",
 			`{"listen":"0.0.0.0","port":8443,"protocol":"vless","settings":{"clients":[],"decryption":"none"},"tag":"a"},
-			 {"listen":"127.0.0.1","port":8443,"protocol":"trojan","tag":"b"}`,
+			 {"listen":"127.0.0.1","port":8443,"protocol":"trojan","settings":{"clients":[]},"tag":"b"}`,
 			``, 1,
 		},
 		{
 			"absent listen means wildcard",
 			`{"port":8443,"protocol":"vless","settings":{"clients":[],"decryption":"none"},"tag":"a"},
-			 {"listen":"127.0.0.1","port":8443,"protocol":"trojan","tag":"b"}`,
+			 {"listen":"127.0.0.1","port":8443,"protocol":"trojan","settings":{"clients":[]},"tag":"b"}`,
 			``, 1,
 		},
 		{
@@ -177,7 +177,14 @@ func TestBindConflicts(t *testing.T) {
 			if tc.running != "" {
 				running = configFromInbounds(t, tc.running)
 			}
-			got := bindConflicts(configFromInbounds(t, tc.inbounds), running)
+			cfg := configFromInbounds(t, tc.inbounds)
+			// An unbuildable side holds every socket, which would pass these cases for nothing.
+			for i := range cfg.InboundConfigs {
+				if _, ok := configTransports(&cfg.InboundConfigs[i]); !ok {
+					t.Fatalf("inbound %q does not build", cfg.InboundConfigs[i].Tag)
+				}
+			}
+			got := bindConflicts(cfg, running)
 			if len(got) != tc.want {
 				t.Fatalf("bindConflicts = %v, want %d conflict(s)", got, tc.want)
 			}
