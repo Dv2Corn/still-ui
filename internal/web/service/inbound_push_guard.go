@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/database"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
@@ -47,7 +48,7 @@ func jsonLeaves(raw string) []jsonLeaf {
 					return false
 				}
 				name, _ := key.(string)
-				if !walk(append(slices.Clone(path), strings.ToLower(name))) {
+				if !walk(append(slices.Clone(path), foldJSONKey(name))) {
 					return false
 				}
 			}
@@ -67,6 +68,19 @@ func jsonLeaves(raw string) []jsonLeaf {
 	}
 	walk(nil)
 	return leaves
+}
+
+// foldJSONKey folds a key the way encoding/json matches field names (Unicode simple folding),
+// so a spelling such as "realitySettingſ" (long s) that xray-core reads as realitySettings is
+// checked as realitysettings: each rune becomes the lower case of the smallest rune it folds with.
+func foldJSONKey(key string) string {
+	return strings.Map(func(r rune) rune {
+		low := r
+		for f := unicode.SimpleFold(r); f != r; f = unicode.SimpleFold(f) {
+			low = min(low, f)
+		}
+		return unicode.ToLower(low)
+	}, key)
 }
 
 // isEnvRef matches what xray-core expands from the panel's environment: a whole value, or
