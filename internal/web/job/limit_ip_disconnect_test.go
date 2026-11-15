@@ -17,6 +17,7 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/xray"
 
 	"github.com/xtls/xray-core/app/proxyman/command"
+	"github.com/xtls/xray-core/proxy/vless"
 	"google.golang.org/grpc"
 	"gorm.io/gorm"
 )
@@ -91,9 +92,10 @@ func TestDisconnectClientTemporarilyAllowsHysteria(t *testing.T) {
 // operations it is asked for and runs onOp inside each, where another job would act.
 type fakeCoreAPI struct {
 	command.UnimplementedHandlerServiceServer
-	mu   sync.Mutex
-	ops  []string
-	onOp func(op string)
+	mu    sync.Mutex
+	ops   []string
+	onOp  func(op string)
+	onAdd func(vlessID string)
 }
 
 func (f *fakeCoreAPI) AlterInbound(_ context.Context, req *command.AlterInboundRequest) (*command.AlterInboundResponse, error) {
@@ -108,6 +110,15 @@ func (f *fakeCoreAPI) AlterInbound(_ context.Context, req *command.AlterInboundR
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.ops = append(f.ops, op)
+	if add, ok := operation.(*command.AddUserOperation); ok && f.onAdd != nil {
+		account, err := add.User.Account.GetInstance()
+		if err != nil {
+			return nil, err
+		}
+		if vlessAccount, ok := account.(*vless.Account); ok {
+			f.onAdd(vlessAccount.Id)
+		}
+	}
 	f.onOp(op)
 	return &command.AlterInboundResponse{}, nil
 }
@@ -131,8 +142,8 @@ func startFakeCoreAPI(t *testing.T, core *fakeCoreAPI) {
 	}
 }
 
-// The re-add hands the core the scan's snapshot. Whatever took the client out of
-// service since then has already been to the core, so the account must not stay.
+// Whatever took the client out of service since the scan has already been to the core,
+// so the account must not come back.
 func TestDisconnectClientTemporarilyDoesNotRestoreDroppedClient(t *testing.T) {
 	const email = "readd-probe"
 	trafficJobDisables := func(db *gorm.DB, _ *model.Inbound) error {
@@ -162,6 +173,10 @@ func TestDisconnectClientTemporarilyDoesNotRestoreDroppedClient(t *testing.T) {
 			if err := db.Model(&model.ClientRecord{}).Where("email = ?", email).Update("enable", true).Error; err != nil {
 				t.Fatal(err)
 			}
+			stored := `{"clients":[{"email":"` + email + `","id":"11111111-1111-1111-1111-111111111111","enable":true}]}`
+			if err := db.Model(&model.Inbound{}).Where("id = ?", inbound.Id).Update("settings", stored).Error; err != nil {
+				t.Fatal(err)
+			}
 			if err := db.Create(&xray.ClientTraffic{InboundId: inbound.Id, Email: email, Enable: true}).Error; err != nil {
 				t.Fatal(err)
 			}
@@ -185,5 +200,37 @@ func TestDisconnectClientTemporarilyDoesNotRestoreDroppedClient(t *testing.T) {
 				t.Fatalf("core saw %v, want %v", core.ops, tt.wantOps)
 			}
 		})
+	}
+}
+
+// An admin who rotates a client's credential after the scan has already sent the new one to
+// the core; the re-add must restore that one, not the scan's copy of the retired credential.
+func TestDisconnectClientTemporarilyRestoresTheStoredCredential(t *testing.T) {
+	const email = "rotate-probe"
+	const retired = "11111111-1111-1111-1111-111111111111"
+	const current = "22222222-2222-2222-2222-222222222222"
+	setupIntegrationDB(t)
+	db := database.GetDB()
+	inbound := seedLinkedInboundWithClient(t, "rotate-probe-tag", email, 1)
+	if err := db.Model(&model.ClientRecord{}).Where("email = ?", email).Update("enable", true).Error; err != nil {
+		t.Fatal(err)
+	}
+	rotated := `{"clients":[{"email":"` + email + `","id":"` + current + `","enable":true}]}`
+	if err := db.Model(&model.Inbound{}).Where("id = ?", inbound.Id).Update("settings", rotated).Error; err != nil {
+		t.Fatal(err)
+	}
+	var added []string
+	core := &fakeCoreAPI{}
+	core.onAdd = func(id string) { added = append(added, id) }
+	core.onOp = func(string) {}
+	startFakeCoreAPI(t, core)
+
+	scan := []model.Client{{Email: email, ID: retired, Enable: true}}
+	(&CheckClientIpJob{}).disconnectClientTemporarily(inbound, email, scan)
+
+	core.mu.Lock()
+	defer core.mu.Unlock()
+	if !slices.Equal(added, []string{current}) {
+		t.Fatalf("core re-added ids %v, want only the stored %s", added, current)
 	}
 }

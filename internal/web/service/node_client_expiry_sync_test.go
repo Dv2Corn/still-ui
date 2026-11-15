@@ -669,13 +669,11 @@ func TestNodeRenewal_SkippedWhileDirty(t *testing.T) {
 		t.Fatalf("mark dirty: %v", err)
 	}
 	// Renewal shape: later expiry + counters below baseline.
+	stats := []xray.ClientTraffic{{
+		Email: email, Up: 10, Down: 10, ExpiryTime: lateAbs, Enable: true, Reset: 30,
+	}}
 	snap := &runtime.TrafficSnapshot{
-		Inbounds: []*model.Inbound{{
-			Tag: "n1-in",
-			ClientStats: []xray.ClientTraffic{{
-				Email: email, Up: 10, Down: 10, ExpiryTime: lateAbs, Enable: true, Reset: 30,
-			}},
-		}},
+		Inbounds: []*model.Inbound{{Tag: "n1-in", Settings: settingsListing(stats), ClientStats: stats}},
 	}
 	if _, err := svc.setRemoteTrafficLocked(1, snap, true, false); err != nil {
 		t.Fatalf("dirty sync: %v", err)
@@ -856,14 +854,12 @@ func TestNodeJustPushed_FreezesLifecycleOnly(t *testing.T) {
 		t.Fatalf("master edit: %v", err)
 	}
 
+	stats := []xray.ClientTraffic{
+		{Email: kept, Up: 20, Down: 20, Total: 100, ExpiryTime: lateAbs, Enable: false},
+		{Email: fresh, Up: 5, Down: 5, ExpiryTime: lateAbs, Enable: true},
+	}
 	snap := &runtime.TrafficSnapshot{
-		Inbounds: []*model.Inbound{{
-			Tag: "n1-in",
-			ClientStats: []xray.ClientTraffic{
-				{Email: kept, Up: 20, Down: 20, Total: 100, ExpiryTime: lateAbs, Enable: false},
-				{Email: fresh, Up: 5, Down: 5, ExpiryTime: lateAbs, Enable: true},
-			},
-		}},
+		Inbounds: []*model.Inbound{{Tag: "n1-in", Settings: settingsListing(stats), ClientStats: stats}},
 	}
 	if _, err := svc.setRemoteTrafficLocked(1, snap, false, true); err != nil {
 		t.Fatalf("just-pushed sync: %v", err)

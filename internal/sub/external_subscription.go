@@ -3,6 +3,7 @@ package sub
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -52,11 +53,23 @@ var subscriptionProxy = http.ProxyFromEnvironment
 var proxiedSubscriptionHTTPClient = &http.Client{
 	Timeout: 6 * time.Second,
 	Transport: &http.Transport{
-		Proxy:                  func(r *http.Request) (*url.URL, error) { return subscriptionProxy(r) },
+		Proxy:                  proxyEveryHop,
 		TLSHandshakeTimeout:    5 * time.Second,
 		MaxResponseHeaderBytes: 64 << 10,
 		IdleConnTimeout:        90 * time.Second,
 	},
+}
+
+var errRedirectBypassesProxy = errors.New("redirect to a host the proxy does not cover")
+
+// proxyEveryHop refuses a redirect to a host the proxy skips (loopback, NO_PROXY): this
+// transport has no SSRF guard, so such a hop would be dialled straight from the panel.
+func proxyEveryHop(r *http.Request) (*url.URL, error) {
+	proxyURL, err := subscriptionProxy(r)
+	if err == nil && proxyURL == nil {
+		return nil, errRedirectBypassesProxy
+	}
+	return proxyURL, err
 }
 
 // subscriptionClientFor picks the proxied client when the host's proxy setting covers req.

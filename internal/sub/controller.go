@@ -515,6 +515,10 @@ func (a *SUBController) buildSubPageData(c *gin.Context) (PageData, bool) {
 	if devices, found, err := a.clientService.HwidSlotStatusForSubID(subId); err == nil && found && devices.Active {
 		page.DeviceLimit, page.DeviceCount = devices.Limit, devices.Registered
 	}
+	// The links are the credentials the device gate guards on the body routes.
+	if held, err := a.clientService.HwidDeviceHoldsSlotForSubID(subId, c.GetHeader("X-HWID")); err != nil || !held {
+		page.Result = []string{}
+	}
 	return page, true
 }
 

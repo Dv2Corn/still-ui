@@ -4,6 +4,7 @@ import (
 	"encoding/gob"
 	"errors"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/database"
@@ -133,6 +134,55 @@ func IsLogin(c *gin.Context) bool {
 	return GetLoginUser(c) != nil
 }
 
+// Login is the cookie session a request authenticated with, kept so a connection
+// that outlives the request can be checked again later.
+type Login struct {
+	userID int
+	epoch  any
+	sid    string
+	at     any
+}
+
+// CurrentLogin is the request's cookie login once GetLoginUser accepts it; an API token gives none.
+func CurrentLogin(c *gin.Context) (Login, bool) {
+	if _, api := c.Get(apiAuthUserKey); api || GetLoginUser(c) == nil {
+		return Login{}, false
+	}
+	s := sessions.Default(c)
+	userID, _ := sessionUserID(s.Get(loginUserKey))
+	sid, _ := s.Get(loginSessionKey).(string)
+	return Login{userID: userID, epoch: s.Get(loginEpochKey), sid: sid, at: s.Get(loginAtKey)}, true
+}
+
+// Valid repeats GetLoginUser's checks: not logged out, within its lifetime, same login epoch.
+func (l Login) Valid() bool {
+	if l.sid == "" || loginExpired(l.at, time.Now()) || sessionRevoked(l.sid) {
+		return false
+	}
+	user, err := getUserByID(l.userID)
+	return err == nil && sessionEpochMatches(l.epoch, user.LoginEpoch)
+}
+
+var (
+	revokedMu sync.Mutex
+	revokedCh = make(chan struct{})
+)
+
+// Revoked is closed by the next NotifyRevoked, so open connections re-check their Login at once.
+func Revoked() <-chan struct{} {
+	revokedMu.Lock()
+	defer revokedMu.Unlock()
+	return revokedCh
+}
+
+// NotifyRevoked follows every logout and login-epoch change.
+func NotifyRevoked() {
+	revokedMu.Lock()
+	defer revokedMu.Unlock()
+	close(revokedCh)
+	revokedCh = make(chan struct{})
+}
+
 func sessionUserID(obj any) (int, bool) {
 	switch v := obj.(type) {
 	case int:
@@ -197,6 +247,7 @@ func ClearSession(c *gin.Context) error {
 	var revokeErr error
 	if sid, ok := s.Get(loginSessionKey).(string); ok {
 		revokeErr = revokeSession(sid, s.Get(loginAtKey))
+		NotifyRevoked()
 	}
 	s.Clear()
 	cookiePath := c.GetString("base_path")

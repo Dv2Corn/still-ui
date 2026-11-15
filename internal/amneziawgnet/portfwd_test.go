@@ -476,32 +476,35 @@ primed:
 	}
 }
 
-// leavePortForwardSlots fills slots until only free remain, so a test hits the
-// ceiling with a handful of flows; returns how many it holds (cleanup releases).
-func leavePortForwardSlots(t *testing.T, slots chan struct{}, free int) int {
+// leavePortForwardSlots takes the global count until only free slots remain, so a test hits
+// the ceiling with a handful of flows; returns how many it holds (cleanup releases).
+func leavePortForwardSlots(t *testing.T, slots *portForwardSlots, free int) int {
 	t.Helper()
-	held := 0
-	for acquirePortForwardSlot(slots) {
-		held++
-	}
-	for range free {
-		<-slots
-		held--
-	}
+	slots.mu.Lock()
+	held := portForwardMaxFlows - slots.total - free
+	slots.total += held
+	slots.mu.Unlock()
 	t.Cleanup(func() {
-		for range held {
-			<-slots
-		}
+		slots.mu.Lock()
+		slots.total -= held
+		slots.mu.Unlock()
 	})
 	return held
 }
 
-func waitPortForwardSlots(t *testing.T, slots chan struct{}, want int) {
+// waitPortForwardSlots waits until only want flows are counted, none of them per peer or source.
+func waitPortForwardSlots(t *testing.T, slots *portForwardSlots, want int) {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
-	for len(slots) > want {
+	for {
+		slots.mu.Lock()
+		total, peers, sources := slots.total, len(slots.byPeer), len(slots.bySource)
+		slots.mu.Unlock()
+		if total <= want && peers == 0 && sources == 0 {
+			return
+		}
 		if time.Now().After(deadline) {
-			t.Fatalf("slots still taken = %d, want at most %d", len(slots), want)
+			t.Fatalf("slots still taken = %d (%d peers, %d sources), want at most %d", total, peers, sources, want)
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
@@ -587,4 +590,115 @@ func TestPortForwardTCPConnectionsAreCapped(t *testing.T) {
 
 	close(release)
 	waitPortForwardSlots(t, portForwardTCPSlots, held)
+}
+
+func udpForwardTo(t *testing.T, gs *stack.Stack, inboundID int, email, peerAddr string) *udpForwardListener {
+	t.Helper()
+	l := listenPortForwardUDP(gs, inboundID, portForwardKey{email: email, port: freeUDPPort(t), proto: udpForward}, func(string) (netip.Addr, bool) {
+		return netip.MustParseAddr(peerAddr), true
+	})
+	if l == nil {
+		t.Fatal("listenPortForwardUDP returned nil")
+	}
+	t.Cleanup(l.Close)
+	return l
+}
+
+// sendUDPFrom sends to l from each of n fresh ports of the loopback address from, a few
+// rounds apart, so a datagram the kernel drops in a burst is sent again.
+func sendUDPFrom(t *testing.T, l *udpForwardListener, from string, n int) {
+	t.Helper()
+	dialer := net.Dialer{LocalAddr: &net.UDPAddr{IP: net.ParseIP(from)}}
+	conns := make([]net.Conn, 0, n)
+	for range n {
+		conn, err := dialer.Dial("udp", l.pc.LocalAddr().String())
+		if err != nil {
+			t.Fatalf("dial udp from %s: %v", from, err)
+		}
+		t.Cleanup(func() { conn.Close() })
+		conns = append(conns, conn)
+	}
+	for range 3 {
+		for _, conn := range conns {
+			if _, err := conn.Write([]byte("x")); err != nil {
+				t.Fatalf("write udp: %v", err)
+			}
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
+func udpSessions(l *udpForwardListener) int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return len(l.sessions)
+}
+
+// waitUDPSessions waits up to a second for l to hold want sessions and returns how many it holds.
+func waitUDPSessions(l *udpForwardListener, want int) int {
+	deadline := time.Now().Add(time.Second)
+	for udpSessions(l) != want && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	return udpSessions(l)
+}
+
+// UDP needs no handshake, so fresh source ports from one host, or fresh hosts toward one
+// peer, must not take the slots another client's forward needs for its next flow.
+func TestPortForwardUDPFloodOnOnePeerLeavesRoomForAnother(t *testing.T) {
+	gs := newTestStack(t, "10.211.4.1")
+	t.Run("one source", func(t *testing.T) {
+		const spare = 8
+		held := leavePortForwardSlots(t, portForwardUDPSlots, portForwardMaxFlowsPerSource+spare)
+		a := udpForwardTo(t, gs, 505, "a@x", "10.211.4.2")
+		b := udpForwardTo(t, gs, 505, "b@x", "10.211.4.3")
+		sendUDPFrom(t, a, "127.0.0.1", portForwardMaxFlowsPerSource+spare)
+		if got := waitUDPSessions(a, -1); got != portForwardMaxFlowsPerSource {
+			t.Fatalf("one source opened %d sessions on peer A, want its share %d", got, portForwardMaxFlowsPerSource)
+		}
+		sendUDPFrom(t, b, "127.0.0.2", 1)
+		if got := waitUDPSessions(b, 1); got != 1 {
+			t.Fatalf("peer B sessions = %d after one source flooded peer A, want 1", got)
+		}
+		a.Close()
+		b.Close()
+		waitPortForwardSlots(t, portForwardUDPSlots, held)
+	})
+	t.Run("many sources on one peer", func(t *testing.T) {
+		const spare = 8
+		held := leavePortForwardSlots(t, portForwardUDPSlots, portForwardMaxFlowsPerPeer+spare)
+		a := udpForwardTo(t, gs, 506, "a@x", "10.211.4.2")
+		b := udpForwardTo(t, gs, 506, "b@x", "10.211.4.3")
+		for i := range portForwardMaxFlowsPerPeer/portForwardMaxFlowsPerSource + 1 {
+			sendUDPFrom(t, a, fmt.Sprintf("127.0.1.%d", i+1), portForwardMaxFlowsPerSource)
+		}
+		if got := waitUDPSessions(a, -1); got != portForwardMaxFlowsPerPeer {
+			t.Fatalf("peer A holds %d sessions, want its share %d", got, portForwardMaxFlowsPerPeer)
+		}
+		sendUDPFrom(t, b, "127.0.2.1", 1)
+		if got := waitUDPSessions(b, 1); got != 1 {
+			t.Fatalf("peer B sessions = %d after many sources flooded peer A, want 1", got)
+		}
+		a.Close()
+		b.Close()
+		waitPortForwardSlots(t, portForwardUDPSlots, held)
+	})
+}
+
+// A datagram from a fresh source port opens a session; with no reply ever coming back it must
+// free its slot after the short unreplied window, not the full idle one.
+func TestPortForwardUDPUnrepliedSessionEndsEarly(t *testing.T) {
+	previous := portForwardUDPUnrepliedIdle
+	portForwardUDPUnrepliedIdle = 500 * time.Millisecond
+	t.Cleanup(func() { portForwardUDPUnrepliedIdle = previous })
+
+	l := udpForwardTo(t, newTestStack(t, "10.211.5.1"), 507, "a@x", "10.211.5.2")
+	sendUDPFrom(t, l, "127.0.0.1", 1)
+	if got := waitUDPSessions(l, 1); got != 1 {
+		t.Fatalf("sessions = %d, want 1", got)
+	}
+	if got := waitUDPSessions(l, 0); got != 0 {
+		t.Fatalf("an unreplied session still open after %v", time.Second)
+	}
+	waitPortForwardSlots(t, portForwardUDPSlots, 0)
 }

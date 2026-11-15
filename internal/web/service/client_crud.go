@@ -791,6 +791,11 @@ func (s *ClientService) update(inboundSvc *InboundService, id int, updated model
 	if updated.SubID == "" {
 		updated.SubID = uuid.NewString()
 	}
+	// The subId alone can claim a Telegram binding, so rotating it to revoke a leak ends the
+	// binding too, unless this edit names a new tgId.
+	if existing.SubID != "" && updated.SubID != existing.SubID && updated.TgID == existing.TgID {
+		updated.TgID = 0
+	}
 	updated.UpdatedAt = time.Now().UnixMilli()
 	if updated.CreatedAt == 0 {
 		updated.CreatedAt = existing.CreatedAt

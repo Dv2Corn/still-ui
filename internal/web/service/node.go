@@ -1392,6 +1392,11 @@ func (s *NodeService) probe(ctx context.Context, n *model.Node, proxyURL string)
 		return patch, errors.New(patch.LastError)
 	}
 	o := envelope.Obj
+	// Checked before any field is copied: a refused answer carries nothing the node reported.
+	if len(o.PanelGuid) > maxPanelGuidLen {
+		patch.LastError = fmt.Sprintf("remote panel reported a %d-byte panelGuid", len(o.PanelGuid))
+		return patch, errors.New(patch.LastError)
+	}
 	patch.CpuPct = o.CpuPct
 	patch.UnavailableMetrics = o.UnavailableMetrics
 	if o.Mem.Total > 0 {
@@ -1402,10 +1407,6 @@ func (s *NodeService) probe(ctx context.Context, n *model.Node, proxyURL string)
 	patch.XrayError = o.Xray.ErrorMsg
 	patch.PanelVersion = o.PanelVersion
 	patch.UpstreamVersion = o.UpstreamVersion
-	if len(o.PanelGuid) > maxPanelGuidLen {
-		patch.LastError = fmt.Sprintf("remote panel reported a %d-byte panelGuid", len(o.PanelGuid))
-		return patch, errors.New(patch.LastError)
-	}
 	patch.Guid = o.PanelGuid
 	patch.UptimeSecs = o.Uptime
 	patch.NetUp = o.NetIO.Up

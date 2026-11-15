@@ -669,7 +669,7 @@ func (s *Server) start(restartXray bool, startTgBot bool) (err error) {
 	if err != nil {
 		return err
 	}
-	listener = network.NewLimitListener(listener, network.MaxPanelConns, network.MaxPanelConnsPerSource)
+	listener = network.NewLimitListener(listener, network.MaxConns, network.MaxConnsPerSource)
 	certreload.Register("panel", nil)
 	if certFile != "" || keyFile != "" {
 		pair, err := certreload.Load(certFile, keyFile)

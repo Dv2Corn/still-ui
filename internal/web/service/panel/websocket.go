@@ -9,6 +9,7 @@ import (
 
 	"github.com/mhsanaei/3x-ui/v3/internal/logger"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/common"
+	"github.com/mhsanaei/3x-ui/v3/internal/web/session"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/websocket"
 
 	"github.com/google/uuid"
@@ -36,8 +37,8 @@ func NewWebSocketService(hub *websocket.Hub) *WebSocketService {
 
 // HandleConnection takes ownership of an upgraded WebSocket connection:
 // registers a new client, starts the read/write pumps, and returns
-// immediately. The connection is closed when both pumps exit.
-func (s *WebSocketService) HandleConnection(conn *ws.Conn, remoteIP string) {
+// immediately. The connection is closed when both pumps exit or login stops being valid.
+func (s *WebSocketService) HandleConnection(conn *ws.Conn, remoteIP string, login session.Login) {
 	if s == nil || s.hub == nil || conn == nil {
 		if conn != nil {
 			conn.Close()
@@ -49,7 +50,7 @@ func (s *WebSocketService) HandleConnection(conn *ws.Conn, remoteIP string) {
 	s.hub.Register(client)
 	logger.Debugf("WebSocket client %s registered from %s", client.ID, remoteIP)
 
-	go s.writePump(client, conn)
+	go s.writePump(client, conn, login)
 	go s.readPump(client, conn)
 }
 
@@ -80,9 +81,11 @@ func (s *WebSocketService) readPump(client *websocket.Client, conn *ws.Conn) {
 	}
 }
 
-// writePump pushes hub messages to the connection and emits keepalive pings.
-func (s *WebSocketService) writePump(client *websocket.Client, conn *ws.Conn) {
+// writePump pushes hub messages to the connection and emits keepalive pings. It ends the
+// connection once its login is revoked or expires: the feed carries client credentials.
+func (s *WebSocketService) writePump(client *websocket.Client, conn *ws.Conn, login session.Login) {
 	ticker := time.NewTicker(wsPingPeriod)
+	revoked := session.Revoked()
 	defer func() {
 		if r := common.Recover("WebSocket writePump panic"); r != nil {
 			logger.Error("WebSocket writePump panic recovered:", r)
@@ -90,10 +93,19 @@ func (s *WebSocketService) writePump(client *websocket.Client, conn *ws.Conn) {
 		ticker.Stop()
 		conn.Close()
 	}()
+	// A revocation between the upgrade and taking the channel above signalled nobody.
+	if !login.Valid() {
+		closeEndedLogin(conn)
+		return
+	}
 
 	for {
 		select {
 		case msg, ok := <-client.Send:
+			if loginEnded(login, &revoked) {
+				closeEndedLogin(conn)
+				return
+			}
 			_ = conn.SetWriteDeadline(time.Now().Add(wsWriteWait))
 			if !ok {
 				_ = conn.WriteMessage(ws.CloseMessage, []byte{})
@@ -104,7 +116,17 @@ func (s *WebSocketService) writePump(client *websocket.Client, conn *ws.Conn) {
 				return
 			}
 
+		case <-revoked:
+			if loginEnded(login, &revoked) {
+				closeEndedLogin(conn)
+				return
+			}
+
 		case <-ticker.C:
+			if !login.Valid() {
+				closeEndedLogin(conn)
+				return
+			}
 			_ = conn.SetWriteDeadline(time.Now().Add(wsWriteWait))
 			if err := conn.WriteMessage(ws.PingMessage, nil); err != nil {
 				logger.Debugf("WebSocket ping error for client %s: %v", client.ID, err)
@@ -112,4 +134,21 @@ func (s *WebSocketService) writePump(client *websocket.Client, conn *ws.Conn) {
 			}
 		}
 	}
+}
+
+// loginEnded re-checks login only when a revocation was signalled since the last check;
+// a queued message never goes out ahead of that check.
+func loginEnded(login session.Login, revoked *<-chan struct{}) bool {
+	select {
+	case <-*revoked:
+		*revoked = session.Revoked()
+		return !login.Valid()
+	default:
+		return false
+	}
+}
+
+func closeEndedLogin(conn *ws.Conn) {
+	_ = conn.SetWriteDeadline(time.Now().Add(wsWriteWait))
+	_ = conn.WriteMessage(ws.CloseMessage, ws.FormatCloseMessage(ws.ClosePolicyViolation, "session ended"))
 }

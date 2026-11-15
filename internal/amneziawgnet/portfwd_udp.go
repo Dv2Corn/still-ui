@@ -20,12 +20,17 @@ import (
 // directions to disagree.
 const portForwardUDPIdleTimeout = 2 * time.Minute
 
+// portForwardUDPUnrepliedIdle frees a session no reply ever came back on sooner: one datagram
+// from a fresh source port must not hold a slot for the whole idle window.
+var portForwardUDPUnrepliedIdle = 30 * time.Second
+
 // udpForwardSession is one established flow from a single external source
 // address into the tunnel toward a peer -- conn is a connected gonet UDP
 // endpoint (DialUDP with a non-nil raddr), so plain Read/Write, not
 // ReadFrom/WriteTo, address it correctly.
 type udpForwardSession struct {
-	conn *gonet.UDPConn
+	conn  *gonet.UDPConn
+	email string
 }
 
 // udpForwardListener is one open host-facing UDP socket for a single
@@ -79,17 +84,17 @@ func (l *udpForwardListener) readLoop(gstack *stack.Stack, inboundID int, key po
 				continue
 			}
 			// Dropped silently: a flood of fresh sources is when a per-datagram log line hurts.
-			if !acquirePortForwardSlot(portForwardUDPSlots) {
+			if !portForwardUDPSlots.acquire(key.email, src.Addr()) {
 				continue
 			}
 			raddr := tunnelFullAddress(addr, key.port)
 			conn, err := gonet.DialUDP(gstack, nil, &raddr, tunnelNetwork(addr))
 			if err != nil {
-				<-portForwardUDPSlots
+				portForwardUDPSlots.release(key.email, src.Addr())
 				logger.Warningf("amneziawgnet: port-forward: inbound %d peer %q: dial tunnel %s:%d: %v", inboundID, key.email, addr, key.port, err)
 				continue
 			}
-			sess = &udpForwardSession{conn: conn}
+			sess = &udpForwardSession{conn: conn, email: key.email}
 			l.mu.Lock()
 			l.sessions[src] = sess
 			l.mu.Unlock()
@@ -114,11 +119,11 @@ func (l *udpForwardListener) pump(src netip.AddrPort, sess *udpForwardSession) {
 		delete(l.sessions, src)
 		l.mu.Unlock()
 		sess.conn.Close()
-		<-portForwardUDPSlots
+		portForwardUDPSlots.release(sess.email, src.Addr())
 	}()
 	buf := make([]byte, 65536)
-	for {
-		_ = sess.conn.SetReadDeadline(time.Now().Add(portForwardUDPIdleTimeout))
+	for idle := portForwardUDPUnrepliedIdle; ; idle = portForwardUDPIdleTimeout {
+		_ = sess.conn.SetReadDeadline(time.Now().Add(idle))
 		n, err := sess.conn.Read(buf)
 		if err != nil {
 			return

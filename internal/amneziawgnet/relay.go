@@ -10,6 +10,7 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -144,13 +145,32 @@ type closeWriter interface{ CloseWrite() error }
 type guardedReader struct {
 	conn  net.Conn
 	armed atomic.Bool
+	// idle > 0 bounds the pair from the start: a read gives up only once neither
+	// side (lastRead is shared) has read anything for idle.
+	idle     time.Duration
+	lastRead *atomic.Int64
 }
 
 func (r *guardedReader) Read(p []byte) (int, error) {
-	if r.armed.Load() {
-		_ = r.conn.SetReadDeadline(time.Now().Add(halfCloseIdle))
+	for {
+		if r.armed.Load() {
+			_ = r.conn.SetReadDeadline(time.Now().Add(halfCloseIdle))
+			return r.conn.Read(p)
+		}
+		if r.idle == 0 {
+			return r.conn.Read(p)
+		}
+		_ = r.conn.SetReadDeadline(time.Unix(0, r.lastRead.Load()).Add(r.idle))
+		n, err := r.conn.Read(p)
+		if n > 0 {
+			r.lastRead.Store(time.Now().UnixNano())
+		}
+		var timeout net.Error
+		if n > 0 || !errors.As(err, &timeout) || !timeout.Timeout() || r.armed.Load() ||
+			time.Since(time.Unix(0, r.lastRead.Load())) >= r.idle {
+			return n, err
+		}
 	}
-	return r.conn.Read(p)
 }
 
 // arm bounds this side's remaining reads, including one already in flight.
@@ -162,7 +182,16 @@ func (r *guardedReader) arm() {
 // pipeBothWays copies a and b into each other until BOTH directions end,
 // half-closing each far side in turn so a half-closed peer still gets its reply.
 func pipeBothWays(a, b net.Conn) {
-	ga, gb := &guardedReader{conn: a}, &guardedReader{conn: b}
+	pipeBothWaysIdle(a, b, 0)
+}
+
+// pipeBothWaysIdle is pipeBothWays that also ends the pair once neither side has
+// sent anything for idle; 0 leaves an open pair unbounded.
+func pipeBothWaysIdle(a, b net.Conn, idle time.Duration) {
+	lastRead := new(atomic.Int64)
+	lastRead.Store(time.Now().UnixNano())
+	ga := &guardedReader{conn: a, idle: idle, lastRead: lastRead}
+	gb := &guardedReader{conn: b, idle: idle, lastRead: lastRead}
 	var wg sync.WaitGroup
 	wg.Add(2)
 	// Arming dst bounds the direction still reading from it -- the one this
@@ -170,6 +199,12 @@ func pipeBothWays(a, b net.Conn) {
 	pipe := func(dst, src *guardedReader) {
 		defer wg.Done()
 		copyPooled(dst.conn, src)
+		// A quiet pair ends whole: the half-close grace is for a side that finished, not one idle.
+		if idle > 0 && time.Since(time.Unix(0, lastRead.Load())) >= idle {
+			_ = a.Close()
+			_ = b.Close()
+			return
+		}
 		if cw, ok := dst.conn.(closeWriter); ok {
 			_ = cw.CloseWrite()
 		} else {

@@ -370,3 +370,37 @@ func TestUDPRelayCapsSessionsPerPeer(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 }
+
+// A forwarded TCP relay must end once both sides stay quiet (an idle connection otherwise
+// holds its slot for good), yet a one-way stream must outlive the idle window.
+func TestPipeBothWaysIdleEndsOnlyAQuietPair(t *testing.T) {
+	const idle = 200 * time.Millisecond
+	client, a := tcpPair(t)
+	b, server := tcpPair(t)
+	done := make(chan struct{})
+	go func() { defer close(done); pipeBothWaysIdle(a, b, idle) }()
+
+	// The client only reads, as during a download, for several idle windows.
+	got := make([]byte, 1)
+	for range 12 {
+		if _, err := server.Write([]byte("x")); err != nil {
+			t.Fatalf("server write: %v", err)
+		}
+		_ = client.SetReadDeadline(time.Now().Add(2 * time.Second))
+		if _, err := io.ReadFull(client, got); err != nil {
+			t.Fatalf("one-way stream cut after an idle window: %v", err)
+		}
+		time.Sleep(idle / 4)
+	}
+	select {
+	case <-done:
+		t.Fatal("relay ended while one side was still sending")
+	default:
+	}
+
+	select {
+	case <-done:
+	case <-time.After(10 * idle):
+		t.Fatal("relay still open after both sides stayed quiet past the idle window")
+	}
+}

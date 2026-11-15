@@ -194,6 +194,10 @@ func TestAddInboundRefusesACertificatePathThatIsNoRegularFile(t *testing.T) {
 	mgr.SetLocalRuntimeOverride(fake)
 
 	dir := filepath.ToSlash(t.TempDir())
+	// The node's own panel certificate passes the push guard; the file check still applies.
+	if err := (&SettingService{}).SetCertFile(dir); err != nil {
+		t.Fatal(err)
+	}
 	inbound := &model.Inbound{
 		Tag:            "tls-device-44311",
 		Enable:         true,
