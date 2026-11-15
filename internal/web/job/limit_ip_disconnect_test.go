@@ -440,3 +440,39 @@ func TestRestoreStaysOwedWhenTheCheckAfterTheReAddFails(t *testing.T) {
 		})
 	}
 }
+
+// The restore is stored before RemoveUser: a panel killed right after the removal comes back
+// owing the client, and a restore that succeeds leaves nothing stored.
+func TestDisconnectClientTemporarilyStoresTheRestoreBeforeRemoving(t *testing.T) {
+	const email = "kill-probe"
+	setupIntegrationDB(t)
+	db := database.GetDB()
+	inbound := seedLinkedInboundWithClient(t, "kill-probe-tag", email, 1)
+	if err := db.Model(&model.ClientRecord{}).Where("email = ?", email).Update("enable", true).Error; err != nil {
+		t.Fatal(err)
+	}
+	stored := func() string {
+		var row model.Setting
+		if err := db.Where("key = ?", owedRestoresKey).Limit(1).Find(&row).Error; err != nil {
+			t.Fatal(err)
+		}
+		return row.Value
+	}
+	atRemove := ""
+	core := &fakeCoreAPI{}
+	core.onOp = func(op string) {
+		if op == "remove" {
+			atRemove = stored()
+		}
+	}
+	startFakeCoreAPI(t, core)
+
+	(&CheckClientIpJob{}).disconnectClientTemporarily(inbound, email, []model.Client{{Email: email, Enable: true}})
+
+	if !strings.Contains(atRemove, `"email":"`+email+`"`) {
+		t.Fatalf("stored owed restores when the core removed the client = %q, want %s owed", atRemove, email)
+	}
+	if after := stored(); after != "" {
+		t.Fatalf("stored owed restores after a successful re-add = %q, want none", after)
+	}
+}

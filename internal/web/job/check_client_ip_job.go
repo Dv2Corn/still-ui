@@ -797,11 +797,24 @@ func (j *CheckClientIpJob) disconnectClientTemporarily(inbound *model.Inbound, c
 		return
 	}
 
+	// Owed before RemoveUser and stored: a panel killed between the removal and the re-add
+	// leaves a core that outlives it without the client, and only the stored entry brings it back.
+	owed := owedRestore{InboundID: inbound.Id, Email: clientEmail}
+	if !slices.Contains(j.owedRestores, owed) {
+		j.owedRestores = append(j.owedRestores, owed)
+	}
+	j.saveOwedRestores()
+	settled := func() {
+		j.owedRestores = slices.DeleteFunc(j.owedRestores, func(o owedRestore) bool { return o == owed })
+		j.saveOwedRestores()
+	}
+
 	// The core's RemoveUser clears its validator: a session already up keeps
 	// running, except a reverse vless client, which is skipped above.
 	err = xrayAPI.RemoveUser(inbound.Tag, clientEmail)
 	if err != nil {
 		logger.Warningf("[LIMIT_IP] Failed to remove user %s: %v", clientEmail, err)
+		settled()
 		return
 	}
 
@@ -809,9 +822,7 @@ func (j *CheckClientIpJob) disconnectClientTemporarily(inbound *model.Inbound, c
 	// only widens the window in which new handshakes fail.
 	time.Sleep(100 * time.Millisecond)
 
-	// The client is out of the core now, so a failure below may not simply return: the
-	// restore is owed, and every later run tries it again until it settles.
-	owed := owedRestore{InboundID: inbound.Id, Email: clientEmail}
+	// A failure below leaves the restore owed, and every later run tries it again until it settles.
 	err = j.restoreRemovedClient(&xrayAPI, owed)
 	for attempt := 0; err != nil && attempt < 2; attempt++ {
 		limitIPRetryPause()
@@ -819,9 +830,9 @@ func (j *CheckClientIpJob) disconnectClientTemporarily(inbound *model.Inbound, c
 	}
 	if err != nil {
 		logger.Warningf("[LIMIT_IP] Cannot restore %s yet, will try again on the next run: %v", clientEmail, err)
-		j.owedRestores = append(j.owedRestores, owed)
-		j.saveOwedRestores()
+		return
 	}
+	settled()
 }
 
 // owedRestore is a client RemoveUser took out of the core and no re-add has put back yet.
