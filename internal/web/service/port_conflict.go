@@ -70,15 +70,12 @@ func configTransports(ib *xray.InboundConfig) (transportBits, bool) {
 	if err != nil {
 		return 0, false
 	}
-	detour := new(conf.InboundDetourConfig)
-	if json.Unmarshal(raw, detour) != nil {
-		return 0, false
-	}
 	// A node's certificate files are not on the master and choose no socket; raw keeps them for the checks.
-	if detour.StreamSetting != nil && detour.StreamSetting.TLSSettings != nil {
-		detour.StreamSetting.TLSSettings.Certs = nil
-	}
-	built, err := xray.BuildInboundDetour(detour, raw)
+	built, err := xray.BuildInbound(raw, func(detour *conf.InboundDetourConfig) {
+		if detour.StreamSetting != nil && detour.StreamSetting.TLSSettings != nil {
+			detour.StreamSetting.TLSSettings.Certs = nil
+		}
+	})
 	if err != nil {
 		return 0, false
 	}
@@ -90,8 +87,11 @@ func configTransports(ib *xray.InboundConfig) (transportBits, bool) {
 	if err != nil {
 		return 0, false
 	}
-	stream := receiver.(*proxyman.ReceiverConfig).StreamSettings
-	return coreSockets(stream, proxy)
+	receiverConfig, ok := receiver.(*proxyman.ReceiverConfig)
+	if !ok {
+		return 0, false
+	}
+	return coreSockets(receiverConfig.StreamSettings, proxy)
 }
 
 // coreSockets follows the core's AlwaysOnInboundHandler: each TCP network of the proxy opens

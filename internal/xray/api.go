@@ -162,12 +162,7 @@ func (x *XrayAPI) AddInbound(inbound []byte) error {
 	}
 	client := *x.HandlerServiceClient
 
-	detour := new(conf.InboundDetourConfig)
-	if err := json.Unmarshal(inbound, detour); err != nil {
-		logger.Debug("Failed to unmarshal inbound:", err)
-		return err
-	}
-	config, err := BuildInboundDetour(detour, inbound)
+	config, err := BuildInbound(inbound, nil)
 	if err != nil {
 		logger.Debug("Failed to build inbound Detur:", err)
 		return err
@@ -211,11 +206,19 @@ func ValidateOutboundConfig(outbound []byte) (err error) {
 	return validateHandlerSettings(built.ProxySettings)
 }
 
-// BuildInboundDetour runs conf.Build() inside the panel the one safe way: assets and noise
-// scripts resolved as the core sees them, untrusted input checked, a loader panic returned.
-func BuildInboundDetour(detour *conf.InboundDetourConfig, raw []byte) (built *core.InboundHandlerConfig, err error) {
+// BuildInbound runs conf.Build() inside the panel the one safe way: assets and noise scripts
+// resolved as the core sees them, untrusted input checked, a loader panic returned.
+func BuildInbound(raw []byte, adjust func(*conf.InboundDetourConfig)) (built *core.InboundHandlerConfig, err error) {
 	ensureXrayAssetLocation()
 	defer recoverLoaderPanic(&err)
+	detour := new(conf.InboundDetourConfig)
+	if err := json.Unmarshal(raw, detour); err != nil {
+		logger.Debug("Failed to unmarshal inbound:", err)
+		return nil, err
+	}
+	if adjust != nil {
+		adjust(detour)
+	}
 	if err := checkUntrustedBuildInput(detour.StreamSetting, raw); err != nil {
 		return nil, err
 	}
@@ -223,7 +226,7 @@ func BuildInboundDetour(detour *conf.InboundDetourConfig, raw []byte) (built *co
 	return detour.Build()
 }
 
-// buildOutbound is BuildInboundDetour for an outbound JSON object.
+// buildOutbound is BuildInbound for an outbound JSON object.
 func buildOutbound(raw []byte) (built *core.OutboundHandlerConfig, err error) {
 	ensureXrayAssetLocation()
 	defer recoverLoaderPanic(&err)
