@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"slices"
 	"strings"
 )
 
@@ -32,6 +33,23 @@ func RemoteIP(r *http.Request) string {
 		return realIP
 	}
 	return remoteIP
+}
+
+// SubLeakIPs is what the leak alert counts: RemoteIP, or, when a trusted proxy's two forwarded
+// headers disagree, both of them that are not trusted proxies (the proxy wrote one of them).
+func SubLeakIPs(r *http.Request) []string {
+	if FromTrustedProxy(r) {
+		realIP, hasRealIP := extractTrustedIP(r.Header.Get("X-Real-IP"))
+		forwardedIP, hasForwarded := forwardedForClient(r.Header.Get("X-Forwarded-For"))
+		if hasRealIP && hasForwarded && realIP != forwardedIP {
+			// A proxy hop in front (a CDN edge, a second front) is no subscriber network.
+			ips := slices.DeleteFunc([]string{realIP, forwardedIP}, isTrustedProxy)
+			if len(ips) > 0 {
+				return ips
+			}
+		}
+	}
+	return []string{RemoteIP(r)}
 }
 
 // forwardedForClient walks X-Forwarded-For from the proxy end: entries a client sent

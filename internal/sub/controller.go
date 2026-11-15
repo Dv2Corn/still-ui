@@ -631,7 +631,9 @@ func countFetchNetwork(c *gin.Context) bool {
 	if c.Request == nil || c.Request.Method != http.MethodGet || c.Writer.Status() != http.StatusOK {
 		return false
 	}
-	service.RecordSubscriptionNetwork(c.Param("subid"), service.RemoteIP(c.Request))
+	for _, ip := range service.SubLeakIPs(c.Request) {
+		service.RecordSubscriptionNetwork(c.Param("subid"), ip)
+	}
 	return true
 }
 

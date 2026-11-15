@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/database"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
@@ -47,7 +48,7 @@ func jsonLeaves(raw string) []jsonLeaf {
 					return false
 				}
 				name, _ := key.(string)
-				if !walk(append(slices.Clone(path), strings.ToLower(name))) {
+				if !walk(append(slices.Clone(path), foldJSONKey(name))) {
 					return false
 				}
 			}
@@ -67,6 +68,18 @@ func jsonLeaves(raw string) []jsonLeaf {
 	}
 	walk(nil)
 	return leaves
+}
+
+// foldJSONKey folds a key as encoding/json matches names (Unicode simple folding), so the
+// "realitySettingſ" xray-core reads as realitySettings is checked as realitysettings.
+func foldJSONKey(key string) string {
+	return strings.Map(func(r rune) rune {
+		low := r
+		for f := unicode.SimpleFold(r); f != r; f = unicode.SimpleFold(f) {
+			low = min(low, f)
+		}
+		return unicode.ToLower(low)
+	}, key)
 }
 
 // isEnvRef matches what xray-core expands from the panel's environment: a whole value, or
@@ -168,9 +181,16 @@ func hostReaches(inbound *model.Inbound, kept map[pushReach]bool, lookup bool) (
 			return a.addrs, a.err
 		}
 	}
-	local, err := localRelayTargets(inbound.Id)
-	if err != nil {
-		return nil, err
+	// Built only for a fallback dest left to decide: it builds every enabled inbound with its clients.
+	var local []string
+	var localErr error
+	localLoaded := false
+	isLocalTarget := func(target string) bool {
+		if !localLoaded {
+			local, localErr = localRelayTargets(inbound.Id)
+			localLoaded = true
+		}
+		return slices.Contains(local, target)
 	}
 	ownPorts := nodeOwnPorts()
 	ownCerts := nodeOwnCertFiles()
@@ -225,7 +245,7 @@ func hostReaches(inbound *model.Inbound, kept map[pushReach]bool, lookup bool) (
 	for _, leaf := range jsonLeaves(inbound.Settings) {
 		switch {
 		case leaf.endsWith("fallbacks", "[]", "dest"):
-			if kept[pushReach{field: "fallback dest", value: leaf.value}] || slices.Contains(local, normalizeRelayTarget(leaf.value)) {
+			if kept[pushReach{field: "fallback dest", value: leaf.value}] || isLocalTarget(normalizeRelayTarget(leaf.value)) {
 				continue
 			}
 			switch public, resolved := isPublicRelayTarget(leaf.value, ownPorts, false, look); {
@@ -239,6 +259,9 @@ func hostReaches(inbound *model.Inbound, kept map[pushReach]bool, lookup bool) (
 				add("domainFronting ip", leaf)
 			}
 		}
+	}
+	if localErr != nil {
+		return nil, localErr
 	}
 	return reaches, nil
 }

@@ -99,8 +99,9 @@ type fakeCoreAPI struct {
 	onOp  func(op string)
 	onAdd func(vlessID string)
 	// failAdd makes the core refuse every AddUser; addExists answers it "already exists".
-	failAdd   bool
-	addExists bool
+	failAdd    bool
+	addExists  bool
+	failRemove bool
 }
 
 func (f *fakeCoreAPI) AlterInbound(_ context.Context, req *command.AlterInboundRequest) (*command.AlterInboundResponse, error) {
@@ -126,6 +127,9 @@ func (f *fakeCoreAPI) AlterInbound(_ context.Context, req *command.AlterInboundR
 		}
 	}
 	f.onOp(op)
+	if op == "remove" && f.failRemove {
+		return nil, errors.New("user not found")
+	}
 	if op == "add" && f.failAdd {
 		return nil, errors.New("core refuses the user")
 	}
@@ -438,5 +442,95 @@ func TestRestoreStaysOwedWhenTheCheckAfterTheReAddFails(t *testing.T) {
 				t.Fatalf("core operations = %v, want %v", core.ops, tc.want)
 			}
 		})
+	}
+}
+
+// The restore is stored before RemoveUser: a panel killed right after the removal comes back
+// owing the client, and a restore that succeeds leaves nothing stored.
+func TestDisconnectClientTemporarilyStoresTheRestoreBeforeRemoving(t *testing.T) {
+	const email = "kill-probe"
+	setupIntegrationDB(t)
+	db := database.GetDB()
+	inbound := seedLinkedInboundWithClient(t, "kill-probe-tag", email, 1)
+	if err := db.Model(&model.ClientRecord{}).Where("email = ?", email).Update("enable", true).Error; err != nil {
+		t.Fatal(err)
+	}
+	settings := `{"clients":[{"email":"` + email + `","id":"33333333-3333-3333-3333-333333333333","enable":true}]}`
+	if err := db.Model(&model.Inbound{}).Where("id = ?", inbound.Id).Update("settings", settings).Error; err != nil {
+		t.Fatal(err)
+	}
+	stored := func() string {
+		var row model.Setting
+		if err := db.Where("key = ?", owedRestoresKey).Limit(1).Find(&row).Error; err != nil {
+			t.Fatal(err)
+		}
+		return row.Value
+	}
+	atRemove := ""
+	core := &fakeCoreAPI{}
+	core.onOp = func(op string) {
+		if op == "remove" {
+			atRemove = stored()
+		}
+	}
+	startFakeCoreAPI(t, core)
+
+	(&CheckClientIpJob{}).disconnectClientTemporarily(inbound, email, []model.Client{{Email: email, Enable: true}})
+
+	if !strings.Contains(atRemove, `"email":"`+email+`"`) {
+		t.Fatalf("stored owed restores when the core removed the client = %q, want %s owed", atRemove, email)
+	}
+	if after := stored(); after != "" {
+		t.Fatalf("stored owed restores after a successful re-add = %q, want none", after)
+	}
+}
+
+// A failed RemoveUser never settles a restore: the client may be out of the core already,
+// from this call or an earlier one that still owes it.
+func TestDisconnectClientTemporarilyKeepsTheRestoreOwedWhenRemoveFails(t *testing.T) {
+	const email = "remove-fail-probe"
+	setupIntegrationDB(t)
+	inbound := seedLinkedInboundWithClient(t, "remove-fail-probe-tag", email, 1)
+	core := &fakeCoreAPI{failRemove: true}
+	core.onOp = func(string) {}
+	startFakeCoreAPI(t, core)
+
+	owed := owedRestore{InboundID: inbound.Id, Email: email}
+	job := &CheckClientIpJob{owedRestores: []owedRestore{owed}}
+	job.disconnectClientTemporarily(inbound, email, []model.Client{{Email: email, Enable: true}})
+
+	next := &CheckClientIpJob{}
+	next.loadOwedRestores()
+	if !slices.Equal(job.owedRestores, []owedRestore{owed}) || !slices.Equal(next.owedRestores, []owedRestore{owed}) {
+		t.Fatalf("owed after a failed remove: in memory %v, stored %v; want %v in both", job.owedRestores, next.owedRestores, owed)
+	}
+}
+
+// A client resolved to a node's inbound is not in the local core: the job neither removes it
+// nor owes its restore, so no run keeps retrying an AddUser the core cannot take.
+func TestDisconnectClientTemporarilyLeavesNodeInboundsAlone(t *testing.T) {
+	const email = "node-probe"
+	setupIntegrationDB(t)
+	db := database.GetDB()
+	inbound := seedLinkedInboundWithClient(t, "node-probe-tag", email, 1)
+	nodeID := 7
+	settings := `{"clients":[{"email":"` + email + `","id":"44444444-4444-4444-4444-444444444444","enable":true}]}`
+	if err := db.Model(&model.Inbound{}).Where("id = ?", inbound.Id).Updates(map[string]any{"settings": settings, "node_id": nodeID}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Model(&model.ClientRecord{}).Where("email = ?", email).Update("enable", true).Error; err != nil {
+		t.Fatal(err)
+	}
+	inbound.NodeID = &nodeID
+	core := &fakeCoreAPI{failRemove: true, failAdd: true}
+	core.onOp = func(string) {}
+	startFakeCoreAPI(t, core)
+	job := &CheckClientIpJob{}
+	job.disconnectClientTemporarily(inbound, email, []model.Client{{Email: email, Enable: true}})
+	for i := 0; i < 3; i++ {
+		job.settleOwedRestores()
+	}
+	if len(job.owedRestores) != 0 || len(core.ops) != 0 {
+		t.Errorf("owed after 3 runs = %v, core ops %v; want nothing owed and the core untouched", job.owedRestores, core.ops)
 	}
 }
