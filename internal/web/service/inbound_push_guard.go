@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -9,6 +10,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/database"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
@@ -127,6 +129,7 @@ func hostReaches(inbound *model.Inbound) ([]pushReach, error) {
 	if err != nil {
 		return nil, err
 	}
+	ownPorts := nodeOwnPorts()
 	ownCerts := nodeOwnCertFiles()
 	var reaches []pushReach
 	add := func(field string, leaf jsonLeaf) {
@@ -161,7 +164,10 @@ func hostReaches(inbound *model.Inbound) ([]pushReach, error) {
 		case (leaf.endsWith("certificatefile") || leaf.endsWith("keyfile")) && lower != "" && !isNodeOwnCertFile(leaf.value, ownCerts):
 			add("certificate file", leaf)
 		case leaf.endsWith("realitysettings", "target") || leaf.endsWith("realitysettings", "dest"):
-			if !isPublicRelayTarget(leaf.value) {
+			switch public, resolved := isPublicRealityTarget(leaf.value, ownPorts); {
+			case !resolved:
+				add("REALITY target (its name does not resolve)", leaf)
+			case !public:
 				add("REALITY target", leaf)
 			}
 		}
@@ -173,7 +179,7 @@ func hostReaches(inbound *model.Inbound) ([]pushReach, error) {
 	for _, leaf := range jsonLeaves(inbound.Settings) {
 		switch {
 		case leaf.endsWith("fallbacks", "[]", "dest"):
-			if !isPublicRelayTarget(leaf.value) && !slices.Contains(local, normalizeRelayTarget(leaf.value)) {
+			if !isPublicRelayTarget(leaf.value, ownPorts) && !slices.Contains(local, normalizeRelayTarget(leaf.value)) {
 				add("fallback dest", leaf)
 			}
 		case leaf.endsWith("domainfronting", "ip"):
@@ -186,30 +192,68 @@ func hostReaches(inbound *model.Inbound) ([]pushReach, error) {
 }
 
 // isPublicRelayTarget reports whether a relay target dials a public host, not this one: a
-// bare port, a unix socket, a loopback or private host and this host's own addresses all
-// stay on the machine.
-func isPublicRelayTarget(target string) bool {
+// bare port, a unix socket, a loopback or private host, this host's own addresses, and any
+// name on one of this node's own ports (it may resolve to loopback by dial time) stay here.
+func isPublicRelayTarget(target string, ownPorts []string) bool {
+	host, port, ok := splitRelayTarget(target)
+	if !ok {
+		return false
+	}
+	if ip := net.ParseIP(strings.Trim(host, "[]")); ip != nil {
+		return !isBlockedIP(ip) && !isLocalInterfaceIP(ip)
+	}
+	return !slices.Contains(ownPorts, port) && !namesInternalHost(host)
+}
+
+// isPublicRealityTarget is isPublicRelayTarget for a REALITY target, with one exception: a
+// name on 443, the usual REALITY target, may share the port with this node's panel or
+// subscription server. Such a name is resolved now and passes only when every address is
+// public; resolved is false when it does not resolve.
+// shortcut: the name may resolve elsewhere when Xray dials it (DNS rebinding); closing that
+// needs Xray to pin the address it was checked against.
+func isPublicRealityTarget(target string, ownPorts []string) (public, resolved bool) {
+	host, port, ok := splitRelayTarget(target)
+	if !ok || port != "443" || net.ParseIP(strings.Trim(host, "[]")) != nil || !slices.Contains(ownPorts, port) {
+		return isPublicRelayTarget(target, ownPorts), true
+	}
+	if namesInternalHost(host) {
+		return false, true
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	addrs, err := pushGuardLookup(ctx, host)
+	if err != nil || len(addrs) == 0 {
+		return false, false
+	}
+	for _, a := range addrs {
+		if isBlockedIP(a.IP) || isLocalInterfaceIP(a.IP) {
+			return false, true
+		}
+	}
+	return true, true
+}
+
+// pushGuardLookup resolves a pushed REALITY target name; tests replace it.
+var pushGuardLookup = net.DefaultResolver.LookupIPAddr
+
+// splitRelayTarget reads host:port as Go's dialer would, refusing a socket path and any port
+// that is not a plain number ("062789" or a service name would slip past a string match).
+func splitRelayTarget(target string) (host, port string, ok bool) {
 	target = strings.TrimSpace(target)
 	if strings.HasPrefix(target, "/") || strings.HasPrefix(target, "@") {
-		return false
+		return "", "", false
 	}
 	host, port, err := net.SplitHostPort(target)
 	if err != nil {
-		return false
+		return "", "", false
 	}
-	// Go's dialer also reads "062789" or a service name, which would slip past a string match.
 	if n, err := strconv.ParseUint(port, 10, 16); err != nil || n == 0 || strconv.FormatUint(n, 10) != port {
-		return false
+		return "", "", false
 	}
-	// shortcut: a name is judged by its text, not resolved; a public name that resolves to this
-	// host still passes. Resolve at push time if that ever matters more than REALITY on 443.
-	if ip := net.ParseIP(strings.Trim(host, "[]")); ip != nil && isLocalInterfaceIP(ip) {
-		return false
-	}
-	return !namesInternalHost(host)
+	return host, port, true
 }
 
-// nodeOwnPorts lists the ports of this node's own services, never a local fallback dest:
+// nodeOwnPorts lists the ports of this node's services a relay must not reach under a name:
 // Xray's API and metrics listeners, the panel and the subscription server.
 func nodeOwnPorts() []string {
 	ports := xrayOwnPorts()

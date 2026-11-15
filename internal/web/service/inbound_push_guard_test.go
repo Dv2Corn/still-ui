@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -20,10 +21,11 @@ func pushGuardTestService(t *testing.T) *InboundService {
 	return &InboundService{FromNodeSync: true}
 }
 
-// A relay target is judged by its address, not by its port: with the panel and the
-// subscription server on 443, a public REALITY target on 443 (the usual kind) passes, while
-// loopback and this host's own addresses are refused on any port.
-func TestPushedRelayTargetIsJudgedByAddressNotPort(t *testing.T) {
+// With the panel and the subscription server on 443, a REALITY target name on 443 passes
+// only when it resolves to public addresses; any other name on one of the node's own ports
+// (127.0.0.1.nip.io reaches loopback by dial time), loopback and this host's own addresses
+// are refused.
+func TestPushedRelayTargetsOnTheNodesOwnPorts(t *testing.T) {
 	push := pushGuardTestService(t)
 	settings := &SettingService{}
 	if err := settings.SetPort(443); err != nil {
@@ -32,31 +34,55 @@ func TestPushedRelayTargetIsJudgedByAddressNotPort(t *testing.T) {
 	if err := settings.setInt("subPort", 443); err != nil {
 		t.Fatal(err)
 	}
+	resolved := map[string]string{"www.nvidia.com": "23.215.0.136", "rebind.example.com": "127.0.0.1", "lan.example.com": "192.168.1.10"}
+	old := pushGuardLookup
+	pushGuardLookup = func(_ context.Context, host string) ([]net.IPAddr, error) {
+		if ip, ok := resolved[host]; ok {
+			return []net.IPAddr{{IP: net.ParseIP(ip)}}, nil
+		}
+		return nil, &net.DNSError{Err: "no such host", Name: host, IsNotFound: true}
+	}
+	t.Cleanup(func() { pushGuardLookup = old })
+
 	reality := func(port int, target string) *model.Inbound {
 		return &model.Inbound{
 			Enable: true, Port: port, Protocol: model.VLESS, Settings: `{"clients":[]}`,
 			StreamSettings: `{"network":"tcp","security":"reality","realitySettings":{"target":"` + target + `"}}`,
 		}
 	}
-	for i, target := range []string{"www.nvidia.com:443", "1.1.1.1:443", "sub.example.com:2096"} {
+	for i, target := range []string{"www.nvidia.com:443", "1.1.1.1:443", "sub.example.com:8443"} {
 		if _, _, err := push.AddInbound(reality(44420+i, target)); err != nil && strings.Contains(err.Error(), "may not set") {
 			t.Errorf("public REALITY target %q refused: %v", target, err)
 		}
 	}
-	refused := []string{"127.0.0.1:443", "[::1]:443", "localhost:443"}
-	if own := firstOwnPublicIP(); own != "" {
-		refused = append(refused, net.JoinHostPort(own, "443"))
+	refused := map[string]string{
+		"127.0.0.1.nip.io:62789":  "REALITY target",
+		"rebind.example.com:443":  "REALITY target",
+		"lan.example.com:443":     "REALITY target",
+		"127.0.0.1:443":           "REALITY target",
+		"[::1]:443":               "REALITY target",
+		"localhost:443":           "REALITY target",
+		"unknown.example.com:443": "REALITY target (its name does not resolve)",
 	}
-	for i, target := range refused {
-		want := fmt.Sprintf("may not set REALITY target to %q", target)
-		if _, _, err := push.AddInbound(reality(44430+i, target)); err == nil || !strings.Contains(err.Error(), want) {
+	if own := firstOwnPublicIP(); own != "" {
+		refused[net.JoinHostPort(own, "443")] = "REALITY target"
+	}
+	port := 44430
+	for target, field := range refused {
+		port++
+		want := fmt.Sprintf("may not set %s to %q", field, target)
+		if _, _, err := push.AddInbound(reality(port, target)); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("AddInbound(%q) = %v, want %q", target, err, want)
 		}
 	}
-	// Go's dialer reads a leading zero as the same port; such a spelling is never public.
-	fb := &model.Inbound{Enable: true, Port: 44440, Protocol: model.VLESS, Settings: `{"clients":[],"fallbacks":[{"dest":"www.example.com:0443"}]}`, StreamSettings: `{"network":"tcp"}`}
-	if _, _, err := push.AddInbound(fb); err == nil || !strings.Contains(err.Error(), `may not set fallback dest to "www.example.com:0443"`) {
-		t.Errorf("AddInbound(leading-zero port) = %v", err)
+	// The 443 exception is REALITY's only: a fallback dest name on an own port stays refused,
+	// and Go's dialer reads a leading zero as the same port.
+	for _, dest := range []string{"www.nvidia.com:443", "127.0.0.1.nip.io:062789"} {
+		port++
+		fb := &model.Inbound{Enable: true, Port: port, Protocol: model.VLESS, Settings: `{"clients":[],"fallbacks":[{"dest":"` + dest + `"}]}`, StreamSettings: `{"network":"tcp"}`}
+		if _, _, err := push.AddInbound(fb); err == nil || !strings.Contains(err.Error(), fmt.Sprintf("may not set fallback dest to %q", dest)) {
+			t.Errorf("AddInbound(fallback %q) = %v", dest, err)
+		}
 	}
 }
 
