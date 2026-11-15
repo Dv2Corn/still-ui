@@ -95,6 +95,7 @@ type fakeCoreAPI struct {
 	command.UnimplementedHandlerServiceServer
 	mu    sync.Mutex
 	ops   []string
+	tags  []string
 	onOp  func(op string)
 	onAdd func(vlessID string)
 	// failAdd makes the core refuse every AddUser.
@@ -113,6 +114,7 @@ func (f *fakeCoreAPI) AlterInbound(_ context.Context, req *command.AlterInboundR
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.ops = append(f.ops, op)
+	f.tags = append(f.tags, req.Tag)
 	if add, ok := operation.(*command.AddUserOperation); ok && f.onAdd != nil {
 		account, err := add.User.Account.GetInstance()
 		if err != nil {
@@ -327,16 +329,29 @@ func TestDisconnectClientTemporarilyDoesNotStrandTheClient(t *testing.T) {
 			if !tc.wantOwed {
 				return
 			}
-			// What failed works again: the next run puts the client back and owes nothing.
+			// What failed works again, the inbound was renamed and the panel restarted (a new
+			// job, the same core): the next run re-adds the client under the tag stored now.
 			if !tc.healOnRetry {
 				mend()
+			}
+			if err := db.Model(&model.Inbound{}).Where("id = ?", inbound.Id).Update("tag", "strand-probe-renamed").Error; err != nil {
+				t.Fatal(err)
 			}
 			core.mu.Lock()
 			core.failAdd = false
 			core.mu.Unlock()
-			job.settleOwedRestores()
-			if got := ops(); len(job.owedRestores) != 0 || got[len(got)-1] != "add" {
-				t.Fatalf("after the next run: core saw %v, still owed %v; want the client re-added", got, job.owedRestores)
+			next := &CheckClientIpJob{}
+			next.settleOwedRestores()
+			core.mu.Lock()
+			lastOp, lastTag := core.ops[len(core.ops)-1], core.tags[len(core.tags)-1]
+			core.mu.Unlock()
+			if len(next.owedRestores) != 0 || lastOp != "add" || lastTag != "strand-probe-renamed" {
+				t.Fatalf("after the next run: last op %s on %q, still owed %v; want the client re-added under the new tag", lastOp, lastTag, next.owedRestores)
+			}
+			again := &CheckClientIpJob{}
+			again.settleOwedRestores()
+			if got := ops(); len(got) != len(tc.wantOps)+1 {
+				t.Fatalf("a settled restore was replayed: core saw %v", got)
 			}
 		})
 	}
