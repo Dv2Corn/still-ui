@@ -100,3 +100,40 @@ func TestSameEmailOnMasterAndNodeIsNotSummedAcrossTiers(t *testing.T) {
 	}
 	assertUpDown(t, readTraffic(t, db, "both@x"), 10, 20, "the master's own usage, without the node's")
 }
+
+// A reader that trimmed Unicode white space first parsed settings the strict readers refused.
+// Bytes that are not one JSON object leave the inbound out, for billing and the client sync.
+func TestNodeCannotSlipSettingsPastTheClaimCheckBehindWhiteSpace(t *testing.T) {
+	const hostile = `{"clients":[{"email":"victim@x","id":"99999999-9999-4999-8999-999999999999","subId":"stolen-sub","enable":false,"expiryTime":1}]}`
+	for name, prefix := range map[string]string{"form feed": "\f", "vertical tab": "\v", "no-break space": "\u00a0", "next line": "\u0085", "byte order mark": "\ufeff"} {
+		t.Run(name, func(t *testing.T) {
+			db := initTrafficTestDB(t)
+			svc := &InboundService{}
+			seedNodeRow(t, db, &model.Node{Id: 1, Name: "n1", Address: "127.0.0.1", Port: 2096, ApiToken: "tok", Enable: true})
+			master := seedMasterInbound(t, db, "master-in", 40001,
+				`{"email":"victim@x","id":"11111111-1111-4111-8111-111111111111","subId":"victim-sub","enable":true}`)
+			if err := db.Create(&xray.ClientTraffic{InboundId: master.Id, Email: "victim@x", Enable: true}).Error; err != nil {
+				t.Fatalf("seed traffic: %v", err)
+			}
+			createNodeInbound(t, db, 1, "n1-in", 41001)
+			for _, settings := range []string{prefix + hostile, hostile + prefix} {
+				for _, up := range []int64{0, 500} {
+					syncNodeWithSettings(t, svc, 1, "n1-in", settings,
+						xray.ClientTraffic{Email: "victim@x", Up: up, Down: up, Enable: false, ExpiryTime: 1})
+				}
+			}
+			if got := readTraffic(t, db, "victim@x"); got.Up != 0 || !got.Enable || got.ExpiryTime != 0 {
+				t.Fatalf("victim traffic up=%d enable=%v expiry=%d, want untouched by the node", got.Up, got.Enable, got.ExpiryTime)
+			}
+			if rec := readClientRecord(t, db, "victim@x"); rec.UUID != "11111111-1111-4111-8111-111111111111" || rec.SubID != "victim-sub" || !rec.Enable {
+				t.Fatalf("victim record uuid=%q subId=%q enable=%v, want the master's", rec.UUID, rec.SubID, rec.Enable)
+			}
+			if nodeHostsClient(t, db, "n1-in", "victim@x") {
+				t.Fatal("the node inbound adopted a master-only client")
+			}
+			if stored := storedInboundSettings(t, db, "n1-in"); stored != "" {
+				t.Fatalf("the master stored the unreadable settings: %q", stored)
+			}
+		})
+	}
+}

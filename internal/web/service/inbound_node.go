@@ -490,10 +490,17 @@ func (s *InboundService) setRemoteTrafficLocked(nodeID int, snap *runtime.Traffi
 	if snap == nil || nodeID <= 0 {
 		return false, nil
 	}
+	// Settings that are not one JSON object are no settings: that inbound is left out below.
+	unreadableSettings := map[*model.Inbound]struct{}{}
 	for _, snapIb := range snap.Inbounds {
-		if snapIb != nil {
-			snapIb.Settings = canonicalNodeSettings(snapIb.Settings)
+		if snapIb == nil {
+			continue
 		}
+		canonical, ok := canonicalNodeSettings(snapIb.Settings)
+		if !ok {
+			unreadableSettings[snapIb] = struct{}{}
+		}
+		snapIb.Settings = canonical
 	}
 	db := database.GetDB()
 	now := time.Now().UnixMilli()
@@ -764,7 +771,11 @@ func (s *InboundService) setRemoteTrafficLocked(nodeID int, snap *runtime.Traffi
 			}
 			mergedCentral[c.Id] = struct{}{}
 		}
-		if reason := oversizeNodeInbound(snapIb); reason != "" {
+		reason := oversizeNodeInbound(snapIb)
+		if _, unreadable := unreadableSettings[snapIb]; unreadable {
+			reason = "its settings are not a JSON object"
+		}
+		if reason != "" {
 			oversizeTags[snapIb.Tag] = reason
 			snap.Inbounds[snapIdx] = nil
 			continue

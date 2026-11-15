@@ -198,28 +198,20 @@ func readSettingsClient(entry json.RawMessage) (settingsClientEntry, bool) {
 	return c, true
 }
 
-// canonicalNodeSettings drops the keys Go would bind to a clients field but the exact-key
-// claim check does not see, so a node cannot list a client past that check.
-func canonicalNodeSettings(settings string) string {
+// canonicalNodeSettings is the one strict parse of a node's settings; every later reader gets
+// its re-marshalled result, without the keys that only fold to "clients".
+func canonicalNodeSettings(settings string) (string, bool) {
 	var members map[string]json.RawMessage
-	if json.Unmarshal([]byte(settings), &members) != nil {
-		return settings
+	if json.Unmarshal([]byte(settings), &members) != nil || members == nil {
+		return "", false
 	}
-	folded := false
 	for key := range members {
 		if key != "clients" && bindsAsClientsKey(key) {
 			delete(members, key)
-			folded = true
 		}
 	}
-	if !folded {
-		return settings
-	}
 	out, err := json.Marshal(members)
-	if err != nil {
-		return settings
-	}
-	return string(out)
+	return string(out), err == nil
 }
 
 // bindsAsClientsKey asks the decoder itself whether it would bind key to a clients field,
