@@ -965,6 +965,11 @@ func (s *ClientService) UpdateInboundClient(inboundSvc *InboundService, data *mo
 			}
 			if v, ok2 := newMap["subId"].(string); ok2 {
 				clients[0].SubID = v
+				// A rotated subId ends the Telegram binding it could claim, in the stored entry
+				// too, unless this edit names a new tgId.
+				if preservedSubID != "" && v != preservedSubID && fmt.Sprint(newMap["tgId"]) == fmt.Sprint(oldClientMap["tgId"]) {
+					newMap["tgId"] = 0
+				}
 			}
 			if oldInbound.Protocol == model.WireGuard || oldInbound.Protocol == model.AmneziaWG {
 				newMap["privateKey"] = clients[0].PrivateKey

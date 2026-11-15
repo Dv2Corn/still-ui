@@ -68,12 +68,19 @@ func applyClientRecordMerge(row *model.ClientRecord, incoming *model.ClientRecor
 	if incoming.ForwardedPorts != "" {
 		row.ForwardedPorts = incoming.ForwardedPorts
 	}
+	// The subId alone can claim a Telegram binding, so rotating it to revoke a leak ends the
+	// binding too, unless the same write names a new tgId.
+	subRotated := row.SubID != "" && incoming.SubID != row.SubID
+	if !subRotated || incoming.TgID != row.TgID {
+		row.TgID = incoming.TgID
+	} else {
+		row.TgID = 0
+	}
 	row.SubID = incoming.SubID
 	row.LimitIP = incoming.LimitIP
 	row.TotalGB = incoming.TotalGB
 	row.ExpiryTime = incoming.ExpiryTime
 	row.Enable = incoming.Enable
-	row.TgID = incoming.TgID
 	if incoming.Group != "" {
 		row.Group = incoming.Group
 	}
