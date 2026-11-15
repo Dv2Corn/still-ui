@@ -799,6 +799,7 @@ func (j *CheckClientIpJob) disconnectClientTemporarily(inbound *model.Inbound, c
 
 	// The local core never hosts a node's inbound: nothing to remove here, and nothing to owe.
 	if inbound.NodeID != nil {
+		logger.Warningf("[LIMIT_IP] Not disconnecting %s: inbound %s is hosted on a node", clientEmail, inbound.Tag)
 		return
 	}
 

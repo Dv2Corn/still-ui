@@ -70,9 +70,8 @@ func jsonLeaves(raw string) []jsonLeaf {
 	return leaves
 }
 
-// foldJSONKey folds a key the way encoding/json matches field names (Unicode simple folding),
-// so a spelling such as "realitySettingſ" (long s) that xray-core reads as realitySettings is
-// checked as realitysettings: each rune becomes the lower case of the smallest rune it folds with.
+// foldJSONKey folds a key as encoding/json matches names (Unicode simple folding), so the
+// "realitySettingſ" xray-core reads as realitySettings is checked as realitysettings.
 func foldJSONKey(key string) string {
 	return strings.Map(func(r rune) rune {
 		low := r

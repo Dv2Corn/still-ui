@@ -35,10 +35,8 @@ func RemoteIP(r *http.Request) string {
 	return remoteIP
 }
 
-// SubLeakIPs is what the subscription leak alert counts for a request: RemoteIP, except that
-// when a trusted proxy's X-Real-IP and X-Forwarded-For disagree it returns both that are not
-// trusted proxies. The proxy wrote one of them, so a client header cannot fold its fetches into
-// the proxy's own network.
+// SubLeakIPs is what the leak alert counts: RemoteIP, or, when a trusted proxy's two forwarded
+// headers disagree, both of them that are not trusted proxies (the proxy wrote one of them).
 func SubLeakIPs(r *http.Request) []string {
 	if FromTrustedProxy(r) {
 		realIP, hasRealIP := extractTrustedIP(r.Header.Get("X-Real-IP"))
