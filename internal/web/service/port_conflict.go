@@ -73,7 +73,7 @@ func inboundTransports(protocol model.Protocol, streamSettings, settings string)
 	if json.Unmarshal([]byte(settings), &st) == nil {
 		raw := st.Network
 		// dokodemo (Tunnel) takes network over allowedNetwork when both are set.
-		if protocol == model.Tunnel && raw == nil {
+		if _, set := xrayStringList(raw); protocol == model.Tunnel && !set {
 			raw = st.AllowedNetwork
 		}
 		switch protocol {

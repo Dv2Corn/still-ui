@@ -1042,6 +1042,7 @@ func TestInboundTransportsFoldKeysLikeTheCore(t *testing.T) {
 		{"shadowsocks, a wrong-typed key the core ignores", model.Shadowsocks, "", `{"network":"udp","udp":"x"}`, transportUDP},
 		{"tunnel, a wrong-typed key the core ignores", model.Tunnel, "", `{"allowedNetwork":"udp","udp":[1]}`, transportUDP},
 		{"shadowsocks, a padded part is no network", model.Shadowsocks, "", `{"network":" tcp,udp"}`, transportUDP},
+		{"tunnel, a null network leaves allowedNetwork", model.Tunnel, "", `{"network":null,"allowedNetwork":"udp"}`, transportUDP},
 	} {
 		if got := inboundTransports(tc.protocol, tc.stream, tc.settings); got != tc.want {
 			t.Errorf("%s: inboundTransports = %b, want %b", tc.name, got, tc.want)
