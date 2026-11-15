@@ -198,6 +198,59 @@ func readSettingsClient(entry json.RawMessage) (settingsClientEntry, bool) {
 	return c, true
 }
 
+// canonicalNodeSettings drops the top-level keys that only fold to "clients". Go binds
+// them to a struct's clients field while the raw-key readers see none, so a node could
+// list a client for crediting that the claim check never saw.
+func canonicalNodeSettings(settings string) string {
+	var members map[string]json.RawMessage
+	if json.Unmarshal([]byte(settings), &members) != nil {
+		return settings
+	}
+	folded := false
+	for key := range members {
+		if key != "clients" && strings.EqualFold(key, "clients") {
+			delete(members, key)
+			folded = true
+		}
+	}
+	if !folded {
+		return settings
+	}
+	out, err := json.Marshal(members)
+	if err != nil {
+		return settings
+	}
+	return string(out)
+}
+
+// snapshotAttachedEmails lowercases the emails a snapshot inbound's settings list, read
+// entry by entry as the claim check reads them, so one odd entry hides no other client.
+// unreadable counts the entries without a readable email; ok is false when the settings
+// or their client list cannot be parsed, so membership is unknown.
+func snapshotAttachedEmails(settings string) (emails map[string]struct{}, unreadable int, ok bool) {
+	var members map[string]json.RawMessage
+	if json.Unmarshal([]byte(settings), &members) != nil || members == nil {
+		return nil, 0, false
+	}
+	emails = map[string]struct{}{}
+	raw := members["clients"]
+	if len(raw) == 0 || string(raw) == "null" {
+		return emails, 0, true
+	}
+	var entries []json.RawMessage
+	if json.Unmarshal(raw, &entries) != nil {
+		return nil, 0, false
+	}
+	for _, entry := range entries {
+		if c, read := readSettingsClient(entry); read && c.Email != "" {
+			emails[strings.ToLower(c.Email)] = struct{}{}
+		} else {
+			unreadable++
+		}
+	}
+	return emails, unreadable, true
+}
+
 // joinSettingsClients writes the blob back compactly; indenting it again would cost the
 // square of whatever depth the node nested into it.
 func joinSettingsClients(settings string, members map[string]json.RawMessage, entries []json.RawMessage) (string, bool) {
