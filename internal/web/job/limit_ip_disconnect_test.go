@@ -2,6 +2,7 @@ package job
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -94,8 +95,12 @@ type fakeCoreAPI struct {
 	command.UnimplementedHandlerServiceServer
 	mu    sync.Mutex
 	ops   []string
+	tags  []string
 	onOp  func(op string)
 	onAdd func(vlessID string)
+	// failAdd makes the core refuse every AddUser; addExists answers it "already exists".
+	failAdd   bool
+	addExists bool
 }
 
 func (f *fakeCoreAPI) AlterInbound(_ context.Context, req *command.AlterInboundRequest) (*command.AlterInboundResponse, error) {
@@ -110,6 +115,7 @@ func (f *fakeCoreAPI) AlterInbound(_ context.Context, req *command.AlterInboundR
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.ops = append(f.ops, op)
+	f.tags = append(f.tags, req.Tag)
 	if add, ok := operation.(*command.AddUserOperation); ok && f.onAdd != nil {
 		account, err := add.User.Account.GetInstance()
 		if err != nil {
@@ -120,6 +126,12 @@ func (f *fakeCoreAPI) AlterInbound(_ context.Context, req *command.AlterInboundR
 		}
 	}
 	f.onOp(op)
+	if op == "add" && f.failAdd {
+		return nil, errors.New("core refuses the user")
+	}
+	if op == "add" && f.addExists {
+		return nil, errors.New("user already exists")
+	}
 	return &command.AlterInboundResponse{}, nil
 }
 
@@ -232,5 +244,199 @@ func TestDisconnectClientTemporarilyRestoresTheStoredCredential(t *testing.T) {
 	defer core.mu.Unlock()
 	if !slices.Equal(added, []string{current}) {
 		t.Fatalf("core re-added ids %v, want only the stored %s", added, current)
+	}
+}
+
+// After RemoveUser no failure may leave the client out of the core for good: a passing
+// failure is retried at once, a lasting one stays owed and the next run puts the client back.
+func TestDisconnectClientTemporarilyDoesNotStrandTheClient(t *testing.T) {
+	const email = "strand-probe"
+	const stored = `{"clients":[{"email":"` + email + `","id":"11111111-1111-1111-1111-111111111111","enable":true}]}`
+	breakSettings := func(db *gorm.DB, inbound *model.Inbound, broken bool) error {
+		settings := stored
+		if broken {
+			settings = `{"clients":[{"email":`
+		}
+		return db.Model(&model.Inbound{}).Where("id = ?", inbound.Id).Update("settings", settings).Error
+	}
+	breakServedCheck := func(db *gorm.DB, _ *model.Inbound, broken bool) error {
+		from, to := "client_inbounds_gone", "client_inbounds"
+		if broken {
+			from, to = to, from
+		}
+		return db.Exec("ALTER TABLE " + from + " RENAME TO " + to).Error
+	}
+	for _, tc := range []struct {
+		name string
+		// fail breaks or mends what the restore needs; nil leaves the database alone.
+		fail        func(db *gorm.DB, inbound *model.Inbound, broken bool) error
+		healOnRetry bool
+		failAdd     bool
+		wantOps     []string
+		wantOwed    bool
+	}{
+		{name: "the settings read fails once", fail: breakSettings, healOnRetry: true, wantOps: []string{"remove", "add"}},
+		{name: "the settings read keeps failing", fail: breakSettings, wantOps: []string{"remove"}, wantOwed: true},
+		{name: "the served check keeps failing", fail: breakServedCheck, wantOps: []string{"remove"}, wantOwed: true},
+		{name: "the re-add fails", failAdd: true, wantOps: []string{"remove", "add", "add", "add"}, wantOwed: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			setupIntegrationDB(t)
+			db := database.GetDB()
+			inbound := seedLinkedInboundWithClient(t, "strand-probe-tag", email, 1)
+			if err := db.Model(&model.ClientRecord{}).Where("email = ?", email).Update("enable", true).Error; err != nil {
+				t.Fatal(err)
+			}
+			if err := breakSettings(db, inbound, false); err != nil {
+				t.Fatal(err)
+			}
+			mend := func() {
+				if tc.fail != nil {
+					if err := tc.fail(db, inbound, false); err != nil {
+						t.Error(err)
+					}
+				}
+			}
+			oldPause := limitIPRetryPause
+			limitIPRetryPause = func() {
+				if tc.healOnRetry {
+					mend()
+				}
+			}
+			t.Cleanup(func() { limitIPRetryPause = oldPause })
+
+			core := &fakeCoreAPI{failAdd: tc.failAdd}
+			core.onOp = func(op string) {
+				if op == "remove" && tc.fail != nil {
+					if err := tc.fail(db, inbound, true); err != nil {
+						t.Error(err)
+					}
+				}
+			}
+			startFakeCoreAPI(t, core)
+
+			job := &CheckClientIpJob{}
+			clients := []model.Client{{Email: email, ID: "11111111-1111-1111-1111-111111111111", Enable: true}}
+			job.disconnectClientTemporarily(inbound, email, clients)
+
+			ops := func() []string {
+				core.mu.Lock()
+				defer core.mu.Unlock()
+				return slices.Clone(core.ops)
+			}
+			if got := ops(); !slices.Equal(got, tc.wantOps) {
+				t.Fatalf("core saw %v, want %v", got, tc.wantOps)
+			}
+			if got := len(job.owedRestores) == 1; got != tc.wantOwed {
+				t.Fatalf("restores owed = %v, want owed %v", job.owedRestores, tc.wantOwed)
+			}
+			if !tc.wantOwed {
+				return
+			}
+			// What failed works again, the inbound was renamed and the panel restarted (a new
+			// job, the same core): the next run re-adds the client under the tag stored now.
+			if !tc.healOnRetry {
+				mend()
+			}
+			if err := db.Model(&model.Inbound{}).Where("id = ?", inbound.Id).Update("tag", "strand-probe-renamed").Error; err != nil {
+				t.Fatal(err)
+			}
+			core.mu.Lock()
+			core.failAdd = false
+			core.mu.Unlock()
+			next := &CheckClientIpJob{}
+			next.settleOwedRestores()
+			core.mu.Lock()
+			lastOp, lastTag := core.ops[len(core.ops)-1], core.tags[len(core.tags)-1]
+			core.mu.Unlock()
+			if len(next.owedRestores) != 0 || lastOp != "add" || lastTag != "strand-probe-renamed" {
+				t.Fatalf("after the next run: last op %s on %q, still owed %v; want the client re-added under the new tag", lastOp, lastTag, next.owedRestores)
+			}
+			again := &CheckClientIpJob{}
+			again.settleOwedRestores()
+			if got := ops(); len(got) != len(tc.wantOps)+1 {
+				t.Fatalf("a settled restore was replayed: core saw %v", got)
+			}
+		})
+	}
+}
+
+// A restore that fails while the stored list cannot be read must not replace that list: what
+// an earlier panel run still owes is kept, and both are stored once the database answers.
+func TestOwedRestoresAreNotOverwrittenWhileTheStoredListIsUnread(t *testing.T) {
+	setupIntegrationDB(t)
+	db := database.GetDB()
+	earlier, later := owedRestore{InboundID: 1, Email: "earlier"}, owedRestore{InboundID: 2, Email: "later"}
+	before := &CheckClientIpJob{owedRestores: []owedRestore{earlier}}
+	before.saveOwedRestores()
+
+	job := &CheckClientIpJob{}
+	if err := db.Exec("ALTER TABLE settings RENAME TO settings_gone").Error; err != nil {
+		t.Fatal(err)
+	}
+	job.owedRestores = append(job.owedRestores, later)
+	job.saveOwedRestores()
+	if err := db.Exec("ALTER TABLE settings_gone RENAME TO settings").Error; err != nil {
+		t.Fatal(err)
+	}
+	if !job.owedUnsaved {
+		t.Fatal("the job forgot it still has to store its list")
+	}
+	job.saveOwedRestores()
+
+	after := &CheckClientIpJob{}
+	after.loadOwedRestores()
+	if !slices.Contains(after.owedRestores, earlier) || !slices.Contains(after.owedRestores, later) || len(after.owedRestores) != 2 {
+		t.Fatalf("stored owed restores = %v, want both %v and %v", after.owedRestores, earlier, later)
+	}
+}
+
+// When the served check fails right after the re-add, a commit may have removed the client
+// meanwhile, so the restore is not done: it stays owed and the next run asks again.
+func TestRestoreStaysOwedWhenTheCheckAfterTheReAddFails(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		addExists bool
+		want      []string
+	}{
+		// Not known to be served: the user this re-add put back comes out until a later run can check.
+		{"re-added", false, []string{"add", "remove"}},
+		// A user something else put back is not this restore's to take out.
+		{"already there", true, []string{"add"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			const email = "after-add-probe"
+			setupIntegrationDB(t)
+			db := database.GetDB()
+			inbound := seedLinkedInboundWithClient(t, "after-add-probe-tag", email, 1)
+			if err := db.Model(&model.ClientRecord{}).Where("email = ?", email).Update("enable", true).Error; err != nil {
+				t.Fatal(err)
+			}
+			if err := db.Model(&model.Inbound{}).Where("id = ?", inbound.Id).Update("settings", `{"clients":[{"email":"`+email+`","id":"11111111-1111-1111-1111-111111111111","enable":true}]}`).Error; err != nil {
+				t.Fatal(err)
+			}
+			core := &fakeCoreAPI{addExists: tc.addExists}
+			core.onOp = func(op string) {
+				if op == "add" {
+					if err := db.Exec("ALTER TABLE client_inbounds RENAME TO client_inbounds_gone").Error; err != nil {
+						t.Error(err)
+					}
+				}
+			}
+			startFakeCoreAPI(t, core)
+			var xrayAPI xray.XrayAPI
+			if err := xrayAPI.Init((&CheckClientIpJob{}).resolveXrayAPIPort()); err != nil {
+				t.Fatal(err)
+			}
+			defer xrayAPI.Close()
+			if err := (&CheckClientIpJob{}).restoreRemovedClient(&xrayAPI, owedRestore{InboundID: inbound.Id, Email: email}); err == nil {
+				t.Fatal("the restore counted as done though the check after the re-add failed")
+			}
+			core.mu.Lock()
+			defer core.mu.Unlock()
+			if !slices.Equal(core.ops, tc.want) {
+				t.Fatalf("core operations = %v, want %v", core.ops, tc.want)
+			}
+		})
 	}
 }

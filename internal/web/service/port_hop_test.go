@@ -156,7 +156,7 @@ func TestPortHopRangesAndUDPPortsOfOneHostStayApart(t *testing.T) {
 		}
 	}
 	tcp := func(port int) *model.Inbound {
-		return &model.Inbound{Enable: true, Port: port, Protocol: model.VLESS, StreamSettings: `{"network":"tcp"}`, Settings: `{"clients":[]}`}
+		return &model.Inbound{Enable: true, Port: port, Protocol: model.VLESS, StreamSettings: `{"network":"tcp"}`, Settings: vlessSettings}
 	}
 	udp := func(port int) *model.Inbound {
 		return &model.Inbound{Enable: true, Port: port, Protocol: model.Hysteria, StreamSettings: `{"network":"hysteria"}`, Settings: `{"clients":[]}`}
@@ -167,7 +167,7 @@ func TestPortHopRangesAndUDPPortsOfOneHostStayApart(t *testing.T) {
 	mustAdd(tcp(26000))
 	wantRefused(hopInbound(443, "20000-30000", true), "the range 20000-30000 contains UDP port 25000 of inbound #"+strconv.Itoa(udpInbound.Id))
 
-	seedInboundConflict(t, "xhttp-h3", "", 25600, model.VLESS, `{"network":"xhttp","security":"tls","tlsSettings":{"alpn":["h3"]}}`, `{"clients":[]}`)
+	seedInboundConflict(t, "xhttp-h3", "", 25600, model.VLESS, `{"network":"xhttp","security":"tls","tlsSettings":{"alpn":["h3"]}}`, vlessSettings)
 	wantRefused(hopInbound(443, "25500-25700", true), "the range 25500-25700 contains UDP port 25600")
 
 	// A TCP listener is out of a UDP redirect's reach, so it does not block the range.
@@ -238,7 +238,7 @@ func TestEnsureHostFollowsTheInbounds(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := svc.AddInbound(&model.Inbound{Enable: true, Port: 21000, Protocol: model.VLESS, StreamSettings: `{"network":"tcp"}`, Settings: `{"clients":[]}`}); err != nil {
+	if _, _, err := svc.AddInbound(&model.Inbound{Enable: true, Port: 21000, Protocol: model.VLESS, StreamSettings: `{"network":"tcp"}`, Settings: vlessSettings}); err != nil {
 		t.Fatal(err)
 	}
 	// A restored backup or a hand-edited row can put a UDP inbound inside the range unchecked.

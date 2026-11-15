@@ -7,6 +7,7 @@ import (
 	"go/token"
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -140,7 +141,7 @@ func newRemoteConn(addr string) *remoteConn {
 // thousands of them used to take the whole panel's memory.
 func TestLimitListenerCapsConnectionsPerSourceAndInTotal(t *testing.T) {
 	queue := queueListener{conns: make(chan net.Conn, 16)}
-	l := NewLimitListener(queue, 4, 2)
+	l := NewLimitListener(queue, 4, 2, nil)
 	accept := func(c *remoteConn) net.Conn {
 		t.Helper()
 		queue.conns <- c
@@ -185,4 +186,26 @@ func TestLimitListenerCapsConnectionsPerSourceAndInTotal(t *testing.T) {
 	if again.RemoteAddr().String() != "203.0.113.1:40000" {
 		t.Fatalf("a closed connection did not free its slot: accepted %s", again.RemoteAddr())
 	}
+}
+
+// A trusted L4 front on another host carries every client on its one address, so it has no
+// share of its own; it still counts toward the total.
+func TestLimitListenerGivesAnUncountedSourceNoShare(t *testing.T) {
+	queue := queueListener{conns: make(chan net.Conn, 16)}
+	front := netip.MustParseAddr("203.0.113.9")
+	l := NewLimitListener(queue, 4, 1, func(addr netip.Addr) bool { return addr == front })
+	for i := range 3 {
+		queue.conns <- newRemoteConn("203.0.113.9")
+		if c, err := l.Accept(); err != nil || c.RemoteAddr().String() != "203.0.113.9:40000" {
+			t.Fatalf("connection %d from the front = %v, %v", i+1, c, err)
+		}
+	}
+	queue.conns <- newRemoteConn("203.0.113.1")
+	if _, err := l.Accept(); err != nil {
+		t.Fatalf("first connection of a counted source: %v", err)
+	}
+	refused := newRemoteConn("203.0.113.9")
+	queue.conns <- refused
+	go func() { _, _ = l.Accept() }()
+	<-refused.closed
 }

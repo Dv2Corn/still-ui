@@ -112,7 +112,8 @@
     "localDirectShadowrocket": "فایل قوانین Shadowrocket",
     "localDirectShadowrocketHint": "در Shadowrocket فایل را در زبانهٔ Config اضافه کنید و Global Routing را روی Config بگذارید.",
     "saveQr": "ذخیره QR",
-    "devices": "دستگاه‌ها"
+    "devices": "دستگاه‌ها",
+    "linksHidden": "This subscription has a device limit, so the configs are shown only in an app registered as one of its devices. Add the subscription link to your VPN app."
   },
   "menu": {
     "basedOn": "بر پایهٔ 3x-ui از MHSanaei · GPL-3.0",

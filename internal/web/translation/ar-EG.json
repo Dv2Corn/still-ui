@@ -112,7 +112,8 @@
     "localDirectShadowrocket": "ملف قواعد Shadowrocket",
     "localDirectShadowrocketHint": "في Shadowrocket أضف الملف من تبويب Config واضبط Global Routing على Config.",
     "saveQr": "حفظ QR",
-    "devices": "الأجهزة"
+    "devices": "الأجهزة",
+    "linksHidden": "This subscription has a device limit, so the configs are shown only in an app registered as one of its devices. Add the subscription link to your VPN app."
   },
   "menu": {
     "basedOn": "مبني على 3x-ui من MHSanaei · GPL-3.0",

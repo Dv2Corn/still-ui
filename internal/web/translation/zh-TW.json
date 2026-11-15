@@ -112,7 +112,8 @@
     "localDirectShadowrocket": "Shadowrocket 規則檔",
     "localDirectShadowrocketHint": "在 Shadowrocket 的「設定」頁加入此檔案，並將全域路由設為「設定」。",
     "saveQr": "儲存 QR 碼",
-    "devices": "裝置"
+    "devices": "裝置",
+    "linksHidden": "This subscription has a device limit, so the configs are shown only in an app registered as one of its devices. Add the subscription link to your VPN app."
   },
   "menu": {
     "basedOn": "基於 MHSanaei 的 3x-ui · GPL-3.0",

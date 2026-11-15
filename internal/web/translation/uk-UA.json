@@ -112,7 +112,8 @@
     "localDirectShadowrocket": "Файл правил для Shadowrocket",
     "localDirectShadowrocketHint": "У Shadowrocket додайте файл на вкладці «Конфігурація» та виберіть глобальну маршрутизацію «Конфігурація».",
     "saveQr": "Зберегти QR",
-    "devices": "Пристрої"
+    "devices": "Пристрої",
+    "linksHidden": "This subscription has a device limit, so the configs are shown only in an app registered as one of its devices. Add the subscription link to your VPN app."
   },
   "menu": {
     "basedOn": "Засновано на 3x-ui від MHSanaei · GPL-3.0",

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -156,6 +157,26 @@ func sameClientConfigExceptUpdatedAt(a, b map[string]any) bool {
 	an, aerr := json.Marshal(aa)
 	bn, berr := json.Marshal(bb)
 	return aerr == nil && berr == nil && string(an) == string(bn)
+}
+
+// settingsTgID reads a tgId as a settings entry may carry it: a JSON number, a numeric
+// string, or nothing (0).
+func settingsTgID(v any) int64 {
+	switch t := v.(type) {
+	case float64:
+		return int64(t)
+	case json.Number:
+		n, _ := t.Int64()
+		return n
+	case int64:
+		return t
+	case int:
+		return int64(t)
+	case string:
+		n, _ := strconv.ParseInt(strings.TrimSpace(t), 10, 64)
+		return n
+	}
+	return 0
 }
 
 // advancePushedInbound advances the node's reconcile-skip fingerprint to what the
@@ -965,6 +986,11 @@ func (s *ClientService) UpdateInboundClient(inboundSvc *InboundService, data *mo
 			}
 			if v, ok2 := newMap["subId"].(string); ok2 {
 				clients[0].SubID = v
+				// A rotated subId ends the Telegram binding it could claim, in the stored entry
+				// too, unless this edit names a new tgId.
+				if preservedSubID != "" && v != preservedSubID && settingsTgID(newMap["tgId"]) == settingsTgID(oldClientMap["tgId"]) {
+					newMap["tgId"] = 0
+				}
 			}
 			if oldInbound.Protocol == model.WireGuard || oldInbound.Protocol == model.AmneziaWG {
 				newMap["privateKey"] = clients[0].PrivateKey

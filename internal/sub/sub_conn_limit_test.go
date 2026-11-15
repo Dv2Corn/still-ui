@@ -3,6 +3,7 @@ package sub
 import (
 	"errors"
 	"net"
+	"net/netip"
 	"os"
 	"strconv"
 	"testing"
@@ -30,7 +31,7 @@ func TestSubServerCapsConnectionsPerSource(t *testing.T) {
 	t.Cleanup(func() { _ = server.Stop() })
 	target := net.JoinHostPort(source.String(), strconv.Itoa(server.listener.Addr().(*net.TCPAddr).Port))
 
-	for range network.MaxConnsPerSource {
+	for range network.MaxSubConnsPerSource {
 		conn, err := net.Dial("tcp", target)
 		if err != nil {
 			t.Fatalf("dial within the cap: %v", err)
@@ -45,7 +46,7 @@ func TestSubServerCapsConnectionsPerSource(t *testing.T) {
 	// An accepted connection waits up to ReadHeaderTimeout (5s) for a request; a refused one ends now.
 	_ = extra.SetReadDeadline(time.Now().Add(2 * time.Second))
 	if _, err := extra.Read(make([]byte, 1)); errors.Is(err, os.ErrDeadlineExceeded) {
-		t.Fatalf("connection %d from one source was held open, want it closed at once", network.MaxConnsPerSource+1)
+		t.Fatalf("connection %d from one source was held open, want it closed at once", network.MaxSubConnsPerSource+1)
 	}
 }
 
@@ -63,4 +64,29 @@ func nonLoopbackIPv4(t *testing.T) net.IP {
 	}
 	t.Skip("no non-loopback IPv4 address to connect from")
 	return nil
+}
+
+// The listener's wiring: a front proxy named in trustedProxyCIDRs has no per-source share,
+// any other address has one, and an idle connection is closed after subIdleTimeout.
+func TestSubServerTrustsTheConfiguredFrontAndClosesIdleConnections(t *testing.T) {
+	initSubDB(t)
+	for key, value := range map[string]string{"subPort": "0", "subListen": "127.0.0.1", "trustedProxyCIDRs": "127.0.0.1/32,203.0.113.0/24"} {
+		if err := database.GetDB().Create(&model.Setting{Key: key, Value: value}).Error; err != nil {
+			t.Fatalf("seed %s: %v", key, err)
+		}
+	}
+	server := NewServer()
+	front := server.trustedFront()
+	for addr, want := range map[string]bool{"203.0.113.9": true, "198.51.100.1": false, "2001:db8::1": false} {
+		if got := front(netip.MustParseAddr(addr)); got != want {
+			t.Errorf("trustedFront(%s) = %v, want %v", addr, got, want)
+		}
+	}
+	if err := server.Start(); err != nil {
+		t.Fatalf("start subscription server: %v", err)
+	}
+	t.Cleanup(func() { _ = server.Stop() })
+	if got := server.httpServer.IdleTimeout; got != subIdleTimeout || got > 15*time.Second {
+		t.Fatalf("idle timeout = %v, want %v", got, subIdleTimeout)
+	}
 }

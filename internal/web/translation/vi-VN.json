@@ -112,7 +112,8 @@
     "localDirectShadowrocket": "Tệp quy tắc Shadowrocket",
     "localDirectShadowrocketHint": "Trong Shadowrocket, thêm tệp ở thẻ Config rồi đặt Global Routing thành Config.",
     "saveQr": "Lưu QR",
-    "devices": "Thiết bị"
+    "devices": "Thiết bị",
+    "linksHidden": "This subscription has a device limit, so the configs are shown only in an app registered as one of its devices. Add the subscription link to your VPN app."
   },
   "menu": {
     "basedOn": "Dựa trên 3x-ui của MHSanaei · GPL-3.0",

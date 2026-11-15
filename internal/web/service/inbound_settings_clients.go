@@ -10,7 +10,8 @@ import (
 )
 
 func ParseInboundSettingsClients(settings string) ([]model.Client, error) {
-	trimmed := strings.TrimSpace(settings)
+	// JSON's own white space only: a blob the decoder refuses must not pass here.
+	trimmed := strings.Trim(settings, " \t\r\n")
 	if trimmed == "" || trimmed == "null" {
 		return nil, common.NewError("inbound settings is empty")
 	}

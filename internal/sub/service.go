@@ -3453,6 +3453,8 @@ type PageData struct {
 	// DeviceLimit is 0 when the subscription has no device limit; DeviceCount never names a device.
 	DeviceLimit int
 	DeviceCount int
+	// LinksHidden says the device gate withheld Result, so the page can say why it is empty.
+	LinksHidden bool
 }
 
 // ResolveRequest extracts scheme, host, and header information from an HTTP request.

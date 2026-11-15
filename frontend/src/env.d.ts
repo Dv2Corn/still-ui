@@ -25,6 +25,8 @@ interface SubPageData {
   shadowrocketConfUrl?: string;
   deviceLimit?: number;
   deviceCount?: number;
+  // The device limit withheld the links from this browser, which holds no device slot.
+  linksHidden?: boolean;
   downloadByte?: string | number;
   uploadByte?: string | number;
   usedByte?: string | number;

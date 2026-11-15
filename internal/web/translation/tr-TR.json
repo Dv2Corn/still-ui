@@ -112,7 +112,8 @@
     "localDirectShadowrocket": "Shadowrocket kural dosyası",
     "localDirectShadowrocketHint": "Shadowrocket'te dosyayı Config sekmesinden ekleyin ve Global Routing'i Config yapın.",
     "saveQr": "QR'ı kaydet",
-    "devices": "Cihazlar"
+    "devices": "Cihazlar",
+    "linksHidden": "This subscription has a device limit, so the configs are shown only in an app registered as one of its devices. Add the subscription link to your VPN app."
   },
   "menu": {
     "basedOn": "MHSanaei'nin 3x-ui projesine dayanır · GPL-3.0",
