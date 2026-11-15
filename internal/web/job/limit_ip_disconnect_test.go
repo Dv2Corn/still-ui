@@ -356,3 +356,33 @@ func TestDisconnectClientTemporarilyDoesNotStrandTheClient(t *testing.T) {
 		})
 	}
 }
+
+// A restore that fails while the stored list cannot be read must not replace that list: what
+// an earlier panel run still owes is kept, and both are stored once the database answers.
+func TestOwedRestoresAreNotOverwrittenWhileTheStoredListIsUnread(t *testing.T) {
+	setupIntegrationDB(t)
+	db := database.GetDB()
+	earlier, later := owedRestore{InboundID: 1, Email: "earlier"}, owedRestore{InboundID: 2, Email: "later"}
+	before := &CheckClientIpJob{owedRestores: []owedRestore{earlier}}
+	before.saveOwedRestores()
+
+	job := &CheckClientIpJob{}
+	if err := db.Exec("ALTER TABLE settings RENAME TO settings_gone").Error; err != nil {
+		t.Fatal(err)
+	}
+	job.owedRestores = append(job.owedRestores, later)
+	job.saveOwedRestores()
+	if err := db.Exec("ALTER TABLE settings_gone RENAME TO settings").Error; err != nil {
+		t.Fatal(err)
+	}
+	if !job.owedUnsaved {
+		t.Fatal("the job forgot it still has to store its list")
+	}
+	job.saveOwedRestores()
+
+	after := &CheckClientIpJob{}
+	after.loadOwedRestores()
+	if !slices.Contains(after.owedRestores, earlier) || !slices.Contains(after.owedRestores, later) || len(after.owedRestores) != 2 {
+		t.Fatalf("stored owed restores = %v, want both %v and %v", after.owedRestores, earlier, later)
+	}
+}

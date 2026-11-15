@@ -45,6 +45,7 @@ type CheckClientIpJob struct {
 	// owedRestores are clients a temporary disconnect removed and could not yet re-add.
 	owedRestores []owedRestore
 	owedLoaded   bool
+	owedUnsaved  bool
 }
 
 const defaultXrayAPIPort = 62789
@@ -818,7 +819,6 @@ func (j *CheckClientIpJob) disconnectClientTemporarily(inbound *model.Inbound, c
 	}
 	if err != nil {
 		logger.Warningf("[LIMIT_IP] Cannot restore %s yet, will try again on the next run: %v", clientEmail, err)
-		j.loadOwedRestores()
 		j.owedRestores = append(j.owedRestores, owed)
 		j.saveOwedRestores()
 	}
@@ -833,6 +833,7 @@ type owedRestore struct {
 // The owed restores are stored: a panel restart leaves the core running without the client.
 const owedRestoresKey = "limitIpOwedRestores"
 
+// loadOwedRestores adds the stored list, once, to what this job already owes.
 func (j *CheckClientIpJob) loadOwedRestores() {
 	if j.owedLoaded {
 		return
@@ -844,12 +845,24 @@ func (j *CheckClientIpJob) loadOwedRestores() {
 		return
 	}
 	j.owedLoaded = true
-	if row.Value != "" && json.Unmarshal([]byte(row.Value), &j.owedRestores) != nil {
+	var stored []owedRestore
+	if row.Value != "" && json.Unmarshal([]byte(row.Value), &stored) != nil {
 		logger.Warningf("[LIMIT_IP] Dropping unreadable owed restores %.200q", row.Value)
+	}
+	for _, owed := range stored {
+		if !slices.Contains(j.owedRestores, owed) {
+			j.owedRestores = append(j.owedRestores, owed)
+		}
 	}
 }
 
+// saveOwedRestores stores the list only once the stored one is merged in, so an unread
+// list is never overwritten; until then the job stays unsaved and saves on a later run.
 func (j *CheckClientIpJob) saveOwedRestores() {
+	j.owedUnsaved = true
+	if j.loadOwedRestores(); !j.owedLoaded {
+		return
+	}
 	db := database.GetDB()
 	err := db.Where("key = ?", owedRestoresKey).Delete(&model.Setting{}).Error
 	if err == nil && len(j.owedRestores) > 0 {
@@ -858,7 +871,9 @@ func (j *CheckClientIpJob) saveOwedRestores() {
 	}
 	if err != nil {
 		logger.Warningf("[LIMIT_IP] Failed to store the owed restores: %v", err)
+		return
 	}
+	j.owedUnsaved = false
 }
 
 // restoreRemovedClient re-adds a temporarily removed client if it is still served; an error
@@ -900,7 +915,9 @@ func (j *CheckClientIpJob) restoreRemovedClient(xrayAPI *xray.XrayAPI, owed owed
 
 // settleOwedRestores retries, at the start of a run, the restores earlier runs still owe.
 func (j *CheckClientIpJob) settleOwedRestores() {
-	j.loadOwedRestores()
+	if j.loadOwedRestores(); j.owedUnsaved {
+		j.saveOwedRestores()
+	}
 	if len(j.owedRestores) == 0 {
 		return
 	}
