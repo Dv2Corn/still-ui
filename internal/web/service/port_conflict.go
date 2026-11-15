@@ -41,12 +41,13 @@ func inboundTransports(protocol model.Protocol, streamSettings, settings string)
 		Network     string `json:"network"`
 		Security    string `json:"security"`
 		TLSSettings struct {
-			ALPN xrayStringList `json:"alpn"`
+			ALPN json.RawMessage `json:"alpn"`
 		} `json:"tlsSettings"`
 	}
 	_ = json.Unmarshal([]byte(streamSettings), &stream)
 	network := strings.ToLower(stream.Network)
-	h3Only := strings.EqualFold(stream.Security, "tls") && slices.Equal(stream.TLSSettings.ALPN, xrayStringList{"h3"})
+	alpn, _ := xrayStringList(stream.TLSSettings.ALPN)
+	h3Only := strings.EqualFold(stream.Security, "tls") && slices.Equal(alpn, []string{"h3"})
 
 	var bits transportBits
 	switch {
@@ -62,23 +63,26 @@ func inboundTransports(protocol model.Protocol, streamSettings, settings string)
 	// a few protocols carry their L4 choice in settings instead of (or in
 	// addition to) streamSettings: SS / Tunnel via a list that wins outright,
 	// Mixed via an additive udp boolean.
+	// Raw fields: a key of the wrong type, which the core ignores when its config has no
+	// such field, must not hide the others.
 	var st struct {
-		Network        *xrayStringList `json:"network"`
-		AllowedNetwork *xrayStringList `json:"allowedNetwork"`
-		UDP            bool            `json:"udp"`
+		Network        json.RawMessage `json:"network"`
+		AllowedNetwork json.RawMessage `json:"allowedNetwork"`
+		UDP            json.RawMessage `json:"udp"`
 	}
 	if json.Unmarshal([]byte(settings), &st) == nil {
-		list := st.Network
+		raw := st.Network
 		// dokodemo (Tunnel) takes network over allowedNetwork when both are set.
-		if protocol == model.Tunnel && list == nil {
-			list = st.AllowedNetwork
+		if protocol == model.Tunnel && raw == nil {
+			raw = st.AllowedNetwork
 		}
 		switch protocol {
 		case model.Shadowsocks, model.Tunnel:
-			if list != nil {
+			if list, ok := xrayStringList(raw); ok {
 				bits = 0
-				for _, part := range *list {
-					switch strings.ToLower(strings.TrimSpace(part)) {
+				// The core lowers each part but does not trim it: " tcp" is no network.
+				for _, part := range list {
+					switch strings.ToLower(part) {
 					case "tcp":
 						bits |= transportTCP
 					case "udp":
@@ -89,7 +93,8 @@ func inboundTransports(protocol model.Protocol, streamSettings, settings string)
 		case model.Mixed:
 			// socks/http "mixed" inbound: settings.udp=true means it
 			// also relays udp on the same port (socks5 udp associate).
-			if st.UDP {
+			var udp bool
+			if json.Unmarshal(st.UDP, &udp) == nil && udp {
 				bits |= transportUDP
 			}
 		}
@@ -102,21 +107,20 @@ func inboundTransports(protocol model.Protocol, streamSettings, settings string)
 	return bits
 }
 
-// xrayStringList is xray-core's StringList: a JSON array, or one string split at commas.
-type xrayStringList []string
-
-func (l *xrayStringList) UnmarshalJSON(data []byte) error {
-	var list []string
-	if err := json.Unmarshal(data, &list); err == nil {
-		*l = list
-		return nil
+// xrayStringList reads raw as xray-core's StringList does: a JSON array, or one string split
+// at commas; ok is false when raw is absent or neither.
+func xrayStringList(raw json.RawMessage) (list []string, ok bool) {
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil, false
+	}
+	if json.Unmarshal(raw, &list) == nil {
+		return list, true
 	}
 	var joined string
-	if err := json.Unmarshal(data, &joined); err != nil {
-		return err
+	if json.Unmarshal(raw, &joined) != nil {
+		return nil, false
 	}
-	*l = strings.Split(joined, ",")
-	return nil
+	return strings.Split(joined, ","), true
 }
 
 // masqueTransports mirrors xray-core's MASQUE listener: HTTP/2 on TCP when the TLS
