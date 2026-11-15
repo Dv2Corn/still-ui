@@ -17,11 +17,11 @@ func TestPushGuardChecksKeysSpelledWithFoldingRunes(t *testing.T) {
 	pushGuardTestService(t)
 	stubPushGuardLookup(t, map[string]string{})
 	const pk = "aGVsbG9oZWxsb2hlbGxvaGVsbG9oZWxsb2hlbGxvMTI"
-	reality := func(key, extra string) string {
+	realityStream := func(key, extra string) string {
 		return `{"network":"tcp","security":"reality","` + key + `":{"target":"127.0.0.1:62789"` + extra + `,"serverNames":["a.com"],"privateKey":"` + pk + `","shortIds":[""]}}`
 	}
 	cases := map[string]*model.Inbound{
-		"realitySettingſ": {Port: 44902, Protocol: model.VLESS, Settings: vlessSettings, StreamSettings: reality("realitySettingſ", "")},
+		"realitySettingſ": {Port: 44902, Protocol: model.VLESS, Settings: vlessSettings, StreamSettings: realityStream("realitySettingſ", "")},
 		"fallbackſ": {Port: 44905, Protocol: model.VLESS, StreamSettings: `{"network":"tcp"}`,
 			Settings: `{"clients":[],"decryption":"none","fallbackſ":[{"dest":"127.0.0.1:62789"}]}`},
 		"maſterKeyLog": {Port: 44904, Protocol: model.VLESS, Settings: vlessSettings,
