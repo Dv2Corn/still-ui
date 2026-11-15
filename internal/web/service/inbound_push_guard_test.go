@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,41 +20,55 @@ func pushGuardTestService(t *testing.T) *InboundService {
 	return &InboundService{FromNodeSync: true}
 }
 
-// 127.0.0.1.nip.io resolves to loopback when the core dials it, so a name passes the
-// lexical check; on this node's own ports the guard must refuse it anyway.
-func TestPushedRelayTargetNameOnThisNodesOwnPortIsRefused(t *testing.T) {
+// A relay target is judged by its address, not by its port: with the panel and the
+// subscription server on 443, a public REALITY target on 443 (the usual kind) passes, while
+// loopback and this host's own addresses are refused on any port.
+func TestPushedRelayTargetIsJudgedByAddressNotPort(t *testing.T) {
 	push := pushGuardTestService(t)
-	for i, tc := range []struct{ settings, stream, want string }{
-		{
-			`{"clients":[],"fallbacks":[{"dest":"127.0.0.1.nip.io:62789"}]}`, `{"network":"tcp"}`,
-			`may not set fallback dest to "127.0.0.1.nip.io:62789"`,
-		},
-		{
-			`{"clients":[]}`, `{"network":"tcp","security":"reality","realitySettings":{"target":"127.0.0.1.nip.io:2053"}}`,
-			`may not set REALITY target to "127.0.0.1.nip.io:2053"`,
-		},
-		{
-			`{"clients":[]}`, `{"network":"tcp","security":"reality","realitySettings":{"dest":"sub.example.com:2096"}}`,
-			`may not set REALITY target to "sub.example.com:2096"`,
-		},
-		// Go's dialer reads a leading zero as the same port.
-		{
-			`{"clients":[],"fallbacks":[{"dest":"127.0.0.1.nip.io:062789"}]}`, `{"network":"tcp"}`,
-			`may not set fallback dest to "127.0.0.1.nip.io:062789"`,
-		},
-	} {
-		ib := &model.Inbound{Enable: true, Port: 44420 + i, Protocol: model.VLESS, Settings: tc.settings, StreamSettings: tc.stream}
-		if _, _, err := push.AddInbound(ib); err == nil || !strings.Contains(err.Error(), tc.want) {
-			t.Errorf("AddInbound = %v, want %q", err, tc.want)
+	settings := &SettingService{}
+	if err := settings.SetPort(443); err != nil {
+		t.Fatal(err)
+	}
+	if err := settings.setInt("subPort", 443); err != nil {
+		t.Fatal(err)
+	}
+	reality := func(port int, target string) *model.Inbound {
+		return &model.Inbound{
+			Enable: true, Port: port, Protocol: model.VLESS, Settings: `{"clients":[]}`,
+			StreamSettings: `{"network":"tcp","security":"reality","realitySettings":{"target":"` + target + `"}}`,
 		}
 	}
-	public := &model.Inbound{
-		Enable: true, Port: 44430, Protocol: model.VLESS, Settings: `{"clients":[]}`,
-		StreamSettings: `{"network":"tcp","security":"reality","realitySettings":{"target":"www.example.com:443"}}`,
+	for i, target := range []string{"www.nvidia.com:443", "1.1.1.1:443", "sub.example.com:2096"} {
+		if _, _, err := push.AddInbound(reality(44420+i, target)); err != nil && strings.Contains(err.Error(), "may not set") {
+			t.Errorf("public REALITY target %q refused: %v", target, err)
+		}
 	}
-	if _, _, err := push.AddInbound(public); err != nil && strings.Contains(err.Error(), "may not set") {
-		t.Errorf("public REALITY target refused: %v", err)
+	refused := []string{"127.0.0.1:443", "[::1]:443", "localhost:443"}
+	if own := firstOwnPublicIP(); own != "" {
+		refused = append(refused, net.JoinHostPort(own, "443"))
 	}
+	for i, target := range refused {
+		want := fmt.Sprintf("may not set REALITY target to %q", target)
+		if _, _, err := push.AddInbound(reality(44430+i, target)); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("AddInbound(%q) = %v, want %q", target, err, want)
+		}
+	}
+	// Go's dialer reads a leading zero as the same port; such a spelling is never public.
+	fb := &model.Inbound{Enable: true, Port: 44440, Protocol: model.VLESS, Settings: `{"clients":[],"fallbacks":[{"dest":"www.example.com:0443"}]}`, StreamSettings: `{"network":"tcp"}`}
+	if _, _, err := push.AddInbound(fb); err == nil || !strings.Contains(err.Error(), `may not set fallback dest to "www.example.com:0443"`) {
+		t.Errorf("AddInbound(leading-zero port) = %v", err)
+	}
+}
+
+// firstOwnPublicIP returns a non-loopback address of this host's interfaces, if any.
+func firstOwnPublicIP() string {
+	addrs, _ := net.InterfaceAddrs()
+	for _, a := range addrs {
+		if n, ok := a.(*net.IPNet); ok && !n.IP.IsLoopback() && !n.IP.IsLinkLocalUnicast() {
+			return n.IP.String()
+		}
+	}
+	return ""
 }
 
 // A local fallback dest passes only as the address an enabled inbound here listens on: a

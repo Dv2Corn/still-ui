@@ -127,7 +127,6 @@ func hostReaches(inbound *model.Inbound) ([]pushReach, error) {
 	if err != nil {
 		return nil, err
 	}
-	ownPorts := nodeOwnPorts()
 	ownCerts := nodeOwnCertFiles()
 	var reaches []pushReach
 	add := func(field string, leaf jsonLeaf) {
@@ -162,7 +161,7 @@ func hostReaches(inbound *model.Inbound) ([]pushReach, error) {
 		case (leaf.endsWith("certificatefile") || leaf.endsWith("keyfile")) && lower != "" && !isNodeOwnCertFile(leaf.value, ownCerts):
 			add("certificate file", leaf)
 		case leaf.endsWith("realitysettings", "target") || leaf.endsWith("realitysettings", "dest"):
-			if !isPublicRelayTarget(leaf.value, ownPorts) {
+			if !isPublicRelayTarget(leaf.value) {
 				add("REALITY target", leaf)
 			}
 		}
@@ -174,7 +173,7 @@ func hostReaches(inbound *model.Inbound) ([]pushReach, error) {
 	for _, leaf := range jsonLeaves(inbound.Settings) {
 		switch {
 		case leaf.endsWith("fallbacks", "[]", "dest"):
-			if !isPublicRelayTarget(leaf.value, ownPorts) && !slices.Contains(local, normalizeRelayTarget(leaf.value)) {
+			if !isPublicRelayTarget(leaf.value) && !slices.Contains(local, normalizeRelayTarget(leaf.value)) {
 				add("fallback dest", leaf)
 			}
 		case leaf.endsWith("domainfronting", "ip"):
@@ -187,8 +186,9 @@ func hostReaches(inbound *model.Inbound) ([]pushReach, error) {
 }
 
 // isPublicRelayTarget reports whether a relay target dials a public host, not this one: a
-// bare port, a unix socket and a loopback or private host all stay on the machine.
-func isPublicRelayTarget(target string, ownPorts []string) bool {
+// bare port, a unix socket, a loopback or private host and this host's own addresses all
+// stay on the machine.
+func isPublicRelayTarget(target string) bool {
 	target = strings.TrimSpace(target)
 	if strings.HasPrefix(target, "/") || strings.HasPrefix(target, "@") {
 		return false
@@ -201,14 +201,15 @@ func isPublicRelayTarget(target string, ownPorts []string) bool {
 	if n, err := strconv.ParseUint(port, 10, 16); err != nil || n == 0 || strconv.FormatUint(n, 10) != port {
 		return false
 	}
-	// A public name may resolve to loopback by dial time, so on this node's own ports the port alone decides.
-	if net.ParseIP(host) == nil && slices.Contains(ownPorts, port) {
+	// shortcut: a name is judged by its text, not resolved; a public name that resolves to this
+	// host still passes. Resolve at push time if that ever matters more than REALITY on 443.
+	if ip := net.ParseIP(strings.Trim(host, "[]")); ip != nil && isLocalInterfaceIP(ip) {
 		return false
 	}
 	return !namesInternalHost(host)
 }
 
-// nodeOwnPorts lists the ports of this node's services a relay must not reach under a name:
+// nodeOwnPorts lists the ports of this node's own services, never a local fallback dest:
 // Xray's API and metrics listeners, the panel and the subscription server.
 func nodeOwnPorts() []string {
 	ports := xrayOwnPorts()

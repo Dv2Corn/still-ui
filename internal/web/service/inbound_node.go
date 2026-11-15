@@ -1066,6 +1066,12 @@ func (s *InboundService) setRemoteTrafficLocked(nodeID int, snap *runtime.Traffi
 		// Parsed once per inbound on the first renewal candidate, not per client.
 		var snapExpiries map[string]int64
 		attachedOnNode, membershipKnown := snapshotAttachedEmails(snapIb.Settings)
+		// Fail closed: without the node's client list no email in its stats is known to be on
+		// this inbound, so none of them is credited (and nothing is swept) this round.
+		if !membershipKnown {
+			logger.Warningf("setRemoteTraffic: node %d inbound %q: settings do not parse, its client traffic is not counted", nodeID, snapIb.Tag)
+			continue
+		}
 		ownInbound := originGuidFor(snapIb) == selfKey
 		// advanceBaseline is the one place a node counter is consumed, so the node's own
 		// usage grows exactly by what the stored baseline moves past.
@@ -1082,7 +1088,7 @@ func (s *InboundService) setRemoteTrafficLocked(nodeID int, snap *runtime.Traffi
 		}
 		for _, cs := range snapIb.ClientStats {
 			// A node detach keeps the stat row, so its quota and verdict are stale (#6724).
-			if _, attached := attachedOnNode[strings.ToLower(cs.Email)]; membershipKnown && !attached {
+			if _, attached := attachedOnNode[strings.ToLower(cs.Email)]; !attached {
 				continue
 			}
 			snapEmails[cs.Email] = struct{}{}
