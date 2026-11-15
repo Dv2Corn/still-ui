@@ -112,7 +112,8 @@
     "localDirectShadowrocket": "Súbor pravidiel pre Shadowrocket",
     "localDirectShadowrocketHint": "V Shadowrocket pridajte súbor na karte Config a nastavte Global Routing na Config.",
     "saveQr": "Uložiť QR kód",
-    "devices": "Zariadenia"
+    "devices": "Zariadenia",
+    "linksHidden": "This subscription has a device limit, so the configs are shown only in an app registered as one of its devices. Add the subscription link to your VPN app."
   },
   "menu": {
     "basedOn": "Založené na 3x-ui od MHSanaei · GPL-3.0",

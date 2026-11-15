@@ -112,7 +112,8 @@
     "localDirectShadowrocket": "Berkas aturan Shadowrocket",
     "localDirectShadowrocketHint": "Di Shadowrocket tambahkan berkas di tab Config lalu atur Global Routing ke Config.",
     "saveQr": "Simpan QR",
-    "devices": "Perangkat"
+    "devices": "Perangkat",
+    "linksHidden": "This subscription has a device limit, so the configs are shown only in an app registered as one of its devices. Add the subscription link to your VPN app."
   },
   "menu": {
     "basedOn": "Berbasis 3x-ui oleh MHSanaei · GPL-3.0",

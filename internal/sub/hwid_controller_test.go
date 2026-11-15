@@ -123,6 +123,19 @@ func TestSubPageCarriesLinksOnlyForRegisteredDevice(t *testing.T) {
 	assertHwidStatus(t, requestSub(t, router, http.MethodGet, "/sub/"+subID+"/hwid-status", "", ""), true, 2, 1, 1, false)
 }
 
+// A page left without links must say so: a browser never holds a device slot, and an empty
+// page with no reason reads as a broken subscription.
+func TestSubPageSaysWhenTheDeviceLimitHidesItsLinks(t *testing.T) {
+	router, subID := initHwidSubRouter(t, 2)
+	assertServesRealServers(t, "/sub/"+subID, requestSub(t, router, http.MethodGet, "/sub/"+subID, "device-one", ""))
+	for hwid, hidden := range map[string]bool{"device-one": false, "device-two": true, "": true} {
+		body := requestSub(t, router, http.MethodGet, "/sub/"+subID+"?html=1", hwid, "").Body.String()
+		if got := strings.Contains(body, "linksHidden"); got != hidden {
+			t.Fatalf("page for %q says its links are hidden = %v, want %v", hwid, got, hidden)
+		}
+	}
+}
+
 // Decoding into a map rather than the service struct keeps the exact field set
 // asserted, so an extra field leaking into the response fails the test.
 func assertHwidStatus(t *testing.T, rec *httptest.ResponseRecorder, active bool, limit, registered, remaining int, full bool) {

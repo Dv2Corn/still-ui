@@ -112,7 +112,8 @@
     "localDirectShadowrocket": "Shadowrocket 用ルールファイル",
     "localDirectShadowrocketHint": "Shadowrocket では Config タブでファイルを追加し、Global Routing を Config にしてください。",
     "saveQr": "QR を保存",
-    "devices": "デバイス"
+    "devices": "デバイス",
+    "linksHidden": "This subscription has a device limit, so the configs are shown only in an app registered as one of its devices. Add the subscription link to your VPN app."
   },
   "menu": {
     "basedOn": "MHSanaei の 3x-ui をベースにしています · GPL-3.0",
