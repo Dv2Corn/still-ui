@@ -15,7 +15,6 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/database"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 	"github.com/mhsanaei/3x-ui/v3/internal/logger"
-	"github.com/mhsanaei/3x-ui/v3/internal/web/service"
 	"github.com/mhsanaei/3x-ui/v3/internal/xray"
 
 	"github.com/xtls/xray-core/app/proxyman/command"
@@ -243,24 +242,37 @@ func TestDisconnectClientTemporarilyRestoresTheStoredCredential(t *testing.T) {
 }
 
 // After RemoveUser no failure may leave the client out of the core for good: a passing
-// read failure is retried, and a lasting one or a failed re-add asks for a restart.
+// failure is retried at once, a lasting one stays owed and the next run puts the client back.
 func TestDisconnectClientTemporarilyDoesNotStrandTheClient(t *testing.T) {
 	const email = "strand-probe"
 	const stored = `{"clients":[{"email":"` + email + `","id":"11111111-1111-1111-1111-111111111111","enable":true}]}`
+	breakSettings := func(db *gorm.DB, inbound *model.Inbound, broken bool) error {
+		settings := stored
+		if broken {
+			settings = `{"clients":[{"email":`
+		}
+		return db.Model(&model.Inbound{}).Where("id = ?", inbound.Id).Update("settings", settings).Error
+	}
+	breakServedCheck := func(db *gorm.DB, _ *model.Inbound, broken bool) error {
+		from, to := "client_inbounds_gone", "client_inbounds"
+		if broken {
+			from, to = to, from
+		}
+		return db.Exec("ALTER TABLE " + from + " RENAME TO " + to).Error
+	}
 	for _, tc := range []struct {
-		name        string
-		breakIt     func(db *gorm.DB, inbound *model.Inbound) error
-		heals       bool
+		name string
+		// fail breaks or mends what the restore needs; nil leaves the database alone.
+		fail        func(db *gorm.DB, inbound *model.Inbound, broken bool) error
+		healOnRetry bool
 		failAdd     bool
 		wantOps     []string
-		wantRestart bool
+		wantOwed    bool
 	}{
-		{name: "the settings read fails once", heals: true, wantOps: []string{"remove", "add"}},
-		{name: "the settings read keeps failing", wantOps: []string{"remove"}, wantRestart: true},
-		{name: "the served check keeps failing", wantOps: []string{"remove"}, wantRestart: true, breakIt: func(db *gorm.DB, _ *model.Inbound) error {
-			return db.Exec("ALTER TABLE client_inbounds RENAME TO client_inbounds_gone").Error
-		}},
-		{name: "the re-add fails", failAdd: true, wantOps: []string{"remove", "add"}, wantRestart: true, breakIt: func(*gorm.DB, *model.Inbound) error { return nil }},
+		{name: "the settings read fails once", fail: breakSettings, healOnRetry: true, wantOps: []string{"remove", "add"}},
+		{name: "the settings read keeps failing", fail: breakSettings, wantOps: []string{"remove"}, wantOwed: true},
+		{name: "the served check keeps failing", fail: breakServedCheck, wantOps: []string{"remove"}, wantOwed: true},
+		{name: "the re-add fails", failAdd: true, wantOps: []string{"remove", "add", "add", "add"}, wantOwed: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			setupIntegrationDB(t)
@@ -269,47 +281,62 @@ func TestDisconnectClientTemporarilyDoesNotStrandTheClient(t *testing.T) {
 			if err := db.Model(&model.ClientRecord{}).Where("email = ?", email).Update("enable", true).Error; err != nil {
 				t.Fatal(err)
 			}
-			setSettings := func(settings string) error {
-				return db.Model(&model.Inbound{}).Where("id = ?", inbound.Id).Update("settings", settings).Error
-			}
-			if err := setSettings(stored); err != nil {
+			if err := breakSettings(db, inbound, false); err != nil {
 				t.Fatal(err)
 			}
-			if tc.breakIt == nil {
-				tc.breakIt = func(*gorm.DB, *model.Inbound) error { return setSettings(`{"clients":[{"email":`) }
-			}
-			xrayService := &service.XrayService{}
-			xrayService.IsNeedRestartAndSetFalse()
-			oldPause := limitIPRetryPause
-			limitIPRetryPause = func() {
-				if tc.heals {
-					if err := setSettings(stored); err != nil {
+			mend := func() {
+				if tc.fail != nil {
+					if err := tc.fail(db, inbound, false); err != nil {
 						t.Error(err)
 					}
+				}
+			}
+			oldPause := limitIPRetryPause
+			limitIPRetryPause = func() {
+				if tc.healOnRetry {
+					mend()
 				}
 			}
 			t.Cleanup(func() { limitIPRetryPause = oldPause })
 
 			core := &fakeCoreAPI{failAdd: tc.failAdd}
 			core.onOp = func(op string) {
-				if op == "remove" {
-					if err := tc.breakIt(db, inbound); err != nil {
+				if op == "remove" && tc.fail != nil {
+					if err := tc.fail(db, inbound, true); err != nil {
 						t.Error(err)
 					}
 				}
 			}
 			startFakeCoreAPI(t, core)
 
+			job := &CheckClientIpJob{}
 			clients := []model.Client{{Email: email, ID: "11111111-1111-1111-1111-111111111111", Enable: true}}
-			(&CheckClientIpJob{}).disconnectClientTemporarily(inbound, email, clients)
+			job.disconnectClientTemporarily(inbound, email, clients)
 
-			core.mu.Lock()
-			defer core.mu.Unlock()
-			if !slices.Equal(core.ops, tc.wantOps) {
-				t.Fatalf("core saw %v, want %v", core.ops, tc.wantOps)
+			ops := func() []string {
+				core.mu.Lock()
+				defer core.mu.Unlock()
+				return slices.Clone(core.ops)
 			}
-			if got := xrayService.IsNeedRestartAndSetFalse(); got != tc.wantRestart {
-				t.Fatalf("restart asked = %v, want %v", got, tc.wantRestart)
+			if got := ops(); !slices.Equal(got, tc.wantOps) {
+				t.Fatalf("core saw %v, want %v", got, tc.wantOps)
+			}
+			if got := len(job.owedRestores) == 1; got != tc.wantOwed {
+				t.Fatalf("restores owed = %v, want owed %v", job.owedRestores, tc.wantOwed)
+			}
+			if !tc.wantOwed {
+				return
+			}
+			// What failed works again: the next run puts the client back and owes nothing.
+			if !tc.healOnRetry {
+				mend()
+			}
+			core.mu.Lock()
+			core.failAdd = false
+			core.mu.Unlock()
+			job.settleOwedRestores()
+			if got := ops(); len(job.owedRestores) != 0 || got[len(got)-1] != "add" {
+				t.Fatalf("after the next run: core saw %v, still owed %v; want the client re-added", got, job.owedRestores)
 			}
 		})
 	}

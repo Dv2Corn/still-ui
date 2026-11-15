@@ -42,6 +42,8 @@ type CheckClientIpJob struct {
 	onlineUsers onlineUsersSource
 	allowlist   ipLimitAllowlist
 	lastIpPrune int64
+	// owedRestores are clients a temporary disconnect removed and could not yet re-add.
+	owedRestores []owedRestore
 }
 
 const defaultXrayAPIPort = 62789
@@ -57,6 +59,7 @@ func NewCheckClientIpJob() *CheckClientIpJob {
 }
 
 func (j *CheckClientIpJob) Run() {
+	j.settleOwedRestores()
 	j.pruneStaleIpRows()
 	observed, apiMode := j.collectFromOnlineAPI()
 	// Kernel-mode AmneziaWG peers never reach Xray, so its online users cannot
@@ -809,56 +812,81 @@ func (j *CheckClientIpJob) disconnectClientTemporarily(inbound *model.Inbound, c
 	// only widens the window in which new handshakes fail.
 	time.Sleep(100 * time.Millisecond)
 
-	// The client is out of the core now, so no failure below may simply return: a restart
-	// rebuilds the core's users from the database, whatever state that is.
-	restart := func(doing string, err error) {
-		logger.Warningf("[LIMIT_IP] Cannot restore %s, restarting Xray to settle it: %s: %v", clientEmail, doing, err)
-		(&service.XrayService{}).SetToNeedRestart()
+	// The client is out of the core now, so a failure below may not simply return: the
+	// restore is owed, and every later run tries it again until it settles.
+	owed := owedRestore{inboundID: inbound.Id, tag: inbound.Tag, protocol: protocol, email: clientEmail}
+	err = j.restoreRemovedClient(&xrayAPI, owed)
+	for attempt := 0; err != nil && attempt < 2; attempt++ {
+		limitIPRetryPause()
+		err = j.restoreRemovedClient(&xrayAPI, owed)
+	}
+	if err != nil {
+		logger.Warningf("[LIMIT_IP] Cannot restore %s yet, will try again on the next run: %v", clientEmail, err)
+		j.owedRestores = append(j.owedRestores, owed)
+	}
+}
+
+// owedRestore is a client RemoveUser took out of the core and no re-add has put back yet.
+type owedRestore struct {
+	inboundID            int
+	tag, protocol, email string
+}
+
+// restoreRemovedClient re-adds a temporarily removed client if it is still served; an error
+// means the outcome is unknown and the restore stays owed.
+func (j *CheckClientIpJob) restoreRemovedClient(xrayAPI *xray.XrayAPI, owed owedRestore) error {
+	// A disable or delete committed since the scan found no user to remove (or restarted
+	// the core) and will not come back for it.
+	served, err := j.clientStillServed(owed.inboundID, owed.email)
+	if err != nil {
+		return fmt.Errorf("checking it is still served: %w", err)
 	}
 	// Read after the removal, not from the scan: a credential rotated since then is already
 	// in the core, and the scan's copy would put the retired one back.
-	read := func() (served bool, config map[string]any, err error) {
-		if served, err = j.clientStillServed(inbound.Id, clientEmail); err != nil || !served {
-			return served, nil, err
+	var clientConfig map[string]any
+	if served {
+		if clientConfig, err = storedClientConfig(owed.inboundID, owed.email); err != nil {
+			return fmt.Errorf("reading its stored settings: %w", err)
 		}
-		config, err = storedClientConfig(inbound.Id, clientEmail)
-		return served, config, err
 	}
-	served, clientConfig, err := read()
-	for attempt := 0; err != nil && attempt < 2; attempt++ {
-		limitIPRetryPause()
-		served, clientConfig, err = read()
-	}
-	if err != nil {
-		restart("reading its stored state", err)
-		return
-	}
-	// A disable or delete committed since the scan found no user to remove (or restarted
-	// the core) and will not come back for it.
 	if !served || clientConfig == nil {
-		logger.Infof("[LIMIT_IP] Not restoring %s: disabled or removed during its temporary disconnect", clientEmail)
-		return
+		logger.Infof("[LIMIT_IP] Not restoring %s: disabled or removed during its temporary disconnect", owed.email)
+		return nil
 	}
-
-	// Re-add user to allow new connections
-	if err := xrayAPI.AddUser(protocol, inbound.Tag, clientConfig); err != nil {
-		restart("re-adding it", err)
-		return
+	// Already there: a restart or an edit since the removal put the user back.
+	if err := xrayAPI.AddUser(owed.protocol, owed.tag, clientConfig); err != nil && !xray.IsUserExistsErr(err) {
+		return fmt.Errorf("re-adding it: %w", err)
 	}
-
 	// Asked again: a commit can land between the check and the re-add. Writers touch
 	// the core only after they commit, so one this check misses removes the user itself.
-	served, err = j.clientStillServed(inbound.Id, clientEmail)
-	if err != nil {
-		restart("checking it is still served", err)
-		return
-	}
-	if !served {
-		logger.Infof("[LIMIT_IP] Removing %s again: disabled or removed during its temporary disconnect", clientEmail)
-		if err := xrayAPI.RemoveUser(inbound.Tag, clientEmail); err != nil {
-			logger.Warningf("[LIMIT_IP] Failed to remove user %s again: %v", clientEmail, err)
+	if served, err = j.clientStillServed(owed.inboundID, owed.email); err == nil && !served {
+		logger.Infof("[LIMIT_IP] Removing %s again: disabled or removed during its temporary disconnect", owed.email)
+		if err := xrayAPI.RemoveUser(owed.tag, owed.email); err != nil {
+			logger.Warningf("[LIMIT_IP] Failed to remove user %s again: %v", owed.email, err)
 		}
 	}
+	return nil
+}
+
+// settleOwedRestores retries, at the start of a run, the restores earlier runs still owe.
+func (j *CheckClientIpJob) settleOwedRestores() {
+	if len(j.owedRestores) == 0 {
+		return
+	}
+	var xrayAPI xray.XrayAPI
+	if err := xrayAPI.Init(j.resolveXrayAPIPort()); err != nil {
+		logger.Warningf("[LIMIT_IP] Failed to init Xray API to restore %d removed clients: %v", len(j.owedRestores), err)
+		return
+	}
+	defer xrayAPI.Close()
+	still := j.owedRestores[:0]
+	for _, owed := range j.owedRestores {
+		if err := j.restoreRemovedClient(&xrayAPI, owed); err != nil {
+			logger.Warningf("[LIMIT_IP] Cannot restore %s yet, will try again on the next run: %v", owed.email, err)
+			still = append(still, owed)
+		}
+	}
+	j.owedRestores = still
 }
 
 // limitIPRetryPause separates the retries of a failed read; tests replace it.
