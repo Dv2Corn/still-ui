@@ -1,6 +1,7 @@
 package service
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/database"
@@ -73,5 +74,18 @@ func TestSubIDRotationEndsTheTelegramBindingOnEveryPath(t *testing.T) {
 				t.Fatalf("record tg_id = %d, want %d", got, tc.wantTgID)
 			}
 		})
+	}
+}
+
+// A tgId stored as a string and sent back as a number is the same binding, so the rotation
+// check compares values; fmt.Sprint compared their spelling.
+func TestSubIDRotationComparesTgIDsByValue(t *testing.T) {
+	for stored, sent := range map[any]any{"7777": float64(7777), float64(7777): "7777", " 7777 ": json.Number("7777")} {
+		if settingsTgID(stored) != settingsTgID(sent) {
+			t.Errorf("tgId %#v and %#v read differently", stored, sent)
+		}
+	}
+	if settingsTgID("7777") == settingsTgID(float64(9999)) {
+		t.Error("different tgIds read the same")
 	}
 }

@@ -625,7 +625,7 @@ func (s *InboundService) setRemoteTrafficLocked(nodeID int, snap *runtime.Traffi
 	reportedEmails := make(map[string]struct{})
 	nodeEmailTotals := make(map[string]nodeTrafficCounter)
 	for _, snapIb := range snap.Inbounds {
-		if snapIb == nil {
+		if _, unreadable := unreadableSettings[snapIb]; snapIb == nil || unreadable {
 			continue
 		}
 		for i := range snapIb.ClientStats {

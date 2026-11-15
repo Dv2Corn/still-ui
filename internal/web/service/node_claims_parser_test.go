@@ -137,3 +137,27 @@ func TestNodeCannotSlipSettingsPastTheClaimCheckBehindWhiteSpace(t *testing.T) {
 		})
 	}
 }
+
+// Unreadable settings leave the inbound out of every pass, the reported-email set too: its
+// stats must not keep a baseline alive or reach a traffic row through a sibling.
+func TestUnreadableNodeSettingsLeaveTheInboundOutOfEveryPass(t *testing.T) {
+	db := initTrafficTestDB(t)
+	svc := &InboundService{}
+	createNodeInbound(t, db, 1, "n1-in", 41001)
+	syncNode(t, svc, 1, "n1-in", xray.ClientTraffic{Email: "solo", Up: 100, Enable: true})
+	before := readTraffic(t, db, "solo")
+	syncNodeWithSettings(t, svc, 1, "n1-in", "\f"+`{"clients":[{"email":"solo"},{"email":"ghost"}]}`,
+		xray.ClientTraffic{Email: "solo", Up: 900, Enable: true}, xray.ClientTraffic{Email: "ghost", Up: 900, Enable: true})
+	if got := readTraffic(t, db, "solo"); got.Up != before.Up {
+		t.Fatalf("solo up = %d after unreadable settings, want %d", got.Up, before.Up)
+	}
+	var rows int64
+	db.Model(xray.ClientTraffic{}).Where("email = ?", "ghost").Count(&rows)
+	if rows != 0 {
+		t.Fatalf("a client from unreadable settings got %d traffic rows", rows)
+	}
+	syncNode(t, svc, 1, "n1-in", xray.ClientTraffic{Email: "solo", Up: 150, Enable: true})
+	if got := readTraffic(t, db, "solo"); got.Up != before.Up+50 {
+		t.Fatalf("solo up = %d after a readable snapshot, want %d: the skipped one must not move the baseline", got.Up, before.Up+50)
+	}
+}

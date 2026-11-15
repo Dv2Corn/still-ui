@@ -386,3 +386,35 @@ func TestOwedRestoresAreNotOverwrittenWhileTheStoredListIsUnread(t *testing.T) {
 		t.Fatalf("stored owed restores = %v, want both %v and %v", after.owedRestores, earlier, later)
 	}
 }
+
+// When the served check fails right after the re-add, a commit may have removed the client
+// meanwhile, so the restore is not done: it stays owed and the next run asks again.
+func TestRestoreStaysOwedWhenTheCheckAfterTheReAddFails(t *testing.T) {
+	const email = "after-add-probe"
+	setupIntegrationDB(t)
+	db := database.GetDB()
+	inbound := seedLinkedInboundWithClient(t, "after-add-probe-tag", email, 1)
+	if err := db.Model(&model.ClientRecord{}).Where("email = ?", email).Update("enable", true).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Model(&model.Inbound{}).Where("id = ?", inbound.Id).Update("settings", `{"clients":[{"email":"`+email+`","id":"11111111-1111-1111-1111-111111111111","enable":true}]}`).Error; err != nil {
+		t.Fatal(err)
+	}
+	core := &fakeCoreAPI{}
+	core.onOp = func(op string) {
+		if op == "add" {
+			if err := db.Exec("ALTER TABLE client_inbounds RENAME TO client_inbounds_gone").Error; err != nil {
+				t.Error(err)
+			}
+		}
+	}
+	startFakeCoreAPI(t, core)
+	var xrayAPI xray.XrayAPI
+	if err := xrayAPI.Init((&CheckClientIpJob{}).resolveXrayAPIPort()); err != nil {
+		t.Fatal(err)
+	}
+	defer xrayAPI.Close()
+	if err := (&CheckClientIpJob{}).restoreRemovedClient(&xrayAPI, owedRestore{InboundID: inbound.Id, Email: email}); err == nil {
+		t.Fatal("the restore counted as done though the check after the re-add failed")
+	}
+}

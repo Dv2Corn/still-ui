@@ -863,12 +863,13 @@ func (j *CheckClientIpJob) saveOwedRestores() {
 	if j.loadOwedRestores(); !j.owedLoaded {
 		return
 	}
-	db := database.GetDB()
-	err := db.Where("key = ?", owedRestoresKey).Delete(&model.Setting{}).Error
-	if err == nil && len(j.owedRestores) > 0 {
+	err := database.GetDB().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("key = ?", owedRestoresKey).Delete(&model.Setting{}).Error; err != nil || len(j.owedRestores) == 0 {
+			return err
+		}
 		value, _ := json.Marshal(j.owedRestores)
-		err = db.Create(&model.Setting{Key: owedRestoresKey, Value: string(value)}).Error
-	}
+		return tx.Create(&model.Setting{Key: owedRestoresKey, Value: string(value)}).Error
+	})
 	if err != nil {
 		logger.Warningf("[LIMIT_IP] Failed to store the owed restores: %v", err)
 		return
@@ -904,7 +905,12 @@ func (j *CheckClientIpJob) restoreRemovedClient(xrayAPI *xray.XrayAPI, owed owed
 	}
 	// Asked again: a commit can land between the check and the re-add. Writers touch
 	// the core only after they commit, so one this check misses removes the user itself.
-	if served, err = j.clientStillServed(owed.InboundID, owed.Email); err == nil && !served {
+	// Unknown whether a commit removed it meanwhile: the restore stays owed and the next
+	// run asks again (AddUser then finds it present).
+	if served, err = j.clientStillServed(owed.InboundID, owed.Email); err != nil {
+		return fmt.Errorf("checking it is still served after the re-add: %w", err)
+	}
+	if !served {
 		logger.Infof("[LIMIT_IP] Removing %s again: disabled or removed during its temporary disconnect", owed.Email)
 		if err := xrayAPI.RemoveUser(stored.Tag, owed.Email); err != nil {
 			logger.Warningf("[LIMIT_IP] Failed to remove user %s again: %v", owed.Email, err)
