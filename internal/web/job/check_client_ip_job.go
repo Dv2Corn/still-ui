@@ -818,8 +818,18 @@ func (j *CheckClientIpJob) disconnectClientTemporarily(inbound *model.Inbound, c
 	// Read after the removal, not from the scan: a credential rotated since then is already
 	// in the core, and the scan's copy would put the retired one back.
 	clientConfig, err := storedClientConfig(inbound.Id, clientEmail)
-	if err != nil || clientConfig == nil {
-		logger.Warningf("[LIMIT_IP] Not restoring %s: reading its stored settings: %v", clientEmail, err)
+	for attempt := 0; err != nil && attempt < 2; attempt++ {
+		time.Sleep(100 * time.Millisecond)
+		clientConfig, err = storedClientConfig(inbound.Id, clientEmail)
+	}
+	if err != nil {
+		// The client is still served but out of the core: a restart rebuilds its users from the database.
+		logger.Warningf("[LIMIT_IP] Cannot restore %s, restarting Xray to bring it back: reading its stored settings: %v", clientEmail, err)
+		(&service.XrayService{}).SetToNeedRestart()
+		return
+	}
+	if clientConfig == nil {
+		logger.Infof("[LIMIT_IP] Not restoring %s: its inbound no longer lists it", clientEmail)
 		return
 	}
 

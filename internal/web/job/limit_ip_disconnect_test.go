@@ -10,10 +10,12 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/database"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 	"github.com/mhsanaei/3x-ui/v3/internal/logger"
+	"github.com/mhsanaei/3x-ui/v3/internal/web/service"
 	"github.com/mhsanaei/3x-ui/v3/internal/xray"
 
 	"github.com/xtls/xray-core/app/proxyman/command"
@@ -232,5 +234,68 @@ func TestDisconnectClientTemporarilyRestoresTheStoredCredential(t *testing.T) {
 	defer core.mu.Unlock()
 	if !slices.Equal(added, []string{current}) {
 		t.Fatalf("core re-added ids %v, want only the stored %s", added, current)
+	}
+}
+
+// The client is out of the core once RemoveUser returns. A read of its stored settings that
+// fails then must not leave it out for good: a passing failure is retried, and a lasting
+// one asks for the restart that rebuilds the core's users from the database.
+func TestDisconnectClientTemporarilyDoesNotStrandTheClientOnAReadFailure(t *testing.T) {
+	const email = "strand-probe"
+	const stored = `{"clients":[{"email":"` + email + `","id":"11111111-1111-1111-1111-111111111111","enable":true}]}`
+	for _, tc := range []struct {
+		name        string
+		healAfter   time.Duration
+		wantOps     []string
+		wantRestart bool
+	}{
+		{name: "the read fails once", healAfter: 50 * time.Millisecond, wantOps: []string{"remove", "add"}},
+		{name: "the read keeps failing", wantOps: []string{"remove"}, wantRestart: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			setupIntegrationDB(t)
+			db := database.GetDB()
+			inbound := seedLinkedInboundWithClient(t, "strand-probe-tag", email, 1)
+			if err := db.Model(&model.ClientRecord{}).Where("email = ?", email).Update("enable", true).Error; err != nil {
+				t.Fatal(err)
+			}
+			setSettings := func(settings string) {
+				if err := db.Model(&model.Inbound{}).Where("id = ?", inbound.Id).Update("settings", settings).Error; err != nil {
+					t.Error(err)
+				}
+			}
+			setSettings(stored)
+			xrayService := &service.XrayService{}
+			xrayService.IsNeedRestartAndSetFalse()
+
+			healed := make(chan struct{})
+			core := &fakeCoreAPI{}
+			core.onOp = func(op string) {
+				if op != "remove" {
+					return
+				}
+				setSettings(`{"clients":[{"email":`)
+				if tc.healAfter > 0 {
+					// The job sleeps 100ms after the removal before its first read.
+					time.AfterFunc(100*time.Millisecond+tc.healAfter, func() { setSettings(stored); close(healed) })
+				}
+			}
+			startFakeCoreAPI(t, core)
+
+			clients := []model.Client{{Email: email, ID: "11111111-1111-1111-1111-111111111111", Enable: true}}
+			(&CheckClientIpJob{}).disconnectClientTemporarily(inbound, email, clients)
+			if tc.healAfter > 0 {
+				<-healed
+			}
+
+			core.mu.Lock()
+			defer core.mu.Unlock()
+			if !slices.Equal(core.ops, tc.wantOps) {
+				t.Fatalf("core saw %v, want %v", core.ops, tc.wantOps)
+			}
+			if got := xrayService.IsNeedRestartAndSetFalse(); got != tc.wantRestart {
+				t.Fatalf("restart asked = %v, want %v", got, tc.wantRestart)
+			}
+		})
 	}
 }
