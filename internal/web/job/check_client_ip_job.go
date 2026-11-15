@@ -804,17 +804,13 @@ func (j *CheckClientIpJob) disconnectClientTemporarily(inbound *model.Inbound, c
 		j.owedRestores = append(j.owedRestores, owed)
 	}
 	j.saveOwedRestores()
-	settled := func() {
-		j.owedRestores = slices.DeleteFunc(j.owedRestores, func(o owedRestore) bool { return o == owed })
-		j.saveOwedRestores()
-	}
 
 	// The core's RemoveUser clears its validator: a session already up keeps
 	// running, except a reverse vless client, which is skipped above.
 	err = xrayAPI.RemoveUser(inbound.Tag, clientEmail)
 	if err != nil {
+		// Stays owed: the removal may have happened, and a re-add of a client still there counts as done.
 		logger.Warningf("[LIMIT_IP] Failed to remove user %s: %v", clientEmail, err)
-		settled()
 		return
 	}
 
@@ -832,7 +828,8 @@ func (j *CheckClientIpJob) disconnectClientTemporarily(inbound *model.Inbound, c
 		logger.Warningf("[LIMIT_IP] Cannot restore %s yet, will try again on the next run: %v", clientEmail, err)
 		return
 	}
-	settled()
+	j.owedRestores = slices.DeleteFunc(j.owedRestores, func(o owedRestore) bool { return o == owed })
+	j.saveOwedRestores()
 }
 
 // owedRestore is a client RemoveUser took out of the core and no re-add has put back yet.

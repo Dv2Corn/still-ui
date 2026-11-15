@@ -99,8 +99,9 @@ type fakeCoreAPI struct {
 	onOp  func(op string)
 	onAdd func(vlessID string)
 	// failAdd makes the core refuse every AddUser; addExists answers it "already exists".
-	failAdd   bool
-	addExists bool
+	failAdd    bool
+	addExists  bool
+	failRemove bool
 }
 
 func (f *fakeCoreAPI) AlterInbound(_ context.Context, req *command.AlterInboundRequest) (*command.AlterInboundResponse, error) {
@@ -126,6 +127,9 @@ func (f *fakeCoreAPI) AlterInbound(_ context.Context, req *command.AlterInboundR
 		}
 	}
 	f.onOp(op)
+	if op == "remove" && f.failRemove {
+		return nil, errors.New("user not found")
+	}
 	if op == "add" && f.failAdd {
 		return nil, errors.New("core refuses the user")
 	}
@@ -478,5 +482,26 @@ func TestDisconnectClientTemporarilyStoresTheRestoreBeforeRemoving(t *testing.T)
 	}
 	if after := stored(); after != "" {
 		t.Fatalf("stored owed restores after a successful re-add = %q, want none", after)
+	}
+}
+
+// A failed RemoveUser never settles a restore: the client may be out of the core already,
+// from this call or an earlier one that still owes it.
+func TestDisconnectClientTemporarilyKeepsTheRestoreOwedWhenRemoveFails(t *testing.T) {
+	const email = "remove-fail-probe"
+	setupIntegrationDB(t)
+	inbound := seedLinkedInboundWithClient(t, "remove-fail-probe-tag", email, 1)
+	core := &fakeCoreAPI{failRemove: true}
+	core.onOp = func(string) {}
+	startFakeCoreAPI(t, core)
+
+	owed := owedRestore{InboundID: inbound.Id, Email: email}
+	job := &CheckClientIpJob{owedRestores: []owedRestore{owed}}
+	job.disconnectClientTemporarily(inbound, email, []model.Client{{Email: email, Enable: true}})
+
+	next := &CheckClientIpJob{}
+	next.loadOwedRestores()
+	if !slices.Equal(job.owedRestores, []owedRestore{owed}) || !slices.Equal(next.owedRestores, []owedRestore{owed}) {
+		t.Fatalf("owed after a failed remove: in memory %v, stored %v; want %v in both", job.owedRestores, next.owedRestores, owed)
 	}
 }
