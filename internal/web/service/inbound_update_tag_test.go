@@ -14,7 +14,7 @@ import (
 // field, so the update arrives carrying the stale tag.
 func TestUpdateInbound_RegeneratesAutoTagOnPortChange(t *testing.T) {
 	setupConflictDB(t)
-	seedInboundConflict(t, "in-22435-tcp", "0.0.0.0", 22435, model.VLESS, `{"network":"tcp"}`, `{"clients":[]}`)
+	seedInboundConflict(t, "in-22435-tcp", "0.0.0.0", 22435, model.VLESS, `{"network":"tcp"}`, vlessSettings)
 
 	var existing model.Inbound
 	if err := database.GetDB().Where("tag = ?", "in-22435-tcp").First(&existing).Error; err != nil {
@@ -50,7 +50,7 @@ func TestUpdateInbound_RegeneratesAutoTagOnPortChange(t *testing.T) {
 // the returned object) which is what the save would use.
 func TestUpdateInbound_NodeTagKeepsPrefixWhenNodeIdOmitted(t *testing.T) {
 	setupConflictDB(t)
-	seedInboundConflictNode(t, "n1-in-443-tcp", "0.0.0.0", 443, model.VLESS, `{"network":"tcp"}`, `{"clients":[]}`, new(1))
+	seedInboundConflictNode(t, "n1-in-443-tcp", "0.0.0.0", 443, model.VLESS, `{"network":"tcp"}`, vlessSettings, new(1))
 
 	var existing model.Inbound
 	if err := database.GetDB().Where("tag = ?", "n1-in-443-tcp").First(&existing).Error; err != nil {
@@ -72,8 +72,8 @@ func TestUpdateInbound_NodeTagKeepsPrefixWhenNodeIdOmitted(t *testing.T) {
 // port-conflict check is scoped to the inbound's stored NodeID, not the body's.
 func TestUpdateInbound_NodeInboundNotBlockedByLocalSamePort(t *testing.T) {
 	setupConflictDB(t)
-	seedInboundConflict(t, "in-10000-tcp", "0.0.0.0", 10000, model.VLESS, `{"network":"tcp"}`, `{"clients":[]}`)
-	seedInboundConflictNode(t, "n1-in-10000-tcp", "0.0.0.0", 10000, model.VLESS, `{"network":"tcp"}`, `{"clients":[]}`, new(1))
+	seedInboundConflict(t, "in-10000-tcp", "0.0.0.0", 10000, model.VLESS, `{"network":"tcp"}`, vlessSettings)
+	seedInboundConflictNode(t, "n1-in-10000-tcp", "0.0.0.0", 10000, model.VLESS, `{"network":"tcp"}`, vlessSettings, new(1))
 
 	var nodeInbound model.Inbound
 	if err := database.GetDB().Where("tag = ?", "n1-in-10000-tcp").First(&nodeInbound).Error; err != nil {
@@ -95,7 +95,7 @@ func TestUpdateInbound_NodeInboundNotBlockedByLocalSamePort(t *testing.T) {
 // port change untouched.
 func TestUpdateInbound_KeepsCustomTagOnPortChange(t *testing.T) {
 	setupConflictDB(t)
-	seedInboundConflict(t, "my-custom-tag", "0.0.0.0", 22435, model.VLESS, `{"network":"tcp"}`, `{"clients":[]}`)
+	seedInboundConflict(t, "my-custom-tag", "0.0.0.0", 22435, model.VLESS, `{"network":"tcp"}`, vlessSettings)
 
 	var existing model.Inbound
 	if err := database.GetDB().Where("tag = ?", "my-custom-tag").First(&existing).Error; err != nil {

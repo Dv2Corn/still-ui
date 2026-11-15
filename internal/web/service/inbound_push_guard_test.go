@@ -46,7 +46,7 @@ func TestPushedRelayTargetsOnTheNodesOwnPorts(t *testing.T) {
 
 	reality := func(port int, target string) *model.Inbound {
 		return &model.Inbound{
-			Enable: true, Port: port, Protocol: model.VLESS, Settings: `{"clients":[]}`,
+			Enable: true, Port: port, Protocol: model.VLESS, Settings: vlessSettings,
 			StreamSettings: `{"network":"tcp","security":"reality","realitySettings":{"target":"` + target + `"}}`,
 		}
 	}
@@ -79,7 +79,7 @@ func TestPushedRelayTargetsOnTheNodesOwnPorts(t *testing.T) {
 	// and Go's dialer reads a leading zero as the same port.
 	for _, dest := range []string{"www.nvidia.com:443", "127.0.0.1.nip.io:062789"} {
 		port++
-		fb := &model.Inbound{Enable: true, Port: port, Protocol: model.VLESS, Settings: `{"clients":[],"fallbacks":[{"dest":"` + dest + `"}]}`, StreamSettings: `{"network":"tcp"}`}
+		fb := &model.Inbound{Enable: true, Port: port, Protocol: model.VLESS, Settings: `{"clients":[],"decryption":"none","fallbacks":[{"dest":"` + dest + `"}]}`, StreamSettings: `{"network":"tcp"}`}
 		if _, _, err := push.AddInbound(fb); err == nil || !strings.Contains(err.Error(), fmt.Sprintf("may not set fallback dest to %q", dest)) {
 			t.Errorf("AddInbound(fallback %q) = %v", dest, err)
 		}
@@ -101,24 +101,24 @@ func firstOwnPublicIP() string {
 // row the master pushed itself (disabled, or on a foreign listen) must not open any host.
 func TestPushedFallbackDestMustBeAnEnabledLocalInboundsAddress(t *testing.T) {
 	push := pushGuardTestService(t)
-	if _, _, err := push.AddInbound(&model.Inbound{Enable: false, Port: 45432, Protocol: model.VLESS, Settings: `{"clients":[]}`}); err != nil {
+	if _, _, err := push.AddInbound(&model.Inbound{Enable: false, Port: 45432, Protocol: model.VLESS, Settings: vlessSettings}); err != nil {
 		t.Fatalf("push a disabled decoy: %v", err)
 	}
-	if _, _, err := push.AddInbound(&model.Inbound{Enable: true, Listen: "10.0.0.5", Port: 45435, Protocol: model.VLESS, Settings: `{"clients":[]}`}); err != nil {
+	if _, _, err := push.AddInbound(&model.Inbound{Enable: true, Listen: "10.0.0.5", Port: 45435, Protocol: model.VLESS, Settings: vlessSettings}); err != nil {
 		t.Fatalf("push a decoy listening on a foreign address: %v", err)
 	}
-	seedInboundConflict(t, "named", "metadata", 45436, model.VLESS, `{"network":"tcp"}`, `{"clients":[]}`)
-	seedInboundConflict(t, "wildcard", "", 45433, model.VLESS, `{"network":"tcp"}`, `{"clients":[]}`)
-	seedInboundConflict(t, "loopback", "127.0.0.1", 45434, model.VLESS, `{"network":"tcp"}`, `{"clients":[]}`)
-	seedInboundConflict(t, "socket", "/dev/shm/in.sock,0666", 0, model.VLESS, `{"network":"tcp"}`, `{"clients":[]}`)
-	seedInboundConflict(t, "on-the-panel-port", "", 2053, model.VLESS, `{"network":"tcp"}`, `{"clients":[]}`)
+	seedInboundConflict(t, "named", "metadata", 45436, model.VLESS, `{"network":"tcp"}`, vlessSettings)
+	seedInboundConflict(t, "wildcard", "", 45433, model.VLESS, `{"network":"tcp"}`, vlessSettings)
+	seedInboundConflict(t, "loopback", "127.0.0.1", 45434, model.VLESS, `{"network":"tcp"}`, vlessSettings)
+	seedInboundConflict(t, "socket", "/dev/shm/in.sock,0666", 0, model.VLESS, `{"network":"tcp"}`, vlessSettings)
+	seedInboundConflict(t, "on-the-panel-port", "", 2053, model.VLESS, `{"network":"tcp"}`, vlessSettings)
 
 	port := 44440
 	fallback := func(dest string) error {
 		port++
 		_, _, err := push.AddInbound(&model.Inbound{
 			Enable: true, Port: port, Protocol: model.VLESS,
-			Settings: `{"clients":[],"fallbacks":[{"dest":` + dest + `}]}`, StreamSettings: `{"network":"tcp"}`,
+			Settings: `{"clients":[],"decryption":"none","fallbacks":[{"dest":` + dest + `}]}`, StreamSettings: `{"network":"tcp"}`,
 		})
 		return err
 	}
@@ -142,19 +142,19 @@ func TestPushedFallbackDestMustBeAnEnabledLocalInboundsAddress(t *testing.T) {
 func TestPushedUnixListenMustBeTheStoredOne(t *testing.T) {
 	push := pushGuardTestService(t)
 	for i, listen := range []string{"/etc/x-ui/victim,0666", "@abstract-name", "[/etc/x-ui/victim,0666]", "[ @abstract-name ]", " /tmp/x.sock"} {
-		_, _, err := push.AddInbound(&model.Inbound{Enable: true, Port: 44450 + i, Listen: listen, Protocol: model.VLESS, Settings: `{"clients":[]}`})
+		_, _, err := push.AddInbound(&model.Inbound{Enable: true, Port: 44450 + i, Listen: listen, Protocol: model.VLESS, Settings: vlessSettings})
 		if want := "may not set listen to"; err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("pushed listen %q = %v, want %q", listen, err, want)
 		}
 	}
 
 	for i, listen := range []string{"[::1]", " 0.0.0.0 "} {
-		if _, _, err := push.AddInbound(&model.Inbound{Enable: true, Port: 44455 + i, Listen: listen, Protocol: model.VLESS, Settings: `{"clients":[]}`}); err != nil {
+		if _, _, err := push.AddInbound(&model.Inbound{Enable: true, Port: 44455 + i, Listen: listen, Protocol: model.VLESS, Settings: vlessSettings}); err != nil {
 			t.Errorf("pushed IP listen %q refused: %v", listen, err)
 		}
 	}
 
-	seedInboundConflict(t, "socket", "/dev/shm/in.sock,0600", 0, model.VLESS, `{"network":"tcp"}`, `{"clients":[]}`)
+	seedInboundConflict(t, "socket", "/dev/shm/in.sock,0600", 0, model.VLESS, `{"network":"tcp"}`, vlessSettings)
 	var stored model.Inbound
 	if err := database.GetDB().Where("tag = ?", "socket").First(&stored).Error; err != nil {
 		t.Fatalf("load the stored socket inbound: %v", err)
@@ -184,7 +184,7 @@ func TestPushedCertificatePathMustBeTheNodesOwn(t *testing.T) {
 	}
 	tls := func(port int, file string) *model.Inbound {
 		return &model.Inbound{
-			Enable: true, Port: port, Protocol: model.VLESS, Settings: `{"clients":[]}`,
+			Enable: true, Port: port, Protocol: model.VLESS, Settings: vlessSettings,
 			StreamSettings: `{"network":"tcp","security":"tls","tlsSettings":{"certificates":[{"certificateFile":"` + file + `","keyFile":"` + file + `"}]}}`,
 		}
 	}

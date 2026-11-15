@@ -13,7 +13,25 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 	"github.com/mhsanaei/3x-ui/v3/internal/tuic"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/common"
+	"github.com/mhsanaei/3x-ui/v3/internal/xray"
 
+	"github.com/xtls/xray-core/app/proxyman"
+	xnet "github.com/xtls/xray-core/common/net"
+	"github.com/xtls/xray-core/infra/conf"
+	"github.com/xtls/xray-core/proxy/dokodemo"
+	xhttpproxy "github.com/xtls/xray-core/proxy/http"
+	"github.com/xtls/xray-core/proxy/hysteria"
+	"github.com/xtls/xray-core/proxy/masque"
+	"github.com/xtls/xray-core/proxy/shadowsocks"
+	"github.com/xtls/xray-core/proxy/shadowsocks_2022"
+	"github.com/xtls/xray-core/proxy/socks"
+	"github.com/xtls/xray-core/proxy/trojan"
+	vlessinbound "github.com/xtls/xray-core/proxy/vless/inbound"
+	vmessinbound "github.com/xtls/xray-core/proxy/vmess/inbound"
+	"github.com/xtls/xray-core/proxy/wireguard"
+	"github.com/xtls/xray-core/transport/internet"
+	xtls "github.com/xtls/xray-core/transport/internet/tls"
+	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 )
 
@@ -24,123 +42,148 @@ const (
 	transportUDP
 )
 
-func inboundTransports(protocol model.Protocol, streamSettings, settings string) transportBits {
-	// protocols that ignore streamSettings entirely.
-	switch protocol {
-	case model.Hysteria, model.WireGuard, model.AmneziaWG, model.TUIC:
-		return transportUDP
+// inboundTransports reports the sockets xray-core opens for an inbound, read from the core's
+// own build of what GenXrayInboundConfig hands it; ok is false when the core cannot build it.
+func inboundTransports(ib *model.Inbound) (transportBits, bool) {
+	return configTransports(ib.GenXrayInboundConfig())
+}
+
+// conflictTransports is inboundTransports for the port checks: the core cannot run an
+// inbound it cannot build, so keeping every socket of its port free for it costs nothing.
+func conflictTransports(ib *model.Inbound) transportBits {
+	if bits, ok := inboundTransports(ib); ok {
+		return bits
+	}
+	return transportTCP | transportUDP
+}
+
+// configTransports builds a generated inbound with infra/conf, exactly as the core loads it.
+func configTransports(ib *xray.InboundConfig) (transportBits, bool) {
+	switch model.Protocol(ib.Protocol) {
+	// Served by the panel's own cores, not by xray-core.
+	case model.AmneziaWG, model.TUIC:
+		return transportUDP, true
 	case model.MTProto:
-		return transportTCP
-	case model.MASQUE:
-		return masqueTransports(streamSettings)
+		return transportTCP, true
 	}
-
-	// Decoded the way xray-core decodes it: struct tags fold key case and the last
-	// duplicate wins. Parse errors keep the default tcp bit below.
-	var stream struct {
-		Network     string `json:"network"`
-		Security    string `json:"security"`
-		TLSSettings struct {
-			ALPN json.RawMessage `json:"alpn"`
-		} `json:"tlsSettings"`
+	raw, err := json.Marshal(ib)
+	if err != nil {
+		return 0, false
 	}
-	_ = json.Unmarshal([]byte(streamSettings), &stream)
-	network := strings.ToLower(stream.Network)
-	alpn, _ := xrayStringList(stream.TLSSettings.ALPN)
-	h3Only := strings.EqualFold(stream.Security, "tls") && slices.Equal(alpn, []string{"h3"})
+	detour := new(conf.InboundDetourConfig)
+	if json.Unmarshal(raw, detour) != nil || xray.CheckStreamBuildCost(ib.StreamSettings) != nil {
+		return 0, false
+	}
+	// Certificate files live on the host that runs the inbound and choose no socket.
+	if detour.StreamSetting != nil && detour.StreamSetting.TLSSettings != nil {
+		detour.StreamSetting.TLSSettings.Certs = nil
+	}
+	built, err := detour.Build()
+	if err != nil {
+		return 0, false
+	}
+	receiver, err := built.ReceiverSettings.GetInstance()
+	if err != nil {
+		return 0, false
+	}
+	proxy, err := built.ProxySettings.GetInstance()
+	if err != nil {
+		return 0, false
+	}
+	stream := receiver.(*proxyman.ReceiverConfig).StreamSettings
+	return coreSockets(stream, proxy)
+}
 
-	var bits transportBits
-	switch {
-	case network == "kcp", network == "mkcp", network == "quic":
-		bits |= transportUDP
-	// xray-core serves XHTTP over QUIC, on UDP alone, when the TLS ALPN is exactly h3.
-	case h3Only && (network == "xhttp" || network == "splithttp"):
-		bits |= transportUDP
+// coreSockets follows the core's AlwaysOnInboundHandler: each TCP network of the proxy opens
+// the stream transport's listener on the port, each UDP network a plain UDP socket.
+func coreSockets(stream *internet.StreamConfig, proxy proto.Message) (transportBits, bool) {
+	orDefault := func(list []xnet.Network, def ...xnet.Network) []xnet.Network {
+		if len(list) == 0 {
+			return def
+		}
+		return list
+	}
+	var networks []xnet.Network
+	switch p := proxy.(type) {
+	case *dokodemo.Config:
+		// DokodemoDoor.Init refuses an empty list, so the core would not start.
+		if networks = p.AllowedNetworks; len(networks) == 0 {
+			return 0, false
+		}
+	case *shadowsocks.ServerConfig:
+		networks = orDefault(p.Network, xnet.Network_TCP)
+	case *shadowsocks_2022.ServerConfig:
+		networks = orDefault(p.Network, xnet.Network_TCP, xnet.Network_UDP)
+	case *shadowsocks_2022.MultiUserServerConfig:
+		networks = orDefault(p.Network, xnet.Network_TCP, xnet.Network_UDP)
+	case *shadowsocks_2022.RelayServerConfig:
+		networks = orDefault(p.Network, xnet.Network_TCP, xnet.Network_UDP)
+	case *wireguard.DeviceConfig:
+		// Network() is empty: the server's Start binds its own UDP socket on the port.
+		return transportUDP, true
+	case *vlessinbound.Config, *vmessinbound.Config, *trojan.ServerConfig, *xhttpproxy.ServerConfig,
+		*socks.ServerConfig, *hysteria.ServerConfig, *masque.ServerConfig:
+		// Network() is TCP (and UNIX); a socks UDP associate takes a fresh port per session.
+		networks = []xnet.Network{xnet.Network_TCP}
 	default:
-		bits |= transportTCP
+		return 0, false
 	}
-
-	// a few protocols carry their L4 choice in settings instead of (or in
-	// addition to) streamSettings: SS / Tunnel via a list that wins outright,
-	// Mixed via an additive udp boolean.
-	// Raw fields: a key of the wrong type, which the core ignores when its config has no
-	// such field, must not hide the others.
-	var st struct {
-		Network        json.RawMessage `json:"network"`
-		AllowedNetwork json.RawMessage `json:"allowedNetwork"`
-		UDP            json.RawMessage `json:"udp"`
-	}
-	if json.Unmarshal([]byte(settings), &st) == nil {
-		raw := st.Network
-		// dokodemo (Tunnel) takes network over allowedNetwork when both are set.
-		if _, set := xrayStringList(raw); protocol == model.Tunnel && !set {
-			raw = st.AllowedNetwork
-		}
-		switch protocol {
-		case model.Shadowsocks, model.Tunnel:
-			if list, ok := xrayStringList(raw); ok {
-				bits = 0
-				// The core lowers each part but does not trim it: " tcp" is no network.
-				for _, part := range list {
-					switch strings.ToLower(part) {
-					case "tcp":
-						bits |= transportTCP
-					case "udp":
-						bits |= transportUDP
-					}
-				}
-			}
-		case model.Mixed:
-			// socks/http "mixed" inbound: settings.udp=true means it
-			// also relays udp on the same port (socks5 udp associate).
-			var udp bool
-			if json.Unmarshal(st.UDP, &udp) == nil && udp {
-				bits |= transportUDP
-			}
-		}
-	}
-
-	// safety net: never return zero, even if every parse failed.
-	if bits == 0 {
-		bits = transportTCP
-	}
-	return bits
-}
-
-// xrayStringList reads raw as xray-core's StringList does: a JSON array, or one string split
-// at commas; ok is false when raw is absent or neither.
-func xrayStringList(raw json.RawMessage) (list []string, ok bool) {
-	if len(raw) == 0 || string(raw) == "null" {
-		return nil, false
-	}
-	if json.Unmarshal(raw, &list) == nil {
-		return list, true
-	}
-	var joined string
-	if json.Unmarshal(raw, &joined) != nil {
-		return nil, false
-	}
-	return strings.Split(joined, ","), true
-}
-
-// masqueTransports mirrors xray-core's MASQUE listener: HTTP/2 on TCP when the TLS
-// ALPN offers h2, HTTP/3 on UDP when it offers h3 or does not offer h2.
-func masqueTransports(streamSettings string) transportBits {
-	var stream struct {
-		TLSSettings struct {
-			ALPN []string `json:"alpn"`
-		} `json:"tlsSettings"`
-	}
-	_ = json.Unmarshal([]byte(streamSettings), &stream)
-	h2 := slices.Contains(stream.TLSSettings.ALPN, "h2")
 	var bits transportBits
-	if h2 {
-		bits |= transportTCP
+	for _, network := range networks {
+		switch network {
+		case xnet.Network_UDP:
+			bits |= transportUDP
+		case xnet.Network_TCP:
+			listener, ok := streamListener(stream)
+			if !ok {
+				return 0, false
+			}
+			bits |= listener
+		}
 	}
-	if !h2 || slices.Contains(stream.TLSSettings.ALPN, "h3") {
-		bits |= transportUDP
+	return bits, true
+}
+
+// streamListener is the socket each registered transport listener opens; xdrive polls
+// remote storage and binds none.
+func streamListener(stream *internet.StreamConfig) (transportBits, bool) {
+	name := "tcp"
+	var tlsConfig *xtls.Config
+	if stream != nil {
+		name = stream.ProtocolName
+		if security, err := stream.GetEffectiveSecuritySettings(); err == nil {
+			tlsConfig, _ = security.(*xtls.Config)
+		}
 	}
-	return bits
+	switch name {
+	case "tcp", "websocket", "grpc", "httpupgrade":
+		return transportTCP, true
+	case "mkcp", "hysteria":
+		return transportUDP, true
+	case "xdrive":
+		return 0, true
+	case "splithttp":
+		// splithttp's ListenXH serves HTTP/3 alone when the TLS ALPN is exactly h3.
+		if tlsConfig != nil && slices.Equal(tlsConfig.NextProtocol, []string{"h3"}) {
+			return transportUDP, true
+		}
+		return transportTCP, true
+	case "masque":
+		// masque's serverVersions: HTTP/2 on TCP when h2 is offered, HTTP/3 on UDP when h3 is or h2 is not.
+		if tlsConfig == nil {
+			return 0, false
+		}
+		h2 := slices.Contains(tlsConfig.NextProtocol, "h2")
+		var bits transportBits
+		if h2 {
+			bits |= transportTCP
+		}
+		if !h2 || slices.Contains(tlsConfig.NextProtocol, "h3") {
+			bits |= transportUDP
+		}
+		return bits, true
+	}
+	return 0, false
 }
 
 // bindAddr is a listen address plus sockopt.v6only. xray listens on "tcp"/"udp",
@@ -306,7 +349,7 @@ func (s *InboundService) checkPortConflict(inbound *model.Inbound, ignoreId int)
 }
 
 func checkPortConflictTx(db *gorm.DB, inbound *model.Inbound, ignoreId int) (*portConflictDetail, error) {
-	newBits := inboundTransports(inbound.Protocol, inbound.StreamSettings, inbound.Settings)
+	newBits := conflictTransports(inbound)
 	if err := checkPortHopConflict(db, inbound, ignoreId); err != nil {
 		return nil, err
 	}
@@ -423,7 +466,7 @@ func checkPortConflictTx(db *gorm.DB, inbound *model.Inbound, ignoreId int) (*po
 		if !listenOverlaps(inboundBindAddr(c), inboundBindAddr(inbound)) {
 			continue
 		}
-		existingBits := inboundTransports(c.Protocol, c.StreamSettings, c.Settings)
+		existingBits := conflictTransports(c)
 		shared := existingBits & newBits
 		if shared == 0 {
 			continue
@@ -746,7 +789,7 @@ func isAutoGeneratedTag(tag string, port int, nodeID *int, bits transportBits) b
 }
 
 func (s *InboundService) generateInboundTag(inbound *model.Inbound, ignoreId int) (string, error) {
-	bits := inboundTransports(inbound.Protocol, inbound.StreamSettings, inbound.Settings)
+	bits := conflictTransports(inbound)
 	candidate := composeInboundTag(inbound.Port, inbound.NodeID, bits)
 	exists, err := s.tagExists(candidate, ignoreId)
 	if err != nil {

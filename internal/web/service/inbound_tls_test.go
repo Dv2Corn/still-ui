@@ -228,7 +228,7 @@ func TestAddInboundRefusesPushedFieldsThatReachThisHost(t *testing.T) {
 	mgr.SetLocalRuntimeOverride(&fakeNodeRuntime{})
 	stubPushGuardLookup(t, map[string]string{"www.example.com": "93.184.215.14"})
 	push := &InboundService{FromNodeSync: true}
-	if _, _, err := push.AddInbound(&model.Inbound{Tag: "web", Enable: true, Port: 44400, Protocol: model.VLESS, Settings: `{"clients":[]}`}); err != nil {
+	if _, _, err := push.AddInbound(&model.Inbound{Tag: "web", Enable: true, Port: 44400, Protocol: model.VLESS, Settings: vlessSettings}); err != nil {
 		t.Fatalf("seed a local inbound: %v", err)
 	}
 	vless := func(settings, stream string) *model.Inbound {
@@ -241,7 +241,7 @@ func TestAddInboundRefusesPushedFieldsThatReachThisHost(t *testing.T) {
 		},
 		"masterKeyLog":               vless(`{"clients":[]}`, `{"network":"tcp","security":"tls","tlsSettings":{"masterKeyLog":"/root/.ssh/authorized_keys"}}`),
 		"tun inbound":                {Enable: true, Port: 44401, Protocol: model.Protocol("tun"), Settings: `{}`},
-		"fallback to the core API":   vless(`{"clients":[],"fallbacks":[{"dest":62789}]}`, `{"network":"tcp"}`),
+		"fallback to the core API":   vless(`{"clients":[],"decryption":"none","fallbacks":[{"dest":62789}]}`, `{"network":"tcp"}`),
 		"REALITY target on loopback": vless(`{"clients":[]}`, `{"network":"tcp","security":"reality","realitySettings":{"target":"127.0.0.1:2053"}}`),
 		"local xdrive storage":       vless(`{"clients":[]}`, `{"network":"xdrive","xdriveSettings":{"service":"local","remoteFolder":"/etc/x-ui"}}`),
 	} {
@@ -250,8 +250,8 @@ func TestAddInboundRefusesPushedFieldsThatReachThisHost(t *testing.T) {
 		}
 	}
 	for name, ib := range map[string]*model.Inbound{
-		"fallback to another inbound here": vless(`{"clients":[],"fallbacks":[{"dest":44400}]}`, `{"network":"tcp"}`),
-		"public REALITY target":            {Enable: true, Port: 44402, Protocol: model.VLESS, Settings: `{"clients":[]}`, StreamSettings: `{"network":"tcp","security":"reality","realitySettings":{"target":"www.example.com:443"}}`},
+		"fallback to another inbound here": vless(`{"clients":[],"decryption":"none","fallbacks":[{"dest":44400}]}`, `{"network":"tcp"}`),
+		"public REALITY target":            {Enable: true, Port: 44402, Protocol: model.VLESS, Settings: vlessSettings, StreamSettings: `{"network":"tcp","security":"reality","realitySettings":{"target":"www.example.com:443"}}`},
 	} {
 		if _, _, err := push.AddInbound(ib); err != nil && strings.Contains(err.Error(), "pushed") {
 			t.Errorf("%s: refused: %v", name, err)
@@ -261,7 +261,7 @@ func TestAddInboundRefusesPushedFieldsThatReachThisHost(t *testing.T) {
 	if _, _, err := push.AddInbound(s3); err == nil || !strings.Contains(err.Error(), "may not set xdrive service") {
 		t.Fatalf("pushed S3 storage on this host's own port = %v, want refused by the push guard", err)
 	}
-	if _, _, err := (&InboundService{}).AddInbound(&model.Inbound{Enable: true, Listen: "env:XUI_DB_DSN", Port: 44403, Protocol: model.VLESS, Settings: `{"clients":[]}`}); err == nil || !strings.Contains(err.Error(), "env:") {
+	if _, _, err := (&InboundService{}).AddInbound(&model.Inbound{Enable: true, Listen: "env:XUI_DB_DSN", Port: 44403, Protocol: model.VLESS, Settings: vlessSettings}); err == nil || !strings.Contains(err.Error(), "env:") {
 		t.Fatalf("env: listen = %v, want refused for every caller", err)
 	}
 }

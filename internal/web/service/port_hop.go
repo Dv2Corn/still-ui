@@ -135,7 +135,7 @@ func checkPortHopConflict(db *gorm.DB, inbound *model.Inbound, ignoreId int) err
 	if err != nil {
 		return common.NewError("Port hopping:", err.Error())
 	}
-	usesUDP := inboundTransports(inbound.Protocol, inbound.StreamSettings, inbound.Settings)&transportUDP != 0
+	usesUDP := conflictTransports(inbound)&transportUDP != 0
 	if ranges == nil && !usesUDP {
 		return nil
 	}
@@ -184,7 +184,7 @@ func checkPortHopConflict(db *gorm.DB, inbound *model.Inbound, ignoreId int) err
 			return err
 		}
 		for _, other := range inside {
-			if inboundTransports(other.Protocol, other.StreamSettings, other.Settings)&transportUDP != 0 {
+			if conflictTransports(other)&transportUDP != 0 {
 				return common.NewError(fmt.Sprintf("Port hopping: the range %s contains UDP port %d of inbound %s.", r, other.Port, inboundDisplayName(other)))
 			}
 		}
@@ -220,7 +220,7 @@ func (s *PortHopService) desired() ([]porthop.Redirect, []PortHopRule, []uint16,
 				return nil, nil, nil, err
 			}
 			for _, other := range inside {
-				if inboundTransports(other.Protocol, other.StreamSettings, other.Settings)&transportUDP != 0 {
+				if conflictTransports(other)&transportUDP != 0 {
 					protected = appendPort(protected, other.Port)
 				}
 			}

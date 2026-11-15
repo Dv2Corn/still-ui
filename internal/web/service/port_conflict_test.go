@@ -55,54 +55,128 @@ func seedInboundConflictNode(t *testing.T, tag, listen string, port int, protoco
 	}
 }
 
+// Minimal settings the core builds, so each case tests the transport and not a refusal.
+const (
+	vlessSettings    = `{"clients":[],"decryption":"none"}`
+	ssLegacy         = `"method":"aes-128-gcm","password":"p"`
+	ss2022           = `"method":"2022-blake3-aes-128-gcm","password":"AAAAAAAAAAAAAAAAAAAAAA=="`
+	tunnelTarget     = `"address":"1.1.1.1","port":53`
+	wireguardKey     = `{"secretKey":"aGVsbG9oZWxsb2hlbGxvaGVsbG9oZWxsb2hlbGxvMTI=","peers":[]}`
+	masqueSettings   = `{"clients":[],"address":["10.9.0.1/24"]}`
+	hysteriaStream   = `{"network":"hysteria","hysteriaSettings":{"version":2},"security":"tls","tlsSettings":{}}`
+	hysteriaSettings = `{"version":2,"clients":[]}`
+)
+
+func transportsOf(protocol model.Protocol, stream, settings string) (transportBits, bool) {
+	return inboundTransports(&model.Inbound{Port: 443, Tag: "t", Protocol: protocol, StreamSettings: stream, Settings: settings})
+}
+
+// Every case goes through the core's own build of the generated inbound: key case folds,
+// the last duplicate wins and "method" overrides "network" there, not in a copy of the rules.
 func TestInboundTransports(t *testing.T) {
+	both := transportTCP | transportUDP
 	cases := []struct {
 		name           string
 		protocol       model.Protocol
 		streamSettings string
 		settings       string
 		want           transportBits
+		ok             bool
 	}{
-		{"vless default tcp", model.VLESS, `{"network":"tcp"}`, ``, transportTCP},
-		{"vless ws (still tcp)", model.VLESS, `{"network":"ws"}`, ``, transportTCP},
-		{"vless kcp is udp", model.VLESS, `{"network":"kcp"}`, ``, transportUDP},
-		{"vless empty stream defaults to tcp", model.VLESS, ``, ``, transportTCP},
-		{"vless xhttp with only h3 is udp", model.VLESS, `{"network":"xhttp","security":"tls","tlsSettings":{"alpn":["h3"]}}`, ``, transportUDP},
-		{"vless xhttp with h3 and h2 is tcp", model.VLESS, `{"network":"xhttp","security":"tls","tlsSettings":{"alpn":["h3","h2"]}}`, ``, transportTCP},
-		{"vless xhttp without tls ignores the alpn", model.VLESS, `{"network":"xhttp","security":"none","tlsSettings":{"alpn":["h3"]}}`, ``, transportTCP},
-		{"vless ws with only h3 is tcp", model.VLESS, `{"network":"ws","security":"tls","tlsSettings":{"alpn":["h3"]}}`, ``, transportTCP},
-		{"vless garbage stream stays tcp", model.VLESS, `not json`, ``, transportTCP},
+		{"vless default tcp", model.VLESS, `{"network":"tcp"}`, vlessSettings, transportTCP, true},
+		{"vless ws (still tcp)", model.VLESS, `{"network":"ws"}`, vlessSettings, transportTCP, true},
+		{"vless kcp is udp", model.VLESS, `{"network":"kcp"}`, vlessSettings, transportUDP, true},
+		{"vless empty stream defaults to tcp", model.VLESS, ``, vlessSettings, transportTCP, true},
+		{"vless xhttp with only h3 is udp", model.VLESS, `{"network":"xhttp","security":"tls","tlsSettings":{"alpn":["h3"]}}`, vlessSettings, transportUDP, true},
+		{"vless xhttp with h3 and h2 is tcp", model.VLESS, `{"network":"xhttp","security":"tls","tlsSettings":{"alpn":["h3","h2"]}}`, vlessSettings, transportTCP, true},
+		{"vless xhttp without tls ignores the alpn", model.VLESS, `{"network":"xhttp","security":"none","tlsSettings":{"alpn":["h3"]}}`, vlessSettings, transportTCP, true},
+		{"vless ws with only h3 is tcp", model.VLESS, `{"network":"ws","security":"tls","tlsSettings":{"alpn":["h3"]}}`, vlessSettings, transportTCP, true},
+		{"tls certificate files are not read", model.VLESS, `{"network":"tcp","security":"tls","tlsSettings":{"certificates":[{"certificateFile":"/nonexistent/c.pem","keyFile":"/nonexistent/k.pem"}]}}`, vlessSettings, transportTCP, true},
+		{"vless garbage stream is no inbound the core runs", model.VLESS, `not json`, vlessSettings, 0, false},
+		{"vless unknown network is refused by the core", model.VLESS, `{"network":"carrier-pigeon"}`, vlessSettings, 0, false},
+		{"vless removed quic transport is refused by the core", model.VLESS, `{"network":"quic"}`, vlessSettings, 0, false},
 
-		{"vmess default tcp", model.VMESS, `{"network":"tcp"}`, ``, transportTCP},
-		{"trojan grpc is tcp", model.Trojan, `{"network":"grpc"}`, ``, transportTCP},
+		// M1: the core lets streamSettings.method override network.
+		{"method mkcp overrides network tcp", model.VLESS, `{"network":"tcp","method":"mkcp"}`, vlessSettings, transportUDP, true},
+		{"capitalised Method overrides network", model.VLESS, `{"network":"tcp","Method":"kcp"}`, vlessSettings, transportUDP, true},
+		{"vless over the hysteria transport is udp", model.VLESS, `{"network":"hysteria","hysteriaSettings":{"version":2}}`, vlessSettings, transportUDP, true},
 
-		{"hysteria forced udp", model.Hysteria, `{"network":"tcp"}`, ``, transportUDP},
-		{"wireguard forced udp", model.WireGuard, ``, ``, transportUDP},
+		{"capitalised network key", model.VLESS, `{"Network":"kcp"}`, vlessSettings, transportUDP, true},
+		{"duplicate key, the last wins", model.VLESS, `{"network":"tcp","Network":"kcp"}`, vlessSettings, transportUDP, true},
+		{"duplicate key, back to tcp", model.VLESS, `{"Network":"kcp","network":"tcp"}`, vlessSettings, transportTCP, true},
+		{"capitalised network value", model.VLESS, `{"network":"KCP"}`, vlessSettings, transportUDP, true},
+		{"capitalised TLS keys on h3-only xhttp", model.VLESS, `{"network":"xhttp","Security":"TLS","TLSSettings":{"ALPN":["h3"]}}`, vlessSettings, transportUDP, true},
+		{"ALPN as one string", model.VLESS, `{"network":"xhttp","security":"tls","tlsSettings":{"alpn":"h3"}}`, vlessSettings, transportUDP, true},
 
-		// MASQUE serves HTTP/3 on UDP unless the TLS ALPN offers only h2, and adds an
-		// HTTP/2 listener on TCP whenever h2 is offered.
-		{"masque without alpn is udp", model.MASQUE, `{"network":"masque","tlsSettings":{}}`, ``, transportUDP},
-		{"masque h3 is udp", model.MASQUE, `{"network":"masque","tlsSettings":{"alpn":["h3"]}}`, ``, transportUDP},
-		{"masque h2 is tcp", model.MASQUE, `{"network":"masque","tlsSettings":{"alpn":["h2"]}}`, ``, transportTCP},
-		{"masque h3+h2 is both", model.MASQUE, `{"network":"masque","tlsSettings":{"alpn":["h3","h2"]}}`, ``, transportTCP | transportUDP},
+		{"vmess default tcp", model.VMESS, `{"network":"tcp"}`, `{"clients":[]}`, transportTCP, true},
+		{"trojan grpc is tcp", model.Trojan, `{"network":"grpc"}`, `{"clients":[]}`, transportTCP, true},
 
-		{"shadowsocks tcp,udp", model.Shadowsocks, ``, `{"network":"tcp,udp"}`, transportTCP | transportUDP},
-		{"shadowsocks udp only", model.Shadowsocks, ``, `{"network":"udp"}`, transportUDP},
-		{"shadowsocks tcp only", model.Shadowsocks, ``, `{"network":"tcp"}`, transportTCP},
-		{"shadowsocks empty network falls back to streamSettings", model.Shadowsocks, `{"network":"tcp"}`, `{}`, transportTCP},
+		{"hysteria over its own transport is udp", model.Hysteria, `{"network":"hysteria","hysteriaSettings":{"version":2},"security":"tls","tlsSettings":{}}`, `{"version":2,"clients":[]}`, transportUDP, true},
+		{"wireguard binds its own udp socket", model.WireGuard, ``, wireguardKey, transportUDP, true},
+		{"amneziawg is run by the panel", model.AmneziaWG, ``, ``, transportUDP, true},
+		{"tuic is run by the panel", model.TUIC, ``, ``, transportUDP, true},
+		{"mtproto is run by the panel", model.MTProto, ``, ``, transportTCP, true},
 
-		{"mixed udp on", model.Mixed, `{"network":"tcp"}`, `{"udp":true}`, transportTCP | transportUDP},
-		{"mixed udp off", model.Mixed, `{"network":"tcp"}`, `{"udp":false}`, transportTCP},
-		{"mixed udp missing", model.Mixed, `{"network":"tcp"}`, `{}`, transportTCP},
+		{"masque without alpn is udp", model.MASQUE, `{"network":"masque","security":"tls","tlsSettings":{}}`, masqueSettings, transportUDP, true},
+		{"masque h3 is udp", model.MASQUE, `{"network":"masque","security":"tls","tlsSettings":{"alpn":["h3"]}}`, masqueSettings, transportUDP, true},
+		{"masque h2 is tcp", model.MASQUE, `{"network":"masque","security":"tls","tlsSettings":{"alpn":["h2"]}}`, masqueSettings, transportTCP, true},
+		{"masque h3+h2 is both", model.MASQUE, `{"network":"masque","security":"tls","tlsSettings":{"alpn":["h3","h2"]}}`, masqueSettings, both, true},
+		{"masque ALPN as one string", model.MASQUE, `{"network":"masque","security":"tls","tlsSettings":{"alpn":"h2"}}`, masqueSettings, transportTCP, true},
+		{"masque without tls cannot listen", model.MASQUE, `{"network":"masque"}`, masqueSettings, 0, false},
+
+		{"shadowsocks tcp,udp", model.Shadowsocks, ``, `{` + ssLegacy + `,"network":"tcp,udp"}`, both, true},
+		{"shadowsocks udp only", model.Shadowsocks, ``, `{` + ssLegacy + `,"network":"udp"}`, transportUDP, true},
+		{"shadowsocks tcp only", model.Shadowsocks, ``, `{` + ssLegacy + `,"network":"tcp"}`, transportTCP, true},
+		{"shadowsocks without network is tcp", model.Shadowsocks, `{"network":"tcp"}`, `{` + ssLegacy + `}`, transportTCP, true},
+		{"shadowsocks 2022 without network is tcp", model.Shadowsocks, ``, `{` + ss2022 + `}`, transportTCP, true},
+		{"shadowsocks 2022 tcp,udp", model.Shadowsocks, ``, `{` + ss2022 + `,"network":"tcp,udp"}`, both, true},
+		{"shadowsocks empty network list is tcp", model.Shadowsocks, ``, `{` + ssLegacy + `,"network":[]}`, transportTCP, true},
+		{"shadowsocks unknown network binds nothing", model.Shadowsocks, ``, `{` + ssLegacy + `,"network":"sctp"}`, 0, true},
+		{"shadowsocks Network udp", model.Shadowsocks, `{"network":"tcp"}`, `{` + ssLegacy + `,"Network":"udp"}`, transportUDP, true},
+		{"shadowsocks network as a list", model.Shadowsocks, ``, `{` + ssLegacy + `,"network":["UDP"]}`, transportUDP, true},
+		{"shadowsocks, a padded part is no network", model.Shadowsocks, ``, `{` + ssLegacy + `,"network":" tcp,udp"}`, transportUDP, true},
+		{"shadowsocks, a wrong-typed key", model.Shadowsocks, ``, `{` + ssLegacy + `,"network":"udp","udp":"x"}`, transportUDP, true},
+
+		{"tunnel network over allowedNetwork", model.Tunnel, ``, `{` + tunnelTarget + `,"allowedNetwork":"tcp","Network":"udp"}`, transportUDP, true},
+		{"tunnel, a null network leaves allowedNetwork", model.Tunnel, ``, `{` + tunnelTarget + `,"network":null,"allowedNetwork":"udp"}`, transportUDP, true},
+		{"tunnel without network is tcp", model.Tunnel, ``, `{` + tunnelTarget + `}`, transportTCP, true},
+		{"tunnel with an empty list does not start", model.Tunnel, ``, `{` + tunnelTarget + `,"network":[]}`, 0, false},
+		{"tunnel, a wrong-typed key", model.Tunnel, ``, `{` + tunnelTarget + `,"allowedNetwork":"udp","udp":[1]}`, transportUDP, true},
+
+		// The fork's socks server answers a UDP associate from a fresh port, never the inbound's.
+		{"mixed udp on is still tcp only", model.Mixed, `{"network":"tcp"}`, `{"auth":"noauth","udp":true}`, transportTCP, true},
+		{"mixed Udp", model.Mixed, ``, `{"auth":"noauth","Udp":true}`, transportTCP, true},
+		{"mixed udp off", model.Mixed, `{"network":"tcp"}`, `{"auth":"noauth","udp":false}`, transportTCP, true},
 	}
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			got := inboundTransports(c.protocol, c.streamSettings, c.settings)
-			if got != c.want {
-				t.Fatalf("got bits %#b, want %#b", got, c.want)
+			got, ok := transportsOf(c.protocol, c.streamSettings, c.settings)
+			if got != c.want || ok != c.ok {
+				t.Fatalf("got bits %#b ok %v, want %#b ok %v", got, ok, c.want, c.ok)
 			}
 		})
+	}
+}
+
+// M2: GenXrayInboundConfig re-marshals healed settings through a map, which sorts the keys;
+// the core reads that output, so "network" (last after sorting) wins over "Network".
+func TestInboundTransportsReadTheHealedSettings(t *testing.T) {
+	settings := `{"network":"udp","Network":"tcp",` + ssLegacy + `,"clients":[{"password":"x","email":"a"}]}`
+	if _, healed := model.HealShadowsocksClientMethods(settings); !healed {
+		t.Fatal("fixture no longer triggers the heal")
+	}
+	got, ok := transportsOf(model.Shadowsocks, ``, settings)
+	if !ok || got != transportUDP {
+		t.Fatalf("got bits %#b ok %v, want udp: the core sees the healed order", got, ok)
+	}
+}
+
+// An inbound the core cannot build may hold any socket of its port for the port checks.
+func TestConflictTransportsAssumeEverySocketWhenTheCoreCannotBuild(t *testing.T) {
+	ib := &model.Inbound{Port: 443, Protocol: model.VLESS, StreamSettings: `{"network":"quic"}`, Settings: vlessSettings}
+	if got := conflictTransports(ib); got != transportTCP|transportUDP {
+		t.Fatalf("got %#b, want tcp|udp", got)
 	}
 }
 
@@ -131,14 +205,16 @@ func TestListenOverlaps(t *testing.T) {
 // hysteria must be allowed to coexist on the same port.
 func TestCheckPortConflict_TCPandUDPCoexistOnSamePort(t *testing.T) {
 	setupConflictDB(t)
-	seedInboundConflict(t, "vless-443-tcp", "0.0.0.0", 443, model.VLESS, `{"network":"tcp"}`, `{}`)
+	seedInboundConflict(t, "vless-443-tcp", "0.0.0.0", 443, model.VLESS, `{"network":"tcp"}`, vlessSettings)
 
 	svc := &InboundService{}
 	hyst2 := &model.Inbound{
-		Tag:      "hyst2-443-udp",
-		Listen:   "0.0.0.0",
-		Port:     443,
-		Protocol: model.Hysteria,
+		Tag:            "hyst2-443-udp",
+		Listen:         "0.0.0.0",
+		Port:           443,
+		Protocol:       model.Hysteria,
+		Settings:       hysteriaSettings,
+		StreamSettings: hysteriaStream,
 	}
 	exist, err := svc.checkPortConflict(hyst2, 0)
 	if err != nil {
@@ -152,7 +228,7 @@ func TestCheckPortConflict_TCPandUDPCoexistOnSamePort(t *testing.T) {
 // two tcp inbounds on the same port still conflict.
 func TestCheckPortConflict_TCPCollidesWithTCP(t *testing.T) {
 	setupConflictDB(t)
-	seedInboundConflict(t, "vless-443-a", "0.0.0.0", 443, model.VLESS, `{"network":"tcp"}`, `{}`)
+	seedInboundConflict(t, "vless-443-a", "0.0.0.0", 443, model.VLESS, `{"network":"tcp"}`, vlessSettings)
 
 	svc := &InboundService{}
 	other := &model.Inbound{
@@ -161,6 +237,7 @@ func TestCheckPortConflict_TCPCollidesWithTCP(t *testing.T) {
 		Port:           443,
 		Protocol:       model.Trojan,
 		StreamSettings: `{"network":"ws"}`,
+		Settings:       `{"clients":[]}`,
 	}
 	exist, err := svc.checkPortConflict(other, 0)
 	if err != nil {
@@ -175,7 +252,7 @@ func TestCheckPortConflict_TCPCollidesWithTCP(t *testing.T) {
 // conflict, since they fight for the same socket.
 func TestCheckPortConflict_UDPCollidesWithUDP(t *testing.T) {
 	setupConflictDB(t)
-	seedInboundConflict(t, "hyst2-443", "0.0.0.0", 443, model.Hysteria, ``, ``)
+	seedInboundConflict(t, "hyst2-443", "0.0.0.0", 443, model.Hysteria, hysteriaStream, hysteriaSettings)
 
 	svc := &InboundService{}
 	wg := &model.Inbound{
@@ -183,6 +260,7 @@ func TestCheckPortConflict_UDPCollidesWithUDP(t *testing.T) {
 		Listen:   "0.0.0.0",
 		Port:     443,
 		Protocol: model.WireGuard,
+		Settings: wireguardKey,
 	}
 	exist, err := svc.checkPortConflict(wg, 0)
 	if err != nil {
@@ -197,7 +275,7 @@ func TestCheckPortConflict_UDPCollidesWithUDP(t *testing.T) {
 // transports, so neither a tcp nor a udp neighbour is allowed.
 func TestCheckPortConflict_ShadowsocksDualListenBlocksBoth(t *testing.T) {
 	setupConflictDB(t)
-	seedInboundConflict(t, "ss-443-dual", "0.0.0.0", 443, model.Shadowsocks, ``, `{"network":"tcp,udp"}`)
+	seedInboundConflict(t, "ss-443-dual", "0.0.0.0", 443, model.Shadowsocks, ``, `{`+ssLegacy+`,"network":"tcp,udp"}`)
 
 	svc := &InboundService{}
 
@@ -207,16 +285,19 @@ func TestCheckPortConflict_ShadowsocksDualListenBlocksBoth(t *testing.T) {
 		Port:           443,
 		Protocol:       model.VLESS,
 		StreamSettings: `{"network":"tcp"}`,
+		Settings:       vlessSettings,
 	}
 	if exist, err := svc.checkPortConflict(tcpClash, 0); err != nil || exist == nil {
 		t.Fatalf("tcp inbound should clash with shadowsocks tcp,udp; exist=%v err=%v", exist, err)
 	}
 
 	udpClash := &model.Inbound{
-		Tag:      "hyst2-443",
-		Listen:   "0.0.0.0",
-		Port:     443,
-		Protocol: model.Hysteria,
+		Tag:            "hyst2-443",
+		Listen:         "0.0.0.0",
+		Port:           443,
+		Protocol:       model.Hysteria,
+		Settings:       hysteriaSettings,
+		StreamSettings: hysteriaStream,
 	}
 	if exist, err := svc.checkPortConflict(udpClash, 0); err != nil || exist == nil {
 		t.Fatalf("udp inbound should clash with shadowsocks tcp,udp; exist=%v err=%v", exist, err)
@@ -226,7 +307,7 @@ func TestCheckPortConflict_ShadowsocksDualListenBlocksBoth(t *testing.T) {
 // different ports never conflict regardless of transport.
 func TestCheckPortConflict_DifferentPortNeverConflicts(t *testing.T) {
 	setupConflictDB(t)
-	seedInboundConflict(t, "vless-443", "0.0.0.0", 443, model.VLESS, `{"network":"tcp"}`, `{}`)
+	seedInboundConflict(t, "vless-443", "0.0.0.0", 443, model.VLESS, `{"network":"tcp"}`, vlessSettings)
 
 	svc := &InboundService{}
 	other := &model.Inbound{
@@ -235,6 +316,7 @@ func TestCheckPortConflict_DifferentPortNeverConflicts(t *testing.T) {
 		Port:           444,
 		Protocol:       model.VLESS,
 		StreamSettings: `{"network":"tcp"}`,
+		Settings:       vlessSettings,
 	}
 	if exist, err := svc.checkPortConflict(other, 0); err != nil || exist != nil {
 		t.Fatalf("different port must not conflict; exist=%v err=%v", exist, err)
@@ -246,7 +328,7 @@ func TestCheckPortConflict_DifferentPortNeverConflicts(t *testing.T) {
 // check).
 func TestCheckPortConflict_ListenOverlapPreserved(t *testing.T) {
 	setupConflictDB(t)
-	seedInboundConflict(t, "vless-1.2.3.4", "1.2.3.4", 443, model.VLESS, `{"network":"tcp"}`, `{}`)
+	seedInboundConflict(t, "vless-1.2.3.4", "1.2.3.4", 443, model.VLESS, `{"network":"tcp"}`, vlessSettings)
 
 	svc := &InboundService{}
 
@@ -257,6 +339,7 @@ func TestCheckPortConflict_ListenOverlapPreserved(t *testing.T) {
 		Port:           443,
 		Protocol:       model.VLESS,
 		StreamSettings: `{"network":"tcp"}`,
+		Settings:       vlessSettings,
 	}
 	if exist, err := svc.checkPortConflict(other, 0); err != nil || exist != nil {
 		t.Fatalf("different specific listen must not conflict; exist=%v err=%v", exist, err)
@@ -269,6 +352,7 @@ func TestCheckPortConflict_ListenOverlapPreserved(t *testing.T) {
 		Port:           443,
 		Protocol:       model.VLESS,
 		StreamSettings: `{"network":"tcp"}`,
+		Settings:       vlessSettings,
 	}
 	if exist, err := svc.checkPortConflict(anyAddr, 0); err != nil || exist == nil {
 		t.Fatalf("any-addr on same port+transport must conflict with specific; exist=%v err=%v", exist, err)
@@ -279,13 +363,15 @@ func TestCheckPortConflict_ListenOverlapPreserved(t *testing.T) {
 // inbound gets a fully qualified canonical tag and does not collide.
 func TestGenerateInboundTag_DisambiguatesByTransportOnSamePort(t *testing.T) {
 	setupConflictDB(t)
-	seedInboundConflict(t, "in-443", "0.0.0.0", 443, model.VLESS, `{"network":"tcp"}`, `{}`)
+	seedInboundConflict(t, "in-443", "0.0.0.0", 443, model.VLESS, `{"network":"tcp"}`, vlessSettings)
 
 	svc := &InboundService{}
 	udp := &model.Inbound{
-		Listen:   "0.0.0.0",
-		Port:     443,
-		Protocol: model.Hysteria,
+		Listen:         "0.0.0.0",
+		Port:           443,
+		Protocol:       model.Hysteria,
+		Settings:       hysteriaSettings,
+		StreamSettings: hysteriaStream,
 	}
 	got, err := svc.generateInboundTag(udp, 0)
 	if err != nil {
@@ -306,6 +392,7 @@ func TestGenerateInboundTag_KeepsBaseTagWhenFree(t *testing.T) {
 		Listen:   "0.0.0.0",
 		Port:     8443,
 		Protocol: model.VLESS,
+		Settings: vlessSettings,
 	}
 	got, err := svc.generateInboundTag(in, 0)
 	if err != nil {
@@ -320,7 +407,7 @@ func TestGenerateInboundTag_KeepsBaseTagWhenFree(t *testing.T) {
 // that's what ignoreId is for.
 func TestGenerateInboundTag_IgnoresSelfOnUpdate(t *testing.T) {
 	setupConflictDB(t)
-	seedInboundConflict(t, "in-443-tcp", "0.0.0.0", 443, model.VLESS, `{"network":"tcp"}`, `{}`)
+	seedInboundConflict(t, "in-443-tcp", "0.0.0.0", 443, model.VLESS, `{"network":"tcp"}`, vlessSettings)
 
 	var existing model.Inbound
 	if err := database.GetDB().Where("tag = ?", "in-443-tcp").First(&existing).Error; err != nil {
@@ -341,13 +428,15 @@ func TestGenerateInboundTag_IgnoresSelfOnUpdate(t *testing.T) {
 // keeps a udp inbound distinct from a tcp one on the same port.
 func TestGenerateInboundTag_ListenIgnoredTransportDisambiguates(t *testing.T) {
 	setupConflictDB(t)
-	seedInboundConflict(t, "in-443-tcp", "1.2.3.4", 443, model.VLESS, `{"network":"tcp"}`, `{}`)
+	seedInboundConflict(t, "in-443-tcp", "1.2.3.4", 443, model.VLESS, `{"network":"tcp"}`, vlessSettings)
 
 	svc := &InboundService{}
 	udp := &model.Inbound{
-		Listen:   "1.2.3.4",
-		Port:     443,
-		Protocol: model.Hysteria,
+		Listen:         "1.2.3.4",
+		Port:           443,
+		Protocol:       model.Hysteria,
+		Settings:       hysteriaSettings,
+		StreamSettings: hysteriaStream,
 	}
 	got, err := svc.generateInboundTag(udp, 0)
 	if err != nil {
@@ -364,8 +453,8 @@ func TestGenerateInboundTag_ListenIgnoredTransportDisambiguates(t *testing.T) {
 // same-node case.
 func TestCheckPortConflict_NodeScope(t *testing.T) {
 	setupConflictDB(t)
-	seedInboundConflictNode(t, "local-443-tcp", "0.0.0.0", 443, model.VLESS, `{"network":"tcp"}`, `{}`, nil)
-	seedInboundConflictNode(t, "node1-443-tcp", "0.0.0.0", 443, model.VLESS, `{"network":"tcp"}`, `{}`, new(1))
+	seedInboundConflictNode(t, "local-443-tcp", "0.0.0.0", 443, model.VLESS, `{"network":"tcp"}`, vlessSettings, nil)
+	seedInboundConflictNode(t, "node1-443-tcp", "0.0.0.0", 443, model.VLESS, `{"network":"tcp"}`, vlessSettings, new(1))
 
 	svc := &InboundService{}
 
@@ -386,6 +475,7 @@ func TestCheckPortConflict_NodeScope(t *testing.T) {
 				Protocol:       model.VLESS,
 				StreamSettings: `{"network":"tcp"}`,
 				NodeID:         c.nodeID,
+				Settings:       vlessSettings,
 			}
 			got, err := svc.checkPortConflict(candidate, 0)
 			if err != nil {
@@ -406,8 +496,8 @@ func TestCheckPortConflict_NodeScope(t *testing.T) {
 // panels diverged, causing a UNIQUE constraint failure on sync.
 func TestResolveInboundTag_RespectsCallerTagWhenFree(t *testing.T) {
 	setupConflictDB(t)
-	seedInboundConflictNode(t, "in-5000-tcp", "0.0.0.0", 5000, model.VLESS, `{"network":"tcp"}`, `{}`, nil)
-	seedInboundConflictNode(t, "in-5000-udp", "0.0.0.0", 5000, model.Hysteria, ``, ``, nil)
+	seedInboundConflictNode(t, "in-5000-tcp", "0.0.0.0", 5000, model.VLESS, `{"network":"tcp"}`, vlessSettings, nil)
+	seedInboundConflictNode(t, "in-5000-udp", "0.0.0.0", 5000, model.Hysteria, hysteriaStream, hysteriaSettings, nil)
 
 	svc := &InboundService{}
 	pushed := &model.Inbound{
@@ -417,6 +507,7 @@ func TestResolveInboundTag_RespectsCallerTagWhenFree(t *testing.T) {
 		Protocol:       model.VLESS,
 		StreamSettings: `{"network":"tcp"}`,
 		NodeID:         new(1),
+		Settings:       vlessSettings,
 	}
 	got, err := svc.resolveInboundTag(pushed, 0)
 	if err != nil {
@@ -438,6 +529,7 @@ func TestResolveInboundTag_GeneratesWhenTagEmpty(t *testing.T) {
 		Listen:   "0.0.0.0",
 		Port:     8443,
 		Protocol: model.VLESS,
+		Settings: vlessSettings,
 	}
 	got, err := svc.resolveInboundTag(in, 0)
 	if err != nil {
@@ -455,7 +547,7 @@ func TestResolveInboundTag_GeneratesWhenTagEmpty(t *testing.T) {
 // tag that the central will pick up via the AddInbound response.
 func TestResolveInboundTag_RegeneratesOnCollision(t *testing.T) {
 	setupConflictDB(t)
-	seedInboundConflictNode(t, "in-5000-tcp", "0.0.0.0", 5000, model.VLESS, `{"network":"tcp"}`, `{}`, nil)
+	seedInboundConflictNode(t, "in-5000-tcp", "0.0.0.0", 5000, model.VLESS, `{"network":"tcp"}`, vlessSettings, nil)
 
 	svc := &InboundService{}
 	pushed := &model.Inbound{
@@ -463,8 +555,8 @@ func TestResolveInboundTag_RegeneratesOnCollision(t *testing.T) {
 		Listen:         "0.0.0.0",
 		Port:           5000,
 		Protocol:       model.Hysteria,
-		StreamSettings: ``,
-		Settings:       ``,
+		StreamSettings: hysteriaStream,
+		Settings:       hysteriaSettings,
 	}
 	got, err := svc.resolveInboundTag(pushed, 0)
 	if err != nil {
@@ -488,6 +580,7 @@ func TestGenerateInboundTag_NodePrefix(t *testing.T) {
 		Port:     443,
 		Protocol: model.VLESS,
 		NodeID:   new(1),
+		Settings: vlessSettings,
 	}
 	got, err := svc.generateInboundTag(in, 0)
 	if err != nil {
@@ -502,7 +595,7 @@ func TestGenerateInboundTag_NodePrefix(t *testing.T) {
 // the prefix scopes the tag to that specific node.
 func TestGenerateInboundTag_NodePrefixedDoesNotCollideWithLocal(t *testing.T) {
 	setupConflictDB(t)
-	seedInboundConflict(t, "in-443-tcp", "0.0.0.0", 443, model.VLESS, `{"network":"tcp"}`, `{}`)
+	seedInboundConflict(t, "in-443-tcp", "0.0.0.0", 443, model.VLESS, `{"network":"tcp"}`, vlessSettings)
 
 	svc := &InboundService{}
 	in := &model.Inbound{
@@ -510,6 +603,7 @@ func TestGenerateInboundTag_NodePrefixedDoesNotCollideWithLocal(t *testing.T) {
 		Port:     443,
 		Protocol: model.VLESS,
 		NodeID:   new(1),
+		Settings: vlessSettings,
 	}
 	got, err := svc.generateInboundTag(in, 0)
 	if err != nil {
@@ -524,7 +618,7 @@ func TestGenerateInboundTag_NodePrefixedDoesNotCollideWithLocal(t *testing.T) {
 // ignoreId is for.
 func TestCheckPortConflict_IgnoreSelfOnUpdate(t *testing.T) {
 	setupConflictDB(t)
-	seedInboundConflict(t, "vless-443", "0.0.0.0", 443, model.VLESS, `{"network":"tcp"}`, `{}`)
+	seedInboundConflict(t, "vless-443", "0.0.0.0", 443, model.VLESS, `{"network":"tcp"}`, vlessSettings)
 
 	var existing model.Inbound
 	if err := database.GetDB().Where("tag = ?", "vless-443").First(&existing).Error; err != nil {
@@ -537,33 +631,33 @@ func TestCheckPortConflict_IgnoreSelfOnUpdate(t *testing.T) {
 	}
 }
 
-// streamSettings.network=quic rides on UDP at L4, so a QUIC inbound must
-// conflict with a UDP-only neighbour (hysteria) on the same port but not
-// with a TCP-only one. covers the gap left by the original kcp-only check.
-func TestCheckPortConflict_QUICTreatedAsUDP(t *testing.T) {
+// The core removed the quic transport and refuses to build it: such a row may hold any
+// socket of its port, so it conflicts with UDP and TCP neighbours alike.
+func TestCheckPortConflict_QUICHoldsTheWholePort(t *testing.T) {
 	quic := &model.Inbound{
 		Tag:            "vless-quic-443",
 		Listen:         "0.0.0.0",
 		Port:           443,
 		Protocol:       model.VLESS,
 		StreamSettings: `{"network":"quic"}`,
+		Settings:       vlessSettings,
 	}
 
 	t.Run("conflicts with hysteria/udp", func(t *testing.T) {
 		setupConflictDB(t)
-		seedInboundConflict(t, "hyst-443", "0.0.0.0", 443, model.Hysteria, ``, ``)
+		seedInboundConflict(t, "hyst-443", "0.0.0.0", 443, model.Hysteria, hysteriaStream, hysteriaSettings)
 		svc := &InboundService{}
 		if exist, err := svc.checkPortConflict(quic, 0); err != nil || exist == nil {
 			t.Fatalf("quic on same port as hysteria must conflict; exist=%v err=%v", exist, err)
 		}
 	})
 
-	t.Run("coexists with vless/tcp", func(t *testing.T) {
+	t.Run("conflicts with vless/tcp", func(t *testing.T) {
 		setupConflictDB(t)
-		seedInboundConflict(t, "vless-tcp-443", "0.0.0.0", 443, model.VLESS, `{"network":"tcp"}`, `{}`)
+		seedInboundConflict(t, "vless-tcp-443", "0.0.0.0", 443, model.VLESS, `{"network":"tcp"}`, vlessSettings)
 		svc := &InboundService{}
-		if exist, err := svc.checkPortConflict(quic, 0); err != nil || exist != nil {
-			t.Fatalf("quic and tcp on same port must coexist; exist=%v err=%v", exist, err)
+		if exist, err := svc.checkPortConflict(quic, 0); err != nil || exist == nil {
+			t.Fatalf("quic on same port as vless/tcp must conflict; exist=%v err=%v", exist, err)
 		}
 	})
 }
@@ -573,7 +667,7 @@ func TestCheckPortConflict_QUICTreatedAsUDP(t *testing.T) {
 // picks the right field for each protocol.
 func TestCheckPortConflict_TunnelAllowedNetwork(t *testing.T) {
 	setupConflictDB(t)
-	seedInboundConflict(t, "tunnel-udp-443", "0.0.0.0", 443, model.Tunnel, ``, `{"allowedNetwork":"udp"}`)
+	seedInboundConflict(t, "tunnel-udp-443", "0.0.0.0", 443, model.Tunnel, ``, `{`+tunnelTarget+`,"allowedNetwork":"udp"}`)
 
 	svc := &InboundService{}
 
@@ -584,6 +678,7 @@ func TestCheckPortConflict_TunnelAllowedNetwork(t *testing.T) {
 		Port:           443,
 		Protocol:       model.VLESS,
 		StreamSettings: `{"network":"tcp"}`,
+		Settings:       vlessSettings,
 	}
 	if exist, err := svc.checkPortConflict(tcpNeighbour, 0); err != nil || exist != nil {
 		t.Fatalf("tunnel/udp and vless/tcp on same port must coexist; exist=%v err=%v", exist, err)
@@ -591,10 +686,12 @@ func TestCheckPortConflict_TunnelAllowedNetwork(t *testing.T) {
 
 	// udp neighbour (hysteria) on same port must conflict.
 	udpNeighbour := &model.Inbound{
-		Tag:      "hyst-443",
-		Listen:   "0.0.0.0",
-		Port:     443,
-		Protocol: model.Hysteria,
+		Tag:            "hyst-443",
+		Listen:         "0.0.0.0",
+		Port:           443,
+		Protocol:       model.Hysteria,
+		Settings:       hysteriaSettings,
+		StreamSettings: hysteriaStream,
 	}
 	if exist, err := svc.checkPortConflict(udpNeighbour, 0); err != nil || exist == nil {
 		t.Fatalf("tunnel/udp and hysteria on same port must conflict; exist=%v err=%v", exist, err)
@@ -613,7 +710,7 @@ func TestCheckPortConflict_DetailMessage(t *testing.T) {
 		Port:           443,
 		Protocol:       model.VLESS,
 		StreamSettings: `{"network":"tcp"}`,
-		Settings:       `{}`,
+		Settings:       vlessSettings,
 	}
 	if err := database.GetDB().Create(seeded).Error; err != nil {
 		t.Fatalf("seed inbound: %v", err)
@@ -626,6 +723,7 @@ func TestCheckPortConflict_DetailMessage(t *testing.T) {
 		Port:           443,
 		Protocol:       model.Trojan,
 		StreamSettings: `{"network":"ws"}`,
+		Settings:       `{"clients":[]}`,
 	}
 	got, err := svc.checkPortConflict(candidate, 0)
 	if err != nil || got == nil {
@@ -689,6 +787,7 @@ func TestCheckPortConflict_ReservedAPIPortBlockedLocal(t *testing.T) {
 		Port:           defaultXrayAPIPort,
 		Protocol:       model.VLESS,
 		StreamSettings: `{"network":"tcp"}`,
+		Settings:       vlessSettings,
 	}
 	got, err := svc.checkPortConflict(candidate, 0)
 	if err != nil {
@@ -715,6 +814,7 @@ func TestCheckPortConflict_ReservedAPIPortAllowedOnNode(t *testing.T) {
 		Protocol:       model.VLESS,
 		StreamSettings: `{"network":"tcp"}`,
 		NodeID:         new(1),
+		Settings:       vlessSettings,
 	}
 	if got, err := svc.checkPortConflict(candidate, 0); err != nil || got != nil {
 		t.Fatalf("node inbound on the reserved API port must be allowed; got=%v err=%v", got, err)
@@ -728,10 +828,12 @@ func TestCheckPortConflict_ReservedAPIPortUDPCoexists(t *testing.T) {
 
 	svc := &InboundService{}
 	candidate := &model.Inbound{
-		Tag:      "hyst-62789",
-		Listen:   "0.0.0.0",
-		Port:     defaultXrayAPIPort,
-		Protocol: model.Hysteria,
+		Tag:            "hyst-62789",
+		Listen:         "0.0.0.0",
+		Port:           defaultXrayAPIPort,
+		Protocol:       model.Hysteria,
+		Settings:       hysteriaSettings,
+		StreamSettings: hysteriaStream,
 	}
 	if got, err := svc.checkPortConflict(candidate, 0); err != nil || got != nil {
 		t.Fatalf("udp-only inbound must coexist with the tcp API inbound; got=%v err=%v", got, err)
@@ -757,6 +859,7 @@ func TestCheckPortConflict_EgressPortBlockedLocal(t *testing.T) {
 		Listen:   "0.0.0.0",
 		Port:     int(amneziawgnet.EgressBasePort),
 		Protocol: model.VLESS,
+		Settings: vlessSettings,
 	}
 	got, err := svc.checkPortConflict(candidate, 0)
 	if err != nil {
@@ -807,6 +910,7 @@ func TestCheckPortConflict_AmneziawgnetSocksRelayBlockedLocal(t *testing.T) {
 		Listen:   "0.0.0.0",
 		Port:     relayPort,
 		Protocol: model.VLESS,
+		Settings: vlessSettings,
 	}
 	got, err := svc.checkPortConflict(candidate, 0)
 	if err != nil {
@@ -834,6 +938,7 @@ func TestCheckPortConflict_KernelAmneziaWGDoesNotReserveEmbeddedRelay(t *testing
 		Listen:   "0.0.0.0",
 		Port:     amneziawgnet.SOCKSPortForInbound(awgInbound.Id),
 		Protocol: model.VLESS,
+		Settings: vlessSettings,
 	}
 	if got, err := (&InboundService{}).checkPortConflict(candidate, 0); err != nil || got != nil {
 		t.Fatalf("kernel-mode AmneziaWG must not reserve an embedded relay port, including with no peers; got=%v err=%v", got, err)
@@ -875,6 +980,7 @@ func TestCheckPortConflict_AmneziawgnetSocksRelayAllowedOnNode(t *testing.T) {
 		Port:     relayPort,
 		Protocol: model.VLESS,
 		NodeID:   new(1),
+		Settings: vlessSettings,
 	}
 	if got, err := svc.checkPortConflict(candidate, 0); err != nil || got != nil {
 		t.Fatalf("a node inbound on the local AmneziaWG relay port must be allowed; got=%v err=%v", got, err)
@@ -902,6 +1008,7 @@ func TestCheckPortConflict_AmneziawgnetSocksRelayReservedRegardlessOfLegacyRoute
 		Listen:   "0.0.0.0",
 		Port:     relayPort,
 		Protocol: model.VLESS,
+		Settings: vlessSettings,
 	}
 	got, err := svc.checkPortConflict(candidate, 0)
 	if err != nil {
@@ -932,6 +1039,7 @@ func TestCheckPortConflict_AmneziawgnetSocksRelayReservedBeforeTheFirstPeer(t *t
 		Listen:   "0.0.0.0",
 		Port:     relayPort,
 		Protocol: model.VLESS,
+		Settings: vlessSettings,
 	}
 	got, err := svc.checkPortConflict(candidate, 0)
 	if err != nil {
@@ -956,6 +1064,7 @@ func TestCheckPortConflict_AmneziawgnetSocksRelayDifferentPortAllowed(t *testing
 		Listen:   "0.0.0.0",
 		Port:     9999,
 		Protocol: model.VLESS,
+		Settings: vlessSettings,
 	}
 	if got, err := svc.checkPortConflict(candidate, 0); err != nil || got != nil {
 		t.Fatalf("an unrelated port must not conflict with the AmneziaWG relay inbound; got=%v err=%v", got, err)
@@ -974,7 +1083,7 @@ func TestCheckPortConflict_AmneziawgnetSocksRelayReverseDirectionBlockedOnUpdate
 		t.Fatalf("read seeded row: %v", err)
 	}
 	relayPort := amneziawgnet.SOCKSPortForInbound(awgInbound.Id)
-	seedInboundConflict(t, "vless-1", "0.0.0.0", relayPort, model.VLESS, ``, `{}`)
+	seedInboundConflict(t, "vless-1", "0.0.0.0", relayPort, model.VLESS, ``, vlessSettings)
 
 	svc := &InboundService{}
 	candidate := &model.Inbound{
@@ -1007,7 +1116,7 @@ func TestCheckPortConflict_V6OnlyWildcardLeavesIPv4AddressFree(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			setupConflictDB(t)
-			seedInboundConflict(t, "vless-v6", "::", 443, model.VLESS, tc.stream, `{}`)
+			seedInboundConflict(t, "vless-v6", "::", 443, model.VLESS, tc.stream, vlessSettings)
 			v4 := &model.Inbound{Tag: "vless-v4", Listen: "10.5.0.200", Port: 443, Protocol: model.VLESS, StreamSettings: `{"network":"tcp"}`}
 			exist, err := (&InboundService{}).checkPortConflict(v4, 0)
 			if err != nil {
@@ -1017,35 +1126,5 @@ func TestCheckPortConflict_V6OnlyWildcardLeavesIPv4AddressFree(t *testing.T) {
 				t.Fatalf("conflict = %v, want %v", got, tc.want)
 			}
 		})
-	}
-}
-
-// xray-core decodes these settings through struct tags, so key case folds and the last
-// duplicate wins; reading them as exact map keys called a UDP-only inbound TCP.
-func TestInboundTransportsFoldKeysLikeTheCore(t *testing.T) {
-	for _, tc := range []struct {
-		name             string
-		protocol         model.Protocol
-		stream, settings string
-		want             transportBits
-	}{
-		{"capitalised network key", model.VLESS, `{"Network":"kcp"}`, "", transportUDP},
-		{"duplicate key, the last wins", model.VLESS, `{"network":"tcp","Network":"kcp"}`, "", transportUDP},
-		{"duplicate key, back to tcp", model.VLESS, `{"Network":"kcp","network":"tcp"}`, "", transportTCP},
-		{"capitalised network value", model.VLESS, `{"network":"KCP"}`, "", transportUDP},
-		{"capitalised TLS keys on h3-only xhttp", model.VLESS, `{"network":"xhttp","Security":"TLS","TLSSettings":{"ALPN":["h3"]}}`, "", transportUDP},
-		{"ALPN as one string", model.VLESS, `{"network":"xhttp","security":"tls","tlsSettings":{"alpn":"h3"}}`, "", transportUDP},
-		{"shadowsocks Network udp", model.Shadowsocks, `{"network":"tcp"}`, `{"Network":"udp"}`, transportUDP},
-		{"shadowsocks network as a list", model.Shadowsocks, "", `{"network":["UDP"]}`, transportUDP},
-		{"tunnel network over allowedNetwork", model.Tunnel, "", `{"allowedNetwork":"tcp","Network":"udp"}`, transportUDP},
-		{"mixed Udp", model.Mixed, "", `{"Udp":true}`, transportTCP | transportUDP},
-		{"shadowsocks, a wrong-typed key the core ignores", model.Shadowsocks, "", `{"network":"udp","udp":"x"}`, transportUDP},
-		{"tunnel, a wrong-typed key the core ignores", model.Tunnel, "", `{"allowedNetwork":"udp","udp":[1]}`, transportUDP},
-		{"shadowsocks, a padded part is no network", model.Shadowsocks, "", `{"network":" tcp,udp"}`, transportUDP},
-		{"tunnel, a null network leaves allowedNetwork", model.Tunnel, "", `{"network":null,"allowedNetwork":"udp"}`, transportUDP},
-	} {
-		if got := inboundTransports(tc.protocol, tc.stream, tc.settings); got != tc.want {
-			t.Errorf("%s: inboundTransports = %b, want %b", tc.name, got, tc.want)
-		}
 	}
 }

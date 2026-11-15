@@ -27,14 +27,14 @@ func stubPushGuardLookup(t *testing.T, resolved map[string]string) {
 // makes only its own address a local fallback dest, not "<port>" or "127.0.0.1:<port>".
 func TestPushedFallbackToAnotherLoopbackAddressOpensOnlyThatAddress(t *testing.T) {
 	push := pushGuardTestService(t)
-	seedInboundConflict(t, "loop2", "127.0.0.2", 45441, model.VLESS, `{"network":"tcp"}`, `{"clients":[]}`)
-	seedInboundConflict(t, "loop6", "::1", 45442, model.VLESS, `{"network":"tcp"}`, `{"clients":[]}`)
+	seedInboundConflict(t, "loop2", "127.0.0.2", 45441, model.VLESS, `{"network":"tcp"}`, vlessSettings)
+	seedInboundConflict(t, "loop6", "::1", 45442, model.VLESS, `{"network":"tcp"}`, vlessSettings)
 	port := 44460
 	fallback := func(dest string) error {
 		port++
 		_, _, err := push.AddInbound(&model.Inbound{
 			Enable: true, Port: port, Protocol: model.VLESS,
-			Settings: `{"clients":[],"fallbacks":[{"dest":` + dest + `}]}`, StreamSettings: `{"network":"tcp"}`,
+			Settings: `{"clients":[],"decryption":"none","fallbacks":[{"dest":` + dest + `}]}`, StreamSettings: `{"network":"tcp"}`,
 		})
 		return err
 	}
@@ -58,7 +58,7 @@ func TestPushedRelayTargetNamesAreResolved(t *testing.T) {
 	port := 44470
 	add := func(reality bool, target string) error {
 		port++
-		ib := &model.Inbound{Enable: true, Port: port, Protocol: model.VLESS, Settings: `{"clients":[],"fallbacks":[{"dest":"` + target + `"}]}`, StreamSettings: `{"network":"tcp"}`}
+		ib := &model.Inbound{Enable: true, Port: port, Protocol: model.VLESS, Settings: `{"clients":[],"decryption":"none","fallbacks":[{"dest":"` + target + `"}]}`, StreamSettings: `{"network":"tcp"}`}
 		if reality {
 			ib.Settings = `{"clients":[]}`
 			ib.StreamSettings = `{"network":"tcp","security":"reality","realitySettings":{"target":"` + target + `"}}`
@@ -132,15 +132,15 @@ func TestPushedCertificatePathsFromCertbotAreTheNodesOwn(t *testing.T) {
 // whatever else binds it, so it makes no local fallback dest.
 func TestPushedFallbackToAUDPOnlyInboundsPortIsRefused(t *testing.T) {
 	push := pushGuardTestService(t)
-	seedInboundConflict(t, "wg", "", 45451, model.WireGuard, "", `{"peers":[]}`)
-	seedInboundConflict(t, "hy", "", 45452, model.Hysteria, `{"network":"hysteria"}`, `{"clients":[]}`)
-	seedInboundConflict(t, "tcp", "", 45453, model.VLESS, `{"network":"tcp"}`, `{"clients":[]}`)
+	seedInboundConflict(t, "wg", "", 45451, model.WireGuard, "", wireguardKey)
+	seedInboundConflict(t, "hy", "", 45452, model.Hysteria, hysteriaStream, hysteriaSettings)
+	seedInboundConflict(t, "tcp", "", 45453, model.VLESS, `{"network":"tcp"}`, vlessSettings)
 	port := 44500
 	fallback := func(dest string) error {
 		port++
 		_, _, err := push.AddInbound(&model.Inbound{
 			Enable: true, Port: port, Protocol: model.VLESS,
-			Settings: `{"clients":[],"fallbacks":[{"dest":` + dest + `}]}`, StreamSettings: `{"network":"tcp"}`,
+			Settings: `{"clients":[],"decryption":"none","fallbacks":[{"dest":` + dest + `}]}`, StreamSettings: `{"network":"tcp"}`,
 		})
 		return err
 	}
@@ -170,7 +170,7 @@ func TestPushedRelayTargetNamesShareOneLookupAndOneBudget(t *testing.T) {
 	t.Cleanup(func() { pushGuardLookup = old })
 	ib := &model.Inbound{
 		Enable: true, Port: 44520, Protocol: model.VLESS,
-		Settings:       `{"clients":[],"fallbacks":[{"dest":"www.nvidia.com:8443"},{"dest":"WWW.nvidia.com:8444"},{"dest":"www.nvidia.com.:8445"}]}`,
+		Settings:       `{"clients":[],"decryption":"none","fallbacks":[{"dest":"www.nvidia.com:8443"},{"dest":"WWW.nvidia.com:8444"},{"dest":"www.nvidia.com.:8445"}]}`,
 		StreamSettings: `{"network":"tcp","security":"reality","realitySettings":{"target":"www.nvidia.com:443"}}`,
 	}
 	if _, _, err := push.AddInbound(ib); err != nil && strings.Contains(err.Error(), "may not set") {
@@ -192,14 +192,14 @@ func TestPushedRelayTargetNamesShareOneLookupAndOneBudget(t *testing.T) {
 // capitalised or duplicated key is UDP-only and opens no TCP fallback dest.
 func TestPushedFallbackToAFoldedKeyUDPInboundIsRefused(t *testing.T) {
 	push := pushGuardTestService(t)
-	seedInboundConflict(t, "kcp1", "", 45461, model.VLESS, `{"Network":"kcp"}`, `{"clients":[]}`)
-	seedInboundConflict(t, "kcp2", "", 45462, model.VLESS, `{"network":"tcp","Network":"kcp"}`, `{"clients":[]}`)
+	seedInboundConflict(t, "kcp1", "", 45461, model.VLESS, `{"Network":"kcp"}`, vlessSettings)
+	seedInboundConflict(t, "kcp2", "", 45462, model.VLESS, `{"network":"tcp","Network":"kcp"}`, vlessSettings)
 	port := 44530
 	for _, dest := range []string{`45461`, `"127.0.0.1:45462"`} {
 		port++
 		_, _, err := push.AddInbound(&model.Inbound{
 			Enable: true, Port: port, Protocol: model.VLESS,
-			Settings: `{"clients":[],"fallbacks":[{"dest":` + dest + `}]}`, StreamSettings: `{"network":"tcp"}`,
+			Settings: `{"clients":[],"decryption":"none","fallbacks":[{"dest":` + dest + `}]}`, StreamSettings: `{"network":"tcp"}`,
 		})
 		if err == nil || !strings.Contains(err.Error(), "may not set fallback dest") {
 			t.Errorf("fallback dest %s = %v, want refused: only UDP is served there", dest, err)

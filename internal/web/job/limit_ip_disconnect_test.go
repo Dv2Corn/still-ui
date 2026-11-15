@@ -417,4 +417,10 @@ func TestRestoreStaysOwedWhenTheCheckAfterTheReAddFails(t *testing.T) {
 	if err := (&CheckClientIpJob{}).restoreRemovedClient(&xrayAPI, owedRestore{InboundID: inbound.Id, Email: email}); err == nil {
 		t.Fatal("the restore counted as done though the check after the re-add failed")
 	}
+	// Not known to be served: the re-added user comes out until a later run can check.
+	core.mu.Lock()
+	defer core.mu.Unlock()
+	if !slices.Equal(core.ops, []string{"add", "remove"}) {
+		t.Fatalf("core operations = %v, want the re-add taken back", core.ops)
+	}
 }

@@ -392,8 +392,9 @@ func localRelayTargets(selfID int) ([]string, error) {
 	}
 	var targets []string
 	for _, ib := range rows {
-		// A fallback dials TCP: an inbound that only takes UDP leaves that TCP port to whoever binds it.
-		if inboundTransports(ib.Protocol, ib.StreamSettings, ib.Settings)&transportTCP == 0 {
+		// A fallback dials TCP: an inbound without a TCP listener, or one the core cannot build,
+		// leaves that TCP port to whoever binds it.
+		if bits, ok := inboundTransports(&ib); !ok || bits&transportTCP == 0 {
 			continue
 		}
 		listen := xrayListenHost(ib.Listen)
