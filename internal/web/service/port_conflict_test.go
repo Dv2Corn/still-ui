@@ -1019,3 +1019,29 @@ func TestCheckPortConflict_V6OnlyWildcardLeavesIPv4AddressFree(t *testing.T) {
 		})
 	}
 }
+
+// xray-core decodes these settings through struct tags, so key case folds and the last
+// duplicate wins; reading them as exact map keys called a UDP-only inbound TCP.
+func TestInboundTransportsFoldKeysLikeTheCore(t *testing.T) {
+	for _, tc := range []struct {
+		name             string
+		protocol         model.Protocol
+		stream, settings string
+		want             transportBits
+	}{
+		{"capitalised network key", model.VLESS, `{"Network":"kcp"}`, "", transportUDP},
+		{"duplicate key, the last wins", model.VLESS, `{"network":"tcp","Network":"kcp"}`, "", transportUDP},
+		{"duplicate key, back to tcp", model.VLESS, `{"Network":"kcp","network":"tcp"}`, "", transportTCP},
+		{"capitalised network value", model.VLESS, `{"network":"KCP"}`, "", transportUDP},
+		{"capitalised TLS keys on h3-only xhttp", model.VLESS, `{"network":"xhttp","Security":"TLS","TLSSettings":{"ALPN":["h3"]}}`, "", transportUDP},
+		{"ALPN as one string", model.VLESS, `{"network":"xhttp","security":"tls","tlsSettings":{"alpn":"h3"}}`, "", transportUDP},
+		{"shadowsocks Network udp", model.Shadowsocks, `{"network":"tcp"}`, `{"Network":"udp"}`, transportUDP},
+		{"shadowsocks network as a list", model.Shadowsocks, "", `{"network":["UDP"]}`, transportUDP},
+		{"tunnel network over allowedNetwork", model.Tunnel, "", `{"allowedNetwork":"tcp","Network":"udp"}`, transportUDP},
+		{"mixed Udp", model.Mixed, "", `{"Udp":true}`, transportTCP | transportUDP},
+	} {
+		if got := inboundTransports(tc.protocol, tc.stream, tc.settings); got != tc.want {
+			t.Errorf("%s: inboundTransports = %b, want %b", tc.name, got, tc.want)
+		}
+	}
+}

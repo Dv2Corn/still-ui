@@ -35,26 +35,22 @@ func inboundTransports(protocol model.Protocol, streamSettings, settings string)
 		return masqueTransports(streamSettings)
 	}
 
-	var bits transportBits
-
-	// peek at streamSettings.network to spot udp-based transports.
-	// parse errors are non-fatal: missing or weird streamSettings just
-	// keeps the default tcp bit below.
-	network := ""
-	h3Only := false
-	if streamSettings != "" {
-		var ss map[string]any
-		if json.Unmarshal([]byte(streamSettings), &ss) == nil {
-			if n, _ := ss["network"].(string); n != "" {
-				network = n
-			}
-			tlsSettings, _ := ss["tlsSettings"].(map[string]any)
-			alpn, _ := tlsSettings["alpn"].([]any)
-			h3Only = ss["security"] == "tls" && len(alpn) == 1 && alpn[0] == "h3"
-		}
+	// Decoded the way xray-core decodes it: struct tags fold key case and the last
+	// duplicate wins. Parse errors keep the default tcp bit below.
+	var stream struct {
+		Network     string `json:"network"`
+		Security    string `json:"security"`
+		TLSSettings struct {
+			ALPN xrayStringList `json:"alpn"`
+		} `json:"tlsSettings"`
 	}
+	_ = json.Unmarshal([]byte(streamSettings), &stream)
+	network := strings.ToLower(stream.Network)
+	h3Only := strings.EqualFold(stream.Security, "tls") && slices.Equal(stream.TLSSettings.ALPN, xrayStringList{"h3"})
+
+	var bits transportBits
 	switch {
-	case network == "kcp", network == "quic":
+	case network == "kcp", network == "mkcp", network == "quic":
 		bits |= transportUDP
 	// xray-core serves XHTTP over QUIC, on UDP alone, when the TLS ALPN is exactly h3.
 	case h3Only && (network == "xhttp" || network == "splithttp"):
@@ -64,34 +60,37 @@ func inboundTransports(protocol model.Protocol, streamSettings, settings string)
 	}
 
 	// a few protocols carry their L4 choice in settings instead of (or in
-	// addition to) streamSettings: SS / Tunnel via a CSV field that wins
-	// outright, Mixed via an additive udp boolean.
-	if settings != "" {
-		var st map[string]any
-		if json.Unmarshal([]byte(settings), &st) == nil {
-			switch protocol {
-			case model.Shadowsocks, model.Tunnel:
-				key := "network"
-				if protocol == model.Tunnel {
-					key = "allowedNetwork"
-				}
-				if n, ok := st[key].(string); ok && n != "" {
-					bits = 0
-					for part := range strings.SplitSeq(n, ",") {
-						switch strings.TrimSpace(part) {
-						case "tcp":
-							bits |= transportTCP
-						case "udp":
-							bits |= transportUDP
-						}
+	// addition to) streamSettings: SS / Tunnel via a list that wins outright,
+	// Mixed via an additive udp boolean.
+	var st struct {
+		Network        *xrayStringList `json:"network"`
+		AllowedNetwork *xrayStringList `json:"allowedNetwork"`
+		UDP            bool            `json:"udp"`
+	}
+	if json.Unmarshal([]byte(settings), &st) == nil {
+		list := st.Network
+		// dokodemo (Tunnel) takes network over allowedNetwork when both are set.
+		if protocol == model.Tunnel && list == nil {
+			list = st.AllowedNetwork
+		}
+		switch protocol {
+		case model.Shadowsocks, model.Tunnel:
+			if list != nil {
+				bits = 0
+				for _, part := range *list {
+					switch strings.ToLower(strings.TrimSpace(part)) {
+					case "tcp":
+						bits |= transportTCP
+					case "udp":
+						bits |= transportUDP
 					}
 				}
-			case model.Mixed:
-				// socks/http "mixed" inbound: settings.udp=true means it
-				// also relays udp on the same port (socks5 udp associate).
-				if udpOn, _ := st["udp"].(bool); udpOn {
-					bits |= transportUDP
-				}
+			}
+		case model.Mixed:
+			// socks/http "mixed" inbound: settings.udp=true means it
+			// also relays udp on the same port (socks5 udp associate).
+			if st.UDP {
+				bits |= transportUDP
 			}
 		}
 	}
@@ -101,6 +100,23 @@ func inboundTransports(protocol model.Protocol, streamSettings, settings string)
 		bits = transportTCP
 	}
 	return bits
+}
+
+// xrayStringList is xray-core's StringList: a JSON array, or one string split at commas.
+type xrayStringList []string
+
+func (l *xrayStringList) UnmarshalJSON(data []byte) error {
+	var list []string
+	if err := json.Unmarshal(data, &list); err == nil {
+		*l = list
+		return nil
+	}
+	var joined string
+	if err := json.Unmarshal(data, &joined); err != nil {
+		return err
+	}
+	*l = strings.Split(joined, ",")
+	return nil
 }
 
 // masqueTransports mirrors xray-core's MASQUE listener: HTTP/2 on TCP when the TLS

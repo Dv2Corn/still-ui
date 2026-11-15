@@ -187,3 +187,22 @@ func TestPushedRelayTargetNamesShareOneLookupAndOneBudget(t *testing.T) {
 		t.Fatalf("lookup budget = %v, want within %v", budget, pushGuardLookupBudget)
 	}
 }
+
+// The fallback guard reads transports as the core does: a kcp inbound written with a
+// capitalised or duplicated key is UDP-only and opens no TCP fallback dest.
+func TestPushedFallbackToAFoldedKeyUDPInboundIsRefused(t *testing.T) {
+	push := pushGuardTestService(t)
+	seedInboundConflict(t, "kcp1", "", 45461, model.VLESS, `{"Network":"kcp"}`, `{"clients":[]}`)
+	seedInboundConflict(t, "kcp2", "", 45462, model.VLESS, `{"network":"tcp","Network":"kcp"}`, `{"clients":[]}`)
+	port := 44530
+	for _, dest := range []string{`45461`, `"127.0.0.1:45462"`} {
+		port++
+		_, _, err := push.AddInbound(&model.Inbound{
+			Enable: true, Port: port, Protocol: model.VLESS,
+			Settings: `{"clients":[],"fallbacks":[{"dest":` + dest + `}]}`, StreamSettings: `{"network":"tcp"}`,
+		})
+		if err == nil || !strings.Contains(err.Error(), "may not set fallback dest") {
+			t.Errorf("fallback dest %s = %v, want refused: only UDP is served there", dest, err)
+		}
+	}
+}
