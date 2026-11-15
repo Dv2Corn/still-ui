@@ -148,6 +148,26 @@ func relayTargets(inbound *model.Inbound) map[pushReach]bool {
 // hostReaches lists what an inbound reaches on this host. A relay target in kept is left
 // out unjudged; lookup resolves the names of the others.
 func hostReaches(inbound *model.Inbound, kept map[pushReach]bool, lookup bool) ([]pushReach, error) {
+	// One answer per name and one time budget for the whole push, however many targets it lists.
+	var look func(host string) ([]net.IPAddr, error)
+	if lookup {
+		ctx, cancel := context.WithTimeout(context.Background(), pushGuardLookupBudget)
+		defer cancel()
+		type answer struct {
+			addrs []net.IPAddr
+			err   error
+		}
+		answers := map[string]answer{}
+		look = func(host string) ([]net.IPAddr, error) {
+			key := strings.ToLower(strings.TrimSuffix(host, "."))
+			a, asked := answers[key]
+			if !asked {
+				a.addrs, a.err = pushGuardLookup(ctx, host)
+				answers[key] = a
+			}
+			return a.addrs, a.err
+		}
+	}
 	local, err := localRelayTargets(inbound.Id)
 	if err != nil {
 		return nil, err
@@ -190,7 +210,7 @@ func hostReaches(inbound *model.Inbound, kept map[pushReach]bool, lookup bool) (
 			if kept[pushReach{field: "REALITY target", value: leaf.value}] {
 				continue
 			}
-			switch public, resolved := isPublicRelayTarget(leaf.value, ownPorts, true, lookup); {
+			switch public, resolved := isPublicRelayTarget(leaf.value, ownPorts, true, look); {
 			case !resolved:
 				add("REALITY target (its name does not resolve)", leaf)
 			case !public:
@@ -208,7 +228,7 @@ func hostReaches(inbound *model.Inbound, kept map[pushReach]bool, lookup bool) (
 			if kept[pushReach{field: "fallback dest", value: leaf.value}] || slices.Contains(local, normalizeRelayTarget(leaf.value)) {
 				continue
 			}
-			switch public, resolved := isPublicRelayTarget(leaf.value, ownPorts, false, lookup); {
+			switch public, resolved := isPublicRelayTarget(leaf.value, ownPorts, false, look); {
 			case !resolved:
 				add("fallback dest (its name does not resolve)", leaf)
 			case !public:
@@ -225,7 +245,7 @@ func hostReaches(inbound *model.Inbound, kept map[pushReach]bool, lookup bool) (
 
 // isPublicRelayTarget reports whether a relay target dials a public host, not this one; a
 // name on an own port passes only as a REALITY target on 443. resolved is false for a dead name.
-func isPublicRelayTarget(target string, ownPorts []string, reality, lookup bool) (public, resolved bool) {
+func isPublicRelayTarget(target string, ownPorts []string, reality bool, look func(host string) ([]net.IPAddr, error)) (public, resolved bool) {
 	host, port, ok := splitRelayTarget(target)
 	if !ok || strings.Contains(host, "%") {
 		return false, true
@@ -236,14 +256,12 @@ func isPublicRelayTarget(target string, ownPorts []string, reality, lookup bool)
 	if (slices.Contains(ownPorts, port) && (!reality || port != "443")) || namesInternalHost(host) {
 		return false, true
 	}
-	if !lookup {
+	if look == nil {
 		return true, true
 	}
 	// shortcut: the name may resolve elsewhere when Xray dials it (DNS rebinding); closing that
 	// needs Xray to pin the address it was checked against.
-	ctx, cancel := context.WithTimeout(context.Background(), pushGuardLookupTimeout)
-	defer cancel()
-	addrs, err := pushGuardLookup(ctx, host)
+	addrs, err := look(host)
 	if err != nil || len(addrs) == 0 {
 		return false, false
 	}
@@ -255,8 +273,8 @@ func isPublicRelayTarget(target string, ownPorts []string, reality, lookup bool)
 	return true, true
 }
 
-// A push waits this long, per new target name, for the node's resolver.
-const pushGuardLookupTimeout = 2 * time.Second
+// A push waits this long in all for the node's resolver, however many new names it carries.
+const pushGuardLookupBudget = 3 * time.Second
 
 // pushGuardLookup resolves a pushed relay target name; tests replace it.
 var pushGuardLookup = net.DefaultResolver.LookupIPAddr
@@ -365,7 +383,7 @@ func normalizeRelayTarget(target string) string {
 // only local fallback dests a master generates; the core's own listeners are never among them.
 func localRelayTargets(selfID int) ([]string, error) {
 	var rows []model.Inbound
-	if err := database.GetDB().Select("id", "listen", "port").Where("node_id IS NULL AND enable = ? AND id <> ?", true, selfID).Find(&rows).Error; err != nil {
+	if err := database.GetDB().Select("id", "listen", "port", "protocol", "stream_settings", "settings").Where("node_id IS NULL AND enable = ? AND id <> ?", true, selfID).Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	reserved := map[string]bool{}
@@ -374,6 +392,10 @@ func localRelayTargets(selfID int) ([]string, error) {
 	}
 	var targets []string
 	for _, ib := range rows {
+		// A fallback dials TCP: an inbound that only takes UDP leaves that TCP port to whoever binds it.
+		if inboundTransports(ib.Protocol, ib.StreamSettings, ib.Settings)&transportTCP == 0 {
+			continue
+		}
 		listen := xrayListenHost(ib.Listen)
 		if strings.HasPrefix(listen, "/") || strings.HasPrefix(listen, "@") {
 			targets = append(targets, strings.SplitN(listen, ",", 2)[0])

@@ -6,6 +6,7 @@ import (
 	"net"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 )
@@ -124,5 +125,65 @@ func TestPushedCertificatePathsFromCertbotAreTheNodesOwn(t *testing.T) {
 		if got := isNodeOwnCertFile(path, nil); got != own {
 			t.Errorf("isNodeOwnCertFile(%q) = %v, want %v", path, got, own)
 		}
+	}
+}
+
+// A fallback dials TCP. An inbound that takes only UDP on a port leaves that TCP port to
+// whatever else binds it, so it makes no local fallback dest.
+func TestPushedFallbackToAUDPOnlyInboundsPortIsRefused(t *testing.T) {
+	push := pushGuardTestService(t)
+	seedInboundConflict(t, "wg", "", 45451, model.WireGuard, "", `{"peers":[]}`)
+	seedInboundConflict(t, "hy", "", 45452, model.Hysteria, `{"network":"hysteria"}`, `{"clients":[]}`)
+	seedInboundConflict(t, "tcp", "", 45453, model.VLESS, `{"network":"tcp"}`, `{"clients":[]}`)
+	port := 44500
+	fallback := func(dest string) error {
+		port++
+		_, _, err := push.AddInbound(&model.Inbound{
+			Enable: true, Port: port, Protocol: model.VLESS,
+			Settings: `{"clients":[],"fallbacks":[{"dest":` + dest + `}]}`, StreamSettings: `{"network":"tcp"}`,
+		})
+		return err
+	}
+	for _, dest := range []string{`45451`, `"127.0.0.1:45451"`, `45452`} {
+		if err := fallback(dest); err == nil || !strings.Contains(err.Error(), "may not set fallback dest") {
+			t.Errorf("fallback dest %s = %v, want refused: only UDP is served there", dest, err)
+		}
+	}
+	if err := fallback(`45453`); err != nil {
+		t.Errorf("fallback dest to the TCP inbound refused: %v", err)
+	}
+}
+
+// One push asks the resolver once per name and gives it one time budget in all.
+func TestPushedRelayTargetNamesShareOneLookupAndOneBudget(t *testing.T) {
+	push := pushGuardTestService(t)
+	asked := map[string]int{}
+	var budget time.Duration
+	old := pushGuardLookup
+	pushGuardLookup = func(ctx context.Context, host string) ([]net.IPAddr, error) {
+		asked[host]++
+		if deadline, ok := ctx.Deadline(); ok {
+			budget = time.Until(deadline)
+		}
+		return []net.IPAddr{{IP: net.ParseIP("23.215.0.136")}}, nil
+	}
+	t.Cleanup(func() { pushGuardLookup = old })
+	ib := &model.Inbound{
+		Enable: true, Port: 44520, Protocol: model.VLESS,
+		Settings:       `{"clients":[],"fallbacks":[{"dest":"www.nvidia.com:8443"},{"dest":"WWW.nvidia.com:8444"},{"dest":"www.nvidia.com.:8445"}]}`,
+		StreamSettings: `{"network":"tcp","security":"reality","realitySettings":{"target":"www.nvidia.com:443"}}`,
+	}
+	if _, _, err := push.AddInbound(ib); err != nil && strings.Contains(err.Error(), "may not set") {
+		t.Fatalf("push refused: %v", err)
+	}
+	total := 0
+	for _, n := range asked {
+		total += n
+	}
+	if total != 1 {
+		t.Fatalf("resolver asked %v, want once for the one name", asked)
+	}
+	if budget <= 0 || budget > pushGuardLookupBudget {
+		t.Fatalf("lookup budget = %v, want within %v", budget, pushGuardLookupBudget)
 	}
 }
