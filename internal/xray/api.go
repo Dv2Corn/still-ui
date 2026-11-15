@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/config"
@@ -699,12 +700,36 @@ func childLuaScriptPath(script string) string {
 }
 
 func ensureXrayAssetLocation() {
-	if os.Getenv("XRAY_LOCATION_ASSET") != "" || os.Getenv("xray.location.asset") != "" {
+	assetLocationMu.Lock()
+	defer assetLocationMu.Unlock()
+	current := os.Getenv("XRAY_LOCATION_ASSET")
+	if os.Getenv("xray.location.asset") != "" || current != "" && current != panelAssetLocation {
 		return
 	}
-	if abs, err := filepath.Abs(config.GetBinFolderPath()); err == nil {
+	// Follows the bin folder: a value the panel set earlier must not outlive a changed XUI_BIN_FOLDER.
+	if abs, err := filepath.Abs(config.GetBinFolderPath()); err == nil && abs != current {
 		os.Setenv("XRAY_LOCATION_ASSET", abs)
+		panelAssetLocation = abs
 	}
+}
+
+var (
+	assetLocationMu sync.Mutex
+	// panelAssetLocation is the XRAY_LOCATION_ASSET value the panel set itself, not the operator.
+	panelAssetLocation string
+)
+
+// OperatorAssetLocation is the asset folder the operator configured through the core's
+// environment, or "" when there is none (the panel's own default does not count).
+func OperatorAssetLocation() string {
+	assetLocationMu.Lock()
+	defer assetLocationMu.Unlock()
+	for _, key := range [...]string{"XRAY_LOCATION_ASSET", "xray.location.asset"} {
+		if dir := os.Getenv(key); dir != "" && dir != panelAssetLocation {
+			return dir
+		}
+	}
+	return ""
 }
 
 // collectStringSlice normalizes a JSON-decoded value into a slice of non-empty

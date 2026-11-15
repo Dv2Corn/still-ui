@@ -2,11 +2,11 @@ package service
 
 import (
 	"errors"
-	"os"
 	"strings"
 	"sync"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/config"
+	"github.com/mhsanaei/3x-ui/v3/internal/xray"
 	"github.com/mhsanaei/3x-ui/v3/internal/xray/geodata"
 )
 
@@ -47,10 +47,8 @@ func assetStore() *geodata.Store {
 // asset directory would otherwise have the panel browsing an empty bin folder
 // and reporting perfectly valid geosite:/geoip: tokens as missing.
 func assetDir() string {
-	for _, key := range [...]string{"XRAY_LOCATION_ASSET", "xray.location.asset"} {
-		if dir := os.Getenv(key); dir != "" {
-			return dir
-		}
+	if dir := xray.OperatorAssetLocation(); dir != "" {
+		return dir
 	}
 	return config.GetBinFolderPath()
 }
