@@ -208,6 +208,7 @@ var healthAlertKeys = map[eventbus.EventType][2]string{
 	eventbus.EventDiskHigh:      {"alertDisk", "alertDiskResolved"},
 	eventbus.EventCertExpiring:  {"alertCertExpiring", "alertCertRenewed"},
 	eventbus.EventBackupFailed:  {"alertBackupFailed", "alertBackupResolved"},
+	eventbus.EventNodeSilent:    {"alertNodeSilent", "alertNodeSilentBack"},
 }
 
 // healthAlertMessage picks the message and its icon: the problem, or its fix; a certificate

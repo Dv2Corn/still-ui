@@ -68,6 +68,23 @@ const GROUPS: NotificationGroupConfig[] = [
       },
       { key: 'node.up', label: 'eventNodeUp', settingKey: '' },
       {
+        key: 'node.silent',
+        label: 'eventNodeSilent',
+        settingKey: 'nodeSilenceMinutes',
+        hint: 'eventNodeSilentHint',
+        extra: ({ value, onChange, ariaLabel }) => (
+          <InputNumber
+            size="small"
+            min={0}
+            max={10080}
+            value={value}
+            onChange={onChange}
+            aria-label={ariaLabel}
+            style={{ width: 80 }}
+          />
+        ),
+      },
+      {
         key: 'node.traffic',
         label: 'eventNodeTraffic',
         settingKey: '',

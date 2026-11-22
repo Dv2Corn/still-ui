@@ -900,6 +900,10 @@ type Node struct {
 	InboundsAdoptedAt int64 `json:"-" gorm:"column:inbounds_adopted_at;default:0"`
 
 	DownNotified bool `json:"-" gorm:"column:down_notified;default:false"`
+	// LastSeenAt is the last answered heartbeat (LastHeartbeat moves on failures too);
+	// SilenceAlertAt is the last node.silent alert, both unix seconds.
+	LastSeenAt     int64 `json:"-" gorm:"column:last_seen_at;default:0"`
+	SilenceAlertAt int64 `json:"-" gorm:"column:silence_alert_at;default:0"`
 
 	// Per-node traffic quota (master-local billing policy, never pushed to the node).
 	// TrafficUsed is raw bytes through the node's own inbounds since TrafficPeriodStart.

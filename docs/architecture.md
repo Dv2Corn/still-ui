@@ -146,7 +146,7 @@ node heartbeat every 5s, periodic traffic resets (hourly/daily/weekly/monthly). 
 │   │                           #   retention + size cap, paged queries (not the panel DB)
 │   ├── pia/                    # PIA WireGuard protocol client (auth, signed server list, /addKey)
 │   ├── eventbus/               # In-process pub/sub (buffered channel): outbound.down|up,
-│   │                           #   xray.crash, node.down|up, cpu.high, memory.high, login.attempt
+│   │                           #   xray.crash, node.down|up|silent, cpu.high, memory.high, login.attempt
 │   ├── tunnelmonitor/          # Optional tunnel health probe (XUI_TUNNEL_HEALTH_* env vars):
 │   │                           #   HTTP probe (default Cloudflare trace); repeated failures
 │   │                           #   trigger an Xray restart hook. Independent of panel settings.
@@ -473,7 +473,7 @@ also has protocol schemas under `frontend/src/schemas/protocols/` and `frontend/
 
 `internal/eventbus/` is a minimal buffered-channel pub/sub. Producers call a non-blocking
 `Publish(Event)`; all subscribers receive every event. Event types: `outbound.down|up`,
-`xray.crash`, `node.down|up`, `cpu.high`, `memory.high`, `login.attempt`, with structured
+`xray.crash`, `node.down|up`, `node.silent`, `cpu.high`, `memory.high`, `login.attempt`, with structured
 payloads (OutboundHealthData, NodeHealthData, LoginEventData, SystemMetricData). Producers
 include the CPU/memory jobs, node heartbeat, and login handling; consumers include the
 Telegram bot, the Discord bot (`service/discord/`), the email notifier (`service/email/`), and the admin

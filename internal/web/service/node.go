@@ -1014,6 +1014,9 @@ func (s *NodeService) UpdateHeartbeat(id int, p HeartbeatPatch) error {
 		updates["guid"] = p.Guid
 		s.warnOnDuplicateGuid(id, p.Guid)
 	}
+	if p.Status == "online" {
+		updates["last_seen_at"] = p.LastHeartbeat
+	}
 	if err := db.Model(model.Node{}).Where("id = ?", id).Updates(updates).Error; err != nil {
 		return err
 	}
@@ -1085,6 +1088,12 @@ func (s *NodeService) SetDownNotified(id int, notified bool) error {
 	return database.GetDB().Model(model.Node{}).
 		Where("id = ?", id).
 		Update("down_notified", notified).Error
+}
+
+func (s *NodeService) SetSilenceAlertAt(id int, at int64) error {
+	return database.GetDB().Model(model.Node{}).
+		Where("id = ?", id).
+		Update("silence_alert_at", at).Error
 }
 
 func (s *NodeService) MarkNodeInboundsAdopted(id int) error {
