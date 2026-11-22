@@ -152,6 +152,19 @@ export default function SubscriptionGeneralTab({
                   />
                 </SettingListItem>
               )}
+              {allSetting.subLocalDirect !== '' && (
+                <SettingListItem
+                  paddings="small"
+                  title={t('pages.settings.subLocalDirectAwg')}
+                  description={t('pages.settings.subLocalDirectAwgDesc')}
+                >
+                  <Switch
+                    aria-label={t('pages.settings.subLocalDirectAwg')}
+                    checked={allSetting.subLocalDirectAwg}
+                    onChange={(v) => updateSetting({ subLocalDirectAwg: v })}
+                  />
+                </SettingListItem>
+              )}
               <SettingListItem
                 paddings="small"
                 title={t('pages.settings.subProbeOrder')}

@@ -136,7 +136,8 @@
     "unpinSidebar": "Desafixar barra lateral",
     "subFormats": "Sub Formats",
     "probes": "Sondas",
-    "connections": "Conexões"
+    "connections": "Conexões",
+    "audit": "Log de auditoria"
   },
   "pages": {
     "login": {
@@ -1025,6 +1026,10 @@
       "importClients": "Importar clientes",
       "import": "Importar",
       "delOrphans": "Excluir clientes sem inbound",
+      "rotationCheck": "Verificar a reemissão da assinatura",
+      "rotationCheckRunning": "Verificando a reemissão da assinatura…",
+      "rotationCheckPassed": "A reemissão da assinatura funciona",
+      "rotationCheckFailed": "A verificação da reemissão da assinatura falhou",
       "delOrphansConfirmTitle": "Excluir clientes sem inbound?",
       "delOrphansConfirmContent": "Remove todos os clientes que não estão vinculados a nenhum inbound, junto com seu registro de tráfego. Não é possível desfazer.",
       "auth": "Auth",
@@ -1603,7 +1608,8 @@
         "apiTokenEmpty": "Nenhum token ainda — crie um para autenticar bots ou painéis remotos.",
         "apiTokenDeleteWarning": "Qualquer cliente usando este token deixará de se autenticar imediatamente.",
         "apiTokenCreatedTitle": "Token criado",
-        "apiTokenCreatedNotice": "Copie este token agora. Por segurança, ele não é armazenado de forma legível e não será exibido novamente."
+        "apiTokenCreatedNotice": "Copie este token agora. Por segurança, ele não é armazenado de forma legível e não será exibido novamente.",
+        "audit": "Log de auditoria"
       },
       "toasts": {
         "modifySettings": "Os parâmetros foram alterados.",
@@ -1653,6 +1659,8 @@
       "eventNodeUp": "Ativo",
       "eventNodeTraffic": "Limite de tráfego",
       "eventNodeTrafficHint": "definido por nó na página Nós",
+      "eventNodeSilent": "Sem resposta",
+      "eventNodeSilentHint": "minutos sem contato, 0 = desativado",
       "eventCPUHigh": "CPU alta (%)",
       "requestFailed": "Falha na requisição",
       "smtpEncryption": "Criptografia",
@@ -2039,6 +2047,8 @@
       "subLocalDirectOff": "Desligado",
       "subLocalDirectProxy": "Sempre pela VPN",
       "subLocalDirectProxyDesc": "Telegram, YouTube, Instagram, Facebook, WhatsApp, Discord, ChatGPT e Claude sempre vão pela VPN, mesmo que pareçam locais. Adicione aqui outros domínios ou faixas de IP, um por linha; são verificados antes da regra do país.",
+      "subLocalDirectAwg": "Também arquivos AmneziaWG",
+      "subLocalDirectAwgDesc": "Os arquivos de configuração AmneziaWG (download, QR, links vpn://) também deixam de fora os endereços do país e o DNS continua acessível. O arquivo é grande (~35 KB, ~2000 prefixos) e pode não caber em um QR code. O servidor não muda, então arquivos já importados seguem como túnel completo até serem reimportados.",
       "subProbeOrder": "Usar os resultados das sondas",
       "subProbeOrderDesc": "Links que as sondas de acessibilidade indicam como fora do ar (2 falhas seguidas) vão para o fim da assinatura ou são ocultados, em todos os formatos: links, JSON e Clash. O usuário sempre mantém pelo menos um link e, sem resultados recentes das sondas, nada muda. A página de sondas mostra o que acontece com cada endpoint.",
       "subProbeOrderOff": "Desligado (padrão)",
@@ -2068,7 +2078,9 @@
       "connLogSourceDesc": "O que é guardado sobre o endereço de onde um cliente se conectou.",
       "connLogSourceFull": "Endereço completo e porta",
       "connLogSourceMasked": "Somente a rede (/24 em IPv4, /48 em IPv6)",
-      "connLogPrivacyHint": "Este registro contém dados pessoais: guarde só o necessário. Ele fica ao lado do banco de dados do painel, não dentro dele nem nos backups. Uma mudança vale para as conexões novas; o que já foi gravado fica como está até expirar."
+      "connLogPrivacyHint": "Este registro contém dados pessoais: guarde só o necessário. Ele fica ao lado do banco de dados do painel, não dentro dele nem nos backups. Uma mudança vale para as conexões novas; o que já foi gravado fica como está até expirar.",
+      "auditLogRetention": "Manter entradas de auditoria (dias)",
+      "auditLogRetentionDesc": "Entradas mais antigas são apagadas a cada hora; a cadeia continua verificável."
     },
     "xray": {
       "importRules": "Importar regras",
@@ -2641,7 +2653,20 @@
       "defaultOutboundDesc": "Tráfego sem regra de roteamento usa esta saída (a primeira da lista).",
       "routingScript": "Script de roteamento",
       "routingScriptDesc": "Caminho para um arquivo .lua que define HandleRoute, absoluto ou relativo à pasta bin do Xray. O script passa a escolher cada rota e o Xray ignora todas as regras de roteamento, inclusive a regra api do painel: envie o inbound api para o outbound api ou as estatísticas de tráfego e as alterações de clientes ao vivo param. O Xray não inicia se o arquivo estiver ausente ou for inválido.",
-      "routingScriptActive": "Há um script de roteamento definido em {section}, então o Xray ignora estas regras."
+      "routingScriptActive": "Há um script de roteamento definido em {section}, então o Xray ignora estas regras.",
+      "exitAddress": {
+        "menu": "IP de saída separado",
+        "title": "IP de entrada e saída separados",
+        "intro": "Os clientes continuam se conectando ao endereço da entrada, enquanto o tráfego deles sai do servidor por outro endereço IPv4 deste servidor. Manter os dois separados impede que o endereço visto pelos sites revele o endereço ao qual os clientes se conectam.",
+        "exitIp": "Endereço IPv4 de saída",
+        "exitIpHint": "Outro endereço IPv4 atribuído a este servidor. Entradas que escutam em todos os endereços não podem ser verificadas; garanta que os clientes se conectem a outro endereço.",
+        "inbounds": "Entradas",
+        "inboundsRequired": "Selecione pelo menos uma entrada",
+        "invalidIp": "Informe um endereço IPv4 válido",
+        "sameAsInbound": "Os clientes se conectam a este endereço. Escolha outro endereço do servidor.",
+        "tagTaken": "Já existe uma saída para este IP de saída",
+        "added": "Saída e regra de roteamento adicionadas. Salve para aplicar."
+      }
     },
     "hosts": {
       "addHost": "Adicionar Host",
@@ -2858,6 +2883,27 @@
       "newer": "Mais recentes",
       "older": "Mais antigas",
       "ofClient": "Conexões deste cliente"
+    },
+    "audit": {
+      "title": "Log de auditoria",
+      "intro": "Cada ação de administrador que altera o estado e cada login, encadeados por SHA-256 para que uma entrada editada ou apagada seja detectada. Corpos de requisição e segredos nunca são armazenados. Cada busca e exportação aqui também é registrada.",
+      "time": "Hora",
+      "actor": "Usuário ou token",
+      "ip": "IP de origem",
+      "action": "Ação",
+      "target": "Alvo",
+      "outcome": "Resultado",
+      "detail": "Detalhe",
+      "actorPlaceholder": "Usuário ou token (exato)",
+      "actionPlaceholder": "Ação contém…",
+      "success": "Sucesso",
+      "failure": "Falha",
+      "exportCsv": "Exportar CSV",
+      "exportHint": "A exportação contém até {count} linhas do filtro atual, com horários em UTC.",
+      "empty": "Nenhuma entrada corresponde.",
+      "verify": "Verificar cadeia",
+      "verifyOk": "A cadeia está íntegra: {count} entradas verificadas.",
+      "verifyBroken": "A cadeia está quebrada na entrada #{id}: {reason}"
     }
   },
   "tgbot": {
@@ -2989,6 +3035,8 @@
       "alertNodeTrafficLimit": "O nó {{ .Name }} atingiu o limite de tráfego: {{ .Used }} de {{ .Limit }}. Reinicia em {{ .Reset }}.",
       "alertNodeTrafficLimitOff": "O nó {{ .Name }} atingiu o limite de tráfego: {{ .Used }} de {{ .Limit }}. As entradas estão desligadas até {{ .Reset }}.",
       "alertNodeTrafficBack": "O nó {{ .Name }} voltou a ficar abaixo do limite de tráfego: {{ .Used }} de {{ .Limit }}.",
+      "alertNodeSilent": "O nó {{ .Name }} ({{ .Address }}) não responde há {{ .Minutes }} min. Visto pela última vez: {{ .LastSeen }}.",
+      "alertNodeSilentBack": "O nó {{ .Name }} ({{ .Address }}) voltou a responder após {{ .Minutes }} min sem resposta.",
       "alertSubLeak": "A assinatura de {{ .Client }} pode ter vazado: foi baixada de {{ .Count }} redes em {{ .Hours }} h (primeira vez {{ .First }}, última {{ .Last }}). Nada foi bloqueado.\nPor exemplo: {{ .Networks }}",
       "inboundsCount": "🔌 Inbounds: {{ .Count }}\r\n",
       "clientsCount": "👥 Clients: {{ .Count }}\r\n",

@@ -137,6 +137,8 @@ export const InboundOptionSchema = z
     wgMtu: z.number().optional(),
     wgDns: z.string().optional(),
     awgServer: AwgServerOptionSchema.nullable().optional(),
+    // "Local sites direct" peer AllowedIPs computed from the panel's geoip.dat; absent = full tunnel.
+    awgAllowedIPs: z.string().optional(),
     tuicServer: TuicServerOptionSchema.nullable().optional(),
     mtprotoDomain: z.string().optional(),
     // Hosting node id; absent/null for this panel's own inbounds (#4997).

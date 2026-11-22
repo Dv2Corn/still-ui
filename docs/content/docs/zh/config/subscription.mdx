@@ -91,7 +91,8 @@ VPN，这样拒绝境外地址的银行、政务和电商网站在开着 VPN 时
 | **Happ、INCY** | `Routing` 响应头中的路由配置，代理规则先于直连规则；Happ 还会收到 `Routing-Enable: true`。 |
 | **Shadowrocket** | 规则文件位于 `<订阅地址>/shadowrocket.conf`，订阅页面上有入口：在“配置”页添加该文件，并将全局路由设为“配置”。只有域名后缀和 `GEOIP`，Shadowrocket 没有 `GEOSITE` 规则。 |
 | **原始链接（Base64）** | 没有。链接列表无法携带路由规则；只接受链接的应用需要使用 JSON 订阅或自己的路由设置。 |
-| **AmneziaWG、WireGuard** | 没有。这类隧道只能按 IP 前缀（`AllowedIPs`）路由，而一个国家有数千个不断变化的前缀。 |
+| **AmneziaWG** | 默认没有。开启 **同样用于 AmneziaWG 文件**（`subLocalDirectAwg`）后，面板生成的每个 AmneziaWG 配置（`vpn://` 链接、客户端页面的下载和二维码、入站导出）的 `AllowedIPs` 为：全部 IPv4 减去该国 `geoip` 段和私有网段，再加回始终走 VPN 列表中的 IPv4 段，配置中不在其内的 IPv4 DNS 以 `/32` 加入，最后是 `::/0`（IPv6 仍走隧道）。国家网段读取自面板自己的 `geoip.dat`；缺少该分类时文件保持全局隧道。文件较大（约 35 KB，约 2000 个前缀），可能无法放入二维码。服务器端 peer 不变，已导入的旧文件在重新导入前仍是全局隧道。 |
+| **WireGuard** | 没有。这类隧道只能按 IP 前缀（`AllowedIPs`）路由，而一个国家有数千个不断变化的前缀。 |
 
 你为某种格式自行设置的路由配置在该格式中优先。**JSON 路由配置**（`subJsonRoutingRules`）
 会在 JSON 文档和 `Routing` 响应头中取代这些规则，Happ 路由配置则在响应头中取代它们。

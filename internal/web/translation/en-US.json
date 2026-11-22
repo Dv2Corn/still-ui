@@ -136,7 +136,8 @@
     "unpinSidebar": "Unpin sidebar",
     "subFormats": "Sub Formats",
     "probes": "Probes",
-    "connections": "Connections"
+    "connections": "Connections",
+    "audit": "Audit log"
   },
   "pages": {
     "login": {
@@ -1025,6 +1026,10 @@
       "importClients": "Import clients",
       "import": "Import",
       "delOrphans": "Delete unattached clients",
+      "rotationCheck": "Check subscription re-issue",
+      "rotationCheckRunning": "Checking subscription re-issue…",
+      "rotationCheckPassed": "Subscription re-issue works",
+      "rotationCheckFailed": "Subscription re-issue check failed",
       "delOrphansConfirmTitle": "Delete clients without an inbound?",
       "delOrphansConfirmContent": "Removes every client that is not attached to any inbound, along with its traffic record. This cannot be undone.",
       "auth": "Auth",
@@ -1728,7 +1733,8 @@
         "apiTokenEmpty": "No tokens yet — create one to authenticate bots or remote panels.",
         "apiTokenDeleteWarning": "Any caller using this token will stop authenticating immediately.",
         "apiTokenCreatedTitle": "Token created",
-        "apiTokenCreatedNotice": "Copy this token now. For security it is not stored in readable form and will not be shown again."
+        "apiTokenCreatedNotice": "Copy this token now. For security it is not stored in readable form and will not be shown again.",
+        "audit": "Audit log"
       },
       "toasts": {
         "modifySettings": "The parameters have been changed.",
@@ -1778,6 +1784,8 @@
       "eventNodeUp": "Up",
       "eventNodeTraffic": "Traffic limit",
       "eventNodeTrafficHint": "set per node on the Nodes page",
+      "eventNodeSilent": "Silent",
+      "eventNodeSilentHint": "minutes without contact, 0 = off",
       "eventCPUHigh": "CPU high (%)",
       "requestFailed": "Request failed",
       "smtpEncryption": "Encryption",
@@ -2160,6 +2168,8 @@
       "subLocalDirectOff": "Off",
       "subLocalDirectProxy": "Always through the VPN",
       "subLocalDirectProxyDesc": "Telegram, YouTube, Instagram, Facebook, WhatsApp, Discord, ChatGPT and Claude always go through the VPN, even where they look local. Add more domains or IP ranges here, one per line; they are checked before the country rule.",
+      "subLocalDirectAwg": "AmneziaWG files too",
+      "subLocalDirectAwgDesc": "AmneziaWG config files (download, QR, vpn:// links) also skip the country's addresses, and their DNS stays reachable. Such a file is large (~35 KB, ~2000 prefixes) and may not fit in a QR code. The server side is unchanged, so files imported earlier keep working as a full tunnel until re-imported.",
       "subProbeOrder": "Use probe results",
       "subProbeOrderDesc": "Links that the reachability probes report down (2 failed checks in a row) move to the end of the subscription or are hidden, in every format: links, JSON and Clash. A user always keeps at least one link, and without fresh probe results nothing changes. The Probes page shows what happens to each endpoint.",
       "subProbeOrderOff": "Off (default)",
@@ -2189,7 +2199,9 @@
       "connLogSourceDesc": "What is stored about the address a client connected from.",
       "connLogSourceFull": "Full address and port",
       "connLogSourceMasked": "Network only (/24 for IPv4, /48 for IPv6)",
-      "connLogPrivacyHint": "This log holds personal data: keep only what you need. It is stored beside the panel database, not in it and not in its backups. A change applies to new connections; what is already stored stays as it is until it expires."
+      "connLogPrivacyHint": "This log holds personal data: keep only what you need. It is stored beside the panel database, not in it and not in its backups. A change applies to new connections; what is already stored stays as it is until it expires.",
+      "auditLogRetention": "Keep audit entries (days)",
+      "auditLogRetentionDesc": "Older entries are deleted every hour; the chain stays verifiable."
     },
     "xray": {
       "save": "Save",
@@ -2762,7 +2774,20 @@
       "defaultOutboundDesc": "Traffic that does not match any routing rule uses this outbound (Xray uses the first outbound in the list).",
       "routingScript": "Routing Script",
       "routingScriptDesc": "Path to a .lua file defining HandleRoute, absolute or relative to the Xray bin folder. The script then picks every route and Xray ignores all routing rules, the panel's api rule included: send the api inbound to the api outbound or traffic stats and live client changes stop. Xray will not start if the file is missing or invalid.",
-      "routingScriptActive": "A routing script is set under {section}, so Xray ignores these rules."
+      "routingScriptActive": "A routing script is set under {section}, so Xray ignores these rules.",
+      "exitAddress": {
+        "menu": "Separate exit IP",
+        "title": "Separate entry and exit IP",
+        "intro": "Clients keep connecting to the inbound address, while their traffic leaves the server from another IPv4 address of this server. Keeping the two apart stops the address that websites see from pointing at the address clients connect to.",
+        "exitIp": "Exit IPv4 address",
+        "exitIpHint": "Another IPv4 address assigned to this server. Inbounds that listen on all addresses cannot be checked, so make sure clients connect to a different address.",
+        "inbounds": "Inbounds",
+        "inboundsRequired": "Select at least one inbound",
+        "invalidIp": "Enter a valid IPv4 address",
+        "sameAsInbound": "Clients connect to this address. Pick a different address of the server.",
+        "tagTaken": "An outbound for this exit IP already exists",
+        "added": "Exit outbound and routing rule added. Save to apply."
+      }
     },
     "probes": {
       "title": "Reachability probes",
@@ -2858,6 +2883,27 @@
       "newer": "Newer",
       "older": "Older",
       "ofClient": "This client's connections"
+    },
+    "audit": {
+      "title": "Audit log",
+      "intro": "Every state-changing admin action and login, chained by SHA-256 so that an edited or deleted entry is detected. Request bodies and secrets are never stored. Each search and export here is recorded too.",
+      "time": "Time",
+      "actor": "User or token",
+      "ip": "Source IP",
+      "action": "Action",
+      "target": "Target",
+      "outcome": "Outcome",
+      "detail": "Detail",
+      "actorPlaceholder": "User or token (exact)",
+      "actionPlaceholder": "Action contains…",
+      "success": "Success",
+      "failure": "Failure",
+      "exportCsv": "Export CSV",
+      "exportHint": "The export holds up to {count} rows of the current filter, with times in UTC.",
+      "empty": "No entries match.",
+      "verify": "Verify chain",
+      "verifyOk": "The chain is intact: {count} entries checked.",
+      "verifyBroken": "The chain is broken at entry #{id}: {reason}"
     }
   },
   "tgbot": {
@@ -2989,6 +3035,8 @@
       "alertNodeTrafficLimit": "Node {{ .Name }} reached its traffic limit: {{ .Used }} of {{ .Limit }}. Resets on {{ .Reset }}.",
       "alertNodeTrafficLimitOff": "Node {{ .Name }} reached its traffic limit: {{ .Used }} of {{ .Limit }}. Its inbounds are off until {{ .Reset }}.",
       "alertNodeTrafficBack": "Node {{ .Name }} is under its traffic limit again: {{ .Used }} of {{ .Limit }}.",
+      "alertNodeSilent": "Node {{ .Name }} ({{ .Address }}) has not answered for {{ .Minutes }} min. Last seen: {{ .LastSeen }}.",
+      "alertNodeSilentBack": "Node {{ .Name }} ({{ .Address }}) is answering again after {{ .Minutes }} min of silence.",
       "alertSubLeak": "Subscription of {{ .Client }} may have leaked: fetched from {{ .Count }} networks in {{ .Hours }} h, first at {{ .First }}, last at {{ .Last }}. Nothing was blocked.\nFor example: {{ .Networks }}",
       "inboundsCount": "🔌 Inbounds: {{ .Count }}\r\n",
       "clientsCount": "👥 Clients: {{ .Count }}\r\n",

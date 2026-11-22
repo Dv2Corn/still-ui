@@ -46,6 +46,7 @@ export default function InboundInfoModal({
   subSettings,
   hosts = EMPTY_HOSTS,
   lastOnlineMap = {},
+  amneziaWGAllowedIPs,
 }: InboundInfoModalProps) {
   const { t } = useTranslation();
   const { datepicker } = useDatepicker();
@@ -121,6 +122,7 @@ export default function InboundInfoModal({
     subSettings: typeof subSettings;
     hosts: typeof hosts;
     ipLimitEnable: typeof ipLimitEnable;
+    amneziaWGAllowedIPs: typeof amneziaWGAllowedIPs;
   } | null>(null);
   if (
     open &&
@@ -131,9 +133,18 @@ export default function InboundInfoModal({
       syncedProps.nodeAddress !== nodeAddress ||
       syncedProps.subSettings !== subSettings ||
       syncedProps.hosts !== hosts ||
-      syncedProps.ipLimitEnable !== ipLimitEnable)
+      syncedProps.ipLimitEnable !== ipLimitEnable ||
+      syncedProps.amneziaWGAllowedIPs !== amneziaWGAllowedIPs)
   ) {
-    setSyncedProps({ dbInbound, clientIndex, nodeAddress, subSettings, hosts, ipLimitEnable });
+    setSyncedProps({
+      dbInbound,
+      clientIndex,
+      nodeAddress,
+      subSettings,
+      hosts,
+      ipLimitEnable,
+      amneziaWGAllowedIPs,
+    });
     const info = buildInboundInfo(dbInbound);
     setInbound(info);
     setActiveTab(info.clients.length > 0 ? 'client' : 'inbound');
@@ -184,6 +195,7 @@ export default function InboundInfoModal({
           remark: dbInbound.remark,
           hostOverride: nodeAddress,
           fallbackHostname,
+          amneziaWGAllowedIPs,
         }),
       );
       setAmneziawgLinks(
@@ -192,6 +204,7 @@ export default function InboundInfoModal({
           remark: dbInbound.remark,
           hostOverride: nodeAddress,
           fallbackHostname,
+          amneziaWGAllowedIPs,
         }),
       );
       setWireguardConfigs([]);

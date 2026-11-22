@@ -15,6 +15,7 @@
     "hosts",
     "reachability-probes",
     "connection-log",
+    "audit-log",
     "nodes",
     "backup",
     "websocket"

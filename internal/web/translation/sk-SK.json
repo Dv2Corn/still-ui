@@ -136,7 +136,8 @@
     "unpinSidebar": "Odopnúť bočné menu",
     "subFormats": "Formáty odberu",
     "probes": "Sondy",
-    "connections": "Pripojenia"
+    "connections": "Pripojenia",
+    "audit": "Auditný záznam"
   },
   "pages": {
     "login": {
@@ -1025,6 +1026,10 @@
       "importClients": "Importovať klientov",
       "import": "Importovať",
       "delOrphans": "Odstrániť nepriradených klientov",
+      "rotationCheck": "Overiť opätovné vydanie predplatného",
+      "rotationCheckRunning": "Overujem opätovné vydanie predplatného…",
+      "rotationCheckPassed": "Opätovné vydanie predplatného funguje",
+      "rotationCheckFailed": "Overenie opätovného vydania predplatného zlyhalo",
       "delOrphansConfirmTitle": "Odstrániť klientov bez vstupu?",
       "delOrphansConfirmContent": "Odstránia sa všetci klienti, ktorí nie sú priradení k žiadnemu vstupu, aj so záznamami o spotrebe. Túto akciu nemožno vrátiť späť.",
       "auth": "Overenie",
@@ -1728,7 +1733,8 @@
         "apiTokenEmpty": "Zatiaľ nie sú vytvorené žiadne tokeny. Vytvorte token na overovanie botov alebo vzdialených panelov.",
         "apiTokenDeleteWarning": "Každý, kto používa tento token, okamžite stratí možnosť overenia.",
         "apiTokenCreatedTitle": "Token bol vytvorený",
-        "apiTokenCreatedNotice": "Token si teraz skopírujte. Z bezpečnostných dôvodov sa neukladá v čitateľnej podobe a už sa znova nezobrazí."
+        "apiTokenCreatedNotice": "Token si teraz skopírujte. Z bezpečnostných dôvodov sa neukladá v čitateľnej podobe a už sa znova nezobrazí.",
+        "audit": "Auditný záznam"
       },
       "toasts": {
         "modifySettings": "Nastavenia boli zmenené.",
@@ -1778,6 +1784,8 @@
       "eventNodeUp": "Dostupný",
       "eventNodeTraffic": "Limit prenosu",
       "eventNodeTrafficHint": "nastavuje sa pre každý uzol na stránke Uzly",
+      "eventNodeSilent": "Neodpovedá",
+      "eventNodeSilentHint": "minúty bez spojenia, 0 = vypnuté",
       "eventCPUHigh": "Vysoké využitie CPU (%)",
       "requestFailed": "Požiadavka zlyhala",
       "smtpEncryption": "Šifrovanie",
@@ -2160,6 +2168,8 @@
       "subLocalDirectOff": "Vypnuté",
       "subLocalDirectProxy": "Vždy cez VPN",
       "subLocalDirectProxyDesc": "Telegram, YouTube, Instagram, Facebook, WhatsApp, Discord, ChatGPT a Claude idú vždy cez VPN, aj keď vyzerajú ako miestne. Pridajte sem ďalšie domény alebo rozsahy IP, jeden na riadok; kontrolujú sa pred pravidlom krajiny.",
+      "subLocalDirectAwg": "Aj súbory AmneziaWG",
+      "subLocalDirectAwgDesc": "Konfiguračné súbory AmneziaWG (stiahnutie, QR, odkazy vpn://) tiež vynechajú adresy krajiny a DNS ostane dostupné. Súbor je veľký (~35 KB, ~2000 prefixov) a nemusí sa zmestiť do QR kódu. Server sa nemení, takže už importované súbory fungujú ako plný tunel, kým sa neimportujú znova.",
       "subProbeOrder": "Používať výsledky sond",
       "subProbeOrderDesc": "Odkazy, ktoré sondy dostupnosti hlásia ako nedostupné (2 zlyhania za sebou), sa presunú na koniec predplatného alebo sa skryjú, vo všetkých formátoch: odkazy, JSON aj Clash. Používateľovi vždy ostane aspoň jeden odkaz a bez čerstvých výsledkov sond sa nič nemení. Stránka sond ukazuje, čo sa deje s každým koncovým bodom.",
       "subProbeOrderOff": "Vypnuté (predvolené)",
@@ -2189,7 +2199,9 @@
       "connLogSourceDesc": "Čo sa ukladá o adrese, z ktorej sa klient pripojil.",
       "connLogSourceFull": "Celá adresa a port",
       "connLogSourceMasked": "Iba sieť (/24 pre IPv4, /48 pre IPv6)",
-      "connLogPrivacyHint": "Tento denník obsahuje osobné údaje: uchovávajte len to, čo potrebujete. Je uložený vedľa databázy panela, nie v nej ani v jej zálohách. Zmena platí pre nové pripojenia; už uložené záznamy zostanú bez zmeny, kým nevypršia."
+      "connLogPrivacyHint": "Tento denník obsahuje osobné údaje: uchovávajte len to, čo potrebujete. Je uložený vedľa databázy panela, nie v nej ani v jej zálohách. Zmena platí pre nové pripojenia; už uložené záznamy zostanú bez zmeny, kým nevypršia.",
+      "auditLogRetention": "Uchovávať auditné záznamy (dni)",
+      "auditLogRetentionDesc": "Staršie záznamy sa mažú každú hodinu; reťazec zostáva overiteľný."
     },
     "xray": {
       "save": "Uložiť",
@@ -2762,7 +2774,20 @@
       "defaultOutboundDesc": "Prevádzka bez zhody s pravidlom smerovania použije tento výstup. Xray používa prvý výstup v zozname.",
       "routingScript": "Skript smerovania",
       "routingScriptDesc": "Cesta k súboru .lua s funkciou HandleRoute, absolútna alebo vzhľadom na priečinok bin Xray. Skript vyberá každú trasu a Xray ignoruje všetky pravidlá vrátane pravidla api panelu. Vstup api preto smerujte na výstup api, inak prestanú fungovať štatistiky spotreby aj zmeny klientov za behu. Ak súbor chýba alebo je neplatný, Xray sa nespustí.",
-      "routingScriptActive": "V časti {section} je nastavený skript smerovania, preto Xray tieto pravidlá ignoruje."
+      "routingScriptActive": "V časti {section} je nastavený skript smerovania, preto Xray tieto pravidlá ignoruje.",
+      "exitAddress": {
+        "menu": "Samostatná výstupná IP",
+        "title": "Oddelená vstupná a výstupná IP",
+        "intro": "Klienti sa naďalej pripájajú na adresu vstupu, ale ich prevádzka opúšťa server cez inú IPv4 adresu tohto servera. Oddelené adresy zabránia tomu, aby adresa, ktorú vidia weby, prezradila adresu, na ktorú sa klienti pripájajú.",
+        "exitIp": "Výstupná IPv4 adresa",
+        "exitIpHint": "Iná IPv4 adresa priradená tomuto serveru. Vstupy počúvajúce na všetkých adresách nemožno overiť, preto sa uistite, že sa klienti pripájajú na inú adresu.",
+        "inbounds": "Vstupy",
+        "inboundsRequired": "Vyberte aspoň jeden vstup",
+        "invalidIp": "Zadajte platnú IPv4 adresu",
+        "sameAsInbound": "Na túto adresu sa pripájajú klienti. Vyberte inú adresu servera.",
+        "tagTaken": "Výstup pre túto výstupnú IP už existuje",
+        "added": "Výstup a pravidlo smerovania boli pridané. Uložte na použitie."
+      }
     },
     "probes": {
       "title": "Sondy dostupnosti",
@@ -2858,6 +2883,27 @@
       "newer": "Novšie",
       "older": "Staršie",
       "ofClient": "Pripojenia tohto klienta"
+    },
+    "audit": {
+      "title": "Auditný záznam",
+      "intro": "Každá akcia administrátora meniaca stav a každé prihlásenie, zreťazené cez SHA-256, takže upravený alebo zmazaný záznam sa odhalí. Telá požiadaviek ani tajomstvá sa nikdy neukladajú. Každé vyhľadávanie a export tu sa tiež zaznamená.",
+      "time": "Čas",
+      "actor": "Používateľ alebo token",
+      "ip": "Zdrojová IP",
+      "action": "Akcia",
+      "target": "Cieľ",
+      "outcome": "Výsledok",
+      "detail": "Detail",
+      "actorPlaceholder": "Používateľ alebo token (presne)",
+      "actionPlaceholder": "Akcia obsahuje…",
+      "success": "Úspech",
+      "failure": "Zlyhanie",
+      "exportCsv": "Exportovať CSV",
+      "exportHint": "Export obsahuje najviac {count} riadkov aktuálneho filtra, časy v UTC.",
+      "empty": "Žiadne záznamy nevyhovujú.",
+      "verify": "Overiť reťazec",
+      "verifyOk": "Reťazec je neporušený: overených záznamov {count}.",
+      "verifyBroken": "Reťazec je prerušený pri zázname #{id}: {reason}"
     }
   },
   "tgbot": {
@@ -2989,6 +3035,8 @@
       "alertNodeTrafficLimit": "Uzol {{ .Name }} dosiahol limit prenosu: {{ .Used }} z {{ .Limit }}. Reset {{ .Reset }}.",
       "alertNodeTrafficLimitOff": "Uzol {{ .Name }} dosiahol limit prenosu: {{ .Used }} z {{ .Limit }}. Jeho vstupy sú vypnuté do {{ .Reset }}.",
       "alertNodeTrafficBack": "Uzol {{ .Name }} je opäť pod limitom prenosu: {{ .Used }} z {{ .Limit }}.",
+      "alertNodeSilent": "Uzol {{ .Name }} ({{ .Address }}) neodpovedá {{ .Minutes }} min. Naposledy videný: {{ .LastSeen }}.",
+      "alertNodeSilentBack": "Uzol {{ .Name }} ({{ .Address }}) opäť odpovedá po {{ .Minutes }} min ticha.",
       "alertSubLeak": "Predplatné {{ .Client }} mohlo uniknúť: stiahnuté z {{ .Count }} sietí za {{ .Hours }} h (prvýkrát {{ .First }}, naposledy {{ .Last }}). Nič nebolo zablokované.\nNapríklad: {{ .Networks }}",
       "inboundsCount": "🔌 Inboundy: {{ .Count }}\r\n",
       "clientsCount": "👥 Klienti: {{ .Count }}\r\n",

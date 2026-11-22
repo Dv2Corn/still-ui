@@ -136,7 +136,8 @@
     "unpinSidebar": "取消固定側邊欄",
     "subFormats": "Sub Formats",
     "probes": "探針",
-    "connections": "連線"
+    "connections": "連線",
+    "audit": "稽核日誌"
   },
   "pages": {
     "login": {
@@ -1025,6 +1026,10 @@
       "importClients": "匯入客戶端",
       "import": "匯入",
       "delOrphans": "刪除未關聯的客戶端",
+      "rotationCheck": "檢查訂閱重新簽發",
+      "rotationCheckRunning": "正在檢查訂閱重新簽發…",
+      "rotationCheckPassed": "訂閱重新簽發正常",
+      "rotationCheckFailed": "訂閱重新簽發檢查失敗",
       "delOrphansConfirmTitle": "刪除沒有入站的客戶端？",
       "delOrphansConfirmContent": "移除所有未關聯任何入站的客戶端，連同其流量紀錄一併刪除。此操作無法復原。",
       "auth": "認證",
@@ -1603,7 +1608,8 @@
         "apiTokenEmpty": "尚無令牌 — 建立一個以認證機器人或遠端面板。",
         "apiTokenDeleteWarning": "使用此令牌的任何呼叫方將立即無法認證。",
         "apiTokenCreatedTitle": "權杖已建立",
-        "apiTokenCreatedNotice": "請立即複製此權杖。基於安全考量，它不會以可讀形式儲存，也不會再次顯示。"
+        "apiTokenCreatedNotice": "請立即複製此權杖。基於安全考量，它不會以可讀形式儲存，也不會再次顯示。",
+        "audit": "稽核日誌"
       },
       "toasts": {
         "modifySettings": "參數已更改。",
@@ -1653,6 +1659,8 @@
       "eventNodeUp": "上線",
       "eventNodeTraffic": "流量上限",
       "eventNodeTrafficHint": "在節點頁面為每個節點設定",
+      "eventNodeSilent": "失聯",
+      "eventNodeSilentHint": "失聯分鐘數，0 = 關閉",
       "eventCPUHigh": "CPU 偏高（%）",
       "requestFailed": "請求失敗",
       "smtpEncryption": "加密",
@@ -2039,6 +2047,8 @@
       "subLocalDirectOff": "關閉",
       "subLocalDirectProxy": "一律走 VPN",
       "subLocalDirectProxyDesc": "Telegram、YouTube、Instagram、Facebook、WhatsApp、Discord、ChatGPT 與 Claude 即使看起來是本地位址也一律走 VPN。可在此加入其他網域或 IP 範圍，每行一個；會在國家規則之前比對。",
+      "subLocalDirectAwg": "同樣用於 AmneziaWG 檔案",
+      "subLocalDirectAwgDesc": "AmneziaWG 設定檔（下載、QR、vpn:// 連結）同樣讓該國位址直連，DNS 仍可存取。這類檔案較大（約 35 KB、約 2000 個前綴），可能無法放進 QR 碼。伺服器端不變，先前匯入的檔案在重新匯入前仍是全域通道。",
       "subProbeOrder": "使用探針結果",
       "subProbeOrderDesc": "可達性探針回報不通的連結（連續 2 次失敗）會移到訂閱末尾或被隱藏，適用於所有格式：連結、JSON 和 Clash。使用者始終至少保留一個連結；沒有新的探針結果時不做任何變動。探針頁面會顯示每個端點的處理情況。",
       "subProbeOrderOff": "關閉（預設）",
@@ -2068,7 +2078,9 @@
       "connLogSourceDesc": "保存客戶端來源位址的哪些資訊。",
       "connLogSourceFull": "完整位址與連接埠",
       "connLogSourceMasked": "僅網段（IPv4 為 /24，IPv6 為 /48）",
-      "connLogPrivacyHint": "此記錄包含個人資料：只保留需要的內容。它存放在面板資料庫旁邊，不在資料庫內，也不在其備份中。變更只對新連線生效；已保存的記錄維持原樣，直到過期。"
+      "connLogPrivacyHint": "此記錄包含個人資料：只保留需要的內容。它存放在面板資料庫旁邊，不在資料庫內，也不在其備份中。變更只對新連線生效；已保存的記錄維持原樣，直到過期。",
+      "auditLogRetention": "稽核項目保留天數",
+      "auditLogRetentionDesc": "較舊的項目每小時刪除一次；鏈仍可驗證。"
     },
     "xray": {
       "save": "儲存",
@@ -2641,7 +2653,20 @@
       "defaultOutboundDesc": "未符合任何路由規則的流量走此出站（清單中的第一個出站）。",
       "routingScript": "路由腳本",
       "routingScriptDesc": "定義了 HandleRoute 的 .lua 檔案路徑，可為絕對路徑或相對於 Xray bin 資料夾的路徑。設定後由腳本選擇所有路由，Xray 會忽略全部路由規則，包括面板的 api 規則：請將 api 入站路由到 api 出站，否則流量統計與用戶端變更的即時套用都會停止。檔案不存在或無效時 Xray 無法啟動。",
-      "routingScriptActive": "已在「{section}」中設定路由腳本，因此 Xray 會忽略這些規則。"
+      "routingScriptActive": "已在「{section}」中設定路由腳本，因此 Xray 會忽略這些規則。",
+      "exitAddress": {
+        "menu": "獨立出口 IP",
+        "title": "分離入口 IP 與出口 IP",
+        "intro": "用戶端仍連線至入站位址，而其流量透過本伺服器的另一個 IPv4 位址離開伺服器。將兩者分開可避免網站看到的位址洩露用戶端連線的位址。",
+        "exitIp": "出口 IPv4 位址",
+        "exitIpHint": "指派給本伺服器的另一個 IPv4 位址。監聽所有位址的入站無法檢查，請確認用戶端連線的是其他位址。",
+        "inbounds": "入站",
+        "inboundsRequired": "請至少選擇一個入站",
+        "invalidIp": "請輸入有效的 IPv4 位址",
+        "sameAsInbound": "用戶端連線的就是此位址。請選擇伺服器的其他位址。",
+        "tagTaken": "此出口 IP 的出站已存在",
+        "added": "已新增出口出站與路由規則。儲存後生效。"
+      }
     },
     "hosts": {
       "addHost": "新增 Host",
@@ -2858,6 +2883,27 @@
       "newer": "較新",
       "older": "較舊",
       "ofClient": "此客戶端的連線"
+    },
+    "audit": {
+      "title": "稽核日誌",
+      "intro": "每一次變更狀態的管理操作與每一次登入都以 SHA-256 串連記錄，因此被修改或刪除的項目會被發現。從不儲存請求內容與機密資訊。此處的每次搜尋與匯出也會被記錄。",
+      "time": "時間",
+      "actor": "使用者或權杖",
+      "ip": "來源 IP",
+      "action": "操作",
+      "target": "對象",
+      "outcome": "結果",
+      "detail": "詳細",
+      "actorPlaceholder": "使用者或權杖（精確）",
+      "actionPlaceholder": "操作包含…",
+      "success": "成功",
+      "failure": "失敗",
+      "exportCsv": "匯出 CSV",
+      "exportHint": "匯出最多包含目前篩選的 {count} 列，時間為 UTC。",
+      "empty": "沒有符合的項目。",
+      "verify": "驗證鏈",
+      "verifyOk": "鏈完整：已檢查 {count} 個項目。",
+      "verifyBroken": "鏈在項目 #{id} 處斷裂：{reason}"
     }
   },
   "tgbot": {
@@ -2989,6 +3035,8 @@
       "alertNodeTrafficLimit": "節點 {{ .Name }} 已達到流量上限：{{ .Used }} / {{ .Limit }}。{{ .Reset }} 重置。",
       "alertNodeTrafficLimitOff": "節點 {{ .Name }} 已達到流量上限：{{ .Used }} / {{ .Limit }}。其入站已關閉至 {{ .Reset }}。",
       "alertNodeTrafficBack": "節點 {{ .Name }} 已回到流量上限以內：{{ .Used }} / {{ .Limit }}。",
+      "alertNodeSilent": "節點 {{ .Name }} ({{ .Address }}) 已 {{ .Minutes }} 分鐘無回應。最後在線：{{ .LastSeen }}。",
+      "alertNodeSilentBack": "節點 {{ .Name }} ({{ .Address }}) 在失聯 {{ .Minutes }} 分鐘後恢復回應。",
       "alertSubLeak": "{{ .Client }} 的訂閱可能已外洩：{{ .Hours }} 小時內從 {{ .Count }} 個網路取得，首次 {{ .First }}，最近 {{ .Last }}。未做任何封鎖。\n例如：{{ .Networks }}",
       "inboundsCount": "🔌 Inbounds: {{ .Count }}\r\n",
       "clientsCount": "👥 Clients: {{ .Count }}\r\n",

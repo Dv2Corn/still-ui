@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"maps"
 	"net"
+	"net/netip"
 	"net/url"
 	"slices"
 	"sort"
@@ -22,6 +23,7 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/database"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 	"github.com/mhsanaei/3x-ui/v3/internal/logger"
+	"github.com/mhsanaei/3x-ui/v3/internal/sub/localdirect"
 	"github.com/mhsanaei/3x-ui/v3/internal/tuic"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/common"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/maskcompat"
@@ -99,6 +101,8 @@ type SubService struct {
 	// settingsByInbound: one decode per request, not one per link of a subId.
 	tuicByInbound            map[int]*tuicLinkInstance
 	amneziaWGServerByInbound map[int]*amneziawg.ServerSettings
+	// amneziaWGTunnel is the "local sites direct" IPv4 tunnel; nil keeps the full tunnel.
+	amneziaWGTunnel []netip.Prefix
 	// probe is the probes' verdict on the endpoints, read lazily by probeVerdicts.
 	probe       *service.ReachSubVerdicts
 	probeLoaded bool
@@ -158,6 +162,7 @@ func (s *SubService) PrepareForRequest(host string) {
 	s.socketFronts = nil
 	s.tuicByInbound = map[int]*tuicLinkInstance{}
 	s.amneziaWGServerByInbound = map[int]*amneziawg.ServerSettings{}
+	s.amneziaWGTunnel = s.settingService.AmneziaWGLocalDirectTunnel()
 	s.hostsByInbound = nil
 	s.hostGroupOrders = nil
 	s.sharedGroupSni = nil
@@ -1202,7 +1207,7 @@ func amneziaWGHeaderOrDefault(value, fallback string) string {
 // amneziaWGConfigText builds the same plain AmneziaWG client .conf text the
 // frontend's genAmneziaWGConfig produces (same field order, same optional-field
 // conditionals) -- this is the payload wrapped into vpn:// links below.
-func amneziaWGConfigText(server *amneziawg.ServerSettings, client *model.Client, host string, port int, remark string) string {
+func amneziaWGConfigText(server *amneziawg.ServerSettings, client *model.Client, host string, port int, remark, allowedIPs string) string {
 	lines := []string{
 		"[Interface]",
 		"PrivateKey = " + client.PrivateKey,
@@ -1276,7 +1281,7 @@ func amneziaWGConfigText(server *amneziawg.ServerSettings, client *model.Client,
 	if client.PreSharedKey != "" {
 		lines = append(lines, "PresharedKey = "+client.PreSharedKey)
 	}
-	lines = append(lines, "AllowedIPs = 0.0.0.0/0, ::/0", fmt.Sprintf("Endpoint = %s:%d", host, port))
+	lines = append(lines, "AllowedIPs = "+allowedIPs, fmt.Sprintf("Endpoint = %s:%d", host, port))
 	if client.KeepAlive != nil {
 		keepAlive := client.KeepAliveText()
 		if (strings.Contains(keepAlive, "-") && client.KeepAlive.Validate(true) == nil) || client.KeepAlive.Seconds() > 0 {
@@ -1313,10 +1318,11 @@ func (s *SubService) genAmneziaWGLink(inbound *model.Inbound, email string) stri
 	}
 	client := &resolved
 
+	allowedIPs := localdirect.AmneziaWGAllowedIPs(s.amneziaWGTunnel, []string{server.PrimaryDNS, server.SecondaryDNS})
 	endpoints := s.advertisedEndpoints(inbound)
 	links := make([]string, 0, len(endpoints))
 	for _, e := range endpoints {
-		text := amneziaWGConfigText(server, client, e.Address, e.Port, s.endpointRemark(inbound, email, e.ep, ""))
+		text := amneziaWGConfigText(server, client, e.Address, e.Port, s.endpointRemark(inbound, email, e.ep, ""), allowedIPs)
 		if text == "" {
 			continue
 		}

@@ -61,6 +61,7 @@ export const AllSettingSchema = z
     tgCpu: z.number().int().min(0).max(100).optional(),
     outboundDownThreshold: z.number().int().min(1).max(100).optional(),
     nodeDownThreshold: z.number().int().min(1).max(100).optional(),
+    nodeSilenceMinutes: z.number().int().min(0).max(10080).optional(),
     tgLang: z.string().optional(),
     twoFactorEnable: z.boolean().optional(),
     twoFactorToken: z.string().optional(),
@@ -110,6 +111,7 @@ export const AllSettingSchema = z
     subClashAutoGroupTolerance: z.number().int().min(0).max(10000).optional(),
     subLocalDirect: z.string().optional(),
     subLocalDirectProxy: z.string().optional(),
+    subLocalDirectAwg: z.boolean().optional(),
     subJsonMux: z.string().optional(),
     subJsonRules: z.string().optional(),
     subJsonRoutingRules: z.string().optional(),
@@ -227,6 +229,7 @@ export const AllSettingSchema = z
     connLogMaxSizeMB: z.number().int().min(16).max(1048576).optional(),
     connLogDestination: z.enum(['full', 'domain', 'none']).optional(),
     connLogSource: z.enum(['full', 'masked', 'none']).optional(),
+    auditLogRetentionDays: z.number().int().min(1).max(3650).optional(),
   })
   .loose();
 

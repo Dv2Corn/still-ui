@@ -104,7 +104,7 @@ STILL_UI_ARCHIVE=/path/still-ui-linux-amd64.tar.gz bash install.sh
 
 Установщик сам придумает логин, пароль и путь к панели и покажет их в конце — сохраните. Дальше команда `still-ui` открывает меню управления: запуск и остановка, просмотр и сброс входа, смена порта, сертификаты и прочее. Подкоманды те же, что у скрипта `x-ui` в 3x-ui: `still-ui start`, `stop`, `restart`, `status`, `log`, `update`, `legacy`, `uninstall` и другие.
 
-Сборки выпуска есть только под **Linux amd64 и arm64**. Текущий выпуск — still-ui **1.9.2** на основе 3x-ui 3.11.0 и исправлений, принятых после неё, с **Xray v26.10.31** в собственной сборке still-ui ([чем отличается](scripts/xray-build/README.md)).
+Сборки выпуска есть только под **Linux amd64 и arm64**. Текущий выпуск — still-ui **1.10.0** на основе 3x-ui 3.11.0 и исправлений, принятых после неё, с **Xray v26.10.31** в собственной сборке still-ui ([чем отличается](scripts/xray-build/README.md)).
 
 ### Что где лежит
 
@@ -266,6 +266,8 @@ BitTorrent, зашифрованный внутри дополнительног
 
 С нодами выберите **Все ноды** или **Выбранные ноды**: панель передаёт им фильтр и повторяет попытки для недоступных; ноды, убранные из списка, оставляют последний фильтр себе. Нода показывает, что фильтр задан центральной панелью; если сохранить его на ноде, он станет её собственным, пока центральная панель не пришлёт его снова.
 
+**Отдельный IP выхода.** Нужен на сервере с двумя и более публичными IPv4-адресами. Обычно трафик уходит с того же адреса, к которому подключаются клиенты, и адрес, который видят сайты, прямо указывает на точку входа; на наших серверах адрес входа заблокировали примерно через сутки после того, как он стал и адресом выхода. **Конфигурации Xray → Исходящие → ещё → Отдельный IP выхода** спрашивает другой IPv4-адрес сервера и входящие, к которым его применить, и добавляет исходящее `freedom` с `sendThrough` на этот адрес и правило маршрутизации в конце списка, которое отправляет туда эти входящие. Адрес, который выбранное входящее слушает или объявляет своим адресом для ссылок, отклоняется, но входящие, слушающие все адреса, проверить нельзя, а сам адрес должен быть действительно назначен серверу, иначе трафик не уйдёт. Трафик, который более ранние правила отправляют в другое место (WARP, blackhole), не затрагивается; чтобы применить, нажмите **Сохранить**.
+
 ## Проверить выпуск
 
 Архивы выпусков собирает GitHub Actions из коммита с тегом ([сценарий выпуска](.github/workflows/release.yml)), а не компьютер разработчика, и к каждому архиву прилагается подписанная [аттестация происхождения](https://docs.github.com/ru/actions/security-for-github-actions/using-artifact-attestations). Выпуски до 1.4.0 включительно собраны вручную скриптом `scripts/still-release.sh`, у них есть только файлы `.sha256`.
@@ -279,10 +281,10 @@ BitTorrent, зашифрованный внутри дополнительног
 | `install.sh`, `update.sh`, `x-ui.sh`, `migrate.sh` | установщик, скрипт обновления, меню `still-ui` и переезд с 3x-ui этого выпуска (те же файлы лежат в архиве); кнопка обновления в панели и `still-ui update` запускают `update.sh`, только если его сумма есть в `SHA256SUMS` |
 | `SHA256SUMS` | контрольные суммы архивов, SBOM, архивов агента проверки и скриптов |
 
-Скачать и проверить суммы (вместо `v1.9.2` — выпуск, который ставите):
+Скачать и проверить суммы (вместо `v1.10.0` — выпуск, который ставите):
 
 ```bash
-gh release download v1.9.2 -R Dv2Corn/still-ui -p 'still-ui-linux-amd64.tar.gz*' -p SHA256SUMS
+gh release download v1.10.0 -R Dv2Corn/still-ui -p 'still-ui-linux-amd64.tar.gz*' -p SHA256SUMS
 sha256sum -c SHA256SUMS --ignore-missing
 ```
 
@@ -290,7 +292,7 @@ sha256sum -c SHA256SUMS --ignore-missing
 
 ```bash
 gh attestation verify still-ui-linux-amd64.tar.gz -R Dv2Corn/still-ui \
-  --signer-workflow Dv2Corn/still-ui/.github/workflows/release.yml --source-ref refs/tags/v1.9.2
+  --signer-workflow Dv2Corn/still-ui/.github/workflows/release.yml --source-ref refs/tags/v1.10.0
 ```
 
 SBOM тоже подписан:
@@ -304,7 +306,7 @@ gh attestation verify still-ui-linux-amd64.tar.gz -R Dv2Corn/still-ui --predicat
 ```bash
 tar -xzf still-ui-linux-amd64.tar.gz still-ui/bin/xray-linux-amd64
 sha256sum still-ui/bin/xray-linux-amd64
-git clone https://github.com/Dv2Corn/still-ui && cd still-ui && git checkout v1.9.2
+git clone https://github.com/Dv2Corn/still-ui && cd still-ui && git checkout v1.10.0
 scripts/xray-build/build.sh /tmp/xray-out amd64 arm64
 ```
 

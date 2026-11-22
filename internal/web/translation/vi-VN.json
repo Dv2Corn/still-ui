@@ -136,7 +136,8 @@
     "unpinSidebar": "Bỏ ghim thanh bên",
     "subFormats": "Sub Formats",
     "probes": "Thăm dò",
-    "connections": "Kết nối"
+    "connections": "Kết nối",
+    "audit": "Nhật ký kiểm toán"
   },
   "pages": {
     "login": {
@@ -1025,6 +1026,10 @@
       "importClients": "Nhập khách hàng",
       "import": "Nhập",
       "delOrphans": "Xóa khách hàng không gắn inbound",
+      "rotationCheck": "Kiểm tra cấp lại gói đăng ký",
+      "rotationCheckRunning": "Đang kiểm tra cấp lại gói đăng ký…",
+      "rotationCheckPassed": "Cấp lại gói đăng ký hoạt động",
+      "rotationCheckFailed": "Kiểm tra cấp lại gói đăng ký thất bại",
       "delOrphansConfirmTitle": "Xóa khách hàng không thuộc inbound nào?",
       "delOrphansConfirmContent": "Gỡ tất cả khách hàng không được gắn vào bất kỳ inbound nào, cùng với bản ghi lưu lượng của họ. Không thể hoàn tác.",
       "auth": "Auth",
@@ -1603,7 +1608,8 @@
         "apiTokenEmpty": "Chưa có token nào — tạo một token để xác thực bot hoặc panel từ xa.",
         "apiTokenDeleteWarning": "Mọi client đang dùng token này sẽ ngừng xác thực ngay lập tức.",
         "apiTokenCreatedTitle": "Đã tạo token",
-        "apiTokenCreatedNotice": "Hãy sao chép token này ngay bây giờ. Vì lý do bảo mật, token không được lưu ở dạng đọc được và sẽ không hiển thị lại."
+        "apiTokenCreatedNotice": "Hãy sao chép token này ngay bây giờ. Vì lý do bảo mật, token không được lưu ở dạng đọc được và sẽ không hiển thị lại.",
+        "audit": "Nhật ký kiểm toán"
       },
       "toasts": {
         "modifySettings": "Các tham số đã được thay đổi.",
@@ -1653,6 +1659,8 @@
       "eventNodeUp": "Hoạt động",
       "eventNodeTraffic": "Giới hạn lưu lượng",
       "eventNodeTrafficHint": "đặt cho từng node ở trang Node",
+      "eventNodeSilent": "Im lặng",
+      "eventNodeSilentHint": "số phút mất liên lạc, 0 = tắt",
       "eventCPUHigh": "CPU cao (%)",
       "requestFailed": "Yêu cầu thất bại",
       "smtpEncryption": "Mã hóa",
@@ -2039,6 +2047,8 @@
       "subLocalDirectOff": "Tắt",
       "subLocalDirectProxy": "Luôn qua VPN",
       "subLocalDirectProxyDesc": "Telegram, YouTube, Instagram, Facebook, WhatsApp, Discord, ChatGPT và Claude luôn đi qua VPN dù trông giống trong nước. Thêm tên miền hoặc dải IP khác vào đây, mỗi dòng một mục; chúng được kiểm tra trước quy tắc quốc gia.",
+      "subLocalDirectAwg": "Cả tệp AmneziaWG",
+      "subLocalDirectAwgDesc": "Tệp cấu hình AmneziaWG (tải về, QR, liên kết vpn://) cũng bỏ qua địa chỉ của quốc gia và DNS vẫn truy cập được. Tệp này lớn (~35 KB, ~2000 tiền tố) và có thể không vừa mã QR. Phía máy chủ không đổi, nên tệp đã nhập trước đó vẫn là đường hầm toàn phần cho đến khi nhập lại.",
       "subProbeOrder": "Dùng kết quả thăm dò",
       "subProbeOrderDesc": "Các liên kết mà bộ thăm dò báo là không truy cập được (thất bại 2 lần liên tiếp) sẽ được chuyển xuống cuối gói đăng ký hoặc bị ẩn, ở mọi định dạng: liên kết, JSON và Clash. Người dùng luôn còn ít nhất một liên kết, và nếu không có kết quả thăm dò mới thì không có gì thay đổi. Trang Thăm dò cho biết điều gì xảy ra với từng điểm kết nối.",
       "subProbeOrderOff": "Tắt (mặc định)",
@@ -2068,7 +2078,9 @@
       "connLogSourceDesc": "Lưu gì về địa chỉ mà khách hàng kết nối từ đó.",
       "connLogSourceFull": "Địa chỉ đầy đủ và cổng",
       "connLogSourceMasked": "Chỉ mạng (/24 với IPv4, /48 với IPv6)",
-      "connLogPrivacyHint": "Nhật ký này chứa dữ liệu cá nhân: chỉ lưu những gì cần. Nó nằm cạnh cơ sở dữ liệu của bảng điều khiển, không nằm trong đó và không nằm trong bản sao lưu. Thay đổi áp dụng cho kết nối mới; dữ liệu đã lưu giữ nguyên cho đến khi hết hạn."
+      "connLogPrivacyHint": "Nhật ký này chứa dữ liệu cá nhân: chỉ lưu những gì cần. Nó nằm cạnh cơ sở dữ liệu của bảng điều khiển, không nằm trong đó và không nằm trong bản sao lưu. Thay đổi áp dụng cho kết nối mới; dữ liệu đã lưu giữ nguyên cho đến khi hết hạn.",
+      "auditLogRetention": "Giữ mục kiểm toán (ngày)",
+      "auditLogRetentionDesc": "Các mục cũ hơn bị xóa mỗi giờ; chuỗi vẫn xác minh được."
     },
     "xray": {
       "importRules": "Nhập quy tắc",
@@ -2641,7 +2653,20 @@
       "defaultOutboundDesc": "Lưu lượng không khớp quy tắc định tuyến dùng outbound này (mục đầu danh sách).",
       "routingScript": "Script định tuyến",
       "routingScriptDesc": "Đường dẫn tới tệp .lua định nghĩa HandleRoute, tuyệt đối hoặc tương đối với thư mục bin của Xray. Khi đó script chọn mọi tuyến và Xray bỏ qua tất cả quy tắc định tuyến, kể cả quy tắc api của panel: hãy chuyển inbound api tới outbound api, nếu không thống kê lưu lượng và việc áp dụng thay đổi client trực tiếp sẽ dừng. Xray sẽ không khởi động nếu tệp không tồn tại hoặc không hợp lệ.",
-      "routingScriptActive": "Một script định tuyến đã được đặt trong {section}, nên Xray bỏ qua các quy tắc này."
+      "routingScriptActive": "Một script định tuyến đã được đặt trong {section}, nên Xray bỏ qua các quy tắc này.",
+      "exitAddress": {
+        "menu": "IP đầu ra riêng",
+        "title": "Tách IP đầu vào và đầu ra",
+        "intro": "Máy khách vẫn kết nối tới địa chỉ của inbound, còn lưu lượng của họ rời máy chủ qua một địa chỉ IPv4 khác của máy chủ này. Tách riêng hai địa chỉ giúp địa chỉ mà các trang web nhìn thấy không làm lộ địa chỉ máy khách kết nối tới.",
+        "exitIp": "Địa chỉ IPv4 đầu ra",
+        "exitIpHint": "Một địa chỉ IPv4 khác được gán cho máy chủ này. Không thể kiểm tra các inbound lắng nghe trên mọi địa chỉ, hãy đảm bảo máy khách kết nối tới địa chỉ khác.",
+        "inbounds": "Inbound",
+        "inboundsRequired": "Chọn ít nhất một inbound",
+        "invalidIp": "Nhập địa chỉ IPv4 hợp lệ",
+        "sameAsInbound": "Máy khách kết nối tới địa chỉ này. Hãy chọn một địa chỉ khác của máy chủ.",
+        "tagTaken": "Đã có outbound cho IP đầu ra này",
+        "added": "Đã thêm outbound đầu ra và quy tắc định tuyến. Lưu để áp dụng."
+      }
     },
     "hosts": {
       "addHost": "Thêm Host",
@@ -2858,6 +2883,27 @@
       "newer": "Mới hơn",
       "older": "Cũ hơn",
       "ofClient": "Kết nối của khách hàng này"
+    },
+    "audit": {
+      "title": "Nhật ký kiểm toán",
+      "intro": "Mọi thao tác quản trị làm thay đổi trạng thái và mọi lần đăng nhập, được xâu chuỗi bằng SHA-256 để phát hiện mục bị sửa hoặc xóa. Không bao giờ lưu nội dung yêu cầu hay bí mật. Mỗi lần tìm kiếm và xuất tại đây cũng được ghi lại.",
+      "time": "Thời gian",
+      "actor": "Người dùng hoặc token",
+      "ip": "IP nguồn",
+      "action": "Thao tác",
+      "target": "Đối tượng",
+      "outcome": "Kết quả",
+      "detail": "Chi tiết",
+      "actorPlaceholder": "Người dùng hoặc token (chính xác)",
+      "actionPlaceholder": "Thao tác chứa…",
+      "success": "Thành công",
+      "failure": "Thất bại",
+      "exportCsv": "Xuất CSV",
+      "exportHint": "Bản xuất chứa tối đa {count} dòng của bộ lọc hiện tại, thời gian theo UTC.",
+      "empty": "Không có mục nào khớp.",
+      "verify": "Xác minh chuỗi",
+      "verifyOk": "Chuỗi còn nguyên vẹn: đã kiểm tra {count} mục.",
+      "verifyBroken": "Chuỗi bị đứt tại mục #{id}: {reason}"
     }
   },
   "tgbot": {
@@ -2989,6 +3035,8 @@
       "alertNodeTrafficLimit": "Node {{ .Name }} đã hết giới hạn lưu lượng: {{ .Used }} / {{ .Limit }}. Đặt lại ngày {{ .Reset }}.",
       "alertNodeTrafficLimitOff": "Node {{ .Name }} đã hết giới hạn lưu lượng: {{ .Used }} / {{ .Limit }}. Các inbound tắt đến {{ .Reset }}.",
       "alertNodeTrafficBack": "Node {{ .Name }} đã trở lại dưới giới hạn lưu lượng: {{ .Used }} / {{ .Limit }}.",
+      "alertNodeSilent": "Nút {{ .Name }} ({{ .Address }}) không phản hồi trong {{ .Minutes }} phút. Lần cuối thấy: {{ .LastSeen }}.",
+      "alertNodeSilentBack": "Nút {{ .Name }} ({{ .Address }}) đã phản hồi lại sau {{ .Minutes }} phút im lặng.",
       "alertSubLeak": "Gói đăng ký của {{ .Client }} có thể đã bị lộ: được tải từ {{ .Count }} mạng trong {{ .Hours }} giờ (lần đầu {{ .First }}, lần cuối {{ .Last }}). Không có gì bị chặn.\nVí dụ: {{ .Networks }}",
       "inboundsCount": "🔌 Inbounds: {{ .Count }}\r\n",
       "clientsCount": "👥 Clients: {{ .Count }}\r\n",

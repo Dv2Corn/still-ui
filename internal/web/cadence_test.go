@@ -29,6 +29,7 @@ func TestJobCadencesAreValidCronSpecs(t *testing.T) {
 		"cadenceCertWatch":     cadenceCertWatch,
 		"cadenceHealthAlerts":  cadenceHealthAlerts,
 		"cadenceConnLog":       cadenceConnLog,
+		"cadenceAuditPrune":    cadenceAuditPrune,
 		"cadenceTorrentBlock":  cadenceTorrentBlock,
 		"cadenceEgressFilter":  cadenceEgressFilter,
 		"cadenceReachStale":    cadenceReachStale,

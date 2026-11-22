@@ -189,7 +189,8 @@ The rules, in match order:
 | **Happ, INCY** | A routing profile in the `Routing` response header, proxy rules ahead of direct ones; Happ also gets `Routing-Enable: true`. |
 | **Shadowrocket** | A rules file at `<subscription URL>/shadowrocket.conf`, offered on the subscription page: add it on the Config tab and set Global Routing to Config. Zones and `GEOIP` only, Shadowrocket has no `GEOSITE` rule. |
 | **Raw links (Base64)** | Nothing. A list of links cannot carry routing rules; apps that only take links need the JSON subscription or their own routing settings. |
-| **AmneziaWG, WireGuard** | Nothing. These tunnels route only by IP prefixes (`AllowedIPs`), and a whole country is thousands of prefixes that keep changing. |
+| **AmneziaWG** | Nothing by default. With **AmneziaWG files too** (`subLocalDirectAwg`) on, every AmneziaWG config the panel renders (`vpn://` links, the clients page download and QR, the inbound export) gets `AllowedIPs` = all IPv4 minus the country's `geoip` ranges and private ranges, with the always-VPN IPv4 ranges put back, any IPv4 DNS server of the config outside that added as `/32`, then `::/0` (IPv6 stays in the tunnel). The country's ranges are read from the panel's own `geoip.dat`; without the category the file stays a full tunnel. The file is large (about 35 KB, ~2000 prefixes) and may not fit in a QR code. The server-side peer is unchanged, so files imported earlier keep working as a full tunnel until re-imported. |
+| **WireGuard** | Nothing. These tunnels route only by IP prefixes (`AllowedIPs`), and a whole country is thousands of prefixes that keep changing. |
 
 A routing profile you set for a format yourself wins in that format. A **JSON
 routing profile** (`subJsonRoutingRules`) replaces these rules in JSON

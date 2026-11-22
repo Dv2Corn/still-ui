@@ -6,6 +6,7 @@ import (
 
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/middleware"
+	"github.com/mhsanaei/3x-ui/v3/internal/web/service"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/service/panel"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/service/tgbot"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/session"
@@ -24,6 +25,7 @@ type APIController struct {
 	xraySettingController *XraySettingController
 	userService           panel.UserService
 	apiTokenService       panel.ApiTokenService
+	auditService          service.AuditService
 	Tgbot                 tgbot.Tgbot
 }
 
@@ -46,6 +48,7 @@ func (a *APIController) checkAPIAuth(c *gin.Context) {
 	if after, ok := strings.CutPrefix(c.GetHeader("Authorization"), "Bearer "); ok {
 		if row, matched := a.apiTokenService.MatchToken(after); matched {
 			matchedScope = row.Scope
+			c.Set("api_token_name", row.Name)
 		}
 	}
 	// Verified mTLS keeps its historical node-sync identity. Only an explicit
@@ -199,6 +202,8 @@ func (a *APIController) initRouter(g *gin.RouterGroup) {
 	// Main API group
 	api := g.Group("/panel/api")
 	api.Use(a.checkAPIAuth)
+	// Before the scope check, so a request a token may not make is journaled as a failure.
+	api.Use(a.recordAudit)
 	api.Use(a.enforceTokenScope)
 	// Decode + verify the node config envelope (zstd + X-Config-Sha256) and
 	// advertise support, before CSRF/handlers read the body.
@@ -241,6 +246,9 @@ func (a *APIController) initRouter(g *gin.RouterGroup) {
 
 	// Connection log — who connected, when, through which inbound, where to
 	NewConnLogController(api.Group("/connlog"))
+
+	// Admin audit log — the journal of state-changing admin actions
+	NewAuditController(api.Group("/audit"))
 
 	// Extra routes
 	api.POST("/backuptotgbot", a.BackuptoTgbot)

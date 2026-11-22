@@ -136,7 +136,8 @@
     "unpinSidebar": "Kenar çubuğu sabitlemesini kaldır",
     "subFormats": "Abonelik Formatları",
     "probes": "Yoklayıcılar",
-    "connections": "Bağlantılar"
+    "connections": "Bağlantılar",
+    "audit": "Denetim günlüğü"
   },
   "pages": {
     "login": {
@@ -1025,6 +1026,10 @@
       "importClients": "Kullanıcıları İçe Aktar",
       "import": "İçe Aktar",
       "delOrphans": "Bağsız Kullanıcıları Sil",
+      "rotationCheck": "Abonelik yeniden oluşturmayı denetle",
+      "rotationCheckRunning": "Abonelik yeniden oluşturma denetleniyor…",
+      "rotationCheckPassed": "Abonelik yeniden oluşturma çalışıyor",
+      "rotationCheckFailed": "Abonelik yeniden oluşturma denetimi başarısız oldu",
       "delOrphansConfirmTitle": "Gelen Bağlantısı Olmayan Kullanıcılar Silinsin Mi?",
       "delOrphansConfirmContent": "Hiçbir gelen bağlantıya bağlı olmayan her kullanıcı, trafik kaydıyla birlikte silinir. Geri alınamaz.",
       "auth": "Auth",
@@ -1603,7 +1608,8 @@
         "apiTokenEmpty": "Henüz token yok — botları veya uzak panelleri doğrulamak için bir tane oluşturun.",
         "apiTokenDeleteWarning": "Bu token'ı kullanan tüm bağlantılar anında kimlik doğrulamasını kaybeder.",
         "apiTokenCreatedTitle": "Token Oluşturuldu",
-        "apiTokenCreatedNotice": "Bu token'ı şimdi kopyalayın. Güvenlik nedeniyle okunabilir biçimde saklanmaz ve tekrar gösterilmez."
+        "apiTokenCreatedNotice": "Bu token'ı şimdi kopyalayın. Güvenlik nedeniyle okunabilir biçimde saklanmaz ve tekrar gösterilmez.",
+        "audit": "Denetim günlüğü"
       },
       "toasts": {
         "modifySettings": "Parametreler değiştirildi.",
@@ -1653,6 +1659,8 @@
       "eventNodeUp": "Çevrimiçi",
       "eventNodeTraffic": "Trafik sınırı",
       "eventNodeTrafficHint": "Düğümler sayfasında düğüm başına ayarlanır",
+      "eventNodeSilent": "Sessiz",
+      "eventNodeSilentHint": "bağlantısız dakika, 0 = kapalı",
       "eventCPUHigh": "Yüksek CPU (%)",
       "requestFailed": "İstek başarısız oldu",
       "smtpEncryption": "Şifreleme",
@@ -2039,6 +2047,8 @@
       "subLocalDirectOff": "Kapalı",
       "subLocalDirectProxy": "Her zaman VPN üzerinden",
       "subLocalDirectProxyDesc": "Telegram, YouTube, Instagram, Facebook, WhatsApp, Discord, ChatGPT ve Claude yerel görünseler bile her zaman VPN üzerinden gider. Buraya başka alan adları veya IP aralıkları ekleyin, her satıra bir tane; ülke kuralından önce denetlenir.",
+      "subLocalDirectAwg": "AmneziaWG dosyalarında da",
+      "subLocalDirectAwgDesc": "AmneziaWG yapılandırma dosyaları (indirme, QR, vpn:// bağlantıları) da ülkenin adreslerini tünel dışında bırakır, DNS erişilebilir kalır. Dosya büyüktür (~35 KB, ~2000 önek) ve QR koduna sığmayabilir. Sunucu tarafı değişmez; önceden içe aktarılan dosyalar yeniden aktarılana kadar tam tünel olarak çalışır.",
       "subProbeOrder": "Yoklayıcı sonuçlarını kullan",
       "subProbeOrderDesc": "Erişilebilirlik yoklayıcılarının erişilemez bildirdiği bağlantılar (art arda 2 başarısız kontrol) aboneliğin sonuna taşınır veya gizlenir; tüm biçimlerde: bağlantılar, JSON ve Clash. Kullanıcıda her zaman en az bir bağlantı kalır ve güncel yoklayıcı sonucu yoksa hiçbir şey değişmez. Yoklayıcılar sayfası her uç noktaya ne olduğunu gösterir.",
       "subProbeOrderOff": "Kapalı (varsayılan)",
@@ -2068,7 +2078,9 @@
       "connLogSourceDesc": "Kullanıcının bağlandığı adres hakkında ne saklanır.",
       "connLogSourceFull": "Tam adres ve port",
       "connLogSourceMasked": "Yalnızca ağ (IPv4 için /24, IPv6 için /48)",
-      "connLogPrivacyHint": "Bu günlük kişisel veri içerir: yalnızca gerekeni saklayın. Panel veritabanının yanında durur; veritabanının ve yedeklerinin içinde değildir. Değişiklik yeni bağlantılara uygulanır; kaydedilmiş olanlar süresi dolana kadar olduğu gibi kalır."
+      "connLogPrivacyHint": "Bu günlük kişisel veri içerir: yalnızca gerekeni saklayın. Panel veritabanının yanında durur; veritabanının ve yedeklerinin içinde değildir. Değişiklik yeni bağlantılara uygulanır; kaydedilmiş olanlar süresi dolana kadar olduğu gibi kalır.",
+      "auditLogRetention": "Denetim kayıtlarını sakla (gün)",
+      "auditLogRetentionDesc": "Daha eski kayıtlar her saat silinir; zincir doğrulanabilir kalır."
     },
     "xray": {
       "save": "Kaydet",
@@ -2641,7 +2653,20 @@
       "defaultOutboundDesc": "Yönlendirme kuralıyla eşleşmeyen trafik bu gideni kullanır (listedeki ilk giden).",
       "routingScript": "Yönlendirme Betiği",
       "routingScriptDesc": "HandleRoute tanımlayan bir .lua dosyasının yolu; mutlak ya da Xray bin klasörüne göre göreli. Betik bundan sonra her rotayı seçer ve Xray, panelin api kuralı dahil tüm yönlendirme kurallarını yok sayar: api gelen bağlantısını api giden bağlantısına yönlendirin, yoksa trafik istatistikleri ve canlı istemci değişiklikleri durur. Dosya yoksa veya geçersizse Xray başlamaz.",
-      "routingScriptActive": "{section} bölümünde bir yönlendirme betiği ayarlı, bu yüzden Xray bu kuralları yok sayar."
+      "routingScriptActive": "{section} bölümünde bir yönlendirme betiği ayarlı, bu yüzden Xray bu kuralları yok sayar.",
+      "exitAddress": {
+        "menu": "Ayrı çıkış IP",
+        "title": "Ayrı giriş ve çıkış IP",
+        "intro": "İstemciler gelen bağlantının adresine bağlanmaya devam eder, trafikleri ise sunucudan bu sunucunun başka bir IPv4 adresiyle çıkar. İkisini ayrı tutmak, sitelerin gördüğü adresin istemcilerin bağlandığı adresi ele vermesini önler.",
+        "exitIp": "Çıkış IPv4 adresi",
+        "exitIpHint": "Bu sunucuya atanmış başka bir IPv4 adresi. Tüm adresleri dinleyen gelenler denetlenemez; istemcilerin farklı bir adrese bağlandığından emin olun.",
+        "inbounds": "Gelenler",
+        "inboundsRequired": "En az bir gelen seçin",
+        "invalidIp": "Geçerli bir IPv4 adresi girin",
+        "sameAsInbound": "İstemciler bu adrese bağlanıyor. Sunucunun farklı bir adresini seçin.",
+        "tagTaken": "Bu çıkış IP için zaten bir giden var",
+        "added": "Çıkış gideni ve yönlendirme kuralı eklendi. Uygulamak için kaydedin."
+      }
     },
     "hosts": {
       "addHost": "Host Ekle",
@@ -2858,6 +2883,27 @@
       "newer": "Daha yeni",
       "older": "Daha eski",
       "ofClient": "Bu kullanıcının bağlantıları"
+    },
+    "audit": {
+      "title": "Denetim günlüğü",
+      "intro": "Durumu değiştiren her yönetici işlemi ve her oturum açma, SHA-256 ile zincirlenir; böylece düzenlenen veya silinen bir kayıt fark edilir. İstek gövdeleri ve gizli bilgiler asla saklanmaz. Buradaki her arama ve dışa aktarma da kaydedilir.",
+      "time": "Zaman",
+      "actor": "Kullanıcı veya token",
+      "ip": "Kaynak IP",
+      "action": "İşlem",
+      "target": "Hedef",
+      "outcome": "Sonuç",
+      "detail": "Ayrıntı",
+      "actorPlaceholder": "Kullanıcı veya token (tam)",
+      "actionPlaceholder": "İşlem şunu içerir…",
+      "success": "Başarılı",
+      "failure": "Başarısız",
+      "exportCsv": "CSV dışa aktar",
+      "exportHint": "Dışa aktarma, geçerli filtrenin en fazla {count} satırını UTC saatleriyle içerir.",
+      "empty": "Eşleşen kayıt yok.",
+      "verify": "Zinciri doğrula",
+      "verifyOk": "Zincir sağlam: {count} kayıt denetlendi.",
+      "verifyBroken": "Zincir #{id} numaralı kayıtta bozuk: {reason}"
     }
   },
   "tgbot": {
@@ -2989,6 +3035,8 @@
       "alertNodeTrafficLimit": "{{ .Name }} düğümü trafik sınırına ulaştı: {{ .Used }} / {{ .Limit }}. {{ .Reset }} tarihinde sıfırlanır.",
       "alertNodeTrafficLimitOff": "{{ .Name }} düğümü trafik sınırına ulaştı: {{ .Used }} / {{ .Limit }}. Gelen bağlantıları {{ .Reset }} tarihine kadar kapalı.",
       "alertNodeTrafficBack": "{{ .Name }} düğümü yeniden trafik sınırının altında: {{ .Used }} / {{ .Limit }}.",
+      "alertNodeSilent": "{{ .Name }} ({{ .Address }}) düğümü {{ .Minutes }} dakikadır yanıt vermiyor. Son görülme: {{ .LastSeen }}.",
+      "alertNodeSilentBack": "{{ .Name }} ({{ .Address }}) düğümü {{ .Minutes }} dakikalık sessizlikten sonra yeniden yanıt veriyor.",
       "alertSubLeak": "{{ .Client }} aboneliği sızmış olabilir: {{ .Hours }} saatte {{ .Count }} farklı ağdan alındı (ilk {{ .First }}, son {{ .Last }}). Hiçbir şey engellenmedi.\nÖrnek: {{ .Networks }}",
       "inboundsCount": "🔌 Inbounds: {{ .Count }}\r\n",
       "clientsCount": "👥 Clients: {{ .Count }}\r\n",

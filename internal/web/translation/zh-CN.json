@@ -136,7 +136,8 @@
     "unpinSidebar": "取消固定侧边栏",
     "subFormats": "Sub Formats",
     "probes": "探针",
-    "connections": "连接"
+    "connections": "连接",
+    "audit": "审计日志"
   },
   "pages": {
     "login": {
@@ -1025,6 +1026,10 @@
       "importClients": "导入客户端",
       "import": "导入",
       "delOrphans": "删除未关联的客户端",
+      "rotationCheck": "检查订阅重新签发",
+      "rotationCheckRunning": "正在检查订阅重新签发…",
+      "rotationCheckPassed": "订阅重新签发正常",
+      "rotationCheckFailed": "订阅重新签发检查失败",
       "delOrphansConfirmTitle": "删除没有入站的客户端？",
       "delOrphansConfirmContent": "删除所有未关联到任何入站的客户端及其流量记录。该操作不可撤销。",
       "auth": "认证",
@@ -1603,7 +1608,8 @@
         "apiTokenEmpty": "暂无令牌 — 创建一个用于认证机器人或远程面板。",
         "apiTokenDeleteWarning": "使用此令牌的任何调用方将立即无法认证。",
         "apiTokenCreatedTitle": "令牌已创建",
-        "apiTokenCreatedNotice": "请立即复制此令牌。出于安全考虑，它不会以可读形式存储，也不会再次显示。"
+        "apiTokenCreatedNotice": "请立即复制此令牌。出于安全考虑，它不会以可读形式存储，也不会再次显示。",
+        "audit": "审计日志"
       },
       "toasts": {
         "modifySettings": "参数已更改。",
@@ -1653,6 +1659,8 @@
       "eventNodeUp": "上线",
       "eventNodeTraffic": "流量上限",
       "eventNodeTrafficHint": "在节点页面为每个节点设置",
+      "eventNodeSilent": "失联",
+      "eventNodeSilentHint": "失联分钟数，0 = 关闭",
       "eventCPUHigh": "CPU 占用过高（%）",
       "requestFailed": "请求失败",
       "smtpEncryption": "加密",
@@ -2039,6 +2047,8 @@
       "subLocalDirectOff": "关闭",
       "subLocalDirectProxy": "始终走 VPN",
       "subLocalDirectProxyDesc": "Telegram、YouTube、Instagram、Facebook、WhatsApp、Discord、ChatGPT 和 Claude 即使看起来是本地地址也始终走 VPN。可在此添加其他域名或 IP 段，每行一个；它们在国家规则之前匹配。",
+      "subLocalDirectAwg": "同样用于 AmneziaWG 文件",
+      "subLocalDirectAwgDesc": "AmneziaWG 配置文件（下载、二维码、vpn:// 链接）同样让该国地址直连，DNS 仍可访问。这类文件较大（约 35 KB，约 2000 个前缀），可能无法放入二维码。服务器端不变，已导入的旧文件在重新导入前仍是全局隧道。",
       "subProbeOrder": "使用探针结果",
       "subProbeOrderDesc": "可达性探针报告不通的链接（连续 2 次失败）会移到订阅末尾或被隐藏，适用于所有格式：链接、JSON 和 Clash。用户始终至少保留一个链接；没有新的探针结果时不做任何改动。探针页面会显示每个端点的处理情况。",
       "subProbeOrderOff": "关闭（默认）",
@@ -2068,7 +2078,9 @@
       "connLogSourceDesc": "保存客户端来源地址的哪些信息。",
       "connLogSourceFull": "完整地址和端口",
       "connLogSourceMasked": "仅网段（IPv4 为 /24，IPv6 为 /48）",
-      "connLogPrivacyHint": "此日志包含个人数据：只保留需要的内容。它存放在面板数据库旁边，不在数据库内，也不在其备份中。更改只对新连接生效；已保存的记录保持原样，直到过期。"
+      "connLogPrivacyHint": "此日志包含个人数据：只保留需要的内容。它存放在面板数据库旁边，不在数据库内，也不在其备份中。更改只对新连接生效；已保存的记录保持原样，直到过期。",
+      "auditLogRetention": "审计条目保留天数",
+      "auditLogRetentionDesc": "更早的条目每小时删除一次；链仍可验证。"
     },
     "xray": {
       "importRules": "导入规则",
@@ -2641,7 +2653,20 @@
       "defaultOutboundDesc": "未匹配任何路由规则的流量走此出站（列表中的第一个出站）。",
       "routingScript": "路由脚本",
       "routingScriptDesc": "定义了 HandleRoute 的 .lua 文件路径，可为绝对路径或相对于 Xray bin 目录的路径。设置后由脚本选择所有路由，Xray 会忽略全部路由规则，包括面板的 api 规则：请把 api 入站路由到 api 出站，否则流量统计和客户端变更的实时生效都会停止。文件不存在或无效时 Xray 无法启动。",
-      "routingScriptActive": "已在“{section}”中设置路由脚本，因此 Xray 会忽略这些规则。"
+      "routingScriptActive": "已在“{section}”中设置路由脚本，因此 Xray 会忽略这些规则。",
+      "exitAddress": {
+        "menu": "独立出口 IP",
+        "title": "分离入口 IP 与出口 IP",
+        "intro": "客户端仍连接入站地址，而其流量通过本服务器的另一个 IPv4 地址离开服务器。将两者分开可避免网站看到的地址暴露客户端连接的地址。",
+        "exitIp": "出口 IPv4 地址",
+        "exitIpHint": "分配给本服务器的另一个 IPv4 地址。监听所有地址的入站无法检查，请确认客户端连接的是其他地址。",
+        "inbounds": "入站",
+        "inboundsRequired": "请至少选择一个入站",
+        "invalidIp": "请输入有效的 IPv4 地址",
+        "sameAsInbound": "客户端连接的就是此地址。请选择服务器的其他地址。",
+        "tagTaken": "该出口 IP 的出站已存在",
+        "added": "已添加出口出站和路由规则。保存后生效。"
+      }
     },
     "hosts": {
       "addHost": "添加主机",
@@ -2858,6 +2883,27 @@
       "newer": "较新",
       "older": "较旧",
       "ofClient": "此客户端的连接"
+    },
+    "audit": {
+      "title": "审计日志",
+      "intro": "每一次更改状态的管理操作和每一次登录都以 SHA-256 串联记录，因此被修改或删除的条目会被发现。从不保存请求正文和机密信息。此处的每次搜索和导出也会被记录。",
+      "time": "时间",
+      "actor": "用户或令牌",
+      "ip": "来源 IP",
+      "action": "操作",
+      "target": "对象",
+      "outcome": "结果",
+      "detail": "详情",
+      "actorPlaceholder": "用户或令牌（精确）",
+      "actionPlaceholder": "操作包含…",
+      "success": "成功",
+      "failure": "失败",
+      "exportCsv": "导出 CSV",
+      "exportHint": "导出最多包含当前筛选的 {count} 行，时间为 UTC。",
+      "empty": "没有匹配的条目。",
+      "verify": "验证链",
+      "verifyOk": "链完整：已检查 {count} 个条目。",
+      "verifyBroken": "链在条目 #{id} 处断裂：{reason}"
     }
   },
   "tgbot": {
@@ -2989,6 +3035,8 @@
       "alertNodeTrafficLimit": "节点 {{ .Name }} 已达到流量上限：{{ .Used }} / {{ .Limit }}。{{ .Reset }} 重置。",
       "alertNodeTrafficLimitOff": "节点 {{ .Name }} 已达到流量上限：{{ .Used }} / {{ .Limit }}。其入站已关闭至 {{ .Reset }}。",
       "alertNodeTrafficBack": "节点 {{ .Name }} 已回到流量上限以内：{{ .Used }} / {{ .Limit }}。",
+      "alertNodeSilent": "节点 {{ .Name }} ({{ .Address }}) 已 {{ .Minutes }} 分钟无响应。最后在线：{{ .LastSeen }}。",
+      "alertNodeSilentBack": "节点 {{ .Name }} ({{ .Address }}) 在失联 {{ .Minutes }} 分钟后恢复响应。",
       "alertSubLeak": "{{ .Client }} 的订阅可能已泄露：{{ .Hours }} 小时内从 {{ .Count }} 个网络获取，首次 {{ .First }}，最近 {{ .Last }}。未做任何封禁。\n例如：{{ .Networks }}",
       "inboundsCount": "🔌 Inbounds: {{ .Count }}\r\n",
       "clientsCount": "👥 Clients: {{ .Count }}\r\n",

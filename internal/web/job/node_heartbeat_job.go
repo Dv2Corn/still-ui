@@ -3,6 +3,7 @@ package job
 import (
 	"context"
 	"fmt"
+	"net"
 	"sort"
 	"strconv"
 	"strings"
@@ -24,13 +25,21 @@ const (
 	// per-node events overflow the notifier queues and every chat's rate limit.
 	nodeTransitionBurst      = 5
 	nodeTransitionBurstNames = 10
+
+	nodeSilenceStartupGrace = 10 * time.Minute
+	nodeSilenceCooldown     = 6 * time.Hour
 )
+
+// processStartedAt anchors the node.silent startup grace: the web server restarts in-process.
+var processStartedAt = time.Now()
 
 type NodeHeartbeatJob struct {
 	nodeService    service.NodeService
 	settingService service.SettingService
 	running        sync.Mutex
 	health         map[int]nodeHealth
+	now            func() time.Time
+	startedAt      time.Time
 }
 
 type nodeHealth struct {
@@ -44,7 +53,7 @@ type nodeProbe struct {
 }
 
 func NewNodeHeartbeatJob() *NodeHeartbeatJob {
-	return &NodeHeartbeatJob{}
+	return &NodeHeartbeatJob{now: time.Now, startedAt: processStartedAt}
 }
 
 func (j *NodeHeartbeatJob) Run() {
@@ -85,6 +94,7 @@ func (j *NodeHeartbeatJob) Run() {
 	}
 	wg.Wait()
 	publishNodeTransitions(j.healthTransitions(probes))
+	j.publishSilence(probes)
 
 	if !websocket.HasClients() {
 		return
@@ -101,6 +111,7 @@ func (j *NodeHeartbeatJob) probeOne(n *model.Node) service.HeartbeatPatch {
 	ctx, cancel := context.WithTimeout(context.Background(), nodeHeartbeatRequestTimeout)
 	defer cancel()
 	patch, err := j.nodeService.Probe(ctx, n)
+	patch.LastHeartbeat = j.now().Unix()
 	if err != nil {
 		patch.Status = "offline"
 	} else {
@@ -152,6 +163,57 @@ func (j *NodeHeartbeatJob) healthTransitions(probes []nodeProbe) []eventbus.Even
 		j.health[p.node.Id] = h
 	}
 	return events
+}
+
+// publishSilence raises node.silent once per outage and resolves it on the first answer.
+// The alert time is persisted, so a restart neither repeats nor forgets an announced outage.
+func (j *NodeHeartbeatJob) publishSilence(probes []nodeProbe) {
+	minutes, err := j.settingService.GetNodeSilenceMinutes()
+	if err != nil || minutes <= 0 {
+		return
+	}
+	now := j.now()
+	for _, p := range probes {
+		n := p.node
+		if n.LastSeenAt == 0 {
+			continue // never answered: node.down covers a node that never worked
+		}
+		lastSeen := time.Unix(n.LastSeenAt, 0)
+		silentFor := now.Sub(lastSeen)
+		announced := n.SilenceAlertAt > n.LastSeenAt
+		phase := ""
+		switch {
+		case p.patch.Status == "online":
+			if announced {
+				phase = "resolved"
+			}
+		case !announced && silentFor >= time.Duration(minutes)*time.Minute &&
+			now.Sub(j.startedAt) >= nodeSilenceStartupGrace &&
+			now.Sub(time.Unix(n.SilenceAlertAt, 0)) >= nodeSilenceCooldown:
+			phase = "raised"
+			if err := j.nodeService.SetSilenceAlertAt(n.Id, now.Unix()); err != nil {
+				logger.Warning("node heartbeat: save silence alert for node", n.Id, "failed:", err)
+				continue
+			}
+		}
+		if phase == "" || EventBus == nil {
+			continue
+		}
+		name := n.Name
+		if name == "" {
+			name = "node-" + strconv.Itoa(n.Id)
+		}
+		EventBus.Publish(eventbus.Event{
+			Type:   eventbus.EventNodeSilent,
+			Source: name,
+			Data: &eventbus.HealthAlertData{Phase: phase, Since: lastSeen, Params: map[string]string{
+				"Name":     name,
+				"Address":  net.JoinHostPort(n.Address, strconv.Itoa(n.Port)),
+				"Minutes":  strconv.Itoa(int(silentFor / time.Minute)),
+				"LastSeen": lastSeen.Local().Format("2006-01-02 15:04"),
+			}},
+		})
+	}
 }
 
 func (j *NodeHeartbeatJob) saveDownNotified(id int, notified bool) {

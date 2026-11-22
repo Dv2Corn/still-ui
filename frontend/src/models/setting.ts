@@ -99,6 +99,7 @@ export class AllSetting {
   subClashAutoGroupTolerance = 50;
   subLocalDirect = '';
   subLocalDirectProxy = '';
+  subLocalDirectAwg = false;
   subJsonMux = '';
   subJsonRules = '';
   subJsonRoutingRules = '';
@@ -200,6 +201,7 @@ export class AllSetting {
   smtpMemory = 80;
   outboundDownThreshold = 3;
   nodeDownThreshold = 1;
+  nodeSilenceMinutes = 30;
   hasTgBotToken = false;
   hasTwoFactorToken = false;
   hasLdapPassword = false;
@@ -240,6 +242,7 @@ export class AllSetting {
   connLogMaxSizeMB = 2048;
   connLogDestination = 'full';
   connLogSource = 'full';
+  auditLogRetentionDays = 90;
 
   constructor(data?: unknown) {
     if (data != null) {

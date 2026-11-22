@@ -136,7 +136,8 @@
     "unpinSidebar": "サイドバーの固定を解除",
     "subFormats": "Sub Formats",
     "probes": "プローブ",
-    "connections": "接続"
+    "connections": "接続",
+    "audit": "監査ログ"
   },
   "pages": {
     "login": {
@@ -1025,6 +1026,10 @@
       "importClients": "クライアントをインポート",
       "import": "インポート",
       "delOrphans": "未アタッチのクライアントを削除",
+      "rotationCheck": "サブスクリプション再発行をチェック",
+      "rotationCheckRunning": "サブスクリプション再発行をチェック中…",
+      "rotationCheckPassed": "サブスクリプション再発行は正常です",
+      "rotationCheckFailed": "サブスクリプション再発行のチェックに失敗しました",
       "delOrphansConfirmTitle": "インバウンドのないクライアントを削除しますか?",
       "delOrphansConfirmContent": "どのインバウンドにもアタッチされていないクライアントを、そのトラフィック記録とともにすべて削除します。元に戻せません。",
       "auth": "Auth",
@@ -1603,7 +1608,8 @@
         "apiTokenEmpty": "トークンがまだありません — ボットやリモートパネルを認証するために作成してください。",
         "apiTokenDeleteWarning": "このトークンを使用しているクライアントは直ちに認証できなくなります。",
         "apiTokenCreatedTitle": "トークンを作成しました",
-        "apiTokenCreatedNotice": "このトークンを今すぐコピーしてください。セキュリティ上、読み取り可能な形式では保存されず、再表示されません。"
+        "apiTokenCreatedNotice": "このトークンを今すぐコピーしてください。セキュリティ上、読み取り可能な形式では保存されず、再表示されません。",
+        "audit": "監査ログ"
       },
       "toasts": {
         "modifySettings": "パラメーターが変更されました。",
@@ -1653,6 +1659,8 @@
       "eventNodeUp": "アップ",
       "eventNodeTraffic": "トラフィック上限",
       "eventNodeTrafficHint": "ノードごとにノードページで設定",
+      "eventNodeSilent": "無応答",
+      "eventNodeSilentHint": "連絡のない分数、0 = オフ",
       "eventCPUHigh": "CPU高負荷（%）",
       "requestFailed": "リクエストに失敗しました",
       "smtpEncryption": "暗号化",
@@ -2039,6 +2047,8 @@
       "subLocalDirectOff": "オフ",
       "subLocalDirectProxy": "常に VPN 経由",
       "subLocalDirectProxyDesc": "Telegram、YouTube、Instagram、Facebook、WhatsApp、Discord、ChatGPT、Claude は、国内に見える場合でも常に VPN を経由します。ほかのドメインや IP 範囲を 1 行に 1 つずつここに追加できます。国のルールより先に判定されます。",
+      "subLocalDirectAwg": "AmneziaWG ファイルにも適用",
+      "subLocalDirectAwgDesc": "AmneziaWG の設定ファイル（ダウンロード、QR、vpn:// リンク）でもその国のアドレスを直接通し、DNS には引き続き到達できます。ファイルは大きく（約 35 KB、約 2000 プレフィックス）、QR コードに収まらない場合があります。サーバー側は変わらないため、既にインポートしたファイルは再インポートするまでフルトンネルのままです。",
       "subProbeOrder": "プローブの結果を使う",
       "subProbeOrderDesc": "到達性プローブが不通と報告したリンク（2回連続の失敗）は、サブスクリプションの末尾に移すか非表示にします。リンク、JSON、Clash のすべての形式に適用されます。ユーザーには常に少なくとも1つのリンクが残り、新しいプローブ結果がなければ何も変わりません。各エンドポイントの扱いはプローブのページで確認できます。",
       "subProbeOrderOff": "オフ（既定）",
@@ -2068,7 +2078,9 @@
       "connLogSourceDesc": "クライアントの接続元アドレスについて何を保存するか。",
       "connLogSourceFull": "完全なアドレスとポート",
       "connLogSourceMasked": "ネットワークのみ（IPv4 は /24、IPv6 は /48）",
-      "connLogPrivacyHint": "このログには個人データが含まれます。必要なものだけを保存してください。パネルのデータベースの隣に保存され、データベースにもそのバックアップにも含まれません。変更は新しい接続に適用され、保存済みの記録は期限が切れるまでそのまま残ります。"
+      "connLogPrivacyHint": "このログには個人データが含まれます。必要なものだけを保存してください。パネルのデータベースの隣に保存され、データベースにもそのバックアップにも含まれません。変更は新しい接続に適用され、保存済みの記録は期限が切れるまでそのまま残ります。",
+      "auditLogRetention": "監査エントリの保持期間（日）",
+      "auditLogRetentionDesc": "古いエントリは毎時削除されます。チェーンは検証可能なままです。"
     },
     "xray": {
       "importRules": "ルールをインポート",
@@ -2641,7 +2653,20 @@
       "defaultOutboundDesc": "ルーティング規則に一致しないトラフィックはこのアウトバウンドを使います（一覧の先頭）。",
       "routingScript": "ルーティングスクリプト",
       "routingScriptDesc": "HandleRoute を定義した .lua ファイルのパス（絶対パス、または Xray の bin フォルダからの相対パス）。設定するとスクリプトがすべての経路を選び、Xray はパネルの api ルールを含むすべてのルーティングルールを無視します。api インバウンドを api アウトバウンドへ送らないと、トラフィック統計とクライアント変更の即時反映が止まります。ファイルが存在しないか不正な場合、Xray は起動しません。",
-      "routingScriptActive": "{section} でルーティングスクリプトが設定されているため、Xray はこれらのルールを無視します。"
+      "routingScriptActive": "{section} でルーティングスクリプトが設定されているため、Xray はこれらのルールを無視します。",
+      "exitAddress": {
+        "menu": "出口IPを分離",
+        "title": "入口IPと出口IPを分離",
+        "intro": "クライアントは引き続きインバウンドのアドレスに接続し、トラフィックはこのサーバーの別のIPv4アドレスから送出されます。2つを分けることで、Webサイトから見えるアドレスからクライアントの接続先アドレスが特定されるのを防ぎます。",
+        "exitIp": "出口IPv4アドレス",
+        "exitIpHint": "このサーバーに割り当てられた別のIPv4アドレス。すべてのアドレスで待ち受けるインバウンドは確認できないため、クライアントが別のアドレスに接続していることを確認してください。",
+        "inbounds": "インバウンド",
+        "inboundsRequired": "インバウンドを1つ以上選択してください",
+        "invalidIp": "有効なIPv4アドレスを入力してください",
+        "sameAsInbound": "このアドレスにはクライアントが接続しています。サーバーの別のアドレスを選んでください。",
+        "tagTaken": "この出口IPのアウトバウンドは既に存在します",
+        "added": "出口アウトバウンドとルーティングルールを追加しました。保存すると適用されます。"
+      }
     },
     "hosts": {
       "addHost": "ホストを追加",
@@ -2858,6 +2883,27 @@
       "newer": "新しい方へ",
       "older": "古い方へ",
       "ofClient": "このクライアントの接続"
+    },
+    "audit": {
+      "title": "監査ログ",
+      "intro": "状態を変更する管理操作とログインをすべて SHA-256 で連鎖させて記録し、編集・削除されたエントリを検出します。リクエスト本文や秘密情報は保存しません。ここでの検索とエクスポートも記録されます。",
+      "time": "時刻",
+      "actor": "ユーザーまたはトークン",
+      "ip": "送信元 IP",
+      "action": "操作",
+      "target": "対象",
+      "outcome": "結果",
+      "detail": "詳細",
+      "actorPlaceholder": "ユーザーまたはトークン（完全一致）",
+      "actionPlaceholder": "操作に含む…",
+      "success": "成功",
+      "failure": "失敗",
+      "exportCsv": "CSV をエクスポート",
+      "exportHint": "エクスポートには現在のフィルターの最大 {count} 行が含まれ、時刻は UTC です。",
+      "empty": "一致するエントリはありません。",
+      "verify": "チェーンを検証",
+      "verifyOk": "チェーンは正常です：{count} 件を確認しました。",
+      "verifyBroken": "チェーンはエントリ #{id} で壊れています：{reason}"
     }
   },
   "tgbot": {
@@ -2989,6 +3035,8 @@
       "alertNodeTrafficLimit": "ノード {{ .Name }} がトラフィック上限に達しました: {{ .Used }} / {{ .Limit }}。{{ .Reset }} にリセットされます。",
       "alertNodeTrafficLimitOff": "ノード {{ .Name }} がトラフィック上限に達しました: {{ .Used }} / {{ .Limit }}。インバウンドは {{ .Reset }} までオフです。",
       "alertNodeTrafficBack": "ノード {{ .Name }} はトラフィック上限を下回りました: {{ .Used }} / {{ .Limit }}。",
+      "alertNodeSilent": "ノード {{ .Name }} ({{ .Address }}) が {{ .Minutes }} 分間応答していません。最終応答: {{ .LastSeen }}。",
+      "alertNodeSilentBack": "ノード {{ .Name }} ({{ .Address }}) が {{ .Minutes }} 分間の無応答の後、再び応答しています。",
       "alertSubLeak": "{{ .Client }} のサブスクリプションが漏えいした可能性があります：{{ .Hours }} 時間に {{ .Count }} 個のネットワークから取得されました（最初 {{ .First }}、最後 {{ .Last }}）。ブロックはしていません。\n例：{{ .Networks }}",
       "inboundsCount": "🔌 Inbounds: {{ .Count }}\r\n",
       "clientsCount": "👥 Clients: {{ .Count }}\r\n",
