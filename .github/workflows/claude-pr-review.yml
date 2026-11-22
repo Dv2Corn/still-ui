@@ -563,6 +563,12 @@ jobs:
             if jq -e 'any(.[]; .type == "result" and ((.api_error_status // 0) == 401 or (.api_error_status // 0) == 403))' "$TRANSCRIPT" >/dev/null 2>&1 \
               || jq -e 'any(.[]; ((.error // "") | test("^(oauth_|authentication_|invalid_api_key)")))' "$TRANSCRIPT" >/dev/null 2>&1; then
               refused=true
+              # The API's own reason, so a refusal can be told apart (plan, region, revoked token).
+              # Letters, digits and basic punctuation only: no "::" can reach the runner.
+              reason=$(jq -r '[.[] | select(.type == "result" or .error != null)
+                | "status=\(.api_error_status // .error_status // "-") error=\(.error // "-") \(.result // "" | tostring)"]
+                | join(" | ")' "$TRANSCRIPT" 2>/dev/null | tr -cd 'A-Za-z0-9 =._,/()|-' | cut -c1-500)
+              echo "Claude refused the credential: ${reason:-no reason in the transcript}"
             fi
           fi
           finished=false
