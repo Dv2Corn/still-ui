@@ -6394,7 +6394,7 @@
     },
     {
       "name": "Audit log",
-      "description": "The tamper-evident journal of admin actions: every state-changing /panel/api request (except read-only POSTs and node telemetry pushes) and every admin login, with the user or API token, source IP, route, target ids and outcome. Request bodies are never stored. Each entry carries the SHA-256 of the previous entry's hash and its own content, so an edited or deleted row breaks the chain. Admin only: a monitor, node-sync or node-admin token is refused. Every call here is journaled too."
+      "description": "The tamper-evident journal of admin actions: every state-changing /panel/api request (except read-only POSTs, and telemetry pushes made with a node token) and every admin login, with the user or API token, source IP, route, target ids and outcome. Request bodies are never stored. Each entry carries the SHA-256 of the previous entry's hash and its own content, so an edited or deleted row breaks the chain. Admin only: a monitor, node-sync or node-admin token is refused. Every call here is journaled too."
     },
     {
       "name": "Backup",

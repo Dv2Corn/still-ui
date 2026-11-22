@@ -21,11 +21,16 @@ import (
 // answer is judged by its status code alone.
 const auditSniffBytes = 64 << 10
 
-// auditExemptPOST lists POST routes (relative to /panel/api) that only read, or that a node
-// pushes every few seconds; recording them would bury the admin actions.
-var auditExemptPOST = map[string]struct{}{
+// auditNodePushPOST lists state-changing POST routes (relative to /panel/api) that a master
+// pushes every few seconds; they skip the journal only under a node token's scope.
+var auditNodePushPOST = map[string]struct{}{
 	"/inbounds/pushClientTraffics": {},
 	"/server/clientIps":            {},
+}
+
+// auditReadOnlyPOST lists POST routes (relative to /panel/api) that change nothing; recording
+// them, some polled every few seconds, would bury the admin actions.
+var auditReadOnlyPOST = map[string]struct{}{
 	"/server/logs/:count":          {},
 	"/server/xraylogs/:count":      {},
 	"/server/amneziawglogs/:count": {},
@@ -119,8 +124,7 @@ func auditTarget(c *gin.Context) string {
 // the /panel/api group, so a route added there is recorded without further wiring.
 func (a *APIController) recordAudit(c *gin.Context) {
 	rel := relAPIPath(c.FullPath())
-	_, exempt := auditExemptPOST[rel]
-	if isSafeHTTPMethod(c.Request.Method) || (exempt && c.Request.Method == http.MethodPost) {
+	if isSafeHTTPMethod(c.Request.Method) || auditSkipsPOST(c, rel) {
 		c.Next()
 		return
 	}
@@ -138,6 +142,19 @@ func (a *APIController) recordAudit(c *gin.Context) {
 	if err != nil {
 		logger.Warning("audit log: record failed:", err)
 	}
+}
+
+// auditSkipsPOST reads the scope checkAPIAuth set, so an admin session or admin token pushing
+// node telemetry is still journaled.
+func auditSkipsPOST(c *gin.Context, rel string) bool {
+	if c.Request.Method != http.MethodPost {
+		return false
+	}
+	if _, readOnly := auditReadOnlyPOST[rel]; readOnly {
+		return true
+	}
+	_, nodePush := auditNodePushPOST[rel]
+	return nodePush && model.IsNodeSyncApiScope(c.GetString("api_token_scope"))
 }
 
 func isSafeHTTPMethod(method string) bool {

@@ -20,6 +20,7 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/crypto"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/global"
+	"github.com/mhsanaei/3x-ui/v3/internal/web/session"
 )
 
 // auditWebServer gives the server controller a cron that is never started.
@@ -42,13 +43,58 @@ func newAuditTestEngine(t *testing.T) *gin.Engine {
 	t.Cleanup(func() { global.SetWebServer(previous) })
 	engine := gin.New()
 	engine.Use(sessions.Sessions("3x-ui", cookie.NewStore([]byte("audit-test-secret"))))
+	// Logs the first user in and hands back the session's CSRF token, as the SPA's login does.
+	engine.GET("/test-login", func(c *gin.Context) {
+		u, err := (&APIController{}).userService.GetFirstUser()
+		if err == nil {
+			err = session.SetLoginUser(c, u)
+		}
+		token, csrfErr := session.EnsureCSRFToken(c)
+		if err != nil || csrfErr != nil {
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+		c.String(http.StatusOK, token)
+	})
 	NewAPIController(engine.Group("/"))
 	return engine
 }
 
+type auditSession struct{ cookie, csrf string }
+
+func loginAuditSession(t *testing.T, engine *gin.Engine) auditSession {
+	t.Helper()
+	w := httptest.NewRecorder()
+	engine.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/test-login", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("test login status = %d", w.Code)
+	}
+	cookies := w.Header().Values("Set-Cookie")
+	if len(cookies) == 0 {
+		t.Fatal("test login set no cookie")
+	}
+	// The CSRF token is saved after the login, so the last cookie carries both.
+	return auditSession{cookie: strings.SplitN(cookies[len(cookies)-1], ";", 2)[0], csrf: w.Body.String()}
+}
+
+func serveAuditSession(engine *gin.Engine, method, path string, s auditSession, body string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(method, path, strings.NewReader(body))
+	req.Header.Set("Cookie", s.cookie)
+	req.Header.Set(session.CSRFHeaderName, s.csrf)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	engine.ServeHTTP(w, req)
+	return w
+}
+
 func seedAuditToken(t *testing.T, name, plaintext string) int {
 	t.Helper()
-	row := model.ApiToken{Name: name, Token: crypto.HashTokenSHA256(plaintext), Enabled: true, Scope: model.ApiScopeAdmin}
+	return seedAuditScopedToken(t, name, plaintext, model.ApiScopeAdmin)
+}
+
+func seedAuditScopedToken(t *testing.T, name, plaintext, scope string) int {
+	t.Helper()
+	row := model.ApiToken{Name: name, Token: crypto.HashTokenSHA256(plaintext), Enabled: true, Scope: scope}
 	if err := database.GetDB().Create(&row).Error; err != nil {
 		t.Fatalf("seed token: %v", err)
 	}
@@ -127,5 +173,31 @@ func TestAuditNeverStoresThePassword(t *testing.T) {
 	stored, _ := json.Marshal(rows)
 	if strings.Contains(string(stored), password) {
 		t.Fatalf("the password reached the journal: %s", stored)
+	}
+}
+
+// Node telemetry pushes change state, so only a node's own credential may skip the journal.
+func TestAuditSkipsNodePushesOnlyForNodeTokens(t *testing.T) {
+	engine := newAuditTestEngine(t)
+	const nodeToken = "audit-node-token"
+	seedAuditScopedToken(t, "master", nodeToken, model.ApiScopeNodeSync)
+	admin := loginAuditSession(t, engine)
+	const push = "/panel/api/inbounds/pushClientTraffics"
+
+	serveAudit(engine, http.MethodPost, push, nodeToken, `{}`)
+	serveAudit(engine, http.MethodPost, "/panel/api/clients/onlines", nodeToken, `{}`)
+	serveAuditSession(engine, http.MethodPost, "/panel/api/setting/all", admin, `{}`)
+	if rows := auditRows(t); len(rows) != 0 {
+		t.Fatalf("a node push or a read was recorded: %+v", rows)
+	}
+
+	serveAuditSession(engine, http.MethodPost, push, admin, `{}`)
+	first, err := (&APIController{}).userService.GetFirstUser()
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows := auditRows(t)
+	if len(rows) != 1 || rows[0].Action != "POST "+push || rows[0].Actor != first.Username || rows[0].Detail != "HTTP 200" {
+		t.Fatalf("journal = %+v; want the admin session's push", rows)
 	}
 }
