@@ -2653,7 +2653,20 @@
       "defaultOutboundDesc": "El tráfico que no coincide con ninguna regla de enrutamiento usa esta salida (la primera de la lista).",
       "routingScript": "Script de enrutamiento",
       "routingScriptDesc": "Ruta a un archivo .lua que define HandleRoute, absoluta o relativa a la carpeta bin de Xray. El script elige entonces cada ruta y Xray ignora todas las reglas de enrutamiento, incluida la regla api del panel: envía el inbound api al outbound api o se detendrán las estadísticas de tráfico y los cambios de clientes en vivo. Xray no arrancará si el archivo falta o no es válido.",
-      "routingScriptActive": "Hay un script de enrutamiento definido en {section}, así que Xray ignora estas reglas."
+      "routingScriptActive": "Hay un script de enrutamiento definido en {section}, así que Xray ignora estas reglas.",
+      "exitAddress": {
+        "menu": "IP de salida separada",
+        "title": "IP de entrada y salida separadas",
+        "intro": "Los clientes siguen conectándose a la dirección de la entrada, mientras su tráfico sale del servidor por otra dirección IPv4 de este servidor. Mantenerlas separadas evita que la dirección que ven los sitios web delate la dirección a la que se conectan los clientes.",
+        "exitIp": "Dirección IPv4 de salida",
+        "exitIpHint": "Otra dirección IPv4 asignada a este servidor. Las entradas que escuchan en todas las direcciones no se pueden comprobar; asegúrese de que los clientes se conecten a otra dirección.",
+        "inbounds": "Entradas",
+        "inboundsRequired": "Seleccione al menos una entrada",
+        "invalidIp": "Introduzca una dirección IPv4 válida",
+        "sameAsInbound": "Los clientes se conectan a esta dirección. Elija otra dirección del servidor.",
+        "tagTaken": "Ya existe una salida para esta IP de salida",
+        "added": "Salida y regla de enrutamiento añadidas. Guarde para aplicar."
+      }
     },
     "hosts": {
       "addHost": "Agregar host",

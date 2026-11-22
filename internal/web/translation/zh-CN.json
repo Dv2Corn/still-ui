@@ -2653,7 +2653,20 @@
       "defaultOutboundDesc": "未匹配任何路由规则的流量走此出站（列表中的第一个出站）。",
       "routingScript": "路由脚本",
       "routingScriptDesc": "定义了 HandleRoute 的 .lua 文件路径，可为绝对路径或相对于 Xray bin 目录的路径。设置后由脚本选择所有路由，Xray 会忽略全部路由规则，包括面板的 api 规则：请把 api 入站路由到 api 出站，否则流量统计和客户端变更的实时生效都会停止。文件不存在或无效时 Xray 无法启动。",
-      "routingScriptActive": "已在“{section}”中设置路由脚本，因此 Xray 会忽略这些规则。"
+      "routingScriptActive": "已在“{section}”中设置路由脚本，因此 Xray 会忽略这些规则。",
+      "exitAddress": {
+        "menu": "独立出口 IP",
+        "title": "分离入口 IP 与出口 IP",
+        "intro": "客户端仍连接入站地址，而其流量通过本服务器的另一个 IPv4 地址离开服务器。将两者分开可避免网站看到的地址暴露客户端连接的地址。",
+        "exitIp": "出口 IPv4 地址",
+        "exitIpHint": "分配给本服务器的另一个 IPv4 地址。监听所有地址的入站无法检查，请确认客户端连接的是其他地址。",
+        "inbounds": "入站",
+        "inboundsRequired": "请至少选择一个入站",
+        "invalidIp": "请输入有效的 IPv4 地址",
+        "sameAsInbound": "客户端连接的就是此地址。请选择服务器的其他地址。",
+        "tagTaken": "该出口 IP 的出站已存在",
+        "added": "已添加出口出站和路由规则。保存后生效。"
+      }
     },
     "hosts": {
       "addHost": "添加主机",

@@ -2653,7 +2653,20 @@
       "defaultOutboundDesc": "未符合任何路由規則的流量走此出站（清單中的第一個出站）。",
       "routingScript": "路由腳本",
       "routingScriptDesc": "定義了 HandleRoute 的 .lua 檔案路徑，可為絕對路徑或相對於 Xray bin 資料夾的路徑。設定後由腳本選擇所有路由，Xray 會忽略全部路由規則，包括面板的 api 規則：請將 api 入站路由到 api 出站，否則流量統計與用戶端變更的即時套用都會停止。檔案不存在或無效時 Xray 無法啟動。",
-      "routingScriptActive": "已在「{section}」中設定路由腳本，因此 Xray 會忽略這些規則。"
+      "routingScriptActive": "已在「{section}」中設定路由腳本，因此 Xray 會忽略這些規則。",
+      "exitAddress": {
+        "menu": "獨立出口 IP",
+        "title": "分離入口 IP 與出口 IP",
+        "intro": "用戶端仍連線至入站位址，而其流量透過本伺服器的另一個 IPv4 位址離開伺服器。將兩者分開可避免網站看到的位址洩露用戶端連線的位址。",
+        "exitIp": "出口 IPv4 位址",
+        "exitIpHint": "指派給本伺服器的另一個 IPv4 位址。監聽所有位址的入站無法檢查，請確認用戶端連線的是其他位址。",
+        "inbounds": "入站",
+        "inboundsRequired": "請至少選擇一個入站",
+        "invalidIp": "請輸入有效的 IPv4 位址",
+        "sameAsInbound": "用戶端連線的就是此位址。請選擇伺服器的其他位址。",
+        "tagTaken": "此出口 IP 的出站已存在",
+        "added": "已新增出口出站與路由規則。儲存後生效。"
+      }
     },
     "hosts": {
       "addHost": "新增 Host",

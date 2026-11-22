@@ -2653,7 +2653,20 @@
       "defaultOutboundDesc": "Yönlendirme kuralıyla eşleşmeyen trafik bu gideni kullanır (listedeki ilk giden).",
       "routingScript": "Yönlendirme Betiği",
       "routingScriptDesc": "HandleRoute tanımlayan bir .lua dosyasının yolu; mutlak ya da Xray bin klasörüne göre göreli. Betik bundan sonra her rotayı seçer ve Xray, panelin api kuralı dahil tüm yönlendirme kurallarını yok sayar: api gelen bağlantısını api giden bağlantısına yönlendirin, yoksa trafik istatistikleri ve canlı istemci değişiklikleri durur. Dosya yoksa veya geçersizse Xray başlamaz.",
-      "routingScriptActive": "{section} bölümünde bir yönlendirme betiği ayarlı, bu yüzden Xray bu kuralları yok sayar."
+      "routingScriptActive": "{section} bölümünde bir yönlendirme betiği ayarlı, bu yüzden Xray bu kuralları yok sayar.",
+      "exitAddress": {
+        "menu": "Ayrı çıkış IP",
+        "title": "Ayrı giriş ve çıkış IP",
+        "intro": "İstemciler gelen bağlantının adresine bağlanmaya devam eder, trafikleri ise sunucudan bu sunucunun başka bir IPv4 adresiyle çıkar. İkisini ayrı tutmak, sitelerin gördüğü adresin istemcilerin bağlandığı adresi ele vermesini önler.",
+        "exitIp": "Çıkış IPv4 adresi",
+        "exitIpHint": "Bu sunucuya atanmış başka bir IPv4 adresi. Tüm adresleri dinleyen gelenler denetlenemez; istemcilerin farklı bir adrese bağlandığından emin olun.",
+        "inbounds": "Gelenler",
+        "inboundsRequired": "En az bir gelen seçin",
+        "invalidIp": "Geçerli bir IPv4 adresi girin",
+        "sameAsInbound": "İstemciler bu adrese bağlanıyor. Sunucunun farklı bir adresini seçin.",
+        "tagTaken": "Bu çıkış IP için zaten bir giden var",
+        "added": "Çıkış gideni ve yönlendirme kuralı eklendi. Uygulamak için kaydedin."
+      }
     },
     "hosts": {
       "addHost": "Host Ekle",
