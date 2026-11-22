@@ -2231,6 +2231,39 @@ export const sections: readonly Section[] = [
   },
 
   {
+    id: 'audit',
+    title: 'Audit log',
+    description:
+      "The tamper-evident journal of admin actions: every state-changing /panel/api request (except read-only POSTs and node telemetry pushes) and every admin login, with the user or API token, source IP, route, target ids and outcome. Request bodies are never stored. Each entry carries the SHA-256 of the previous entry's hash and its own content, so an edited or deleted row breaks the chain. Admin only: a monitor, node-sync or node-admin token is refused. Every call here is journaled too.",
+    endpoints: [
+      {
+        method: 'POST',
+        path: '/panel/api/audit/list',
+        summary:
+          'One page of entries, newest first. Every filter field is optional: actor and outcome match exactly, action matches any part of the route, from and to are unix milliseconds. page starts at 1; pageSize is capped at 500.',
+        body: '{\n  "from": 1735689600000,\n  "to": 1735775999999,\n  "actor": "admin",\n  "action": "inbounds",\n  "outcome": "failure",\n  "page": 1,\n  "pageSize": 50\n}',
+        responseSchema: 'AuditPage',
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/audit/export',
+        summary:
+          'The entries matching the same filter as CSV (text/csv), newest first, at most 100000 rows, times in UTC. page and pageSize are ignored. A cell that a spreadsheet would read as a formula is prefixed with an apostrophe.',
+        body: '{\n  "outcome": "failure"\n}',
+        response:
+          'id,time_utc,actor,ip,action,target,outcome,detail,hash\n42,2025-01-01T12:00:00.000Z,admin,203.0.113.9,POST /panel/api/inbounds/update/:id,id=7,success,HTTP 200,9f86d081884c7d65…',
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/audit/verify',
+        summary:
+          'Recompute the hash chain from the retention anchor. ok is false when an entry was edited or deleted; brokenId names the first entry that does not link.',
+        responseSchema: 'AuditVerifyResult',
+      },
+    ],
+  },
+
+  {
     id: 'backup',
     title: 'Backup',
     description: 'Operations that interact with the configured Telegram bot.',

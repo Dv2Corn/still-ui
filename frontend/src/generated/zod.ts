@@ -37,6 +37,7 @@ export const AllSettingSchema = z.object({
   alertRemindHours: z.number().int().min(0).max(720),
   alertXrayRestartWindow: z.number().int().min(1).max(1440),
   alertXrayRestarts: z.number().int().min(1).max(100),
+  auditLogRetentionDays: z.number().int().min(1).max(3650),
   backupAgeRecipients: z.string(),
   backupEnable: z.boolean(),
   backupKeep: z.number().int().min(1).max(1000),
@@ -254,6 +255,7 @@ export const AllSettingViewSchema = z.object({
   alertRemindHours: z.number().int().min(0).max(720),
   alertXrayRestartWindow: z.number().int().min(1).max(1440),
   alertXrayRestarts: z.number().int().min(1).max(100),
+  auditLogRetentionDays: z.number().int().min(1).max(3650),
   backupAgeRecipients: z.string(),
   backupEnable: z.boolean(),
   backupKeep: z.number().int().min(1).max(1000),
@@ -500,6 +502,45 @@ export const ApiTokenViewSchema = z.object({
   token: z.string().optional(),
 });
 export type ApiTokenView = z.infer<typeof ApiTokenViewSchema>;
+
+export const AuditFilterSchema = z.object({
+  action: z.string(),
+  actor: z.string(),
+  from: z.number().int(),
+  outcome: z.enum(['success', 'failure']),
+  page: z.number().int(),
+  pageSize: z.number().int(),
+  to: z.number().int(),
+});
+export type AuditFilter = z.infer<typeof AuditFilterSchema>;
+
+export const AuditLogSchema = z.object({
+  action: z.string(),
+  actor: z.string(),
+  detail: z.string(),
+  hash: z.string(),
+  id: z.number().int(),
+  ip: z.string(),
+  outcome: z.string(),
+  prevHash: z.string(),
+  target: z.string(),
+  time: z.number().int(),
+});
+export type AuditLog = z.infer<typeof AuditLogSchema>;
+
+export const AuditPageSchema = z.object({
+  rows: z.array(z.lazy(() => AuditLogSchema)),
+  total: z.number().int(),
+});
+export type AuditPage = z.infer<typeof AuditPageSchema>;
+
+export const AuditVerifyResultSchema = z.object({
+  brokenId: z.number().int(),
+  checked: z.number().int(),
+  ok: z.boolean(),
+  reason: z.string(),
+});
+export type AuditVerifyResult = z.infer<typeof AuditVerifyResultSchema>;
 
 export const AwgSignaturePacketResponseSchema = z.object({
   i1: z.string(),

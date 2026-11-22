@@ -302,6 +302,9 @@ var defaultValueMap = map[string]string{
 	"connLogDestination":   "full",
 	"connLogSource":        "full",
 
+	// Admin audit log (still-ui): days an entry is kept before the cron prune.
+	"auditLogRetentionDays": "90",
+
 	// Server health alerts (still-ui): thresholds shared by every notifier
 	"alertXrayRestarts":      "3",
 	"alertXrayRestartWindow": "10",
@@ -736,6 +739,16 @@ type ConnLogSettings struct {
 	MaxSizeMB     int
 	Destination   string
 	Source        string
+}
+
+// GetAuditLogRetentionDays is how long audit entries are kept; a value under one day is refused
+// rather than read as "prune everything".
+func (s *SettingService) GetAuditLogRetentionDays() (int, error) {
+	days, err := s.getInt("auditLogRetentionDays")
+	if err == nil && days < 1 {
+		err = common.NewErrorf("audit log retention of %d days is not valid", days)
+	}
+	return days, err
 }
 
 // GetConnLogEnable reports whether the connection log is on; an unreadable switch reads as off.
@@ -1911,6 +1924,11 @@ func (s *SettingService) UpdateAllSetting(allSetting *entity.AllSetting, clears 
 	}
 	if allSetting.ConnLogSource == "" {
 		allSetting.ConnLogSource = connLog.Source
+	}
+	if allSetting.AuditLogRetentionDays == 0 {
+		if allSetting.AuditLogRetentionDays, err = s.GetAuditLogRetentionDays(); err != nil {
+			return err
+		}
 	}
 	switch allSetting.SubProfileMode {
 	case "", SubProfileModeNone, SubProfileModeBuiltin, SubProfileModeCustom:

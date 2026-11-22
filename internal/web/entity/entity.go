@@ -106,6 +106,9 @@ type AllSetting struct {
 	ConnLogDestination   string `json:"connLogDestination" form:"connLogDestination" validate:"omitempty,oneof=full domain none" example:"full"`
 	ConnLogSource        string `json:"connLogSource" form:"connLogSource" validate:"omitempty,oneof=full masked none" example:"full"`
 
+	// Admin audit log (still-ui): days an entry is kept; older ones are pruned by a cron job.
+	AuditLogRetentionDays int `json:"auditLogRetentionDays" form:"auditLogRetentionDays" validate:"omitempty,gte=1,lte=3650" example:"90"`
+
 	// Server health alert thresholds (events xray.down, xray.flapping, process.memory,
 	// disk.high, cert.expiring, backup.failed); a reminder repeats every alertRemindHours, 0 = never.
 	AlertXrayRestarts      int `json:"alertXrayRestarts" form:"alertXrayRestarts" validate:"gte=1,lte=100"`
