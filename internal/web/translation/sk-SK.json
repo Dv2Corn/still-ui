@@ -2160,6 +2160,8 @@
       "subLocalDirectOff": "Vypnuté",
       "subLocalDirectProxy": "Vždy cez VPN",
       "subLocalDirectProxyDesc": "Telegram, YouTube, Instagram, Facebook, WhatsApp, Discord, ChatGPT a Claude idú vždy cez VPN, aj keď vyzerajú ako miestne. Pridajte sem ďalšie domény alebo rozsahy IP, jeden na riadok; kontrolujú sa pred pravidlom krajiny.",
+      "subLocalDirectAwg": "Aj súbory AmneziaWG",
+      "subLocalDirectAwgDesc": "Konfiguračné súbory AmneziaWG (stiahnutie, QR, odkazy vpn://) tiež vynechajú adresy krajiny a DNS ostane dostupné. Súbor je veľký (~35 KB, ~2000 prefixov) a nemusí sa zmestiť do QR kódu. Server sa nemení, takže už importované súbory fungujú ako plný tunel, kým sa neimportujú znova.",
       "subProbeOrder": "Používať výsledky sond",
       "subProbeOrderDesc": "Odkazy, ktoré sondy dostupnosti hlásia ako nedostupné (2 zlyhania za sebou), sa presunú na koniec predplatného alebo sa skryjú, vo všetkých formátoch: odkazy, JSON aj Clash. Používateľovi vždy ostane aspoň jeden odkaz a bez čerstvých výsledkov sond sa nič nemení. Stránka sond ukazuje, čo sa deje s každým koncovým bodom.",
       "subProbeOrderOff": "Vypnuté (predvolené)",

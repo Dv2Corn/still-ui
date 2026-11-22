@@ -84,4 +84,6 @@ export interface InboundInfoModalProps {
   subSettings?: SubSettings;
   hosts?: HostRecord[];
   lastOnlineMap?: Record<string, number>;
+  // Backend "local sites direct" AllowedIPs for an AmneziaWG inbound; absent = full tunnel.
+  amneziaWGAllowedIPs?: string;
 }

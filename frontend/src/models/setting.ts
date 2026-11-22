@@ -99,6 +99,7 @@ export class AllSetting {
   subClashAutoGroupTolerance = 50;
   subLocalDirect = '';
   subLocalDirectProxy = '';
+  subLocalDirectAwg = false;
   subJsonMux = '';
   subJsonRules = '';
   subJsonRoutingRules = '';

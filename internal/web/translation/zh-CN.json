@@ -2039,6 +2039,8 @@
       "subLocalDirectOff": "关闭",
       "subLocalDirectProxy": "始终走 VPN",
       "subLocalDirectProxyDesc": "Telegram、YouTube、Instagram、Facebook、WhatsApp、Discord、ChatGPT 和 Claude 即使看起来是本地地址也始终走 VPN。可在此添加其他域名或 IP 段，每行一个；它们在国家规则之前匹配。",
+      "subLocalDirectAwg": "同样用于 AmneziaWG 文件",
+      "subLocalDirectAwgDesc": "AmneziaWG 配置文件（下载、二维码、vpn:// 链接）同样让该国地址直连，DNS 仍可访问。这类文件较大（约 35 KB，约 2000 个前缀），可能无法放入二维码。服务器端不变，已导入的旧文件在重新导入前仍是全局隧道。",
       "subProbeOrder": "使用探针结果",
       "subProbeOrderDesc": "可达性探针报告不通的链接（连续 2 次失败）会移到订阅末尾或被隐藏，适用于所有格式：链接、JSON 和 Clash。用户始终至少保留一个链接；没有新的探针结果时不做任何改动。探针页面会显示每个端点的处理情况。",
       "subProbeOrderOff": "关闭（默认）",

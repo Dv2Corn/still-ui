@@ -102,7 +102,10 @@ export function buildAmneziaWGClientConfig(
   if (remark) lines.push(`# ${remark}`);
   lines.push('[Peer]', `PublicKey = ${server?.publicKey || ''}`);
   if (client.preSharedKey) lines.push(`PresharedKey = ${client.preSharedKey}`);
-  lines.push('AllowedIPs = 0.0.0.0/0, ::/0', `Endpoint = ${endpoint}`);
+  lines.push(
+    `AllowedIPs = ${inbound?.awgAllowedIPs || '0.0.0.0/0, ::/0'}`,
+    `Endpoint = ${endpoint}`,
+  );
   if (typeof client.keepAlive === 'string') {
     if (!AmneziaWGKeepAliveRangeSchema.safeParse(client.keepAlive).success) return '';
     lines.push(`PersistentKeepalive = ${client.keepAlive}`);

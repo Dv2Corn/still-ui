@@ -39,6 +39,7 @@ import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useNodesQuery } from '@/api/queries/useNodesQuery';
 import { useHostsQuery } from '@/api/queries/useHostsQuery';
+import { useInboundOptions } from '@/api/queries/useInboundOptions';
 import { withHostEndpoints } from '@/lib/hosts/host-link';
 import AppSidebar from '@/layouts/AppSidebar';
 const TextModal = lazy(() => import('@/components/feedback/TextModal'));
@@ -120,6 +121,7 @@ export default function InboundsPage() {
     fetchError: hostsFetchError,
     refetch: refetchHosts,
   } = useHostsQuery();
+  const { data: inboundOptions } = useInboundOptions();
   // A background refetch that fails while rows are still cached is not fatal.
   const hostsError = hosts.length > 0 ? '' : hostsFetchError;
   const nodesById = useMemo(() => {
@@ -346,6 +348,7 @@ export default function InboundsPage() {
         remark: projected.remark,
         hostOverride,
         fallbackHostname,
+        amneziaWGAllowedIPs: inboundOptions?.find((o) => o.id === dbInbound.id)?.awgAllowedIPs,
       };
       const content = genInboundLinks(genInput);
       const tabs: TextModalTab[] | undefined = projected.isWireguard
@@ -374,7 +377,7 @@ export default function InboundsPage() {
         tabs,
       });
     },
-    [checkFallback, hostOverrideFor, hosts, subSettings.publicHost, openText, t],
+    [checkFallback, hostOverrideFor, hosts, inboundOptions, subSettings.publicHost, openText, t],
   );
 
   const exportInboundClipboard = useCallback(
@@ -838,6 +841,9 @@ export default function InboundsPage() {
             hosts={hosts}
             lastOnlineMap={lastOnlineMap}
             nodeAddress={infoNodeAddress}
+            amneziaWGAllowedIPs={
+              inboundOptions?.find((o) => o.id === infoDbInbound?.id)?.awgAllowedIPs
+            }
           />
         </LazyMount>
         <LazyMount when={attachOpen}>

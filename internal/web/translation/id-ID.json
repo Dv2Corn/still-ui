@@ -2039,6 +2039,8 @@
       "subLocalDirectOff": "Mati",
       "subLocalDirectProxy": "Selalu lewat VPN",
       "subLocalDirectProxyDesc": "Telegram, YouTube, Instagram, Facebook, WhatsApp, Discord, ChatGPT, dan Claude selalu lewat VPN meski tampak lokal. Tambahkan domain atau rentang IP lain di sini, satu per baris; diperiksa sebelum aturan negara.",
+      "subLocalDirectAwg": "Juga berkas AmneziaWG",
+      "subLocalDirectAwgDesc": "Berkas konfigurasi AmneziaWG (unduhan, QR, tautan vpn://) juga melewatkan alamat negara itu dan DNS-nya tetap terjangkau. Berkasnya besar (~35 KB, ~2000 prefiks) dan mungkin tidak muat di kode QR. Sisi server tidak berubah, jadi berkas yang sudah diimpor tetap menjadi terowongan penuh sampai diimpor ulang.",
       "subProbeOrder": "Gunakan hasil probe",
       "subProbeOrderDesc": "Tautan yang dilaporkan mati oleh probe keterjangkauan (2 kali gagal berturut-turut) dipindah ke akhir langganan atau disembunyikan, di semua format: tautan, JSON, dan Clash. Pengguna selalu menyisakan setidaknya satu tautan, dan tanpa hasil probe terbaru tidak ada yang berubah. Halaman Probe menampilkan apa yang terjadi pada setiap endpoint.",
       "subProbeOrderOff": "Mati (bawaan)",

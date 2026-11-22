@@ -605,6 +605,9 @@ export const SCHEMAS: Record<string, unknown> = {
       "subLocalDirect": {
         "type": "string"
       },
+      "subLocalDirectAwg": {
+        "type": "boolean"
+      },
       "subLocalDirectProxy": {
         "type": "string"
       },
@@ -918,6 +921,7 @@ export const SCHEMAS: Record<string, unknown> = {
       "subLeakWindowHours",
       "subListen",
       "subLocalDirect",
+      "subLocalDirectAwg",
       "subLocalDirectProxy",
       "subPath",
       "subPort",
@@ -1589,6 +1593,9 @@ export const SCHEMAS: Record<string, unknown> = {
       "subLocalDirect": {
         "type": "string"
       },
+      "subLocalDirectAwg": {
+        "type": "boolean"
+      },
       "subLocalDirectProxy": {
         "type": "string"
       },
@@ -1910,6 +1917,7 @@ export const SCHEMAS: Record<string, unknown> = {
       "subLeakWindowHours",
       "subListen",
       "subLocalDirect",
+      "subLocalDirectAwg",
       "subLocalDirectProxy",
       "subPath",
       "subPort",
@@ -3897,6 +3905,10 @@ export const SCHEMAS: Record<string, unknown> = {
   },
   "InboundOption": {
     "properties": {
+      "awgAllowedIPs": {
+        "description": "AwgAllowedIPs is the \"local sites direct\" peer AllowedIPs; empty means the full tunnel.",
+        "type": "string"
+      },
       "awgServer": {
         "allOf": [
           {

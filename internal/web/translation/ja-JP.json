@@ -2039,6 +2039,8 @@
       "subLocalDirectOff": "オフ",
       "subLocalDirectProxy": "常に VPN 経由",
       "subLocalDirectProxyDesc": "Telegram、YouTube、Instagram、Facebook、WhatsApp、Discord、ChatGPT、Claude は、国内に見える場合でも常に VPN を経由します。ほかのドメインや IP 範囲を 1 行に 1 つずつここに追加できます。国のルールより先に判定されます。",
+      "subLocalDirectAwg": "AmneziaWG ファイルにも適用",
+      "subLocalDirectAwgDesc": "AmneziaWG の設定ファイル（ダウンロード、QR、vpn:// リンク）でもその国のアドレスを直接通し、DNS には引き続き到達できます。ファイルは大きく（約 35 KB、約 2000 プレフィックス）、QR コードに収まらない場合があります。サーバー側は変わらないため、既にインポートしたファイルは再インポートするまでフルトンネルのままです。",
       "subProbeOrder": "プローブの結果を使う",
       "subProbeOrderDesc": "到達性プローブが不通と報告したリンク（2回連続の失敗）は、サブスクリプションの末尾に移すか非表示にします。リンク、JSON、Clash のすべての形式に適用されます。ユーザーには常に少なくとも1つのリンクが残り、新しいプローブ結果がなければ何も変わりません。各エンドポイントの扱いはプローブのページで確認できます。",
       "subProbeOrderOff": "オフ（既定）",

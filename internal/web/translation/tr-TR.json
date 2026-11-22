@@ -2039,6 +2039,8 @@
       "subLocalDirectOff": "Kapalı",
       "subLocalDirectProxy": "Her zaman VPN üzerinden",
       "subLocalDirectProxyDesc": "Telegram, YouTube, Instagram, Facebook, WhatsApp, Discord, ChatGPT ve Claude yerel görünseler bile her zaman VPN üzerinden gider. Buraya başka alan adları veya IP aralıkları ekleyin, her satıra bir tane; ülke kuralından önce denetlenir.",
+      "subLocalDirectAwg": "AmneziaWG dosyalarında da",
+      "subLocalDirectAwgDesc": "AmneziaWG yapılandırma dosyaları (indirme, QR, vpn:// bağlantıları) da ülkenin adreslerini tünel dışında bırakır, DNS erişilebilir kalır. Dosya büyüktür (~35 KB, ~2000 önek) ve QR koduna sığmayabilir. Sunucu tarafı değişmez; önceden içe aktarılan dosyalar yeniden aktarılana kadar tam tünel olarak çalışır.",
       "subProbeOrder": "Yoklayıcı sonuçlarını kullan",
       "subProbeOrderDesc": "Erişilebilirlik yoklayıcılarının erişilemez bildirdiği bağlantılar (art arda 2 başarısız kontrol) aboneliğin sonuna taşınır veya gizlenir; tüm biçimlerde: bağlantılar, JSON ve Clash. Kullanıcıda her zaman en az bir bağlantı kalır ve güncel yoklayıcı sonucu yoksa hiçbir şey değişmez. Yoklayıcılar sayfası her uç noktaya ne olduğunu gösterir.",
       "subProbeOrderOff": "Kapalı (varsayılan)",

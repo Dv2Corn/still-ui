@@ -205,6 +205,7 @@ export const AllSettingSchema = z.object({
   subLeakWindowHours: z.number().int().min(1).max(168),
   subListen: z.string(),
   subLocalDirect: z.string(),
+  subLocalDirectAwg: z.boolean(),
   subLocalDirectProxy: z.string(),
   subPath: z.string(),
   subPort: z.number().int().min(1).max(65535),
@@ -430,6 +431,7 @@ export const AllSettingViewSchema = z.object({
   subLeakWindowHours: z.number().int().min(1).max(168),
   subListen: z.string(),
   subLocalDirect: z.string(),
+  subLocalDirectAwg: z.boolean(),
   subLocalDirectProxy: z.string(),
   subPath: z.string(),
   subPort: z.number().int().min(1).max(65535),
@@ -924,6 +926,7 @@ export const InboundFallbackSchema = z.object({
 export type InboundFallback = z.infer<typeof InboundFallbackSchema>;
 
 export const InboundOptionSchema = z.object({
+  awgAllowedIPs: z.string().optional(),
   awgServer: z.lazy(() => ServerSettingsSchema).nullable().optional(),
   enable: z.boolean(),
   id: z.number().int(),

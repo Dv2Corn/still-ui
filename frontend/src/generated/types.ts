@@ -185,6 +185,7 @@ export interface AllSetting {
   subLeakWindowHours: number;
   subListen: string;
   subLocalDirect: string;
+  subLocalDirectAwg: boolean;
   subLocalDirectProxy: string;
   subPath: string;
   subPort: number;
@@ -409,6 +410,7 @@ export interface AllSettingView {
   subLeakWindowHours: number;
   subListen: string;
   subLocalDirect: string;
+  subLocalDirectAwg: boolean;
   subLocalDirectProxy: string;
   subPath: string;
   subPort: number;
@@ -869,6 +871,7 @@ export interface InboundFallback {
 }
 
 export interface InboundOption {
+  awgAllowedIPs?: string;
   awgServer?: ServerSettings | null;
   enable: boolean;
   id: number;

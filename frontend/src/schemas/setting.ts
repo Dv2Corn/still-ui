@@ -110,6 +110,7 @@ export const AllSettingSchema = z
     subClashAutoGroupTolerance: z.number().int().min(0).max(10000).optional(),
     subLocalDirect: z.string().optional(),
     subLocalDirectProxy: z.string().optional(),
+    subLocalDirectAwg: z.boolean().optional(),
     subJsonMux: z.string().optional(),
     subJsonRules: z.string().optional(),
     subJsonRoutingRules: z.string().optional(),
