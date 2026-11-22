@@ -455,7 +455,8 @@ func getEnv(key, fallback string) string {
 func (s *SettingService) ResetSettings() error {
 	db := database.GetDB()
 	return db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("1 = 1").Delete(model.Setting{}).Error; err != nil {
+		// The audit prune anchor is journal state, not a setting: losing it breaks Verify.
+		if err := tx.Where("key <> ?", auditAnchorKey).Delete(model.Setting{}).Error; err != nil {
 			return err
 		}
 		paths := []model.Setting{

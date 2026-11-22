@@ -136,3 +136,21 @@ func TestAuditPruneKeepsTheChainVerifiable(t *testing.T) {
 		t.Fatalf("Verify() after prune = %+v, %v; want ok with 3 checked", got, err)
 	}
 }
+
+// Reset settings once wiped the prune anchor, so Verify failed on an untouched journal.
+func TestAuditVerifyPassesAfterSettingsReset(t *testing.T) {
+	initAuditDB(t)
+	s := &AuditService{}
+	now := time.Now()
+	recordAudit(t, s, 2, now.AddDate(0, 0, -100))
+	recordAudit(t, s, 1, now.AddDate(0, 0, -1))
+	if _, err := s.Prune(now); err != nil {
+		t.Fatalf("Prune: %v", err)
+	}
+	if err := (&SettingService{}).ResetSettings(); err != nil {
+		t.Fatalf("ResetSettings: %v", err)
+	}
+	if got, err := s.Verify(); err != nil || !got.Ok || got.Checked != 2 {
+		t.Fatalf("Verify() after reset = %+v, %v; want ok with 2 checked", got, err)
+	}
+}
