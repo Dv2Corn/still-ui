@@ -1319,6 +1319,18 @@ export interface SubBalancer {
   updatedAt: number;
 }
 
+export interface SubRotationReport {
+  client: string;
+  passed: boolean;
+  steps: SubRotationStep[];
+}
+
+export interface SubRotationStep {
+  detail: string;
+  name: string;
+  ok: boolean;
+}
+
 export interface TgBotCapabilities {
   groupPrivacy: boolean;
   inlineEnabled: boolean;

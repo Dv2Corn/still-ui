@@ -1513,6 +1513,22 @@ export const EXAMPLES: Record<string, unknown> = {
     "strategy": "random",
     "updatedAt": 1710000000000
   },
+  "SubRotationReport": {
+    "client": "still-ui-rotation-check-1767225600000",
+    "passed": true,
+    "steps": [
+      {
+        "detail": "HTTP 404",
+        "name": "old link answers 404",
+        "ok": true
+      }
+    ]
+  },
+  "SubRotationStep": {
+    "detail": "HTTP 404",
+    "name": "old link answers 404",
+    "ok": true
+  },
   "TgBotCapabilities": {
     "groupPrivacy": false,
     "inlineEnabled": true,

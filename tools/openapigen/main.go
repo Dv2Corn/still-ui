@@ -127,6 +127,8 @@ func run(root, outDir string) error {
 				"NodeInviteCreated",
 				"PanelImportInbound",
 				"PanelImportReport",
+				"SubRotationStep",
+				"SubRotationReport",
 			),
 		},
 		{

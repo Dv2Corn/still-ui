@@ -3817,6 +3817,7 @@ show_usage() {
 │  ${blue}still-ui backup${plain}                - Take a local backup now          │
 │  ${blue}still-ui restore <file> [key]${plain}  - Restore a local backup           │
 │  ${blue}still-ui import marzban <db>${plain}   - Import from Marzban or x-ui      │
+│  ${blue}still-ui check rotation${plain}        - Self-check subscription re-issue │
 │  ${blue}still-ui pgclient [ver]${plain}        - Upgrade pg_dump/pg_restore tools │
 │  ${blue}still-ui migrate-rollback${plain}      - Undo a migration from 3x-ui      │
 │  ${blue}still-ui legacy${plain}                - Legacy version                   │
@@ -4031,6 +4032,9 @@ if [[ $# -gt 0 ]]; then
             ;;
         "import")
             check_install 0 && import_panel "${@:2}"
+            ;;
+        "check")
+            check_install 0 && "${xui_folder}/x-ui" check "${@:2}"
             ;;
         "migrate" | "migrate-rollback")
             still_migrate "$@"

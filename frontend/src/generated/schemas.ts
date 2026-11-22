@@ -5958,6 +5958,52 @@ export const SCHEMAS: Record<string, unknown> = {
     ],
     "type": "object"
   },
+  "SubRotationReport": {
+    "properties": {
+      "client": {
+        "example": "still-ui-rotation-check-1767225600000",
+        "type": "string"
+      },
+      "passed": {
+        "example": true,
+        "type": "boolean"
+      },
+      "steps": {
+        "items": {
+          "$ref": "#/components/schemas/SubRotationStep"
+        },
+        "type": "array"
+      }
+    },
+    "required": [
+      "client",
+      "passed",
+      "steps"
+    ],
+    "type": "object"
+  },
+  "SubRotationStep": {
+    "properties": {
+      "detail": {
+        "example": "HTTP 404",
+        "type": "string"
+      },
+      "name": {
+        "example": "old link answers 404",
+        "type": "string"
+      },
+      "ok": {
+        "example": true,
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "detail",
+      "name",
+      "ok"
+    ],
+    "type": "object"
+  },
   "TgBotCapabilities": {
     "description": "TgBotCapabilities is the browser-safe shape of the bot's own capabilities.",
     "properties": {

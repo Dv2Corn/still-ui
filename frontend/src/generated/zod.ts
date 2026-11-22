@@ -1405,6 +1405,20 @@ export const SubBalancerSchema = z.object({
 });
 export type SubBalancer = z.infer<typeof SubBalancerSchema>;
 
+export const SubRotationReportSchema = z.object({
+  client: z.string(),
+  passed: z.boolean(),
+  steps: z.array(z.lazy(() => SubRotationStepSchema)),
+});
+export type SubRotationReport = z.infer<typeof SubRotationReportSchema>;
+
+export const SubRotationStepSchema = z.object({
+  detail: z.string(),
+  name: z.string(),
+  ok: z.boolean(),
+});
+export type SubRotationStep = z.infer<typeof SubRotationStepSchema>;
+
 export const TgBotCapabilitiesSchema = z.object({
   groupPrivacy: z.boolean(),
   inlineEnabled: z.boolean(),
