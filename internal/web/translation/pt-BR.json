@@ -2641,7 +2641,20 @@
       "defaultOutboundDesc": "Tráfego sem regra de roteamento usa esta saída (a primeira da lista).",
       "routingScript": "Script de roteamento",
       "routingScriptDesc": "Caminho para um arquivo .lua que define HandleRoute, absoluto ou relativo à pasta bin do Xray. O script passa a escolher cada rota e o Xray ignora todas as regras de roteamento, inclusive a regra api do painel: envie o inbound api para o outbound api ou as estatísticas de tráfego e as alterações de clientes ao vivo param. O Xray não inicia se o arquivo estiver ausente ou for inválido.",
-      "routingScriptActive": "Há um script de roteamento definido em {section}, então o Xray ignora estas regras."
+      "routingScriptActive": "Há um script de roteamento definido em {section}, então o Xray ignora estas regras.",
+      "exitAddress": {
+        "menu": "IP de saída separado",
+        "title": "IP de entrada e saída separados",
+        "intro": "Os clientes continuam se conectando ao endereço da entrada, enquanto o tráfego deles sai do servidor por outro endereço IPv4 deste servidor. Manter os dois separados impede que o endereço visto pelos sites revele o endereço ao qual os clientes se conectam.",
+        "exitIp": "Endereço IPv4 de saída",
+        "exitIpHint": "Outro endereço IPv4 atribuído a este servidor. Entradas que escutam em todos os endereços não podem ser verificadas; garanta que os clientes se conectem a outro endereço.",
+        "inbounds": "Entradas",
+        "inboundsRequired": "Selecione pelo menos uma entrada",
+        "invalidIp": "Informe um endereço IPv4 válido",
+        "sameAsInbound": "Os clientes se conectam a este endereço. Escolha outro endereço do servidor.",
+        "tagTaken": "Já existe uma saída para este IP de saída",
+        "added": "Saída e regra de roteamento adicionadas. Salve para aplicar."
+      }
     },
     "hosts": {
       "addHost": "Adicionar Host",

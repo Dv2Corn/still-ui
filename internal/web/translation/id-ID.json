@@ -2641,7 +2641,20 @@
       "defaultOutboundDesc": "Lalu lintas tanpa aturan routing memakai outbound ini (yang pertama dalam daftar).",
       "routingScript": "Skrip Routing",
       "routingScriptDesc": "Path ke file .lua yang mendefinisikan HandleRoute, absolut atau relatif terhadap folder bin Xray. Skrip lalu memilih setiap rute dan Xray mengabaikan semua aturan routing, termasuk aturan api panel: arahkan inbound api ke outbound api atau statistik trafik dan perubahan klien langsung akan berhenti. Xray tidak akan berjalan jika file tidak ada atau tidak valid.",
-      "routingScriptActive": "Skrip routing diatur di {section}, jadi Xray mengabaikan aturan ini."
+      "routingScriptActive": "Skrip routing diatur di {section}, jadi Xray mengabaikan aturan ini.",
+      "exitAddress": {
+        "menu": "IP keluar terpisah",
+        "title": "IP masuk dan keluar terpisah",
+        "intro": "Klien tetap terhubung ke alamat inbound, sedangkan lalu lintas mereka keluar dari server melalui alamat IPv4 lain milik server ini. Memisahkan keduanya mencegah alamat yang dilihat situs web mengungkap alamat yang dihubungi klien.",
+        "exitIp": "Alamat IPv4 keluar",
+        "exitIpHint": "Alamat IPv4 lain yang ditetapkan ke server ini. Inbound yang mendengarkan semua alamat tidak dapat diperiksa, jadi pastikan klien terhubung ke alamat lain.",
+        "inbounds": "Inbound",
+        "inboundsRequired": "Pilih setidaknya satu inbound",
+        "invalidIp": "Masukkan alamat IPv4 yang valid",
+        "sameAsInbound": "Klien terhubung ke alamat ini. Pilih alamat server yang lain.",
+        "tagTaken": "Outbound untuk IP keluar ini sudah ada",
+        "added": "Outbound keluar dan aturan routing ditambahkan. Simpan untuk menerapkan."
+      }
     },
     "hosts": {
       "addHost": "Tambah Host",

@@ -2762,7 +2762,20 @@
       "defaultOutboundDesc": "Prevádzka bez zhody s pravidlom smerovania použije tento výstup. Xray používa prvý výstup v zozname.",
       "routingScript": "Skript smerovania",
       "routingScriptDesc": "Cesta k súboru .lua s funkciou HandleRoute, absolútna alebo vzhľadom na priečinok bin Xray. Skript vyberá každú trasu a Xray ignoruje všetky pravidlá vrátane pravidla api panelu. Vstup api preto smerujte na výstup api, inak prestanú fungovať štatistiky spotreby aj zmeny klientov za behu. Ak súbor chýba alebo je neplatný, Xray sa nespustí.",
-      "routingScriptActive": "V časti {section} je nastavený skript smerovania, preto Xray tieto pravidlá ignoruje."
+      "routingScriptActive": "V časti {section} je nastavený skript smerovania, preto Xray tieto pravidlá ignoruje.",
+      "exitAddress": {
+        "menu": "Samostatná výstupná IP",
+        "title": "Oddelená vstupná a výstupná IP",
+        "intro": "Klienti sa naďalej pripájajú na adresu vstupu, ale ich prevádzka opúšťa server cez inú IPv4 adresu tohto servera. Oddelené adresy zabránia tomu, aby adresa, ktorú vidia weby, prezradila adresu, na ktorú sa klienti pripájajú.",
+        "exitIp": "Výstupná IPv4 adresa",
+        "exitIpHint": "Iná IPv4 adresa priradená tomuto serveru. Vstupy počúvajúce na všetkých adresách nemožno overiť, preto sa uistite, že sa klienti pripájajú na inú adresu.",
+        "inbounds": "Vstupy",
+        "inboundsRequired": "Vyberte aspoň jeden vstup",
+        "invalidIp": "Zadajte platnú IPv4 adresu",
+        "sameAsInbound": "Na túto adresu sa pripájajú klienti. Vyberte inú adresu servera.",
+        "tagTaken": "Výstup pre túto výstupnú IP už existuje",
+        "added": "Výstup a pravidlo smerovania boli pridané. Uložte na použitie."
+      }
     },
     "probes": {
       "title": "Sondy dostupnosti",

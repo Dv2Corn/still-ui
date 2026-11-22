@@ -2641,7 +2641,20 @@
       "defaultOutboundDesc": "Lưu lượng không khớp quy tắc định tuyến dùng outbound này (mục đầu danh sách).",
       "routingScript": "Script định tuyến",
       "routingScriptDesc": "Đường dẫn tới tệp .lua định nghĩa HandleRoute, tuyệt đối hoặc tương đối với thư mục bin của Xray. Khi đó script chọn mọi tuyến và Xray bỏ qua tất cả quy tắc định tuyến, kể cả quy tắc api của panel: hãy chuyển inbound api tới outbound api, nếu không thống kê lưu lượng và việc áp dụng thay đổi client trực tiếp sẽ dừng. Xray sẽ không khởi động nếu tệp không tồn tại hoặc không hợp lệ.",
-      "routingScriptActive": "Một script định tuyến đã được đặt trong {section}, nên Xray bỏ qua các quy tắc này."
+      "routingScriptActive": "Một script định tuyến đã được đặt trong {section}, nên Xray bỏ qua các quy tắc này.",
+      "exitAddress": {
+        "menu": "IP đầu ra riêng",
+        "title": "Tách IP đầu vào và đầu ra",
+        "intro": "Máy khách vẫn kết nối tới địa chỉ của inbound, còn lưu lượng của họ rời máy chủ qua một địa chỉ IPv4 khác của máy chủ này. Tách riêng hai địa chỉ giúp địa chỉ mà các trang web nhìn thấy không làm lộ địa chỉ máy khách kết nối tới.",
+        "exitIp": "Địa chỉ IPv4 đầu ra",
+        "exitIpHint": "Một địa chỉ IPv4 khác được gán cho máy chủ này. Không thể kiểm tra các inbound lắng nghe trên mọi địa chỉ, hãy đảm bảo máy khách kết nối tới địa chỉ khác.",
+        "inbounds": "Inbound",
+        "inboundsRequired": "Chọn ít nhất một inbound",
+        "invalidIp": "Nhập địa chỉ IPv4 hợp lệ",
+        "sameAsInbound": "Máy khách kết nối tới địa chỉ này. Hãy chọn một địa chỉ khác của máy chủ.",
+        "tagTaken": "Đã có outbound cho IP đầu ra này",
+        "added": "Đã thêm outbound đầu ra và quy tắc định tuyến. Lưu để áp dụng."
+      }
     },
     "hosts": {
       "addHost": "Thêm Host",

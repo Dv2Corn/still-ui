@@ -62,6 +62,8 @@ import { originalOutboundIndex } from './outbounds-tab-helpers';
 import { useOutboundColumns } from './useOutboundColumns';
 import OutboundCardList from './OutboundCardList';
 import SubscriptionOutbounds from './SubscriptionOutbounds';
+import ExitAddressModal from './ExitAddressModal';
+import { applyExitAddressPreset } from '@/lib/xray/exit-address-preset';
 
 const defaultOutboundSubscriptionUserAgent = '3x-ui-outbound-sub/1.0';
 
@@ -110,7 +112,7 @@ export default function OutboundsTab({
   outboundTestStates,
   subscriptionTestStates,
   testingAll,
-  inboundTags: _inboundTags,
+  inboundTags,
   subscriptionOutbounds,
   subscriptionOutboundTags,
   isMobile,
@@ -288,6 +290,13 @@ export default function OutboundsTab({
       if (!tt.outbounds) return;
       [tt.outbounds[next], tt.outbounds[target]] = [tt.outbounds[target], tt.outbounds[next]];
     });
+  }
+
+  const [exitAddressOpen, setExitAddressOpen] = useState(false);
+  function addExitAddress(ip: string, tags: string[]) {
+    mutate((tt) => applyExitAddressPreset(tt, ip, tags));
+    setExitAddressOpen(false);
+    messageApi.success(t('pages.xray.exitAddress.added'));
   }
 
   const [importOpen, setImportOpen] = useState(false);
@@ -583,6 +592,12 @@ export default function OutboundsTab({
                       label: t('pages.xray.pia.menu'),
                       onClick: onShowPia,
                     },
+                    {
+                      key: 'exitAddress',
+                      icon: <ExportOutlined aria-hidden />,
+                      label: t('pages.xray.exitAddress.menu'),
+                      onClick: () => setExitAddressOpen(true),
+                    },
                     { type: 'divider' },
                     {
                       key: 'import',
@@ -688,6 +703,13 @@ export default function OutboundsTab({
           type="textarea"
           json
           onConfirm={importOutbounds}
+        />
+        <ExitAddressModal
+          open={exitAddressOpen}
+          inboundTags={inboundTags}
+          existingOutboundTags={outbounds.map((o) => o.tag || '').filter(Boolean)}
+          onClose={() => setExitAddressOpen(false)}
+          onConfirm={addExitAddress}
         />
         <TextModal
           open={exportOpen}
