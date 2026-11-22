@@ -246,31 +246,31 @@ func (c *SubRotationCheck) reissue(email, newSubID string) error {
 }
 
 // fetch sends what a device-limited app sends: a device id, so the gate counts it as a device.
-func (c *SubRotationCheck) fetch(ctx context.Context, url string) (*http.Response, []byte, error) {
+func (c *SubRotationCheck) fetch(ctx context.Context, url string) (int, http.Header, []byte, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return nil, nil, err
+		return 0, nil, nil, err
 	}
 	req.Header.Set("User-Agent", subRotationUserAgent)
 	req.Header.Set("X-HWID", subRotationUserAgent)
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
-		return nil, nil, err
+		return 0, nil, nil, err
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, subRotationBodyLimit))
-	return resp, body, err
+	return resp.StatusCode, resp.Header, body, err
 }
 
 func (c *SubRotationCheck) expectClient(ctx context.Context, url, credential string) error {
-	resp, body, err := c.fetch(ctx, url)
+	status, header, body, err := c.fetch(ctx, url)
 	if err != nil {
 		return err
 	}
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("HTTP %d", resp.StatusCode)
+	if status != http.StatusOK {
+		return fmt.Errorf("HTTP %d", status)
 	}
-	if resp.Header.Get("X-Hwid-Limit") != "" || resp.Header.Get("X-Hwid-Not-Supported") != "" {
+	if header.Get("X-Hwid-Limit") != "" || header.Get("X-Hwid-Not-Supported") != "" {
 		return errors.New("the device limit refused the check's device and served its notice instead of servers")
 	}
 	outbounds, _, err := link.ParseSubscriptionBody(body)
@@ -289,12 +289,12 @@ func (c *SubRotationCheck) expectClient(ctx context.Context, url, credential str
 }
 
 func (c *SubRotationCheck) expectGone(ctx context.Context, url string) error {
-	resp, body, err := c.fetch(ctx, url)
+	status, _, body, err := c.fetch(ctx, url)
 	if err != nil {
 		return err
 	}
-	if resp.StatusCode != http.StatusNotFound {
-		return fmt.Errorf("HTTP %d, %d bytes: the old link still answers", resp.StatusCode, len(strings.TrimSpace(string(body))))
+	if status != http.StatusNotFound {
+		return fmt.Errorf("HTTP %d, %d bytes: the old link still answers", status, len(strings.TrimSpace(string(body))))
 	}
 	return nil
 }
