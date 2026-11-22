@@ -761,6 +761,8 @@ func main() {
 		os.Exit(restoreLocalBackup(os.Args[2:], os.Stdin))
 	case "import":
 		os.Exit(runPanelImport(os.Args[2:], os.Stdout, os.Stderr))
+	case "check":
+		os.Exit(runCheck(os.Args[2:], os.Stdout, os.Stderr))
 	case "cert":
 		err := settingCmd.Parse(os.Args[2:])
 		if err != nil {
@@ -797,6 +799,8 @@ Commands:
     restore        replace the database with a backup (-file F [-identity KEY|-]); stop the panel first
     import         bring inbounds and users over from Marzban or an old x-ui
                    (marzban|x-ui <database> [-dry-run] [-merge])
+    check rotation prove that re-issuing a subscription id makes the running
+                   subscription server serve the new link and 404 the old one
     xray-unit-check
                    list what keeps Xray from running as the still-xray service (exit 3)
     install-awg-kernel

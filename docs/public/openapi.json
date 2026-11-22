@@ -6189,6 +6189,52 @@
         ],
         "type": "object"
       },
+      "SubRotationReport": {
+        "properties": {
+          "client": {
+            "example": "still-ui-rotation-check-1767225600000",
+            "type": "string"
+          },
+          "passed": {
+            "example": true,
+            "type": "boolean"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/SubRotationStep"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "client",
+          "passed",
+          "steps"
+        ],
+        "type": "object"
+      },
+      "SubRotationStep": {
+        "properties": {
+          "detail": {
+            "example": "HTTP 404",
+            "type": "string"
+          },
+          "name": {
+            "example": "old link answers 404",
+            "type": "string"
+          },
+          "ok": {
+            "example": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "detail",
+          "name",
+          "ok"
+        ],
+        "type": "object"
+      },
       "TgBotCapabilities": {
         "description": "TgBotCapabilities is the browser-safe shape of the bot's own capabilities.",
         "properties": {
@@ -11566,6 +11612,53 @@
                   "success": true,
                   "obj": {
                     "deleted": 0
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/clients/rotationCheck": {
+      "post": {
+        "tags": [
+          "Clients"
+        ],
+        "summary": "Self-check that re-issuing a subscription id works: creates a temporary client named still-ui-rotation-check-<unix ms> (1-byte quota, 15-minute expiry) on the first enabled local VLESS, VMess or Trojan inbound in the subscription, fetches its link from the running subscription server over loopback, re-issues the subscription id through the same update the client form sends, and expects the new link to carry the client and the old one to answer 404.",
+        "operationId": "post_panel_api_clients_rotationCheck",
+        "description": "Fetches send an X-HWID header, so a device limit gives the check a slot like a real app; a device-limit notice fails the step by name. The temporary client is deleted on every path once it may exist, and that deletion is reported as the last step. success is true whenever the check ran: read obj.passed and each step. Fails with success=false when the subscription server is disabled. Admin only.",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "$ref": "#/components/schemas/SubRotationReport"
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": {
+                    "client": "still-ui-rotation-check-1767225600000",
+                    "passed": true,
+                    "steps": [
+                      {
+                        "detail": "HTTP 404",
+                        "name": "old link answers 404",
+                        "ok": true
+                      }
+                    ]
                   }
                 }
               }

@@ -131,6 +131,8 @@ func run(root, outDir string) error {
 				"AuditFilter",
 				"AuditPage",
 				"AuditVerifyResult",
+				"SubRotationStep",
+				"SubRotationReport",
 			),
 		},
 		{

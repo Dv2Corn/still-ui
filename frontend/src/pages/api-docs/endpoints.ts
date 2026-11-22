@@ -1556,6 +1556,15 @@ export const sections: readonly Section[] = [
         response: '{\n  "success": true,\n  "obj": {\n    "deleted": 0\n  }\n}',
       },
       {
+        method: 'POST',
+        path: '/panel/api/clients/rotationCheck',
+        summary:
+          'Self-check that re-issuing a subscription id works: creates a temporary client named still-ui-rotation-check-<unix ms> (1-byte quota, 15-minute expiry) on the first enabled local VLESS, VMess or Trojan inbound in the subscription, fetches its link from the running subscription server over loopback, re-issues the subscription id through the same update the client form sends, and expects the new link to carry the client and the old one to answer 404.',
+        description:
+          'Fetches send an X-HWID header, so a device limit gives the check a slot like a real app; a device-limit notice fails the step by name. The temporary client is deleted on every path once it may exist, and that deletion is reported as the last step. success is true whenever the check ran: read obj.passed and each step. Fails with success=false when the subscription server is disabled. Admin only.',
+        responseSchema: 'SubRotationReport',
+      },
+      {
         method: 'GET',
         path: '/panel/api/clients/export',
         summary:

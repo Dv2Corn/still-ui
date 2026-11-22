@@ -33,6 +33,7 @@ import {
   type BulkDetachResult,
 } from '@/schemas/client';
 import { DefaultsPayloadSchema } from '@/schemas/defaults';
+import { SubRotationReportSchema } from '@/generated/zod';
 import { TRAFFIC_POLL_INTERVAL_S } from '@/lib/traffic/poll-interval';
 
 // One row sent to POST /clients/:email/externalLinks.
@@ -550,6 +551,13 @@ export function useClients(options: UseClientsOptions = {}) {
     },
   });
 
+  const rotationCheckMut = useMutation({
+    mutationFn: async () => {
+      const raw = await HttpUtil.post('/panel/api/clients/rotationCheck');
+      return parseMsg(raw, SubRotationReportSchema, 'clients/rotationCheck');
+    },
+  });
+
   const importClientsMut = useMutation({
     mutationFn: async (data: string): Promise<Msg<BulkCreateResult>> => {
       const raw = await HttpUtil.post('/panel/api/clients/import', { data }, JSON_HEADERS);
@@ -689,6 +697,7 @@ export function useClients(options: UseClientsOptions = {}) {
   );
   const delDepleted = useCallback(() => delDepletedMut.mutateAsync(), [delDepletedMut]);
   const delOrphans = useCallback(() => delOrphansMut.mutateAsync(), [delOrphansMut]);
+  const rotationCheck = useCallback(() => rotationCheckMut.mutateAsync(), [rotationCheckMut]);
   const importClients = useCallback(
     (data: string) => importClientsMut.mutateAsync(data),
     [importClientsMut],
@@ -889,6 +898,7 @@ export function useClients(options: UseClientsOptions = {}) {
     resetAllTraffics,
     delDepleted,
     delOrphans,
+    rotationCheck,
     exportClients,
     importClients,
     setEnable,
