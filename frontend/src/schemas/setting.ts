@@ -228,6 +228,7 @@ export const AllSettingSchema = z
     connLogMaxSizeMB: z.number().int().min(16).max(1048576).optional(),
     connLogDestination: z.enum(['full', 'domain', 'none']).optional(),
     connLogSource: z.enum(['full', 'masked', 'none']).optional(),
+    auditLogRetentionDays: z.number().int().min(1).max(3650).optional(),
   })
   .loose();
 

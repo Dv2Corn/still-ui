@@ -83,6 +83,7 @@ export const PALETTE_KEYWORDS: Record<string, string[]> = {
   '/hosts': ['hosts', 'sni', 'domains'],
   '/probes': ['probes', 'reachability', 'blocking', 'censorship', 'monitoring'],
   '/connections': ['connections', 'connection log', 'access log', 'history', 'abuse', 'who'],
+  '/audit': ['audit', 'audit log', 'journal', 'admin actions', 'tamper', 'logins'],
   '/outbound': ['outbounds', 'freedom', 'blackhole', 'socks', 'http', 'warp', 'nord', 'pia'],
   '/routing': ['routing', 'rules', 'geoip', 'geosite', 'direct', 'block'],
   '/settings': ['settings', 'config', 'port', 'password', 'ssl', 'telegram'],

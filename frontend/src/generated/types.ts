@@ -17,6 +17,7 @@ export interface AllSetting {
   alertRemindHours: number;
   alertXrayRestartWindow: number;
   alertXrayRestarts: number;
+  auditLogRetentionDays: number;
   backupAgeRecipients: string;
   backupEnable: boolean;
   backupKeep: number;
@@ -234,6 +235,7 @@ export interface AllSettingView {
   alertRemindHours: number;
   alertXrayRestartWindow: number;
   alertXrayRestarts: number;
+  auditLogRetentionDays: number;
   backupAgeRecipients: string;
   backupEnable: boolean;
   backupKeep: number;
@@ -476,6 +478,41 @@ export interface ApiTokenView {
   name: string;
   scope: string;
   token?: string;
+}
+
+export interface AuditFilter {
+  action: string;
+  actor: string;
+  from: number;
+  outcome: string;
+  page: number;
+  pageSize: number;
+  to: number;
+}
+
+export interface AuditLog {
+  action: string;
+  actor: string;
+  detail: string;
+  hash: string;
+  id: number;
+  ip: string;
+  outcome: string;
+  prevHash: string;
+  target: string;
+  time: number;
+}
+
+export interface AuditPage {
+  rows: AuditLog[];
+  total: number;
+}
+
+export interface AuditVerifyResult {
+  brokenId: number;
+  checked: number;
+  ok: boolean;
+  reason: string;
 }
 
 export interface AwgSignaturePacketResponse {

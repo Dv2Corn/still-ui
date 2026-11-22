@@ -136,7 +136,8 @@
     "unpinSidebar": "サイドバーの固定を解除",
     "subFormats": "Sub Formats",
     "probes": "プローブ",
-    "connections": "接続"
+    "connections": "接続",
+    "audit": "監査ログ"
   },
   "pages": {
     "login": {
@@ -1603,7 +1604,8 @@
         "apiTokenEmpty": "トークンがまだありません — ボットやリモートパネルを認証するために作成してください。",
         "apiTokenDeleteWarning": "このトークンを使用しているクライアントは直ちに認証できなくなります。",
         "apiTokenCreatedTitle": "トークンを作成しました",
-        "apiTokenCreatedNotice": "このトークンを今すぐコピーしてください。セキュリティ上、読み取り可能な形式では保存されず、再表示されません。"
+        "apiTokenCreatedNotice": "このトークンを今すぐコピーしてください。セキュリティ上、読み取り可能な形式では保存されず、再表示されません。",
+        "audit": "監査ログ"
       },
       "toasts": {
         "modifySettings": "パラメーターが変更されました。",
@@ -2070,7 +2072,9 @@
       "connLogSourceDesc": "クライアントの接続元アドレスについて何を保存するか。",
       "connLogSourceFull": "完全なアドレスとポート",
       "connLogSourceMasked": "ネットワークのみ（IPv4 は /24、IPv6 は /48）",
-      "connLogPrivacyHint": "このログには個人データが含まれます。必要なものだけを保存してください。パネルのデータベースの隣に保存され、データベースにもそのバックアップにも含まれません。変更は新しい接続に適用され、保存済みの記録は期限が切れるまでそのまま残ります。"
+      "connLogPrivacyHint": "このログには個人データが含まれます。必要なものだけを保存してください。パネルのデータベースの隣に保存され、データベースにもそのバックアップにも含まれません。変更は新しい接続に適用され、保存済みの記録は期限が切れるまでそのまま残ります。",
+      "auditLogRetention": "監査エントリの保持期間（日）",
+      "auditLogRetentionDesc": "古いエントリは毎時削除されます。チェーンは検証可能なままです。"
     },
     "xray": {
       "importRules": "ルールをインポート",
@@ -2860,6 +2864,27 @@
       "newer": "新しい方へ",
       "older": "古い方へ",
       "ofClient": "このクライアントの接続"
+    },
+    "audit": {
+      "title": "監査ログ",
+      "intro": "状態を変更する管理操作とログインをすべて SHA-256 で連鎖させて記録し、編集・削除されたエントリを検出します。リクエスト本文や秘密情報は保存しません。ここでの検索とエクスポートも記録されます。",
+      "time": "時刻",
+      "actor": "ユーザーまたはトークン",
+      "ip": "送信元 IP",
+      "action": "操作",
+      "target": "対象",
+      "outcome": "結果",
+      "detail": "詳細",
+      "actorPlaceholder": "ユーザーまたはトークン（完全一致）",
+      "actionPlaceholder": "操作に含む…",
+      "success": "成功",
+      "failure": "失敗",
+      "exportCsv": "CSV をエクスポート",
+      "exportHint": "エクスポートには現在のフィルターの最大 {count} 行が含まれ、時刻は UTC です。",
+      "empty": "一致するエントリはありません。",
+      "verify": "チェーンを検証",
+      "verifyOk": "チェーンは正常です：{count} 件を確認しました。",
+      "verifyBroken": "チェーンはエントリ #{id} で壊れています：{reason}"
     }
   },
   "tgbot": {

@@ -59,6 +59,13 @@
             "minimum": 1,
             "type": "integer"
           },
+          "auditLogRetentionDays": {
+            "description": "Admin audit log (still-ui): days an entry is kept; older ones are pruned by a cron job.",
+            "example": 90,
+            "maximum": 3650,
+            "minimum": 1,
+            "type": "integer"
+          },
           "backupAgeRecipients": {
             "type": "string"
           },
@@ -779,6 +786,7 @@
           "alertRemindHours",
           "alertXrayRestartWindow",
           "alertXrayRestarts",
+          "auditLogRetentionDays",
           "backupAgeRecipients",
           "backupEnable",
           "backupKeep",
@@ -1020,6 +1028,13 @@
           "alertXrayRestarts": {
             "description": "Server health alert thresholds (events xray.down, xray.flapping, process.memory,\ndisk.high, cert.expiring, backup.failed); a reminder repeats every alertRemindHours, 0 = never.",
             "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "auditLogRetentionDays": {
+            "description": "Admin audit log (still-ui): days an entry is kept; older ones are pruned by a cron job.",
+            "example": 90,
+            "maximum": 3650,
             "minimum": 1,
             "type": "integer"
           },
@@ -1767,6 +1782,7 @@
           "alertRemindHours",
           "alertXrayRestartWindow",
           "alertXrayRestarts",
+          "auditLogRetentionDays",
           "backupAgeRecipients",
           "backupEnable",
           "backupKeep",
@@ -2094,6 +2110,167 @@
           "id",
           "name",
           "scope"
+        ],
+        "type": "object"
+      },
+      "AuditFilter": {
+        "description": "AuditFilter selects journal entries; empty strings and zero times leave that side open.",
+        "properties": {
+          "action": {
+            "example": "inbounds",
+            "type": "string"
+          },
+          "actor": {
+            "example": "admin",
+            "type": "string"
+          },
+          "from": {
+            "example": 1735689600000,
+            "format": "int64",
+            "type": "integer"
+          },
+          "outcome": {
+            "enum": [
+              "success",
+              "failure"
+            ],
+            "example": "failure",
+            "type": "string"
+          },
+          "page": {
+            "example": 1,
+            "type": "integer"
+          },
+          "pageSize": {
+            "example": 50,
+            "type": "integer"
+          },
+          "to": {
+            "example": 1735775999999,
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "action",
+          "actor",
+          "from",
+          "outcome",
+          "page",
+          "pageSize",
+          "to"
+        ],
+        "type": "object"
+      },
+      "AuditLog": {
+        "description": "AuditLog is one admin action in the tamper-evident journal. Hash is the SHA-256 of PrevHash\nand the entry's canonical content, so an edited or deleted row breaks the chain after it.",
+        "properties": {
+          "action": {
+            "description": "Action is the method and route template, or LOGIN / PRUNE.",
+            "example": "POST /panel/api/inbounds/update/:id",
+            "type": "string"
+          },
+          "actor": {
+            "example": "admin",
+            "type": "string"
+          },
+          "detail": {
+            "example": "HTTP 200",
+            "type": "string"
+          },
+          "hash": {
+            "type": "string"
+          },
+          "id": {
+            "example": 42,
+            "format": "int64",
+            "type": "integer"
+          },
+          "ip": {
+            "example": "203.0.113.9",
+            "type": "string"
+          },
+          "outcome": {
+            "example": "success",
+            "type": "string"
+          },
+          "prevHash": {
+            "description": "PrevHash and Hash are hex SHA-256 digests.",
+            "type": "string"
+          },
+          "target": {
+            "example": "id=7",
+            "type": "string"
+          },
+          "time": {
+            "description": "Time is unix milliseconds, UTC.",
+            "example": 1735689600000,
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "action",
+          "actor",
+          "detail",
+          "hash",
+          "id",
+          "ip",
+          "outcome",
+          "prevHash",
+          "target",
+          "time"
+        ],
+        "type": "object"
+      },
+      "AuditPage": {
+        "description": "AuditPage is one page of journal entries, newest first.",
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/AuditLog"
+            },
+            "type": "array"
+          },
+          "total": {
+            "example": 1234,
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rows",
+          "total"
+        ],
+        "type": "object"
+      },
+      "AuditVerifyResult": {
+        "description": "AuditVerifyResult reports the chain check; BrokenId is the first entry that does not link.",
+        "properties": {
+          "brokenId": {
+            "example": 42,
+            "format": "int64",
+            "type": "integer"
+          },
+          "checked": {
+            "example": 1234,
+            "format": "int64",
+            "type": "integer"
+          },
+          "ok": {
+            "example": false,
+            "type": "boolean"
+          },
+          "reason": {
+            "example": "the previous entry is missing or was changed",
+            "type": "string"
+          }
+        },
+        "required": [
+          "brokenId",
+          "checked",
+          "ok",
+          "reason"
         ],
         "type": "object"
       },
@@ -6226,6 +6403,10 @@
     {
       "name": "Connection log",
       "description": "Who connected, when, through which inbound and where to, read from the Xray access log of this panel's own server. Off until \"Record connections\" is turned on in the settings; what is stored of a destination and of a client address follows the settings too. Admin only: a monitor, node-sync or node-admin token is refused. Each request is written to the panel log with the user and the filter."
+    },
+    {
+      "name": "Audit log",
+      "description": "The tamper-evident journal of admin actions: every state-changing /panel/api request (except read-only POSTs, and telemetry pushes made with a node token) and every admin login, with the user or API token, source IP, route, target ids and outcome. Request bodies are never stored. Each entry carries the SHA-256 of the previous entry's hash and its own content, so an edited or deleted row breaks the chain. Admin only: a monitor, node-sync or node-admin token is refused. Every call here is journaled too."
     },
     {
       "name": "Backup",
@@ -15853,6 +16034,161 @@
                       "type": "string"
                     },
                     "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/audit/list": {
+      "post": {
+        "tags": [
+          "Audit log"
+        ],
+        "summary": "One page of entries, newest first. Every filter field is optional: actor and outcome match exactly, action matches any part of the route, from and to are unix milliseconds. page starts at 1; pageSize is capped at 500.",
+        "operationId": "post_panel_api_audit_list",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "from": 1735689600000,
+                "to": 1735775999999,
+                "actor": "admin",
+                "action": "inbounds",
+                "outcome": "failure",
+                "page": 1,
+                "pageSize": 50
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "$ref": "#/components/schemas/AuditPage"
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": {
+                    "rows": [
+                      {
+                        "action": "POST /panel/api/inbounds/update/:id",
+                        "actor": "admin",
+                        "detail": "HTTP 200",
+                        "hash": "",
+                        "id": 42,
+                        "ip": "203.0.113.9",
+                        "outcome": "success",
+                        "prevHash": "",
+                        "target": "id=7",
+                        "time": 1735689600000
+                      }
+                    ],
+                    "total": 1234
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/audit/export": {
+      "post": {
+        "tags": [
+          "Audit log"
+        ],
+        "summary": "The entries matching the same filter as CSV (text/csv), newest first, at most 100000 rows, times in UTC. page and pageSize are ignored. A cell that a spreadsheet would read as a formula is prefixed with an apostrophe.",
+        "operationId": "post_panel_api_audit_export",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              },
+              "example": {
+                "outcome": "failure"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/panel/api/audit/verify": {
+      "post": {
+        "tags": [
+          "Audit log"
+        ],
+        "summary": "Recompute the hash chain from the retention anchor. ok is false when an entry was edited or deleted; brokenId names the first entry that does not link.",
+        "operationId": "post_panel_api_audit_verify",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "obj": {
+                      "$ref": "#/components/schemas/AuditVerifyResult"
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "obj": {
+                    "brokenId": 42,
+                    "checked": 1234,
+                    "ok": false,
+                    "reason": "the previous entry is missing or was changed"
                   }
                 }
               }

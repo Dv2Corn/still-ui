@@ -136,7 +136,8 @@
     "unpinSidebar": "Desfijar barra lateral",
     "subFormats": "Sub Formats",
     "probes": "Sondas",
-    "connections": "Conexiones"
+    "connections": "Conexiones",
+    "audit": "Registro de auditoría"
   },
   "pages": {
     "login": {
@@ -1603,7 +1604,8 @@
         "apiTokenEmpty": "Aún no hay tokens — crea uno para autenticar bots o paneles remotos.",
         "apiTokenDeleteWarning": "Cualquier cliente que use este token dejará de autenticarse inmediatamente.",
         "apiTokenCreatedTitle": "Token creado",
-        "apiTokenCreatedNotice": "Copia este token ahora. Por seguridad, no se almacena de forma legible y no se volverá a mostrar."
+        "apiTokenCreatedNotice": "Copia este token ahora. Por seguridad, no se almacena de forma legible y no se volverá a mostrar.",
+        "audit": "Registro de auditoría"
       },
       "toasts": {
         "modifySettings": "Los parámetros han sido modificados.",
@@ -2070,7 +2072,9 @@
       "connLogSourceDesc": "Qué se guarda sobre la dirección desde la que se conectó un cliente.",
       "connLogSourceFull": "Dirección completa y puerto",
       "connLogSourceMasked": "Solo la red (/24 en IPv4, /48 en IPv6)",
-      "connLogPrivacyHint": "Este registro contiene datos personales: guarde solo lo necesario. Se almacena junto a la base de datos del panel, no dentro de ella ni en sus copias de seguridad. Un cambio se aplica a las conexiones nuevas; lo ya guardado queda como está hasta que caduque."
+      "connLogPrivacyHint": "Este registro contiene datos personales: guarde solo lo necesario. Se almacena junto a la base de datos del panel, no dentro de ella ni en sus copias de seguridad. Un cambio se aplica a las conexiones nuevas; lo ya guardado queda como está hasta que caduque.",
+      "auditLogRetention": "Conservar entradas de auditoría (días)",
+      "auditLogRetentionDesc": "Las entradas más antiguas se borran cada hora; la cadena sigue siendo verificable."
     },
     "xray": {
       "save": "Guardar configuración",
@@ -2860,6 +2864,27 @@
       "newer": "Más recientes",
       "older": "Más antiguas",
       "ofClient": "Conexiones de este cliente"
+    },
+    "audit": {
+      "title": "Registro de auditoría",
+      "intro": "Cada acción de administración que cambia el estado y cada inicio de sesión, encadenados con SHA-256 para detectar una entrada editada o borrada. Nunca se guardan cuerpos de petición ni secretos. Cada búsqueda y exportación aquí también se registra.",
+      "time": "Hora",
+      "actor": "Usuario o token",
+      "ip": "IP de origen",
+      "action": "Acción",
+      "target": "Objetivo",
+      "outcome": "Resultado",
+      "detail": "Detalle",
+      "actorPlaceholder": "Usuario o token (exacto)",
+      "actionPlaceholder": "La acción contiene…",
+      "success": "Éxito",
+      "failure": "Fallo",
+      "exportCsv": "Exportar CSV",
+      "exportHint": "La exportación incluye hasta {count} filas del filtro actual, con horas en UTC.",
+      "empty": "No hay entradas que coincidan.",
+      "verify": "Verificar cadena",
+      "verifyOk": "La cadena está intacta: {count} entradas comprobadas.",
+      "verifyBroken": "La cadena está rota en la entrada #{id}: {reason}"
     }
   },
   "tgbot": {

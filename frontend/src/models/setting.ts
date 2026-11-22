@@ -241,6 +241,7 @@ export class AllSetting {
   connLogMaxSizeMB = 2048;
   connLogDestination = 'full';
   connLogSource = 'full';
+  auditLogRetentionDays = 90;
 
   constructor(data?: unknown) {
     if (data != null) {

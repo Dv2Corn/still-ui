@@ -7,6 +7,7 @@ export const EXAMPLES: Record<string, unknown> = {
     "alertRemindHours": 0,
     "alertXrayRestartWindow": 1,
     "alertXrayRestarts": 1,
+    "auditLogRetentionDays": 90,
     "backupAgeRecipients": "",
     "backupEnable": false,
     "backupKeep": 1,
@@ -223,6 +224,7 @@ export const EXAMPLES: Record<string, unknown> = {
     "alertRemindHours": 0,
     "alertXrayRestartWindow": 1,
     "alertXrayRestarts": 1,
+    "auditLogRetentionDays": 90,
     "backupAgeRecipients": "",
     "backupEnable": false,
     "backupKeep": 1,
@@ -477,6 +479,50 @@ export const EXAMPLES: Record<string, unknown> = {
     "name": "central-panel-a",
     "scope": "admin",
     "token": "new-token-string"
+  },
+  "AuditFilter": {
+    "action": "inbounds",
+    "actor": "admin",
+    "from": 1735689600000,
+    "outcome": "failure",
+    "page": 1,
+    "pageSize": 50,
+    "to": 1735775999999
+  },
+  "AuditLog": {
+    "action": "POST /panel/api/inbounds/update/:id",
+    "actor": "admin",
+    "detail": "HTTP 200",
+    "hash": "",
+    "id": 42,
+    "ip": "203.0.113.9",
+    "outcome": "success",
+    "prevHash": "",
+    "target": "id=7",
+    "time": 1735689600000
+  },
+  "AuditPage": {
+    "rows": [
+      {
+        "action": "POST /panel/api/inbounds/update/:id",
+        "actor": "admin",
+        "detail": "HTTP 200",
+        "hash": "",
+        "id": 42,
+        "ip": "203.0.113.9",
+        "outcome": "success",
+        "prevHash": "",
+        "target": "id=7",
+        "time": 1735689600000
+      }
+    ],
+    "total": 1234
+  },
+  "AuditVerifyResult": {
+    "brokenId": 42,
+    "checked": 1234,
+    "ok": false,
+    "reason": "the previous entry is missing or was changed"
   },
   "AwgSignaturePacketResponse": {
     "i1": "\u003cr 2\u003e\u003cb 0x010000010000000000000377777706676f6f676c6503636f6d0000010001\u003e"

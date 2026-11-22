@@ -33,6 +33,13 @@ export const SCHEMAS: Record<string, unknown> = {
         "minimum": 1,
         "type": "integer"
       },
+      "auditLogRetentionDays": {
+        "description": "Admin audit log (still-ui): days an entry is kept; older ones are pruned by a cron job.",
+        "example": 90,
+        "maximum": 3650,
+        "minimum": 1,
+        "type": "integer"
+      },
       "backupAgeRecipients": {
         "type": "string"
       },
@@ -753,6 +760,7 @@ export const SCHEMAS: Record<string, unknown> = {
       "alertRemindHours",
       "alertXrayRestartWindow",
       "alertXrayRestarts",
+      "auditLogRetentionDays",
       "backupAgeRecipients",
       "backupEnable",
       "backupKeep",
@@ -994,6 +1002,13 @@ export const SCHEMAS: Record<string, unknown> = {
       "alertXrayRestarts": {
         "description": "Server health alert thresholds (events xray.down, xray.flapping, process.memory,\ndisk.high, cert.expiring, backup.failed); a reminder repeats every alertRemindHours, 0 = never.",
         "maximum": 100,
+        "minimum": 1,
+        "type": "integer"
+      },
+      "auditLogRetentionDays": {
+        "description": "Admin audit log (still-ui): days an entry is kept; older ones are pruned by a cron job.",
+        "example": 90,
+        "maximum": 3650,
         "minimum": 1,
         "type": "integer"
       },
@@ -1741,6 +1756,7 @@ export const SCHEMAS: Record<string, unknown> = {
       "alertRemindHours",
       "alertXrayRestartWindow",
       "alertXrayRestarts",
+      "auditLogRetentionDays",
       "backupAgeRecipients",
       "backupEnable",
       "backupKeep",
@@ -2068,6 +2084,167 @@ export const SCHEMAS: Record<string, unknown> = {
       "id",
       "name",
       "scope"
+    ],
+    "type": "object"
+  },
+  "AuditFilter": {
+    "description": "AuditFilter selects journal entries; empty strings and zero times leave that side open.",
+    "properties": {
+      "action": {
+        "example": "inbounds",
+        "type": "string"
+      },
+      "actor": {
+        "example": "admin",
+        "type": "string"
+      },
+      "from": {
+        "example": 1735689600000,
+        "format": "int64",
+        "type": "integer"
+      },
+      "outcome": {
+        "enum": [
+          "success",
+          "failure"
+        ],
+        "example": "failure",
+        "type": "string"
+      },
+      "page": {
+        "example": 1,
+        "type": "integer"
+      },
+      "pageSize": {
+        "example": 50,
+        "type": "integer"
+      },
+      "to": {
+        "example": 1735775999999,
+        "format": "int64",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "action",
+      "actor",
+      "from",
+      "outcome",
+      "page",
+      "pageSize",
+      "to"
+    ],
+    "type": "object"
+  },
+  "AuditLog": {
+    "description": "AuditLog is one admin action in the tamper-evident journal. Hash is the SHA-256 of PrevHash\nand the entry's canonical content, so an edited or deleted row breaks the chain after it.",
+    "properties": {
+      "action": {
+        "description": "Action is the method and route template, or LOGIN / PRUNE.",
+        "example": "POST /panel/api/inbounds/update/:id",
+        "type": "string"
+      },
+      "actor": {
+        "example": "admin",
+        "type": "string"
+      },
+      "detail": {
+        "example": "HTTP 200",
+        "type": "string"
+      },
+      "hash": {
+        "type": "string"
+      },
+      "id": {
+        "example": 42,
+        "format": "int64",
+        "type": "integer"
+      },
+      "ip": {
+        "example": "203.0.113.9",
+        "type": "string"
+      },
+      "outcome": {
+        "example": "success",
+        "type": "string"
+      },
+      "prevHash": {
+        "description": "PrevHash and Hash are hex SHA-256 digests.",
+        "type": "string"
+      },
+      "target": {
+        "example": "id=7",
+        "type": "string"
+      },
+      "time": {
+        "description": "Time is unix milliseconds, UTC.",
+        "example": 1735689600000,
+        "format": "int64",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "action",
+      "actor",
+      "detail",
+      "hash",
+      "id",
+      "ip",
+      "outcome",
+      "prevHash",
+      "target",
+      "time"
+    ],
+    "type": "object"
+  },
+  "AuditPage": {
+    "description": "AuditPage is one page of journal entries, newest first.",
+    "properties": {
+      "rows": {
+        "items": {
+          "$ref": "#/components/schemas/AuditLog"
+        },
+        "type": "array"
+      },
+      "total": {
+        "example": 1234,
+        "format": "int64",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "rows",
+      "total"
+    ],
+    "type": "object"
+  },
+  "AuditVerifyResult": {
+    "description": "AuditVerifyResult reports the chain check; BrokenId is the first entry that does not link.",
+    "properties": {
+      "brokenId": {
+        "example": 42,
+        "format": "int64",
+        "type": "integer"
+      },
+      "checked": {
+        "example": 1234,
+        "format": "int64",
+        "type": "integer"
+      },
+      "ok": {
+        "example": false,
+        "type": "boolean"
+      },
+      "reason": {
+        "example": "the previous entry is missing or was changed",
+        "type": "string"
+      }
+    },
+    "required": [
+      "brokenId",
+      "checked",
+      "ok",
+      "reason"
     ],
     "type": "object"
   },

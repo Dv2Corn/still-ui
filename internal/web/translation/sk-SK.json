@@ -136,7 +136,8 @@
     "unpinSidebar": "Odopnúť bočné menu",
     "subFormats": "Formáty odberu",
     "probes": "Sondy",
-    "connections": "Pripojenia"
+    "connections": "Pripojenia",
+    "audit": "Auditný záznam"
   },
   "pages": {
     "login": {
@@ -1728,7 +1729,8 @@
         "apiTokenEmpty": "Zatiaľ nie sú vytvorené žiadne tokeny. Vytvorte token na overovanie botov alebo vzdialených panelov.",
         "apiTokenDeleteWarning": "Každý, kto používa tento token, okamžite stratí možnosť overenia.",
         "apiTokenCreatedTitle": "Token bol vytvorený",
-        "apiTokenCreatedNotice": "Token si teraz skopírujte. Z bezpečnostných dôvodov sa neukladá v čitateľnej podobe a už sa znova nezobrazí."
+        "apiTokenCreatedNotice": "Token si teraz skopírujte. Z bezpečnostných dôvodov sa neukladá v čitateľnej podobe a už sa znova nezobrazí.",
+        "audit": "Auditný záznam"
       },
       "toasts": {
         "modifySettings": "Nastavenia boli zmenené.",
@@ -2191,7 +2193,9 @@
       "connLogSourceDesc": "Čo sa ukladá o adrese, z ktorej sa klient pripojil.",
       "connLogSourceFull": "Celá adresa a port",
       "connLogSourceMasked": "Iba sieť (/24 pre IPv4, /48 pre IPv6)",
-      "connLogPrivacyHint": "Tento denník obsahuje osobné údaje: uchovávajte len to, čo potrebujete. Je uložený vedľa databázy panela, nie v nej ani v jej zálohách. Zmena platí pre nové pripojenia; už uložené záznamy zostanú bez zmeny, kým nevypršia."
+      "connLogPrivacyHint": "Tento denník obsahuje osobné údaje: uchovávajte len to, čo potrebujete. Je uložený vedľa databázy panela, nie v nej ani v jej zálohách. Zmena platí pre nové pripojenia; už uložené záznamy zostanú bez zmeny, kým nevypršia.",
+      "auditLogRetention": "Uchovávať auditné záznamy (dni)",
+      "auditLogRetentionDesc": "Staršie záznamy sa mažú každú hodinu; reťazec zostáva overiteľný."
     },
     "xray": {
       "save": "Uložiť",
@@ -2860,6 +2864,27 @@
       "newer": "Novšie",
       "older": "Staršie",
       "ofClient": "Pripojenia tohto klienta"
+    },
+    "audit": {
+      "title": "Auditný záznam",
+      "intro": "Každá akcia administrátora meniaca stav a každé prihlásenie, zreťazené cez SHA-256, takže upravený alebo zmazaný záznam sa odhalí. Telá požiadaviek ani tajomstvá sa nikdy neukladajú. Každé vyhľadávanie a export tu sa tiež zaznamená.",
+      "time": "Čas",
+      "actor": "Používateľ alebo token",
+      "ip": "Zdrojová IP",
+      "action": "Akcia",
+      "target": "Cieľ",
+      "outcome": "Výsledok",
+      "detail": "Detail",
+      "actorPlaceholder": "Používateľ alebo token (presne)",
+      "actionPlaceholder": "Akcia obsahuje…",
+      "success": "Úspech",
+      "failure": "Zlyhanie",
+      "exportCsv": "Exportovať CSV",
+      "exportHint": "Export obsahuje najviac {count} riadkov aktuálneho filtra, časy v UTC.",
+      "empty": "Žiadne záznamy nevyhovujú.",
+      "verify": "Overiť reťazec",
+      "verifyOk": "Reťazec je neporušený: overených záznamov {count}.",
+      "verifyBroken": "Reťazec je prerušený pri zázname #{id}: {reason}"
     }
   },
   "tgbot": {

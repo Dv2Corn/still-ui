@@ -136,7 +136,8 @@
     "unpinSidebar": "Kenar çubuğu sabitlemesini kaldır",
     "subFormats": "Abonelik Formatları",
     "probes": "Yoklayıcılar",
-    "connections": "Bağlantılar"
+    "connections": "Bağlantılar",
+    "audit": "Denetim günlüğü"
   },
   "pages": {
     "login": {
@@ -1603,7 +1604,8 @@
         "apiTokenEmpty": "Henüz token yok — botları veya uzak panelleri doğrulamak için bir tane oluşturun.",
         "apiTokenDeleteWarning": "Bu token'ı kullanan tüm bağlantılar anında kimlik doğrulamasını kaybeder.",
         "apiTokenCreatedTitle": "Token Oluşturuldu",
-        "apiTokenCreatedNotice": "Bu token'ı şimdi kopyalayın. Güvenlik nedeniyle okunabilir biçimde saklanmaz ve tekrar gösterilmez."
+        "apiTokenCreatedNotice": "Bu token'ı şimdi kopyalayın. Güvenlik nedeniyle okunabilir biçimde saklanmaz ve tekrar gösterilmez.",
+        "audit": "Denetim günlüğü"
       },
       "toasts": {
         "modifySettings": "Parametreler değiştirildi.",
@@ -2070,7 +2072,9 @@
       "connLogSourceDesc": "Kullanıcının bağlandığı adres hakkında ne saklanır.",
       "connLogSourceFull": "Tam adres ve port",
       "connLogSourceMasked": "Yalnızca ağ (IPv4 için /24, IPv6 için /48)",
-      "connLogPrivacyHint": "Bu günlük kişisel veri içerir: yalnızca gerekeni saklayın. Panel veritabanının yanında durur; veritabanının ve yedeklerinin içinde değildir. Değişiklik yeni bağlantılara uygulanır; kaydedilmiş olanlar süresi dolana kadar olduğu gibi kalır."
+      "connLogPrivacyHint": "Bu günlük kişisel veri içerir: yalnızca gerekeni saklayın. Panel veritabanının yanında durur; veritabanının ve yedeklerinin içinde değildir. Değişiklik yeni bağlantılara uygulanır; kaydedilmiş olanlar süresi dolana kadar olduğu gibi kalır.",
+      "auditLogRetention": "Denetim kayıtlarını sakla (gün)",
+      "auditLogRetentionDesc": "Daha eski kayıtlar her saat silinir; zincir doğrulanabilir kalır."
     },
     "xray": {
       "save": "Kaydet",
@@ -2860,6 +2864,27 @@
       "newer": "Daha yeni",
       "older": "Daha eski",
       "ofClient": "Bu kullanıcının bağlantıları"
+    },
+    "audit": {
+      "title": "Denetim günlüğü",
+      "intro": "Durumu değiştiren her yönetici işlemi ve her oturum açma, SHA-256 ile zincirlenir; böylece düzenlenen veya silinen bir kayıt fark edilir. İstek gövdeleri ve gizli bilgiler asla saklanmaz. Buradaki her arama ve dışa aktarma da kaydedilir.",
+      "time": "Zaman",
+      "actor": "Kullanıcı veya token",
+      "ip": "Kaynak IP",
+      "action": "İşlem",
+      "target": "Hedef",
+      "outcome": "Sonuç",
+      "detail": "Ayrıntı",
+      "actorPlaceholder": "Kullanıcı veya token (tam)",
+      "actionPlaceholder": "İşlem şunu içerir…",
+      "success": "Başarılı",
+      "failure": "Başarısız",
+      "exportCsv": "CSV dışa aktar",
+      "exportHint": "Dışa aktarma, geçerli filtrenin en fazla {count} satırını UTC saatleriyle içerir.",
+      "empty": "Eşleşen kayıt yok.",
+      "verify": "Zinciri doğrula",
+      "verifyOk": "Zincir sağlam: {count} kayıt denetlendi.",
+      "verifyBroken": "Zincir #{id} numaralı kayıtta bozuk: {reason}"
     }
   },
   "tgbot": {
