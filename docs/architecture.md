@@ -423,6 +423,7 @@ All registered in `web.go` → `startTask()`. Each is a struct with a `Run()` me
 | `@every 5s`         | (`ConnLogService.Tick` in `startTask`)                                                           | Connection log: store new access-log lines while it is on; prune once a minute        |
 | `@every 10m`        | `clear_logs_job` (`PruneXrayLogsJob`)                                                            | Truncate Xray access/error logs once either exceeds 64 MiB                            |
 | `@hourly`           | `warp_ip_job`, `periodic_traffic_reset_job("hourly")`                                            | WARP IP rotation; traffic resets                                                      |
+| `@hourly`           | (`AuditService.PruneJob` in `startTask`)                                                         | Admin audit log: delete entries past `auditLogRetentionDays`, move the chain anchor   |
 | `@daily`            | `clear_logs_job`, `periodic_traffic_reset_job("daily")`, `periodic_traffic_reset_job("monthly")` | IP-limit and Xray access/error log cleanup; daily resets and due monthly resets       |
 | `@daily`            | inline func → `ClientService.PurgeExpiredClientHwids`                                            | Drop subscription devices not seen for `subHwidExpireDays`                            |
 | `@weekly`           | `periodic_traffic_reset_job("weekly")`                                                           | Weekly traffic resets                                                                 |
@@ -475,7 +476,8 @@ also has protocol schemas under `frontend/src/schemas/protocols/` and `frontend/
 `xray.crash`, `node.down|up`, `cpu.high`, `memory.high`, `login.attempt`, with structured
 payloads (OutboundHealthData, NodeHealthData, LoginEventData, SystemMetricData). Producers
 include the CPU/memory jobs, node heartbeat, and login handling; consumers include the
-Telegram bot, the Discord bot (`service/discord/`), and the email notifier (`service/email/`). Use it for cross-cutting
+Telegram bot, the Discord bot (`service/discord/`), the email notifier (`service/email/`), and the admin
+audit log (`service/audit.go`, `login.attempt` only). Use it for cross-cutting
 notifications instead of importing notification services into producers.
 
 ### 5.8 Tunnel health monitor
@@ -547,6 +549,7 @@ for AutoMigrate in `internal/database/db.go`.
 | **Geo category browser** empty / won't open                                       | `xray/geodata/` (`Store`, `reader.go`), `service/geodata.go`                 | `controller/xray_setting.go` (`/panel/api/xray/geodata/*`), asset dir = `config.GetBinFolderPath()` |
 | **`geosite:`/`geoip:` token** reported unknown in a routing rule                  | `xray/geodata/token.go`, `service/geodata.go` (`Validate`)                   | `frontend/src/lib/xray/geoTokens.ts`, `frontend/src/components/geodata/`                            |
 | **Connection log** empty / missing lines / too large                              | `internal/connlog/` (`collector.go`, `store.go`), `service/connlog.go`       | `xray/accesslog.go` (parser), `job/clear_logs_job.go` (truncation), `controller/connlog.go`         |
+| **Audit log** entry missing / Verify reports a broken chain                      | `controller/audit.go` (`recordAudit` on `/panel/api`), `service/audit.go`    | `controller/api.go` (middleware order), `auditExemptPOST`, `web.go` (login bus subscriber)          |
 | **Telegram bot** commands                                                         | `service/tgbot/`                                                             | `job/stats_notify_job.go`                                                                           |
 | **Discord bot** commands & reports                                                | `service/discord/`                                                           | `job/discord_notify_job.go`                                                                         |
 | **Email notifications**                                                           | `service/email/`                                                             | `internal/eventbus/` (consumers)                                                                    |
