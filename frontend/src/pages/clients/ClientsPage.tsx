@@ -44,6 +44,7 @@ import {
   QrcodeOutlined,
   RestOutlined,
   RetweetOutlined,
+  SafetyCertificateOutlined,
   SearchOutlined,
   SortAscendingOutlined,
   StopOutlined,
@@ -94,6 +95,7 @@ const BulkDetachInboundsModal = lazy(() => import('./BulkDetachInboundsModal'));
 const TextModal = lazy(() => import('@/components/feedback/TextModal'));
 const PromptModal = lazy(() => import('@/components/feedback/PromptModal'));
 import { ClientInboundChips, ClientRowActions } from './RowCells';
+import RotationCheckReport from './RotationCheckReport';
 import { emptyFilters, activeFilterCount } from './filters';
 import type { ClientFilters } from './filters';
 import './ClientsPage.css';
@@ -365,6 +367,7 @@ export default function ClientsPage() {
     resetAllTraffics,
     delDepleted,
     delOrphans,
+    rotationCheck,
     exportClients,
     importClients,
     setEnable,
@@ -876,6 +879,26 @@ export default function ClientsPage() {
           messageApi.success(t('pages.clients.toasts.delOrphans', { count: deleted }));
         }
       },
+    });
+  }
+
+  async function onRotationCheck() {
+    const key = 'rotationCheck';
+    messageApi.open({
+      key,
+      type: 'loading',
+      content: t('pages.clients.rotationCheckRunning'),
+      duration: 0,
+    });
+    const msg = await rotationCheck().finally(() => messageApi.destroy(key));
+    if (!msg?.success || !msg.obj) return;
+    const report = msg.obj;
+    (report.passed ? modal.success : modal.error)({
+      title: t(
+        report.passed ? 'pages.clients.rotationCheckPassed' : 'pages.clients.rotationCheckFailed',
+      ),
+      content: <RotationCheckReport report={report} />,
+      width: 640,
     });
   }
 
@@ -1506,6 +1529,12 @@ export default function ClientsPage() {
                                         icon: <RetweetOutlined aria-hidden />,
                                         label: t('pages.clients.resetAllTraffics'),
                                         onClick: onResetAllTraffics,
+                                      },
+                                      {
+                                        key: 'rotationCheck',
+                                        icon: <SafetyCertificateOutlined aria-hidden />,
+                                        label: t('pages.clients.rotationCheck'),
+                                        onClick: onRotationCheck,
                                       },
                                       { type: 'divider' as const },
                                       {
