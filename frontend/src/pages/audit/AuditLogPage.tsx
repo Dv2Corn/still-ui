@@ -148,7 +148,10 @@ export default function AuditLogPage() {
         title: t('pages.audit.outcome'),
         dataIndex: 'outcome',
         render: (outcome: string, row) => (
-          <Tag color={outcome === 'success' ? 'green' : 'red'} title={`${t('pages.audit.detail')}: ${row.detail}`}>
+          <Tag
+            color={outcome === 'success' ? 'green' : 'red'}
+            title={`${t('pages.audit.detail')}: ${row.detail}`}
+          >
             {outcome === 'success' ? t('pages.audit.success') : t('pages.audit.failure')}
           </Tag>
         ),
