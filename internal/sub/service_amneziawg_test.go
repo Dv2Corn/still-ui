@@ -216,7 +216,7 @@ func TestAmneziaWGConfigTextPeerFieldOrder(t *testing.T) {
 
 	t.Run("every optional field set", func(t *testing.T) {
 		client := &model.Client{PrivateKey: "clientPriv", AllowedIPs: []string{"10.8.1.2/32"}, PreSharedKey: "psk", KeepAlive: model.KeepAlivePtr(25)}
-		conf := amneziaWGConfigText(server, client, "203.0.113.7", 51820, "remark")
+		conf := amneziaWGConfigText(server, client, "203.0.113.7", 51820, "remark", "0.0.0.0/0, ::/0")
 		if got := peerFields(t, conf); !slices.Equal(got, peerFieldOrder) {
 			t.Fatalf("peer fields = %v, want %v\n%s", got, peerFieldOrder, conf)
 		}
@@ -230,7 +230,7 @@ func TestAmneziaWGConfigTextPeerFieldOrder(t *testing.T) {
 	t.Run("range keepalive is preserved in native config", func(t *testing.T) {
 		keepAlive := model.KeepAliveValue("15-25")
 		client := &model.Client{PrivateKey: "clientPriv", AllowedIPs: []string{"10.8.1.2/32"}, KeepAlive: &keepAlive}
-		conf := amneziaWGConfigText(server, client, "203.0.113.7", 51820, "remark")
+		conf := amneziaWGConfigText(server, client, "203.0.113.7", 51820, "remark", "0.0.0.0/0, ::/0")
 		if !strings.Contains(conf, "PersistentKeepalive = 15-25") {
 			t.Fatalf("native config lost keepalive range:\n%s", conf)
 		}
@@ -239,7 +239,7 @@ func TestAmneziaWGConfigTextPeerFieldOrder(t *testing.T) {
 	t.Run("legacy negative keepalive is omitted", func(t *testing.T) {
 		keepAlive := model.KeepAliveValue("-1")
 		client := &model.Client{PrivateKey: "clientPriv", AllowedIPs: []string{"10.8.1.2/32"}, KeepAlive: &keepAlive}
-		conf := amneziaWGConfigText(server, client, "203.0.113.7", 51820, "remark")
+		conf := amneziaWGConfigText(server, client, "203.0.113.7", 51820, "remark", "0.0.0.0/0, ::/0")
 		if strings.Contains(conf, "PersistentKeepalive") {
 			t.Fatalf("native config emitted invalid legacy keepalive:\n%s", conf)
 		}
@@ -247,7 +247,7 @@ func TestAmneziaWGConfigTextPeerFieldOrder(t *testing.T) {
 
 	t.Run("no preshared key or keepalive", func(t *testing.T) {
 		client := &model.Client{PrivateKey: "clientPriv", AllowedIPs: []string{"10.8.1.2/32"}}
-		conf := amneziaWGConfigText(server, client, "203.0.113.7", 51820, "remark")
+		conf := amneziaWGConfigText(server, client, "203.0.113.7", 51820, "remark", "0.0.0.0/0, ::/0")
 		want := []string{"PublicKey", "AllowedIPs", "Endpoint"}
 		if got := peerFields(t, conf); !slices.Equal(got, want) {
 			t.Fatalf("peer fields = %v, want %v\n%s", got, want, conf)
@@ -268,13 +268,13 @@ func TestAmneziaWGConfigTextRejectsLineBreakInAnyValue(t *testing.T) {
 	}
 	client := &model.Client{Email: "peer-1", PrivateKey: "clientPriv==", AllowedIPs: []string{"10.8.1.2/32"}}
 
-	clean := amneziaWGConfigText(server, client, "203.0.113.7", 51820, "peer-1")
+	clean := amneziaWGConfigText(server, client, "203.0.113.7", 51820, "peer-1", "0.0.0.0/0, ::/0")
 	if !strings.Contains(clean, "PrivateKey = clientPriv==") {
 		t.Fatalf("clean input did not render: %q", clean)
 	}
 
 	server.H1 = "140232109\nPostUp = touch /tmp/pwned"
-	if got := amneziaWGConfigText(server, client, "203.0.113.7", 51820, "peer-1"); got != "" {
+	if got := amneziaWGConfigText(server, client, "203.0.113.7", 51820, "peer-1", "0.0.0.0/0, ::/0"); got != "" {
 		t.Fatalf("H1 with a line break rendered a config:\n%s", got)
 	}
 }
@@ -306,7 +306,7 @@ func TestAmneziaWGConfigTextAlwaysCarriesTheClientMTU(t *testing.T) {
 				MTU:       tc.serverMTU,
 				S4:        tc.s4,
 			}
-			got := amneziaWGConfigText(server, client, "203.0.113.7", 51820, "peer-1")
+			got := amneziaWGConfigText(server, client, "203.0.113.7", 51820, "peer-1", "0.0.0.0/0, ::/0")
 			if !strings.Contains(got, tc.want+"\n") {
 				t.Errorf("expected %q in the client config\n%s", tc.want, got)
 			}

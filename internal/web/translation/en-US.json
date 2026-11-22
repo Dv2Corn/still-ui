@@ -2160,6 +2160,8 @@
       "subLocalDirectOff": "Off",
       "subLocalDirectProxy": "Always through the VPN",
       "subLocalDirectProxyDesc": "Telegram, YouTube, Instagram, Facebook, WhatsApp, Discord, ChatGPT and Claude always go through the VPN, even where they look local. Add more domains or IP ranges here, one per line; they are checked before the country rule.",
+      "subLocalDirectAwg": "AmneziaWG files too",
+      "subLocalDirectAwgDesc": "AmneziaWG config files (download, QR, vpn:// links) also skip the country's addresses, and their DNS stays reachable. Such a file is large (~35 KB, ~2000 prefixes) and may not fit in a QR code. The server side is unchanged, so files imported earlier keep working as a full tunnel until re-imported.",
       "subProbeOrder": "Use probe results",
       "subProbeOrderDesc": "Links that the reachability probes report down (2 failed checks in a row) move to the end of the subscription or are hidden, in every format: links, JSON and Clash. A user always keeps at least one link, and without fresh probe results nothing changes. The Probes page shows what happens to each endpoint.",
       "subProbeOrderOff": "Off (default)",

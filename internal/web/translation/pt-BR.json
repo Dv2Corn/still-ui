@@ -2039,6 +2039,8 @@
       "subLocalDirectOff": "Desligado",
       "subLocalDirectProxy": "Sempre pela VPN",
       "subLocalDirectProxyDesc": "Telegram, YouTube, Instagram, Facebook, WhatsApp, Discord, ChatGPT e Claude sempre vão pela VPN, mesmo que pareçam locais. Adicione aqui outros domínios ou faixas de IP, um por linha; são verificados antes da regra do país.",
+      "subLocalDirectAwg": "Também arquivos AmneziaWG",
+      "subLocalDirectAwgDesc": "Os arquivos de configuração AmneziaWG (download, QR, links vpn://) também deixam de fora os endereços do país e o DNS continua acessível. O arquivo é grande (~35 KB, ~2000 prefixos) e pode não caber em um QR code. O servidor não muda, então arquivos já importados seguem como túnel completo até serem reimportados.",
       "subProbeOrder": "Usar os resultados das sondas",
       "subProbeOrderDesc": "Links que as sondas de acessibilidade indicam como fora do ar (2 falhas seguidas) vão para o fim da assinatura ou são ocultados, em todos os formatos: links, JSON e Clash. O usuário sempre mantém pelo menos um link e, sem resultados recentes das sondas, nada muda. A página de sondas mostra o que acontece com cada endpoint.",
       "subProbeOrderOff": "Desligado (padrão)",

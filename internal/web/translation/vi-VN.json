@@ -2039,6 +2039,8 @@
       "subLocalDirectOff": "Tắt",
       "subLocalDirectProxy": "Luôn qua VPN",
       "subLocalDirectProxyDesc": "Telegram, YouTube, Instagram, Facebook, WhatsApp, Discord, ChatGPT và Claude luôn đi qua VPN dù trông giống trong nước. Thêm tên miền hoặc dải IP khác vào đây, mỗi dòng một mục; chúng được kiểm tra trước quy tắc quốc gia.",
+      "subLocalDirectAwg": "Cả tệp AmneziaWG",
+      "subLocalDirectAwgDesc": "Tệp cấu hình AmneziaWG (tải về, QR, liên kết vpn://) cũng bỏ qua địa chỉ của quốc gia và DNS vẫn truy cập được. Tệp này lớn (~35 KB, ~2000 tiền tố) và có thể không vừa mã QR. Phía máy chủ không đổi, nên tệp đã nhập trước đó vẫn là đường hầm toàn phần cho đến khi nhập lại.",
       "subProbeOrder": "Dùng kết quả thăm dò",
       "subProbeOrderDesc": "Các liên kết mà bộ thăm dò báo là không truy cập được (thất bại 2 lần liên tiếp) sẽ được chuyển xuống cuối gói đăng ký hoặc bị ẩn, ở mọi định dạng: liên kết, JSON và Clash. Người dùng luôn còn ít nhất một liên kết, và nếu không có kết quả thăm dò mới thì không có gì thay đổi. Trang Thăm dò cho biết điều gì xảy ra với từng điểm kết nối.",
       "subProbeOrderOff": "Tắt (mặc định)",

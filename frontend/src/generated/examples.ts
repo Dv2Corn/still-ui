@@ -175,6 +175,7 @@ export const EXAMPLES: Record<string, unknown> = {
     "subLeakWindowHours": 24,
     "subListen": "",
     "subLocalDirect": "",
+    "subLocalDirectAwg": false,
     "subLocalDirectProxy": "",
     "subPath": "",
     "subPort": 1,
@@ -398,6 +399,7 @@ export const EXAMPLES: Record<string, unknown> = {
     "subLeakWindowHours": 24,
     "subListen": "",
     "subLocalDirect": "",
+    "subLocalDirectAwg": false,
     "subLocalDirectProxy": "",
     "subPath": "",
     "subPort": 1,
@@ -972,6 +974,7 @@ export const EXAMPLES: Record<string, unknown> = {
     "xver": 0
   },
   "InboundOption": {
+    "awgAllowedIPs": "",
     "awgServer": null,
     "enable": true,
     "id": 1,
