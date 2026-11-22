@@ -28,11 +28,13 @@ _openapi:
         tlsFlowCapable flag (true for VLESS on TCP with tls or reality, or on
         XHTTP with VLESS encryption / vlessenc enabled), and ssMethod (the
         Shadowsocks cipher, empty for non-Shadowsocks inbounds — used by the
-        client UI to generate a valid Shadowsocks 2022 PSK). Use this for
-        dropdowns and attach pickers — it skips settings, streamSettings, and
-        clientStats so the payload stays small even on panels with thousands of
-        clients.
-      url: '#lightweight-picker-projection-of-the-authenticated-users-inbounds-returns-id-remark-tag-protocol-port-a-server-computed-tlsflowcapable-flag-true-for-vless-on-tcp-with-tls-or-reality-or-on-xhttp-with-vless-encryption--vlessenc-enabled-and-ssmethod-the-shadowsocks-cipher-empty-for-non-shadowsocks-inbounds--used-by-the-client-ui-to-generate-a-valid-shadowsocks-2022-psk-use-this-for-dropdowns-and-attach-pickers--it-skips-settings-streamsettings-and-clientstats-so-the-payload-stays-small-even-on-panels-with-thousands-of-clients'
+        client UI to generate a valid Shadowsocks 2022 PSK). AmneziaWG inbounds
+        also carry awgAllowedIPs, the peer AllowedIPs computed from the panel
+        geoip.dat when "Local sites direct" is on for AmneziaWG files (absent
+        means a full tunnel). Use this for dropdowns and attach pickers — it
+        skips settings, streamSettings, and clientStats so the payload stays
+        small even on panels with thousands of clients.
+      url: '#lightweight-picker-projection-of-the-authenticated-users-inbounds-returns-id-remark-tag-protocol-port-a-server-computed-tlsflowcapable-flag-true-for-vless-on-tcp-with-tls-or-reality-or-on-xhttp-with-vless-encryption--vlessenc-enabled-and-ssmethod-the-shadowsocks-cipher-empty-for-non-shadowsocks-inbounds--used-by-the-client-ui-to-generate-a-valid-shadowsocks-2022-psk-amneziawg-inbounds-also-carry-awgallowedips-the-peer-allowedips-computed-from-the-panel-geoipdat-when-local-sites-direct-is-on-for-amneziawg-files-absent-means-a-full-tunnel-use-this-for-dropdowns-and-attach-pickers--it-skips-settings-streamsettings-and-clientstats-so-the-payload-stays-small-even-on-panels-with-thousands-of-clients'
     - depth: 2
       title: Whether this host can run an AmneziaWG inbound on the kernel module.
         Returns ready, host blocker codes (root/tools/module/nft), and the
@@ -140,11 +142,13 @@ _openapi:
           tlsFlowCapable flag (true for VLESS on TCP with tls or reality, or on
           XHTTP with VLESS encryption / vlessenc enabled), and ssMethod (the
           Shadowsocks cipher, empty for non-Shadowsocks inbounds — used by the
-          client UI to generate a valid Shadowsocks 2022 PSK). Use this for
-          dropdowns and attach pickers — it skips settings, streamSettings, and
-          clientStats so the payload stays small even on panels with thousands
-          of clients.
-        id: lightweight-picker-projection-of-the-authenticated-users-inbounds-returns-id-remark-tag-protocol-port-a-server-computed-tlsflowcapable-flag-true-for-vless-on-tcp-with-tls-or-reality-or-on-xhttp-with-vless-encryption--vlessenc-enabled-and-ssmethod-the-shadowsocks-cipher-empty-for-non-shadowsocks-inbounds--used-by-the-client-ui-to-generate-a-valid-shadowsocks-2022-psk-use-this-for-dropdowns-and-attach-pickers--it-skips-settings-streamsettings-and-clientstats-so-the-payload-stays-small-even-on-panels-with-thousands-of-clients
+          client UI to generate a valid Shadowsocks 2022 PSK). AmneziaWG
+          inbounds also carry awgAllowedIPs, the peer AllowedIPs computed from
+          the panel geoip.dat when "Local sites direct" is on for AmneziaWG
+          files (absent means a full tunnel). Use this for dropdowns and attach
+          pickers — it skips settings, streamSettings, and clientStats so the
+          payload stays small even on panels with thousands of clients.
+        id: lightweight-picker-projection-of-the-authenticated-users-inbounds-returns-id-remark-tag-protocol-port-a-server-computed-tlsflowcapable-flag-true-for-vless-on-tcp-with-tls-or-reality-or-on-xhttp-with-vless-encryption--vlessenc-enabled-and-ssmethod-the-shadowsocks-cipher-empty-for-non-shadowsocks-inbounds--used-by-the-client-ui-to-generate-a-valid-shadowsocks-2022-psk-amneziawg-inbounds-also-carry-awgallowedips-the-peer-allowedips-computed-from-the-panel-geoipdat-when-local-sites-direct-is-on-for-amneziawg-files-absent-means-a-full-tunnel-use-this-for-dropdowns-and-attach-pickers--it-skips-settings-streamsettings-and-clientstats-so-the-payload-stays-small-even-on-panels-with-thousands-of-clients
       - content: Whether this host can run an AmneziaWG inbound on the kernel module.
           Returns ready, host blocker codes (root/tools/module/nft), and the
           command that fixes them. Saving an inbound also checks its features
