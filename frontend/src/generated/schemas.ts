@@ -215,6 +215,13 @@ export const SCHEMAS: Record<string, unknown> = {
         "minimum": 1,
         "type": "integer"
       },
+      "nodeSilenceMinutes": {
+        "description": "Minutes without a heartbeat before the node.silent alert; 0 turns it off.",
+        "example": 30,
+        "maximum": 10080,
+        "minimum": 0,
+        "type": "integer"
+      },
       "outboundDownThreshold": {
         "maximum": 100,
         "minimum": 1,
@@ -799,6 +806,7 @@ export const SCHEMAS: Record<string, unknown> = {
       "ldapUserFilter",
       "ldapVlessField",
       "nodeDownThreshold",
+      "nodeSilenceMinutes",
       "outboundDownThreshold",
       "pageSize",
       "panelOutbound",
@@ -1197,6 +1205,13 @@ export const SCHEMAS: Record<string, unknown> = {
       "nodeDownThreshold": {
         "maximum": 100,
         "minimum": 1,
+        "type": "integer"
+      },
+      "nodeSilenceMinutes": {
+        "description": "Minutes without a heartbeat before the node.silent alert; 0 turns it off.",
+        "example": 30,
+        "maximum": 10080,
+        "minimum": 0,
         "type": "integer"
       },
       "outboundDownThreshold": {
@@ -1791,6 +1806,7 @@ export const SCHEMAS: Record<string, unknown> = {
       "ldapUserFilter",
       "ldapVlessField",
       "nodeDownThreshold",
+      "nodeSilenceMinutes",
       "outboundDownThreshold",
       "pageSize",
       "panelOutbound",

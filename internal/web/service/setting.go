@@ -261,7 +261,8 @@ var defaultValueMap = map[string]string{
 	// Consecutive failed observatory probes before an outbound.down event fires
 	"outboundDownThreshold": "3",
 
-	"nodeDownThreshold": "1",
+	"nodeDownThreshold":  "1",
+	"nodeSilenceMinutes": "30",
 
 	// Email (SMTP) notifications
 	"smtpEnable":         "false",
@@ -1868,6 +1869,14 @@ func (s *SettingService) GetNodeDownThreshold() (int, error) {
 
 func (s *SettingService) SetNodeDownThreshold(value int) error {
 	return s.setInt("nodeDownThreshold", value)
+}
+
+func (s *SettingService) GetNodeSilenceMinutes() (int, error) {
+	return s.getInt("nodeSilenceMinutes")
+}
+
+func (s *SettingService) SetNodeSilenceMinutes(value int) error {
+	return s.setInt("nodeSilenceMinutes", value)
 }
 
 // SecretClears marks redacted secrets the user explicitly emptied. Without a

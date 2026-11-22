@@ -200,6 +200,7 @@ export class AllSetting {
   smtpMemory = 80;
   outboundDownThreshold = 3;
   nodeDownThreshold = 1;
+  nodeSilenceMinutes = 30;
   hasTgBotToken = false;
   hasTwoFactorToken = false;
   hasLdapPassword = false;

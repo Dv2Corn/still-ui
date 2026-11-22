@@ -61,6 +61,7 @@ export const AllSettingSchema = z
     tgCpu: z.number().int().min(0).max(100).optional(),
     outboundDownThreshold: z.number().int().min(1).max(100).optional(),
     nodeDownThreshold: z.number().int().min(1).max(100).optional(),
+    nodeSilenceMinutes: z.number().int().min(0).max(10080).optional(),
     tgLang: z.string().optional(),
     twoFactorEnable: z.boolean().optional(),
     twoFactorToken: z.string().optional(),

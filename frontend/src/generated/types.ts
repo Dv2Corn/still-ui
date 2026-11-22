@@ -66,6 +66,7 @@ export interface AllSetting {
   ldapUserFilter: string;
   ldapVlessField: string;
   nodeDownThreshold: number;
+  nodeSilenceMinutes: number;
   outboundDownThreshold: number;
   pageSize: number;
   panelOutbound: string;
@@ -290,6 +291,7 @@ export interface AllSettingView {
   ldapUserFilter: string;
   ldapVlessField: string;
   nodeDownThreshold: number;
+  nodeSilenceMinutes: number;
   outboundDownThreshold: number;
   pageSize: number;
   panelOutbound: string;

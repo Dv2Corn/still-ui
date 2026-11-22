@@ -122,6 +122,8 @@ type AllSetting struct {
 
 	OutboundDownThreshold int `json:"outboundDownThreshold" form:"outboundDownThreshold" validate:"gte=1,lte=100"`
 	NodeDownThreshold     int `json:"nodeDownThreshold" form:"nodeDownThreshold" validate:"gte=1,lte=100"`
+	// Minutes without a heartbeat before the node.silent alert; 0 turns it off.
+	NodeSilenceMinutes int `json:"nodeSilenceMinutes" form:"nodeSilenceMinutes" validate:"gte=0,lte=10080" example:"30"`
 
 	TimeLocation    string `json:"timeLocation" form:"timeLocation"`
 	TwoFactorEnable bool   `json:"twoFactorEnable" form:"twoFactorEnable"`
