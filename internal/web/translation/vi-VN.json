@@ -136,7 +136,8 @@
     "unpinSidebar": "Bỏ ghim thanh bên",
     "subFormats": "Sub Formats",
     "probes": "Thăm dò",
-    "connections": "Kết nối"
+    "connections": "Kết nối",
+    "audit": "Nhật ký kiểm toán"
   },
   "pages": {
     "login": {
@@ -1603,7 +1604,8 @@
         "apiTokenEmpty": "Chưa có token nào — tạo một token để xác thực bot hoặc panel từ xa.",
         "apiTokenDeleteWarning": "Mọi client đang dùng token này sẽ ngừng xác thực ngay lập tức.",
         "apiTokenCreatedTitle": "Đã tạo token",
-        "apiTokenCreatedNotice": "Hãy sao chép token này ngay bây giờ. Vì lý do bảo mật, token không được lưu ở dạng đọc được và sẽ không hiển thị lại."
+        "apiTokenCreatedNotice": "Hãy sao chép token này ngay bây giờ. Vì lý do bảo mật, token không được lưu ở dạng đọc được và sẽ không hiển thị lại.",
+        "audit": "Nhật ký kiểm toán"
       },
       "toasts": {
         "modifySettings": "Các tham số đã được thay đổi.",
@@ -2068,7 +2070,9 @@
       "connLogSourceDesc": "Lưu gì về địa chỉ mà khách hàng kết nối từ đó.",
       "connLogSourceFull": "Địa chỉ đầy đủ và cổng",
       "connLogSourceMasked": "Chỉ mạng (/24 với IPv4, /48 với IPv6)",
-      "connLogPrivacyHint": "Nhật ký này chứa dữ liệu cá nhân: chỉ lưu những gì cần. Nó nằm cạnh cơ sở dữ liệu của bảng điều khiển, không nằm trong đó và không nằm trong bản sao lưu. Thay đổi áp dụng cho kết nối mới; dữ liệu đã lưu giữ nguyên cho đến khi hết hạn."
+      "connLogPrivacyHint": "Nhật ký này chứa dữ liệu cá nhân: chỉ lưu những gì cần. Nó nằm cạnh cơ sở dữ liệu của bảng điều khiển, không nằm trong đó và không nằm trong bản sao lưu. Thay đổi áp dụng cho kết nối mới; dữ liệu đã lưu giữ nguyên cho đến khi hết hạn.",
+      "auditLogRetention": "Giữ mục kiểm toán (ngày)",
+      "auditLogRetentionDesc": "Các mục cũ hơn bị xóa mỗi giờ; chuỗi vẫn xác minh được."
     },
     "xray": {
       "importRules": "Nhập quy tắc",
@@ -2858,6 +2862,27 @@
       "newer": "Mới hơn",
       "older": "Cũ hơn",
       "ofClient": "Kết nối của khách hàng này"
+    },
+    "audit": {
+      "title": "Nhật ký kiểm toán",
+      "intro": "Mọi thao tác quản trị làm thay đổi trạng thái và mọi lần đăng nhập, được xâu chuỗi bằng SHA-256 để phát hiện mục bị sửa hoặc xóa. Không bao giờ lưu nội dung yêu cầu hay bí mật. Mỗi lần tìm kiếm và xuất tại đây cũng được ghi lại.",
+      "time": "Thời gian",
+      "actor": "Người dùng hoặc token",
+      "ip": "IP nguồn",
+      "action": "Thao tác",
+      "target": "Đối tượng",
+      "outcome": "Kết quả",
+      "detail": "Chi tiết",
+      "actorPlaceholder": "Người dùng hoặc token (chính xác)",
+      "actionPlaceholder": "Thao tác chứa…",
+      "success": "Thành công",
+      "failure": "Thất bại",
+      "exportCsv": "Xuất CSV",
+      "exportHint": "Bản xuất chứa tối đa {count} dòng của bộ lọc hiện tại, thời gian theo UTC.",
+      "empty": "Không có mục nào khớp.",
+      "verify": "Xác minh chuỗi",
+      "verifyOk": "Chuỗi còn nguyên vẹn: đã kiểm tra {count} mục.",
+      "verifyBroken": "Chuỗi bị đứt tại mục #{id}: {reason}"
     }
   },
   "tgbot": {

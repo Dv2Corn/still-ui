@@ -136,7 +136,8 @@
     "unpinSidebar": "取消固定侧边栏",
     "subFormats": "Sub Formats",
     "probes": "探针",
-    "connections": "连接"
+    "connections": "连接",
+    "audit": "审计日志"
   },
   "pages": {
     "login": {
@@ -1603,7 +1604,8 @@
         "apiTokenEmpty": "暂无令牌 — 创建一个用于认证机器人或远程面板。",
         "apiTokenDeleteWarning": "使用此令牌的任何调用方将立即无法认证。",
         "apiTokenCreatedTitle": "令牌已创建",
-        "apiTokenCreatedNotice": "请立即复制此令牌。出于安全考虑，它不会以可读形式存储，也不会再次显示。"
+        "apiTokenCreatedNotice": "请立即复制此令牌。出于安全考虑，它不会以可读形式存储，也不会再次显示。",
+        "audit": "审计日志"
       },
       "toasts": {
         "modifySettings": "参数已更改。",
@@ -2068,7 +2070,9 @@
       "connLogSourceDesc": "保存客户端来源地址的哪些信息。",
       "connLogSourceFull": "完整地址和端口",
       "connLogSourceMasked": "仅网段（IPv4 为 /24，IPv6 为 /48）",
-      "connLogPrivacyHint": "此日志包含个人数据：只保留需要的内容。它存放在面板数据库旁边，不在数据库内，也不在其备份中。更改只对新连接生效；已保存的记录保持原样，直到过期。"
+      "connLogPrivacyHint": "此日志包含个人数据：只保留需要的内容。它存放在面板数据库旁边，不在数据库内，也不在其备份中。更改只对新连接生效；已保存的记录保持原样，直到过期。",
+      "auditLogRetention": "审计条目保留天数",
+      "auditLogRetentionDesc": "更早的条目每小时删除一次；链仍可验证。"
     },
     "xray": {
       "importRules": "导入规则",
@@ -2858,6 +2862,27 @@
       "newer": "较新",
       "older": "较旧",
       "ofClient": "此客户端的连接"
+    },
+    "audit": {
+      "title": "审计日志",
+      "intro": "每一次更改状态的管理操作和每一次登录都以 SHA-256 串联记录，因此被修改或删除的条目会被发现。从不保存请求正文和机密信息。此处的每次搜索和导出也会被记录。",
+      "time": "时间",
+      "actor": "用户或令牌",
+      "ip": "来源 IP",
+      "action": "操作",
+      "target": "对象",
+      "outcome": "结果",
+      "detail": "详情",
+      "actorPlaceholder": "用户或令牌（精确）",
+      "actionPlaceholder": "操作包含…",
+      "success": "成功",
+      "failure": "失败",
+      "exportCsv": "导出 CSV",
+      "exportHint": "导出最多包含当前筛选的 {count} 行，时间为 UTC。",
+      "empty": "没有匹配的条目。",
+      "verify": "验证链",
+      "verifyOk": "链完整：已检查 {count} 个条目。",
+      "verifyBroken": "链在条目 #{id} 处断裂：{reason}"
     }
   },
   "tgbot": {

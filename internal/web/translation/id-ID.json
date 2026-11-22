@@ -136,7 +136,8 @@
     "unpinSidebar": "Lepas sematan bilah sisi",
     "subFormats": "Sub Formats",
     "probes": "Probe",
-    "connections": "Koneksi"
+    "connections": "Koneksi",
+    "audit": "Log audit"
   },
   "pages": {
     "login": {
@@ -1603,7 +1604,8 @@
         "apiTokenEmpty": "Belum ada token — buat satu untuk mengautentikasi bot atau panel jarak jauh.",
         "apiTokenDeleteWarning": "Setiap pemanggil yang menggunakan token ini akan berhenti terautentikasi segera.",
         "apiTokenCreatedTitle": "Token dibuat",
-        "apiTokenCreatedNotice": "Salin token ini sekarang. Demi keamanan, token tidak disimpan dalam bentuk yang dapat dibaca dan tidak akan ditampilkan lagi."
+        "apiTokenCreatedNotice": "Salin token ini sekarang. Demi keamanan, token tidak disimpan dalam bentuk yang dapat dibaca dan tidak akan ditampilkan lagi.",
+        "audit": "Log audit"
       },
       "toasts": {
         "modifySettings": "Parameter telah diubah.",
@@ -2068,7 +2070,9 @@
       "connLogSourceDesc": "Apa yang disimpan tentang alamat asal koneksi klien.",
       "connLogSourceFull": "Alamat lengkap dan port",
       "connLogSourceMasked": "Hanya jaringan (/24 untuk IPv4, /48 untuk IPv6)",
-      "connLogPrivacyHint": "Log ini berisi data pribadi: simpan hanya yang diperlukan. Log disimpan di samping basis data panel, bukan di dalamnya dan bukan di cadangannya. Perubahan berlaku untuk koneksi baru; yang sudah tersimpan tetap seperti adanya sampai kedaluwarsa."
+      "connLogPrivacyHint": "Log ini berisi data pribadi: simpan hanya yang diperlukan. Log disimpan di samping basis data panel, bukan di dalamnya dan bukan di cadangannya. Perubahan berlaku untuk koneksi baru; yang sudah tersimpan tetap seperti adanya sampai kedaluwarsa.",
+      "auditLogRetention": "Simpan entri audit (hari)",
+      "auditLogRetentionDesc": "Entri yang lebih lama dihapus setiap jam; rantai tetap dapat diverifikasi."
     },
     "xray": {
       "save": "Simpan",
@@ -2858,6 +2862,27 @@
       "newer": "Lebih baru",
       "older": "Lebih lama",
       "ofClient": "Koneksi klien ini"
+    },
+    "audit": {
+      "title": "Log audit",
+      "intro": "Setiap tindakan admin yang mengubah keadaan dan setiap login, dirantai dengan SHA-256 sehingga entri yang diedit atau dihapus terdeteksi. Isi permintaan dan rahasia tidak pernah disimpan. Setiap pencarian dan ekspor di sini juga dicatat.",
+      "time": "Waktu",
+      "actor": "Pengguna atau token",
+      "ip": "IP sumber",
+      "action": "Tindakan",
+      "target": "Target",
+      "outcome": "Hasil",
+      "detail": "Detail",
+      "actorPlaceholder": "Pengguna atau token (persis)",
+      "actionPlaceholder": "Tindakan berisi…",
+      "success": "Berhasil",
+      "failure": "Gagal",
+      "exportCsv": "Ekspor CSV",
+      "exportHint": "Ekspor berisi hingga {count} baris dari filter saat ini, dengan waktu UTC.",
+      "empty": "Tidak ada entri yang cocok.",
+      "verify": "Verifikasi rantai",
+      "verifyOk": "Rantai utuh: {count} entri diperiksa.",
+      "verifyBroken": "Rantai rusak pada entri #{id}: {reason}"
     }
   },
   "tgbot": {

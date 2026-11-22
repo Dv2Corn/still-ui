@@ -136,7 +136,8 @@
     "unpinSidebar": "取消固定側邊欄",
     "subFormats": "Sub Formats",
     "probes": "探針",
-    "connections": "連線"
+    "connections": "連線",
+    "audit": "稽核日誌"
   },
   "pages": {
     "login": {
@@ -1603,7 +1604,8 @@
         "apiTokenEmpty": "尚無令牌 — 建立一個以認證機器人或遠端面板。",
         "apiTokenDeleteWarning": "使用此令牌的任何呼叫方將立即無法認證。",
         "apiTokenCreatedTitle": "權杖已建立",
-        "apiTokenCreatedNotice": "請立即複製此權杖。基於安全考量，它不會以可讀形式儲存，也不會再次顯示。"
+        "apiTokenCreatedNotice": "請立即複製此權杖。基於安全考量，它不會以可讀形式儲存，也不會再次顯示。",
+        "audit": "稽核日誌"
       },
       "toasts": {
         "modifySettings": "參數已更改。",
@@ -2068,7 +2070,9 @@
       "connLogSourceDesc": "保存客戶端來源位址的哪些資訊。",
       "connLogSourceFull": "完整位址與連接埠",
       "connLogSourceMasked": "僅網段（IPv4 為 /24，IPv6 為 /48）",
-      "connLogPrivacyHint": "此記錄包含個人資料：只保留需要的內容。它存放在面板資料庫旁邊，不在資料庫內，也不在其備份中。變更只對新連線生效；已保存的記錄維持原樣，直到過期。"
+      "connLogPrivacyHint": "此記錄包含個人資料：只保留需要的內容。它存放在面板資料庫旁邊，不在資料庫內，也不在其備份中。變更只對新連線生效；已保存的記錄維持原樣，直到過期。",
+      "auditLogRetention": "稽核項目保留天數",
+      "auditLogRetentionDesc": "較舊的項目每小時刪除一次；鏈仍可驗證。"
     },
     "xray": {
       "save": "儲存",
@@ -2858,6 +2862,27 @@
       "newer": "較新",
       "older": "較舊",
       "ofClient": "此客戶端的連線"
+    },
+    "audit": {
+      "title": "稽核日誌",
+      "intro": "每一次變更狀態的管理操作與每一次登入都以 SHA-256 串連記錄，因此被修改或刪除的項目會被發現。從不儲存請求內容與機密資訊。此處的每次搜尋與匯出也會被記錄。",
+      "time": "時間",
+      "actor": "使用者或權杖",
+      "ip": "來源 IP",
+      "action": "操作",
+      "target": "對象",
+      "outcome": "結果",
+      "detail": "詳細",
+      "actorPlaceholder": "使用者或權杖（精確）",
+      "actionPlaceholder": "操作包含…",
+      "success": "成功",
+      "failure": "失敗",
+      "exportCsv": "匯出 CSV",
+      "exportHint": "匯出最多包含目前篩選的 {count} 列，時間為 UTC。",
+      "empty": "沒有符合的項目。",
+      "verify": "驗證鏈",
+      "verifyOk": "鏈完整：已檢查 {count} 個項目。",
+      "verifyBroken": "鏈在項目 #{id} 處斷裂：{reason}"
     }
   },
   "tgbot": {

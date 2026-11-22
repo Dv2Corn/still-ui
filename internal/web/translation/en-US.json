@@ -136,7 +136,8 @@
     "unpinSidebar": "Unpin sidebar",
     "subFormats": "Sub Formats",
     "probes": "Probes",
-    "connections": "Connections"
+    "connections": "Connections",
+    "audit": "Audit log"
   },
   "pages": {
     "login": {
@@ -1728,7 +1729,8 @@
         "apiTokenEmpty": "No tokens yet — create one to authenticate bots or remote panels.",
         "apiTokenDeleteWarning": "Any caller using this token will stop authenticating immediately.",
         "apiTokenCreatedTitle": "Token created",
-        "apiTokenCreatedNotice": "Copy this token now. For security it is not stored in readable form and will not be shown again."
+        "apiTokenCreatedNotice": "Copy this token now. For security it is not stored in readable form and will not be shown again.",
+        "audit": "Audit log"
       },
       "toasts": {
         "modifySettings": "The parameters have been changed.",
@@ -2189,7 +2191,9 @@
       "connLogSourceDesc": "What is stored about the address a client connected from.",
       "connLogSourceFull": "Full address and port",
       "connLogSourceMasked": "Network only (/24 for IPv4, /48 for IPv6)",
-      "connLogPrivacyHint": "This log holds personal data: keep only what you need. It is stored beside the panel database, not in it and not in its backups. A change applies to new connections; what is already stored stays as it is until it expires."
+      "connLogPrivacyHint": "This log holds personal data: keep only what you need. It is stored beside the panel database, not in it and not in its backups. A change applies to new connections; what is already stored stays as it is until it expires.",
+      "auditLogRetention": "Keep audit entries (days)",
+      "auditLogRetentionDesc": "Older entries are deleted every hour; the chain stays verifiable."
     },
     "xray": {
       "save": "Save",
@@ -2858,6 +2862,27 @@
       "newer": "Newer",
       "older": "Older",
       "ofClient": "This client's connections"
+    },
+    "audit": {
+      "title": "Audit log",
+      "intro": "Every state-changing admin action and login, chained by SHA-256 so that an edited or deleted entry is detected. Request bodies and secrets are never stored. Each search and export here is recorded too.",
+      "time": "Time",
+      "actor": "User or token",
+      "ip": "Source IP",
+      "action": "Action",
+      "target": "Target",
+      "outcome": "Outcome",
+      "detail": "Detail",
+      "actorPlaceholder": "User or token (exact)",
+      "actionPlaceholder": "Action contains…",
+      "success": "Success",
+      "failure": "Failure",
+      "exportCsv": "Export CSV",
+      "exportHint": "The export holds up to {count} rows of the current filter, with times in UTC.",
+      "empty": "No entries match.",
+      "verify": "Verify chain",
+      "verifyOk": "The chain is intact: {count} entries checked.",
+      "verifyBroken": "The chain is broken at entry #{id}: {reason}"
     }
   },
   "tgbot": {
