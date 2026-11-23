@@ -10,6 +10,16 @@
   <a href="https://github.com/Dv2Corn/still-ui/attestations"><img src="https://img.shields.io/badge/builds-attested-2ea44f" alt="发布构建由 GitHub Actions 证明"></a>
 </p>
 
+<p align="center">
+  <a href="https://dv2corn.github.io/still-ui/">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="media/still/still-ui-overview-dark.png">
+      <img src="media/still/still-ui-overview-light.png" alt="still-ui overview page" width="900">
+    </picture>
+  </a>
+</p>
+
+
 **still-ui** 是 MHSanaei 开发的 [3x-ui](https://github.com/MHSanaei/3x-ui) 面板的一个分支（fork），用于管理 [Xray-core](https://github.com/XTLS/Xray-core)。它以 3x-ui **v3.11.0** 为基础，保留了原面板的全部能力：相同的协议、相同的界面、相同的数据库。
 
 不同之处在于关注点。当面板在一台小服务器上连续运行几个月、用户大多使用移动网络时，一些问题会逐渐暴露出来：客户端设置悄无声息地丢失、握手在丢包严重的线路上失败、面板进程一点点吃光服务器内存。still-ui 专门解决这些问题。

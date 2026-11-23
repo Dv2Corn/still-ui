@@ -10,6 +10,16 @@
   <a href="https://github.com/Dv2Corn/still-ui/attestations"><img src="https://img.shields.io/badge/builds-attested-2ea44f" alt="Сборки выпусков подписаны GitHub Actions"></a>
 </p>
 
+<p align="center">
+  <a href="https://dv2corn.github.io/still-ui/">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="media/still/still-ui-overview-dark.png">
+      <img src="media/still/still-ui-overview-light.png" alt="still-ui overview page" width="900">
+    </picture>
+  </a>
+</p>
+
+
 **still-ui** — форк панели [3x-ui](https://github.com/MHSanaei/3x-ui) (автор — MHSanaei) для [Xray-core](https://github.com/XTLS/Xray-core). За основу взята 3x-ui **v3.11.0**, и всё, что умеет она, умеет и still-ui: те же протоколы, тот же интерфейс, та же база.
 
 Разница — в том, на что смотрим. still-ui чинит то, что начинает мешать, когда панель месяцами крутится на небольшом сервере, а клиенты сидят в мобильных сетях: настройки клиентов молча теряются, рукопожатие рвётся на плохой связи, а сама панель потихоньку съедает память сервера.
