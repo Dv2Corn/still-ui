@@ -141,6 +141,8 @@ expect_port() {
     actual=$(awk 'last == "-port" {print; exit} {last = $0}' "$CASE_DIR/settings-args")
     [[ "$actual" == "$1" ]] || { echo "Port $actual, expected $1"; return 1; }
     grep -Fxq 'Panel Installation Complete!' < <(sed 's/^[[:space:]]*//;s/[[:space:]]*$//' "$CASE_DIR/output")
+    # A fresh install tells the owner what to do next, not only the login.
+    grep -Fq 'Inbounds: pick one of the ready-made cards' "$CASE_DIR/output" || { echo "no next steps"; return 1; }
     [[ -f "$CASE_DIR/result" ]] || return 1
     [[ $(sed -n '3p' "$CASE_DIR/result") == "$1" ]] || return 1
     [[ $(sed -n '1p' "$CASE_DIR/result") == test-user ]] || return 1
