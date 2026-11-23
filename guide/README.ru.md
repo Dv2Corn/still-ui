@@ -118,7 +118,7 @@ STILL_UI_ARCHIVE=/path/still-ui-linux-amd64.tar.gz bash install.sh
 
 Установщик сам придумает логин, пароль и путь к панели и покажет их в конце — сохраните. Дальше команда `still-ui` открывает меню управления: запуск и остановка, просмотр и сброс входа, смена порта, сертификаты и прочее. Подкоманды те же, что у скрипта `x-ui` в 3x-ui: `still-ui start`, `stop`, `restart`, `status`, `log`, `update`, `legacy`, `uninstall` и другие.
 
-Сборки выпуска есть только под **Linux amd64 и arm64**. Текущий выпуск — still-ui **1.11.0** на основе 3x-ui 3.11.0 и исправлений, принятых после неё, с **Xray v26.10.31** в собственной сборке still-ui ([чем отличается](../scripts/xray-build/README.md)).
+Сборки выпуска есть только под **Linux amd64 и arm64**. Текущий выпуск — still-ui **1.11.1** на основе 3x-ui 3.11.0 и исправлений, принятых после неё, с **Xray v26.10.31** в собственной сборке still-ui ([чем отличается](../scripts/xray-build/README.md)).
 
 ### Docker
 
@@ -128,7 +128,7 @@ STILL_UI_ARCHIVE=/path/still-ui-linux-amd64.tar.gz bash install.sh
 docker pull ghcr.io/dv2corn/still-ui:latest
 ```
 
-Чтобы остаться на одном выпуске, вместо `latest` укажите версию (например, `ghcr.io/dv2corn/still-ui:1.11.0`). Запуск с теми же настройками, что в [docker-compose.yml](../docker-compose.yml):
+Чтобы остаться на одном выпуске, вместо `latest` укажите версию (например, `ghcr.io/dv2corn/still-ui:1.11.1`). Запуск с теми же настройками, что в [docker-compose.yml](../docker-compose.yml):
 
 ```bash
 docker run -d --name still-ui --restart unless-stopped \
@@ -318,10 +318,10 @@ BitTorrent, зашифрованный внутри дополнительног
 | `install.sh`, `update.sh`, `x-ui.sh`, `migrate.sh` | установщик, скрипт обновления, меню `still-ui` и переезд с 3x-ui этого выпуска (те же файлы лежат в архиве); кнопка обновления в панели и `still-ui update` запускают `update.sh`, только если его сумма есть в `SHA256SUMS` |
 | `SHA256SUMS` | контрольные суммы архивов, SBOM, архивов агента проверки и скриптов |
 
-Скачать и проверить суммы (вместо `v1.11.0` — выпуск, который ставите):
+Скачать и проверить суммы (вместо `v1.11.1` — выпуск, который ставите):
 
 ```bash
-gh release download v1.11.0 -R Dv2Corn/still-ui -p 'still-ui-linux-amd64.tar.gz*' -p SHA256SUMS
+gh release download v1.11.1 -R Dv2Corn/still-ui -p 'still-ui-linux-amd64.tar.gz*' -p SHA256SUMS
 sha256sum -c SHA256SUMS --ignore-missing
 ```
 
@@ -329,7 +329,7 @@ sha256sum -c SHA256SUMS --ignore-missing
 
 ```bash
 gh attestation verify still-ui-linux-amd64.tar.gz -R Dv2Corn/still-ui \
-  --signer-workflow Dv2Corn/still-ui/.github/workflows/release.yml --source-ref refs/tags/v1.11.0
+  --signer-workflow Dv2Corn/still-ui/.github/workflows/release.yml --source-ref refs/tags/v1.11.1
 ```
 
 SBOM тоже подписан:
@@ -343,7 +343,7 @@ gh attestation verify still-ui-linux-amd64.tar.gz -R Dv2Corn/still-ui --predicat
 ```bash
 tar -xzf still-ui-linux-amd64.tar.gz still-ui/bin/xray-linux-amd64
 sha256sum still-ui/bin/xray-linux-amd64
-git clone https://github.com/Dv2Corn/still-ui && cd still-ui && git checkout v1.11.0
+git clone https://github.com/Dv2Corn/still-ui && cd still-ui && git checkout v1.11.1
 scripts/xray-build/build.sh /tmp/xray-out amd64 arm64
 ```
 
