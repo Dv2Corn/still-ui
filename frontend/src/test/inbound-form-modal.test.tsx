@@ -572,54 +572,57 @@ describe('InboundFormModal', () => {
 
   // The preset must land in the saved inbound, not only in the visible form, and leave
   // the operator on Security where the target still has to be chosen.
-  it('saves the mobile-network REALITY preset with the ios fingerprint', async () => {
-    const get = vi.mocked(HttpUtil.get);
-    const fallback = get.getMockImplementation()!;
-    get.mockImplementation(async (url, ...rest) =>
-      url === '/panel/api/server/getNewX25519Cert'
-        ? new Msg(true, '', { privateKey: 'preset-private', publicKey: 'preset-public' })
-        : fallback(url, ...rest),
-    );
-    onTestFinished(() => {
-      get.mockImplementation(fallback);
-    });
-    const post = vi.mocked(HttpUtil.post);
-    post.mockClear();
-    renderModal();
+  it.each([
+    ['Mobile networks (Russia): VLESS REALITY', 'tcp'],
+    ['Mobile networks (Russia): VLESS XHTTP REALITY', 'xhttp'],
+  ])(
+    'saves the preset %s with a fresh key pair and the ios fingerprint',
+    async (preset, network) => {
+      const get = vi.mocked(HttpUtil.get);
+      const fallback = get.getMockImplementation()!;
+      get.mockImplementation(async (url, ...rest) =>
+        url === '/panel/api/server/getNewX25519Cert'
+          ? new Msg(true, '', { privateKey: 'preset-private', publicKey: 'preset-public' })
+          : fallback(url, ...rest),
+      );
+      onTestFinished(() => {
+        get.mockImplementation(fallback);
+      });
+      const post = vi.mocked(HttpUtil.post);
+      post.mockClear();
+      renderModal();
 
-    chooseSelectOption(
-      screen.getByLabelText('Preset').id,
-      'Mobile networks (Russia): VLESS REALITY',
-    );
-    await waitFor(() =>
-      expect(screen.getByRole('tab', { name: 'Security' }).getAttribute('aria-selected')).toBe(
-        'true',
-      ),
-    );
-    expect(screen.getByText(/Find Targets checks candidate sites/)).toBeTruthy();
-    fireEvent.change(screen.getByLabelText('Target'), {
-      target: { value: 'www.example.com:443' },
-    });
-    fireEvent.click(primaryButton());
+      chooseSelectOption(screen.getByLabelText('Preset').id, preset);
+      await waitFor(() =>
+        expect(screen.getByRole('tab', { name: 'Security' }).getAttribute('aria-selected')).toBe(
+          'true',
+        ),
+      );
+      expect(screen.getByText(/Find Targets checks candidate sites/)).toBeTruthy();
+      fireEvent.change(screen.getByLabelText('Target'), {
+        target: { value: 'www.example.com:443' },
+      });
+      fireEvent.click(primaryButton());
 
-    const isAdd = ([url]: unknown[]) => url === '/panel/api/inbounds/add';
-    await waitFor(() => expect(post.mock.calls.some(isAdd)).toBe(true));
-    const payload = post.mock.calls.find(isAdd)![1] as {
-      protocol: string;
-      port: number;
-      streamSettings: string;
-    };
-    expect(payload).toMatchObject({ protocol: 'vless', port: 443 });
-    expect(JSON.parse(payload.streamSettings)).toMatchObject({
-      network: 'tcp',
-      security: 'reality',
-      realitySettings: {
-        target: 'www.example.com:443',
-        privateKey: 'preset-private',
-        settings: { fingerprint: 'ios', publicKey: 'preset-public' },
-      },
-    });
-  });
+      const isAdd = ([url]: unknown[]) => url === '/panel/api/inbounds/add';
+      await waitFor(() => expect(post.mock.calls.some(isAdd)).toBe(true));
+      const payload = post.mock.calls.find(isAdd)![1] as {
+        protocol: string;
+        port: number;
+        streamSettings: string;
+      };
+      expect(payload).toMatchObject({ protocol: 'vless', port: 443 });
+      expect(JSON.parse(payload.streamSettings)).toMatchObject({
+        network,
+        security: 'reality',
+        realitySettings: {
+          target: 'www.example.com:443',
+          privateKey: 'preset-private',
+          settings: { fingerprint: 'ios', publicKey: 'preset-public' },
+        },
+      });
+    },
+  );
 });
 
 describe('VLESS fallback safety', () => {
