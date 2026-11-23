@@ -5,7 +5,7 @@ from pathlib import Path
 
 INSTALL = 'bash &lt;(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh)'
 GH = 'https://github.com/Dv2Corn/still-ui'
-LANGS = [('en', '', 'EN'), ('ru', 'ru/', 'RU'), ('zh', 'zh/', '中文'), ('ar', 'ar/', 'العربية')]
+LANGS = [('en', '', 'English'), ('ru', 'ru/', 'Русский'), ('zh', 'zh/', '中文'), ('ar', 'ar/', 'العربية')]
 
 T = {
  'en': dict(
@@ -179,8 +179,8 @@ def page(lang, prefix):
     t = T[lang]
     up = '../' if prefix else ''
     m = up + 'media/'
-    cur = ' aria-current="page"'
-    langs = ''.join(f'<a href="{up}{p}"{cur if l == lang else ""} hreflang="{l}">{n}</a>' for l, p, n in LANGS)
+    sel = ' selected'
+    langs = ''.join(f'<option value="{(up + p) or "./"}"{sel if l == lang else ""} lang="{l}">{n}</option>' for l, p, n in LANGS)
     alt = ''.join(f'<link rel="alternate" hreflang="{l}" href="https://dv2corn.github.io/still-ui/{p}">' for l, p, _ in LANGS)
     cards = ''.join(f'<div class="card"><h3>{a}</h3><p>{b}</p></div>' for a, b in t['cards'])
     nums = ''.join(f'<div class="card"><span class="num">{a}</span><p>{b}</p></div>' for a, b in t['nums'])
@@ -204,8 +204,7 @@ def page(lang, prefix):
 </head>
 <body>
 <div class="w">
-<nav><b>still-ui</b><span><a href="{GH}#readme">{t['docs']}</a><a href="{GH}/releases/latest">{t['releases']}</a><a href="{GH}">GitHub</a></span></nav>
-<div class="langs">{langs}</div>
+<nav><b>still-ui</b><span><a href="{GH}#readme">{t['docs']}</a><a href="{GH}/releases/latest">{t['releases']}</a><a href="{GH}">GitHub</a><select class="lang" aria-label="Language" onchange="location.href=this.value">{langs}</select></span></nav>
 
 <header>
   <h1>{t['h1']}</h1>
