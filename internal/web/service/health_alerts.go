@@ -138,7 +138,7 @@ func memoryCheck(u memUsage, threshold int) health.Check {
 		Hold:    u.limit > 0 && pct >= float64(threshold-memoryClearMargin),
 		Params: map[string]string{
 			"Process": u.name, "Percent": strconv.FormatFloat(pct, 'f', 0, 64),
-			"Used": mib(u.used), "Limit": mib(u.limit), "LimitKind": u.limitKind,
+			"Used": alertSize(u.used), "Limit": alertSize(u.limit), "LimitKind": u.limitKind,
 			"Threshold": strconv.Itoa(threshold),
 		},
 	}
@@ -234,7 +234,7 @@ func diskChecks(threshold int) []health.Check {
 			Hold:    u.UsedPercent >= float64(threshold-diskClearMargin),
 			Params: map[string]string{
 				"Path": p, "Percent": strconv.FormatFloat(u.UsedPercent, 'f', 0, 64),
-				"Free": mib(u.Free), "Threshold": strconv.Itoa(threshold),
+				"Free": alertSize(u.Free), "Threshold": strconv.Itoa(threshold),
 			},
 		})
 	}
@@ -327,7 +327,12 @@ func backupCheck() (health.Check, bool) {
 	}, true
 }
 
-func mib(b uint64) string { return strconv.FormatUint(b>>20, 10) + " MB" }
+func alertSize(b uint64) string {
+	if b >= 1<<30 {
+		return strconv.FormatFloat(float64(b)/(1<<30), 'f', 1, 64) + " GB"
+	}
+	return strconv.FormatUint(b>>20, 10) + " MB"
+}
 
 func oneLineCut(s string, n int) string {
 	s = strings.Join(strings.Fields(s), " ")

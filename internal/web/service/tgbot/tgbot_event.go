@@ -95,7 +95,7 @@ func (t *Tgbot) formatEventMessage(e eventbus.Event) string {
 
 	switch e.Type {
 	case eventbus.EventOutboundDown:
-		msg := header + t.I18nBot("tgbot.messages.eventOutboundDown",
+		msg := header + "🔴 " + t.I18nBot("tgbot.messages.eventOutboundDown",
 			"Tag=="+e.Source)
 		if data, ok := e.Data.(*eventbus.OutboundHealthData); ok {
 			if data.Error != "" {
@@ -107,10 +107,10 @@ func (t *Tgbot) formatEventMessage(e eventbus.Event) string {
 					"Delay=="+fmt.Sprintf("%d", data.Delay))
 			}
 		}
-		return msg
+		return msg + "\n" + t.I18nBot("tgbot.messages.hintOutboundDown")
 
 	case eventbus.EventOutboundUp:
-		msg := header + t.I18nBot("tgbot.messages.eventOutboundUp",
+		msg := header + "🟢 " + t.I18nBot("tgbot.messages.eventOutboundUp",
 			"Tag=="+e.Source)
 		if data, ok := e.Data.(*eventbus.OutboundHealthData); ok && data.Delay > 0 {
 			msg += "\n" + t.I18nBot("tgbot.messages.eventDelayDetail",
@@ -127,14 +127,14 @@ func (t *Tgbot) formatEventMessage(e eventbus.Event) string {
 		if errStr != "" {
 			msg += "\n" + t.I18nBot("tgbot.messages.eventXrayCrashError", "Error=="+errStr)
 		}
-		return msg
+		return msg + "\n" + t.I18nBot("tgbot.messages.hintXrayCrash")
 
 	case eventbus.EventNodeDown:
 		msg := header + "🔴 " + t.I18nBot("tgbot.messages.eventNodeDown", "Name=="+e.Source)
 		if data, ok := e.Data.(*eventbus.NodeHealthData); ok && data.XrayError != "" {
 			msg += "\n" + t.I18nBot("tgbot.messages.eventErrorDetail", "Error=="+data.XrayError)
 		}
-		return msg
+		return msg + "\n" + t.I18nBot("tgbot.messages.hintNodeDown")
 
 	case eventbus.EventNodeUp:
 		msg := header + "🟢 " + t.I18nBot("tgbot.messages.eventNodeUp", "Name=="+e.Source)
@@ -157,8 +157,8 @@ func (t *Tgbot) formatEventMessage(e eventbus.Event) string {
 				return ""
 			}
 			return header + "🔴 " + t.I18nBot("tgbot.messages.cpuThreshold",
-				"Percent=="+strconv.FormatFloat(data.Percent, 'f', 2, 64),
-				"Threshold=="+strconv.Itoa(tgCpu))
+				"Percent=="+strconv.FormatFloat(data.Percent, 'f', 1, 64),
+				"Threshold=="+strconv.Itoa(tgCpu)) + "\n" + t.I18nBot("tgbot.messages.hintCpuHigh")
 		}
 		return ""
 
@@ -169,8 +169,8 @@ func (t *Tgbot) formatEventMessage(e eventbus.Event) string {
 				return ""
 			}
 			return header + "🔴 " + t.I18nBot("tgbot.messages.memoryThreshold",
-				"Percent=="+strconv.FormatFloat(data.Percent, 'f', 2, 64),
-				"Threshold=="+strconv.Itoa(tgMemory))
+				"Percent=="+strconv.FormatFloat(data.Percent, 'f', 1, 64),
+				"Threshold=="+strconv.Itoa(tgMemory)) + "\n" + t.I18nBot("tgbot.messages.hintMemoryHigh")
 		}
 		return ""
 
@@ -182,7 +182,7 @@ func (t *Tgbot) formatEventMessage(e eventbus.Event) string {
 				msg += t.I18nBot("tgbot.messages.username", "Username=="+oneLine(data.Username))
 				msg += t.I18nBot("tgbot.messages.ip", "IP=="+data.IP)
 				msg += t.I18nBot("tgbot.messages.time", "Time=="+data.Time)
-				return msg
+				return msg + t.I18nBot("tgbot.messages.hintLoginSuccess")
 			}
 			msg := t.I18nBot("tgbot.messages.loginFailed")
 			msg += t.I18nBot("tgbot.messages.hostname", "Hostname=="+host)
@@ -192,7 +192,7 @@ func (t *Tgbot) formatEventMessage(e eventbus.Event) string {
 			msg += t.I18nBot("tgbot.messages.username", "Username=="+oneLine(data.Username))
 			msg += t.I18nBot("tgbot.messages.ip", "IP=="+data.IP)
 			msg += t.I18nBot("tgbot.messages.time", "Time=="+data.Time)
-			return msg
+			return msg + t.I18nBot("tgbot.messages.hintLoginFailed")
 		}
 		return header + t.I18nBot("tgbot.messages.eventLoginFallback", "Source=="+e.Source)
 	}
