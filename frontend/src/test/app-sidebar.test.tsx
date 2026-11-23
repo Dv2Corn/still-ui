@@ -1,4 +1,4 @@
-import { act, fireEvent, screen } from '@testing-library/react';
+import { act, fireEvent, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { afterEach, expect, test, vi } from 'vitest';
 
@@ -73,4 +73,11 @@ test('labels the palette shortcut with the modifier the platform actually uses',
   const view = await renderSidebar();
   const chip = view.container.querySelector('.sidebar-command-kbd');
   expect(chip?.textContent).toBe('CtrlK');
+});
+
+test('names the panel in the phone top bar next to the menu button', async () => {
+  await renderSidebar();
+  const topBar = screen.getByRole('banner');
+  expect(topBar.textContent).toContain('still-ui');
+  expect(within(topBar).getByRole('button', { name: 'Open menu' })).not.toBeNull();
 });

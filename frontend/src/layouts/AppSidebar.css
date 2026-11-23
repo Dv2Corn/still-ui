@@ -162,23 +162,48 @@
   gap: 4px;
 }
 
-.drawer-handle {
+.mobile-topbar {
+  display: none;
   position: fixed;
-  top: 12px;
-  left: 12px;
-  z-index: 1100;
-  background: rgba(0, 0, 0, 0.55);
-  color: #fff;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--mobile-topbar-height);
+  padding: 0 8px;
+  align-items: center;
+  gap: 4px;
+  background: color-mix(in srgb, var(--ant-color-bg-container) 82%, transparent);
+  backdrop-filter: saturate(180%) blur(16px);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  border-bottom: 1px solid var(--ant-color-border-secondary);
+}
+
+.mobile-topbar-brand {
+  font-weight: 600;
+  font-size: 17px;
+  letter-spacing: 0.3px;
+  color: var(--ant-color-text);
+  user-select: none;
+}
+
+.drawer-handle {
+  background: transparent;
+  color: var(--ant-color-text);
   border: none;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   cursor: pointer;
-  display: none;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  font-size: 20px;
+}
+
+.drawer-handle:active,
+.drawer-handle:focus-visible {
+  background: var(--ant-color-fill-tertiary);
+  outline: none;
 }
 
 .drawer-header {
@@ -219,8 +244,18 @@
   font-size: 16px;
 }
 
+/* Only the nav list scrolls; the header, search and footer keep their height. */
+.ant-drawer-body:has(> .drawer-nav) > :not(.drawer-nav) {
+  flex-shrink: 0;
+}
+
+.drawer-nav {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
 .drawer-utility {
-  margin-top: auto;
   border-top: 1px solid var(--ant-color-border-secondary);
 }
 
@@ -331,9 +366,17 @@
   padding: 8px 8px 12px;
 }
 
+:root {
+  --mobile-topbar-height: 56px;
+}
+
 @media (max-width: 768px) {
-  .drawer-handle {
-    display: inline-flex;
+  .mobile-topbar {
+    display: flex;
+  }
+
+  .ant-sidebar ~ .content-shell {
+    padding-top: var(--mobile-topbar-height);
   }
 
   .ant-sidebar > .ant-layout-sider .ant-layout-sider-children {
