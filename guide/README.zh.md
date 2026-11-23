@@ -13,8 +13,8 @@
 <p align="center">
   <a href="https://dv2corn.github.io/still-ui/">
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="media/still/still-ui-overview-dark.png">
-      <img src="media/still/still-ui-overview-light.png" alt="still-ui overview page" width="900">
+      <source media="(prefers-color-scheme: dark)" srcset="../media/still/still-ui-overview-dark.png">
+      <img src="../media/still/still-ui-overview-light.png" alt="still-ui overview page" width="900">
     </picture>
   </a>
 </p>
@@ -56,19 +56,19 @@ still-ui migrate-rollback
 ### 已完成
 
 - **部分修改客户端不再把客户端改坏。** 在 3x-ui v3.11.0 中，通过 API（`/panel/api/clients/update/:email`）更新客户端时如果只提交部分字段，客户端会被禁用（`enable=false`），`limitIp`、`totalGB`、`tgId`、`comment`、`group`、`flow`、续期设置（`reset`、`resetMax`）和 `limitHwid` 会被清零。在 still-ui 中，请求里没有的字段取自已保存的客户端。显式提交 0 或空值仍然会清空对应字段。WireGuard/AmneziaWG 的密钥和对端地址在 v3.11.0 中本来就会保留，有测试保证这一点。
-- **Xray 核心重新支持 `ios` 指纹和 sing-box 客户端。** 从 Xray 26.9.9 起，官方 REALITY 服务端只接受带有 X25519MLKEM768 密钥交换的 ClientHello，因此使用 `ios`、`edge`、`qq` 指纹的 Xray 客户端、任何指纹的 sing-box 客户端（Hiddify、Karing），以及未开启 `support-x25519mlkem768` 的 mihomo 都无法连接。`ios` 指纹很短（约 517 字节，一个 TCP 分段），在会丢弃较长 ClientHello 的移动网络上只有它能用。still-ui 1.4.0 自带从源码构建的 Xray v26.10.31，只对 REALITY 打了一处补丁：没有该密钥交换的 ClientHello 重新被接受，重复的密钥交换仍被拒绝，其他不变。构建可复现：配方、补丁和 sha256 见 [scripts/xray-build](scripts/xray-build/README.md)。新建的 REALITY 入站与 3x-ui 一样默认使用 `chrome`。在面板中把 Xray 切换为官方版本（概览页 Xray 旁的 **版本** 按钮）会恢复旧行为；`still-ui update` 会装回 still-ui 的构建。
+- **Xray 核心重新支持 `ios` 指纹和 sing-box 客户端。** 从 Xray 26.9.9 起，官方 REALITY 服务端只接受带有 X25519MLKEM768 密钥交换的 ClientHello，因此使用 `ios`、`edge`、`qq` 指纹的 Xray 客户端、任何指纹的 sing-box 客户端（Hiddify、Karing），以及未开启 `support-x25519mlkem768` 的 mihomo 都无法连接。`ios` 指纹很短（约 517 字节，一个 TCP 分段），在会丢弃较长 ClientHello 的移动网络上只有它能用。still-ui 1.4.0 自带从源码构建的 Xray v26.10.31，只对 REALITY 打了一处补丁：没有该密钥交换的 ClientHello 重新被接受，重复的密钥交换仍被拒绝，其他不变。构建可复现：配方、补丁和 sha256 见 [scripts/xray-build](../scripts/xray-build/README.md)。新建的 REALITY 入站与 3x-ui 一样默认使用 `chrome`。在面板中把 Xray 切换为官方版本（概览页 Xray 旁的 **版本** 按钮）会恢复旧行为；`still-ui update` 会装回 still-ui 的构建。
 - **安装脚本为面板设置内存上限。** 服务会获得 systemd 限制：`MemoryMax` 为内存的 35%（最少 256 MiB，最多 1 GiB），`MemoryHigh` 为其 85%，并且禁止面板使用 swap。面板内存失控时由 systemd 重启它，而不是把整台服务器拖进 swap 直至卡死。如果服务器没有 swap 且内存不超过 2 GiB，安装脚本会提议为系统其余部分创建一个 2 GiB 的 `/swapfile`。
 - **面板重启时 Xray 继续运行。** Xray 作为独立服务 `still-xray` 运行：非特权用户、只有 `CAP_NET_BIND_SERVICE` 和 `CAP_NET_ADMIN`（套接字标记、TPROXY）、`ProtectSystem=strict`、`Restart=always`，并有自己的内存上限。重启、升级面板或面板崩溃都不会断开客户端。面板仍通过 Xray API 增删客户端而无需重启，只有入站结构变化时才重启内核——且先用 `xray run -test` 检查配置；通过检查却无法启动的配置会被换回上一个可用配置。在所有带 systemd 的服务器上这都是默认行为；已有的安装会在下一次 `still-ui update` 时迁移过来，除非其配置需要该服务做不到的事（见下文）。Docker 镜像与 3x-ui 一样把 Xray 留在面板内部。内置的 AmneziaWG、MTProto 和 TUIC 仍运行在面板内部，面板重启时会重新连接。
 - **定时加密备份与恢复命令。** 面板可以按计划把数据库备份到 `/etc/still-ui/backups`，保留最近 N 份，用你的 [age](https://age-encryption.org) 或 SSH 公钥加密（私钥从不接触服务器），并把加密后的副本发送到 Telegram。`still-ui restore <file>` 会检查备份、停止面板、替换数据库（保留旧数据库）并重新启动面板。
 - **Telegram 健康告警。** Xray 未运行、Xray 重启过于频繁、面板或 Xray 内存接近上限、磁盘已满、证书即将过期、备份失败。问题出现时发一条消息，持续期间定期提醒，修复后再发一条。
 - **自动加载续期后的证书。** Xray 每小时（或每 `ocspStapling` 秒）会自行重新读取 TLS 和 Hysteria 入站的证书文件。面板每分钟通过握手（TLS，Hysteria 用 QUIC）检查每个入站实际提供的证书；如果续期后内核在该时间内没有加载新文件（或入站使用 `oneTimeLoading`），或者正在提供的证书将在一小时内过期，只重启 Xray：使用 `still-xray` 服务时自动重启；Xray 在面板内部运行时（Docker，或 STILL_XRAY_UNIT=off），只有在 `/etc/default/still-ui` 中设置 `STILL_CERT_RESTART=on` 才会重启，因为这种重启会断开所有客户端；未设置时标签只显示证书已续期。概览页上的“证书”标签显示每个入站提供的证书及其有效期，并提前警告（提前一周；对于 IP 上的短期证书则提前其有效期的四分之一）。
-- **AmneziaWG 转发缓冲区复用。** 经内置 AmneziaWG 的每个 TCP 连接都会新分配两个 32 KiB 复制缓冲区；现在改为从池中获取。仅转发部分：每个连接的分配约 69 KB → 2.9 KB。整个面板在 2 vCPU / 2 GiB 测试服务器上，经 AmneziaWG 每秒 100 个短连接、持续 5 分钟、各 3 次，3x-ui v3.11.0 对比 still-ui：负载下面板平均内存 403 → 176 MiB，峰值 525 → 211 MiB，空闲时相同。方法、限制和原始数据：[bench/awg-relay-churn](bench/awg-relay-churn/README.md)。
+- **AmneziaWG 转发缓冲区复用。** 经内置 AmneziaWG 的每个 TCP 连接都会新分配两个 32 KiB 复制缓冲区；现在改为从池中获取。仅转发部分：每个连接的分配约 69 KB → 2.9 KB。整个面板在 2 vCPU / 2 GiB 测试服务器上，经 AmneziaWG 每秒 100 个短连接、持续 5 分钟、各 3 次，3x-ui v3.11.0 对比 still-ui：负载下面板平均内存 403 → 176 MiB，峰值 525 → 211 MiB，空闲时相同。方法、限制和原始数据：[bench/awg-relay-churn](../bench/awg-relay-churn/README.md)。
 - **Clash/Mihomo 订阅中的 Auto 组。** 订阅有两台或更多服务器时，Clash/Mihomo 配置会多出一个 `Auto` 组：应用通过隧道测试每台服务器并自动切换到可用的一台（最快的一台，容差 50 ms，每 300 秒检测一次；或第一台有响应的）。`Auto` 是 `PROXY` 中的默认选择，仍可手动选服务器。新安装默认开启；已有面板请在订阅设置中开启 **Auto group**。
 - **订阅参考可达性探测结果。** 探测报告为不可用（连续两次失败）的入口，其链接可以移到订阅末尾或隐藏，适用于所有格式：链接、JSON 和 Clash。用户至少保留一条链接；没有新的探测结果时不做任何改动。默认关闭。
-- **一个设置让本地网站直连。** 在 **设置 → 订阅 → 本地网站直连** 中选择国家后，客户端应用会直接访问该国网站（其域名后缀、`geosite` 中的现成列表和 `geoip`），其余流量走 VPN，这样拒绝境外地址的银行、政务和电商网站在开着 VPN 时也能正常使用。一份简短的“始终走 VPN”列表会先匹配——Telegram（其地址段在 geoip 库中被标为俄罗斯）、YouTube、Instagram、WhatsApp、Discord、ChatGPT、Claude——并且可以追加自己的条目。适用于 JSON、Clash/Mihomo 和 Happ/INCY 订阅，订阅页面还提供 Shadowrocket 规则文件；普通链接列表和 AmneziaWG 配置无法携带这类规则。默认关闭。[详情](docs/content/docs/zh/config/subscription.mdx)
+- **一个设置让本地网站直连。** 在 **设置 → 订阅 → 本地网站直连** 中选择国家后，客户端应用会直接访问该国网站（其域名后缀、`geosite` 中的现成列表和 `geoip`），其余流量走 VPN，这样拒绝境外地址的银行、政务和电商网站在开着 VPN 时也能正常使用。一份简短的“始终走 VPN”列表会先匹配——Telegram（其地址段在 geoip 库中被标为俄罗斯）、YouTube、Instagram、WhatsApp、Discord、ChatGPT、Claude——并且可以追加自己的条目。适用于 JSON、Clash/Mihomo 和 Happ/INCY 订阅，订阅页面还提供 Shadowrocket 规则文件；普通链接列表和 AmneziaWG 配置无法携带这类规则。默认关闭。[详情](../docs/content/docs/zh/config/subscription.mdx)
 - **客户端出站过滤。** 可以禁止客户端经 25 端口发信（新安装默认开启）、访问服务器后面的私有网络和服务器自身的面板与 SSH 端口，以及你列出的地址和端口。对经 Xray 的所有客户端入站生效，有 `nft` 时也对内核模式的 AmneziaWG 客户端生效；主面板可以把过滤规则下发给节点。
 - **每个节点的月流量上限。** 主面板按月（从你选定的重置日起）统计节点自身入站的流量，在 80%（可调）和达到上限时发送 Telegram 告警，并可在下一周期前关闭该节点的入站。计费系数（0.1 到 100）按比例换算该节点计入客户端统计的流量，从修改时起生效（之前的流量按原系数计）。节点按每个客户端所属主面板的计数检查其配额，因此系数不同的主面板可以共用一个节点。默认不设上限。
-- **一条命令添加节点。** **节点 → 用命令添加** 会生成一次性邀请（默认 30 分钟有效，可撤销）；在新服务器上以 root 运行面板给出的命令，即可从发行版安装 still-ui、把它设为节点并加入主面板。无需手动复制 API 令牌和证书指纹；节点在做任何改动前会先校验主面板的密钥。[说明（英文）](docs/content/docs/en/operations/multi-node.mdx)。
+- **一条命令添加节点。** **节点 → 用命令添加** 会生成一次性邀请（默认 30 分钟有效，可撤销）；在新服务器上以 root 运行面板给出的命令，即可从发行版安装 still-ui、把它设为节点并加入主面板。无需手动复制 API 令牌和证书指纹；节点在做任何改动前会先校验主面板的密钥。[说明（英文）](../docs/content/docs/en/operations/multi-node.mdx)。
 - **设备限制会告诉用户发生了什么，可设面板默认值，并会忘记旧设备。** 3x-ui v3.11.0 可以限制一个订阅的设备数（客户端的 **HWID 限制**；与 **IP 限制**不同，它不需要 Fail2ban，手机在 Wi-Fi 和移动网络之间切换时也不会误触发），但超出限制的设备只得到一个 404，不发送设备 ID 的应用一律被拒绝，没有面板级的默认值，设备在管理员删除之前一直占用名额。在 still-ui 中，超出限制的新设备会收到对其应用有效的应答，其中唯一的服务器是一条提示——“Device limit 3 reached. Remove a device in your account or ask the seller.”（文字可自定义；Happ 还会把它显示为公告），绝不返回错误；此前已注册的设备照常得到服务器。**设置 → 订阅 → 设备限制** 提供：对没有单独限制的所有客户端生效的默认限制（设置之前为关闭；设备数已超出的订阅只保留最近活跃的设备）、对不发送设备 ID 的应用的处理方式（它们合用订阅的一个名额，新面板默认如此；或拒绝并给出提示；或照常下发且不计数——升级后没有设备限制的面板保持这一方式，此时不发送 ID 的应用可以绕过限制，面板会给出警告），以及过期：30 天（可调；升级后的面板在你设置之前为关闭）没有拉取订阅的设备会腾出名额。订阅页面向用户显示设备数“2 / 3”，不显示设备本身的任何信息；管理员在客户端卡片中查看和删除设备，API 也可列出和删除（`/panel/api/clients/hwids/:email`）。面板只保存设备 ID 的哈希，从不保存 ID 本身。限制作用于拉取订阅：已导入应用的服务器仍然可用，手动复制的链接不计入。
 - **订阅疑似泄露时发出告警。** 被转卖、被到处分享或被审查者买走的订阅，会从很多网络被获取，其中的所有地址都可能被封锁。面板统计每个订阅是从哪些网络获取的（IPv4 按 /24，IPv6 按 /48；订阅页面和被设备限制拒绝的设备也计入），当一个订阅在 24 小时内从 6 个网络被获取时（两个数都可调整）发送一条 Telegram 消息：哪个客户、多少个网络、首次和最近一次获取、几个网络示例。同一订阅的下一条消息在 7 天后发出，若网络数翻倍则提前。不会封锁任何东西。在反向代理后面，只有当代理位于 **可信代理 CIDR** 中时才从 `X-Forwarded-For`/`X-Real-IP` 读取客户地址，与面板登录相同。计数保存在内存中，面板重启后重新开始。**设置 → Telegram → Telegram 事件通知 → 安全 → 订阅泄露**：新安装默认开启（机器人本身在你配置之前保持关闭），升级的面板默认关闭。
 - **一条命令从 Marzban 或旧版 x-ui 迁移。** `still-ui import marzban /var/lib/marzban` 会迁移入站、用户和主机，保留相同的 UUID 和密码、相同的 REALITY 密钥和 short ID、端口、已用流量、限额、到期时间和状态，因此用户手中已有的链接可以继续连接，Marzban 签发的订阅链接也继续可用。`-dry-run` 显示将导入什么、哪些无法导入；真正导入前会先备份，并且要么全部写入、要么什么都不写。面板的 **设置 → 导入** 提供同样的功能。见 [从 Marzban 或 x-ui 迁移](#从-marzban-或-x-ui-迁移)。
@@ -86,7 +86,7 @@ still-ui migrate-rollback
 
 - 目前没有。
 
-完整计划（俄文）见 [docs/ROADMAP.md](docs/ROADMAP.md)。
+完整计划（俄文）见 [docs/ROADMAP.md](../docs/ROADMAP.md)。
 
 ## 安装
 
@@ -110,17 +110,17 @@ STILL_UI_ARCHIVE=/path/still-ui-linux-amd64.tar.gz bash install.sh
 
 安装脚本会随机生成用户名、密码和面板访问路径，并在结束时显示出来，请妥善保存。之后运行 `still-ui` 即可打开管理菜单：启动和停止服务、查看或重置登录信息、修改端口、管理证书等。子命令与 3x-ui 的 `x-ui` 脚本相同：`still-ui start`、`stop`、`restart`、`status`、`log`、`update`、`legacy`、`uninstall` 等。
 
-发行版只提供 **Linux amd64 和 arm64** 的构建。当前版本：still-ui **1.11.0**（基于 3x-ui 3.11.0 及其后合并的修复），内置 still-ui 自行构建的 **Xray v26.10.31**（[有何不同](scripts/xray-build/README.md)）。
+发行版只提供 **Linux amd64 和 arm64** 的构建。当前版本：still-ui **1.11.0**（基于 3x-ui 3.11.0 及其后合并的修复），内置 still-ui 自行构建的 **Xray v26.10.31**（[有何不同](../scripts/xray-build/README.md)）。
 
 ### Docker
 
-每个版本还会发布 linux/amd64 和 linux/arm64 的镜像，内含与该版本归档相同的已校验文件（[deploy/docker/Dockerfile.release](deploy/docker/Dockerfile.release)）；仓库中的 [Dockerfile](Dockerfile) 用于本地构建：
+每个版本还会发布 linux/amd64 和 linux/arm64 的镜像，内含与该版本归档相同的已校验文件（[deploy/docker/Dockerfile.release](../deploy/docker/Dockerfile.release)）；仓库中的 [Dockerfile](../Dockerfile) 用于本地构建：
 
 ```bash
 docker pull ghcr.io/dv2corn/still-ui:latest
 ```
 
-如需固定在某个版本，请用版本号代替 `latest`（例如 `ghcr.io/dv2corn/still-ui:1.11.0`）。按 [docker-compose.yml](docker-compose.yml) 的相同设置运行：
+如需固定在某个版本，请用版本号代替 `latest`（例如 `ghcr.io/dv2corn/still-ui:1.11.0`）。按 [docker-compose.yml](../docker-compose.yml) 的相同设置运行：
 
 ```bash
 docker run -d --name still-ui --restart unless-stopped \
@@ -253,7 +253,7 @@ still-ui uninstall
 
 ## 验证发行版
 
-发行版压缩包由 GitHub Actions 从打了标签的提交构建（[release 工作流](.github/workflows/release.yml)），而不是在开发者的机器上构建，每个压缩包都附带经过签名的[构建来源证明（build provenance attestation）](https://docs.github.com/actions/security-for-github-actions/using-artifact-attestations)。1.4.0 及之前的版本是用 `scripts/still-release.sh` 手工构建的，只有 `.sha256` 文件。
+发行版压缩包由 GitHub Actions 从打了标签的提交构建（[release 工作流](../.github/workflows/release.yml)），而不是在开发者的机器上构建，每个压缩包都附带经过签名的[构建来源证明（build provenance attestation）](https://docs.github.com/actions/security-for-github-actions/using-artifact-attestations)。1.4.0 及之前的版本是用 `scripts/still-release.sh` 手工构建的，只有 `.sha256` 文件。
 
 | 文件 | 说明 |
 | --- | --- |
@@ -292,7 +292,7 @@ git clone https://github.com/Dv2Corn/still-ui && cd still-ui && git checkout v1.
 scripts/xray-build/build.sh /tmp/xray-out amd64 arm64
 ```
 
-`build.sh` 会打印它构建出的二进制文件的校验和，如果与脚本中固定的值不同就会失败；压缩包中 `xray-linux-amd64` 的校验和必须与之相同。[Xray 可复现构建](.github/workflows/xray-reproducible.yml) 工作流会在配方每次变更时以及每周一次，分别在一台 x86_64 和一台 arm64 runner 上执行这一检查。补丁改了什么：[scripts/xray-build](scripts/xray-build/README.md)。
+`build.sh` 会打印它构建出的二进制文件的校验和，如果与脚本中固定的值不同就会失败；压缩包中 `xray-linux-amd64` 的校验和必须与之相同。[Xray 可复现构建](../.github/workflows/xray-reproducible.yml) 工作流会在配方每次变更时以及每周一次，分别在一台 x86_64 和一台 arm64 runner 上执行这一检查。补丁改了什么：[scripts/xray-build](../scripts/xray-build/README.md)。
 
 压缩包整体并不能逐位复现：面板二进制文件使用构建时当前的 C 工具链链接，geo 文件和 `mtg` 是各自项目当时的最新版本。把压缩包与提交和工作流运行关联起来的，是构建来源证明。
 
@@ -408,4 +408,4 @@ XUI_API_TOKEN=<token> xui-doctor check --url https://<server>:<port>/<base path>
 
 ## 许可证
 
-still-ui 采用 [GNU General Public License v3.0](LICENSE) 许可证发布，与 3x-ui 相同。分发修改版本时，必须以同一许可证公开你的修改。
+still-ui 采用 [GNU General Public License v3.0](../LICENSE) 许可证发布，与 3x-ui 相同。分发修改版本时，必须以同一许可证公开你的修改。
