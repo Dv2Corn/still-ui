@@ -10,6 +10,16 @@
   <a href="https://github.com/Dv2Corn/still-ui/attestations"><img src="https://img.shields.io/badge/builds-attested-2ea44f" alt="Release builds are attested by GitHub Actions"></a>
 </p>
 
+<p align="center">
+  <a href="https://dv2corn.github.io/still-ui/">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="media/still/still-ui-overview-dark.png">
+      <img src="media/still/still-ui-overview-light.png" alt="still-ui overview page" width="900">
+    </picture>
+  </a>
+</p>
+
+
 **still-ui** is a fork of [3x-ui](https://github.com/MHSanaei/3x-ui) by MHSanaei — the web panel for [Xray-core](https://github.com/XTLS/Xray-core). It starts from 3x-ui **v3.11.0** and keeps everything that panel can do: the same protocols, the same interface, the same database.
 
 The difference is focus. still-ui fixes the things that hurt when a panel runs for months on a small server with real users on mobile networks: client settings that quietly get lost, handshakes that die on lossy links, and a panel process that slowly eats the server's memory.

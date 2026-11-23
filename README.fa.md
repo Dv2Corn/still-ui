@@ -10,6 +10,16 @@
   <a href="https://github.com/Dv2Corn/still-ui/attestations"><img src="https://img.shields.io/badge/builds-attested-2ea44f" alt="بیلدهای انتشار با GitHub Actions گواهی شده‌اند"></a>
 </p>
 
+<p align="center">
+  <a href="https://dv2corn.github.io/still-ui/">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="media/still/still-ui-overview-dark.png">
+      <img src="media/still/still-ui-overview-light.png" alt="still-ui overview page" width="900">
+    </picture>
+  </a>
+</p>
+
+
 **still-ui** یک فورک از پنل [3x-ui](https://github.com/MHSanaei/3x-ui) ساختهٔ MHSanaei است؛ همان پنل وب برای [Xray-core](https://github.com/XTLS/Xray-core). پایهٔ آن نسخهٔ **v3.11.0** از 3x-ui است و هر کاری که آن پنل انجام می‌دهد، still-ui هم انجام می‌دهد: همان پروتکل‌ها، همان رابط کاربری و همان پایگاه داده.
 
 تفاوت در تمرکز است. still-ui مشکلاتی را برطرف می‌کند که وقتی پنل ماه‌ها روی یک سرور کوچک کار می‌کند و کاربران واقعی پشت اینترنت موبایل هستند، دردسر می‌شوند: تنظیمات کلاینت‌هایی که بی‌صدا از دست می‌روند، دست‌دادن (handshake) که روی شبکهٔ ضعیف قطع می‌شود، و پنلی که آرام‌آرام حافظهٔ سرور را می‌بلعد.
