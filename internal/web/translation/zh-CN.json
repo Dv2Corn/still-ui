@@ -848,7 +848,11 @@
         "peerNumberConfig": "Peer {n} 配置"
       },
       "sniffingDestOverride": "目标覆盖",
-      "advancedTitle": "高级设置"
+      "advancedTitle": "高级设置",
+      "firstRun": {
+        "title": "从现成的入站开始",
+        "manual": "手动设置"
+      }
     },
     "clients": {
       "tabBasics": "基本",

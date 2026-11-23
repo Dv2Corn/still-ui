@@ -848,7 +848,11 @@
         "peerNumberConfig": "Config Peer {n}"
       },
       "sniffingDestOverride": "Anulación de destino",
-      "advancedTitle": "Configuración avanzada"
+      "advancedTitle": "Configuración avanzada",
+      "firstRun": {
+        "title": "Empieza con una entrada lista",
+        "manual": "Configurar manualmente"
+      }
     },
     "clients": {
       "tabBasics": "Básico",

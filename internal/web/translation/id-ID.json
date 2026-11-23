@@ -848,7 +848,11 @@
         "peerNumberConfig": "Konfig Peer {n}"
       },
       "sniffingDestOverride": "Penggantian tujuan",
-      "advancedTitle": "Pengaturan Lanjutan"
+      "advancedTitle": "Pengaturan Lanjutan",
+      "firstRun": {
+        "title": "Mulai dengan inbound siap pakai",
+        "manual": "Atur secara manual"
+      }
     },
     "clients": {
       "tabBasics": "Dasar",

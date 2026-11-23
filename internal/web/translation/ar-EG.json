@@ -848,7 +848,11 @@
         "peerNumberConfig": "تكوين Peer {n}"
       },
       "sniffingDestOverride": "تجاوز الوجهة",
-      "advancedTitle": "الإعدادات المتقدمة"
+      "advancedTitle": "الإعدادات المتقدمة",
+      "firstRun": {
+        "title": "ابدأ بإعداد وارد جاهز",
+        "manual": "الإعداد يدويًا"
+      }
     },
     "clients": {
       "tabBasics": "أساسي",

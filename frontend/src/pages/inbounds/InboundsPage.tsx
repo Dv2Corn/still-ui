@@ -25,6 +25,7 @@ import {
 import { HttpUtil, SizeFormatter, RandomUtil } from '@/utils';
 import { buildClonePayload } from '@/lib/xray/inbound-clone';
 import { NODE_ELIGIBLE_PROTOCOLS } from '@/lib/xray/node-protocols';
+import type { InboundPreset } from '@/lib/xray/inbound-presets';
 import {
   genAmneziaWGLinks,
   genInboundLinks,
@@ -161,6 +162,7 @@ export default function InboundsPage() {
 
   const [formOpen, setFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
+  const [formPreset, setFormPreset] = useState<InboundPreset | null>(null);
   const [formDbInbound, setFormDbInbound] = useState<DBInbound | null>(null);
 
   const [infoOpen, setInfoOpen] = useState(false);
@@ -461,15 +463,17 @@ export default function InboundsPage() {
     });
   }, [openPrompt, refresh, t]);
 
-  const onAddInbound = useCallback(() => {
+  const onAddInbound = useCallback((preset?: InboundPreset) => {
     setFormMode('add');
     setFormDbInbound(null);
+    setFormPreset(preset ?? null);
     setFormOpen(true);
   }, []);
 
   const openEdit = useCallback((dbInbound: DBInbound) => {
     setFormMode('edit');
     setFormDbInbound(dbInbound);
+    setFormPreset(null);
     setFormOpen(true);
   }, []);
 
@@ -821,6 +825,7 @@ export default function InboundsPage() {
             onClose={() => setFormOpen(false)}
             onSaved={refresh}
             mode={formMode}
+            initialPreset={formPreset}
             dbInbound={formDbInbound}
             dbInbounds={dbInbounds}
             availableNodes={nodesList}

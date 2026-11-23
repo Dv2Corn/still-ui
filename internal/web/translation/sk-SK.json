@@ -848,7 +848,11 @@
         "peerNumber": "Peer {n}",
         "peerNumberConfig": "Konfigurácia peeru {n}"
       },
-      "sniffingDestOverride": "Prepísať cieľ"
+      "sniffingDestOverride": "Prepísať cieľ",
+      "firstRun": {
+        "title": "Začnite s pripraveným inboundom",
+        "manual": "Nastaviť ručne"
+      }
     },
     "clients": {
       "tabBasics": "Základné údaje",

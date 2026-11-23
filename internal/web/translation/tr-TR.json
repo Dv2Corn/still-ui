@@ -848,7 +848,11 @@
         "peerNumberConfig": "Peer {n} Yapılandırması"
       },
       "sniffingDestOverride": "Hedef geçersiz kılma",
-      "advancedTitle": "Gelişmiş Ayarlar"
+      "advancedTitle": "Gelişmiş Ayarlar",
+      "firstRun": {
+        "title": "Hazır bir gelen bağlantıyla başlayın",
+        "manual": "Elle ayarla"
+      }
     },
     "clients": {
       "tabBasics": "Temel",

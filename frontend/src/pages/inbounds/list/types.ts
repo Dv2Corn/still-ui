@@ -1,3 +1,4 @@
+import type { InboundPreset } from '@/lib/xray/inbound-presets';
 import type { NodeRecord } from '@/api/queries/useNodesQuery';
 import type { HostRecord } from '@/schemas/api/host';
 
@@ -79,7 +80,7 @@ export interface InboundListProps {
   nodesById: Map<number, NodeRecord>;
   hasActiveNode: boolean;
   hosts: HostRecord[];
-  onAddInbound: () => void;
+  onAddInbound: (preset?: InboundPreset) => void;
   onGeneralAction: (key: GeneralAction) => void;
   onRowAction: (action: { key: RowAction; dbInbound: DBInboundRecord }) => void;
   onBulkDelete: (ids: number[]) => Promise<boolean>;

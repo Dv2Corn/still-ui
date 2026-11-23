@@ -34,6 +34,7 @@ import { buildRowActionsMenu } from './RowActions';
 import { useInboundColumns } from './useInboundColumns';
 import { buildHostRemarksByInboundId, formatHostRemarksLabel } from './helpers';
 import InboundStatsModal from './InboundStatsModal';
+import FirstRunPresets from './FirstRunPresets';
 import type { DBInboundRecord, GeneralAction, InboundListProps, RowAction } from './types';
 import './InboundList.css';
 
@@ -224,7 +225,7 @@ export default function InboundList({
         <Space>
           <Button
             type="primary"
-            onClick={onAddInbound}
+            onClick={() => onAddInbound()}
             icon={<PlusOutlined aria-hidden />}
             aria-label={t('pages.inbounds.addInbound')}
           >
@@ -285,7 +286,9 @@ export default function InboundList({
       <Space orientation="vertical" style={{ width: '100%' }}>
         {isMobile ? (
           <div className="inbound-cards">
-            {visibleInbounds.length === 0 ? (
+            {dbInbounds.length === 0 ? (
+              <FirstRunPresets onAddInbound={onAddInbound} />
+            ) : visibleInbounds.length === 0 ? (
               <div className="card-empty">
                 <ImportOutlined aria-hidden style={{ fontSize: 28, opacity: 0.5 }} />
                 <div>{t('noData')}</div>
@@ -380,12 +383,15 @@ export default function InboundList({
             style={{ marginTop: 10 }}
             size="small"
             locale={{
-              emptyText: (
-                <div className="card-empty">
-                  <ImportOutlined aria-hidden style={{ fontSize: 32, marginBottom: 8 }} />
-                  <div>{t('noData')}</div>
-                </div>
-              ),
+              emptyText:
+                dbInbounds.length === 0 ? (
+                  <FirstRunPresets onAddInbound={onAddInbound} />
+                ) : (
+                  <div className="card-empty">
+                    <ImportOutlined aria-hidden style={{ fontSize: 32, marginBottom: 8 }} />
+                    <div>{t('noData')}</div>
+                  </div>
+                ),
             }}
           />
         )}

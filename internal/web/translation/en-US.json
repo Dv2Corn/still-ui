@@ -848,7 +848,11 @@
         "peerNumber": "Peer {n}",
         "peerNumberConfig": "Peer {n} config"
       },
-      "sniffingDestOverride": "Destination override"
+      "sniffingDestOverride": "Destination override",
+      "firstRun": {
+        "title": "Start with a ready-made inbound",
+        "manual": "Set up manually"
+      }
     },
     "clients": {
       "tabBasics": "Basics",
