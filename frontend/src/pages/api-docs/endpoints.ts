@@ -272,7 +272,7 @@ export const sections: readonly Section[] = [
         method: 'GET',
         path: '/panel/api/inbounds/options',
         summary:
-          'Lightweight picker projection of the authenticated user’s inbounds. Returns id, remark, tag, protocol, port, a server-computed tlsFlowCapable flag (true for VLESS on TCP with tls or reality, or on XHTTP with VLESS encryption / vlessenc enabled), and ssMethod (the Shadowsocks cipher, empty for non-Shadowsocks inbounds — used by the client UI to generate a valid Shadowsocks 2022 PSK). Use this for dropdowns and attach pickers — it skips settings, streamSettings, and clientStats so the payload stays small even on panels with thousands of clients.',
+          'Lightweight picker projection of the authenticated user’s inbounds. Returns id, remark, tag, protocol, port, a server-computed tlsFlowCapable flag (true for VLESS on TCP with tls or reality, or on XHTTP with VLESS encryption / vlessenc enabled), and ssMethod (the Shadowsocks cipher, empty for non-Shadowsocks inbounds — used by the client UI to generate a valid Shadowsocks 2022 PSK). AmneziaWG inbounds also carry awgAllowedIPs, the peer AllowedIPs computed from the panel geoip.dat when "Local sites direct" is on for AmneziaWG files (absent means a full tunnel). Use this for dropdowns and attach pickers — it skips settings, streamSettings, and clientStats so the payload stays small even on panels with thousands of clients.',
         responseSchema: 'InboundOption',
         responseSchemaArray: true,
       },
@@ -1556,6 +1556,15 @@ export const sections: readonly Section[] = [
         response: '{\n  "success": true,\n  "obj": {\n    "deleted": 0\n  }\n}',
       },
       {
+        method: 'POST',
+        path: '/panel/api/clients/rotationCheck',
+        summary:
+          'Self-check that re-issuing a subscription id works: creates a temporary client named still-ui-rotation-check-<unix ms> (1-byte quota, 15-minute expiry) on the first enabled local VLESS, VMess or Trojan inbound in the subscription, fetches its link from the running subscription server over loopback, re-issues the subscription id through the same update the client form sends, and expects the new link to carry the client and the old one to answer 404.',
+        description:
+          'Fetches send an X-HWID header, so a device limit gives the check a slot like a real app; a device-limit notice fails the step by name. The temporary client is deleted on every path once it may exist, and that deletion is reported as the last step. success is true whenever the check ran: read obj.passed and each step. Fails with success=false when the subscription server is disabled. Admin only.',
+        responseSchema: 'SubRotationReport',
+      },
+      {
         method: 'GET',
         path: '/panel/api/clients/export',
         summary:
@@ -2226,6 +2235,39 @@ export const sections: readonly Section[] = [
         body: '{\n  "client": "alice@example.com",\n  "from": 1735689600000,\n  "to": 1735775999999\n}',
         response:
           'time_utc,client,inbound,outbound,source,source_port,network,host,port\n2025-01-01T12:00:00.000Z,alice@example.com,inbound-443,direct,203.0.113.9,54321,tcp,example.com,443',
+      },
+    ],
+  },
+
+  {
+    id: 'audit',
+    title: 'Audit log',
+    description:
+      "The tamper-evident journal of admin actions: every state-changing /panel/api request (except read-only POSTs, and telemetry pushes made with a node token) and every admin login, with the user or API token, source IP, route, target ids and outcome. Request bodies are never stored. Each entry carries the SHA-256 of the previous entry's hash and its own content, so an edited or deleted row breaks the chain. Admin only: a monitor, node-sync or node-admin token is refused. Every call here is journaled too.",
+    endpoints: [
+      {
+        method: 'POST',
+        path: '/panel/api/audit/list',
+        summary:
+          'One page of entries, newest first. Every filter field is optional: actor and outcome match exactly, action matches any part of the route, from and to are unix milliseconds. page starts at 1; pageSize is capped at 500.',
+        body: '{\n  "from": 1735689600000,\n  "to": 1735775999999,\n  "actor": "admin",\n  "action": "inbounds",\n  "outcome": "failure",\n  "page": 1,\n  "pageSize": 50\n}',
+        responseSchema: 'AuditPage',
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/audit/export',
+        summary:
+          'The entries matching the same filter as CSV (text/csv), newest first, at most 100000 rows, times in UTC. page and pageSize are ignored. A cell that a spreadsheet would read as a formula is prefixed with an apostrophe.',
+        body: '{\n  "outcome": "failure"\n}',
+        response:
+          'id,time_utc,actor,ip,action,target,outcome,detail,hash\n42,2025-01-01T12:00:00.000Z,admin,203.0.113.9,POST /panel/api/inbounds/update/:id,id=7,success,HTTP 200,9f86d081884c7d65…',
+      },
+      {
+        method: 'POST',
+        path: '/panel/api/audit/verify',
+        summary:
+          'Recompute the hash chain from the retention anchor. ok is false when an entry was edited or deleted; brokenId names the first entry that does not link.',
+        responseSchema: 'AuditVerifyResult',
       },
     ],
   },

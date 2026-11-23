@@ -93,6 +93,7 @@ func allModels() []any {
 		&model.ReachProbeResult{},
 		&model.ReachProbeTarget{},
 		&model.NodeInvite{},
+		&model.AuditLog{},
 	}
 }
 
@@ -1583,6 +1584,9 @@ func runSeeders(isUsersEmpty bool) error {
 	}
 
 	if err := seedSubClashAutoGroupKeepOff(empty && isUsersEmpty); err != nil {
+		return err
+	}
+	if err := seedSubLeakAlertKeepOff(empty && isUsersEmpty); err != nil {
 		return err
 	}
 

@@ -74,6 +74,7 @@ func (a *ClientController) initRouter(g *gin.RouterGroup) {
 	g.GET("/export", a.export)
 	g.POST("/import", a.importClients)
 	g.POST("/delOrphans", a.delOrphans)
+	g.POST("/rotationCheck", a.rotationCheck)
 	g.POST("/resetAllTraffics", a.resetAllTraffics)
 	g.POST("/delDepleted", a.delDepleted)
 	g.POST("/bulkAdjust", a.bulkAdjust)
@@ -584,6 +585,21 @@ func (a *ClientController) delOrphans(c *gin.Context) {
 		return
 	}
 	jsonObj(c, gin.H{"deleted": deleted}, nil)
+	notifyClientsChanged()
+}
+
+func (a *ClientController) rotationCheck(c *gin.Context) {
+	check, err := service.NewSubRotationCheck(&a.settingService, &a.clientService, &a.inboundService)
+	if err != nil {
+		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
+		return
+	}
+	report := check.Run(c.Request.Context())
+	if report.NeedRestart {
+		a.xrayService.SetToNeedRestart()
+	}
+	jsonObj(c, report, nil)
+	// A list fetched mid-check may still show the temporary client.
 	notifyClientsChanged()
 }
 

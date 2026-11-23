@@ -40,6 +40,7 @@ func run(root, outDir string) error {
 				"InboundFallback",
 				"Host",
 				"SubBalancer",
+				"AuditLog",
 			),
 			AliasAllow: setOf("Protocol"),
 			Overrides: map[string][]walkOverride{
@@ -127,6 +128,11 @@ func run(root, outDir string) error {
 				"NodeInviteCreated",
 				"PanelImportInbound",
 				"PanelImportReport",
+				"AuditFilter",
+				"AuditPage",
+				"AuditVerifyResult",
+				"SubRotationStep",
+				"SubRotationReport",
 			),
 		},
 		{

@@ -106,6 +106,9 @@ type AllSetting struct {
 	ConnLogDestination   string `json:"connLogDestination" form:"connLogDestination" validate:"omitempty,oneof=full domain none" example:"full"`
 	ConnLogSource        string `json:"connLogSource" form:"connLogSource" validate:"omitempty,oneof=full masked none" example:"full"`
 
+	// Admin audit log (still-ui): days an entry is kept; older ones are pruned by a cron job.
+	AuditLogRetentionDays int `json:"auditLogRetentionDays" form:"auditLogRetentionDays" validate:"omitempty,gte=1,lte=3650" example:"90"`
+
 	// Server health alert thresholds (events xray.down, xray.flapping, process.memory,
 	// disk.high, cert.expiring, backup.failed); a reminder repeats every alertRemindHours, 0 = never.
 	AlertXrayRestarts      int `json:"alertXrayRestarts" form:"alertXrayRestarts" validate:"gte=1,lte=100"`
@@ -115,8 +118,15 @@ type AllSetting struct {
 	AlertCertDays          int `json:"alertCertDays" form:"alertCertDays" validate:"gte=1,lte=365"`
 	AlertRemindHours       int `json:"alertRemindHours" form:"alertRemindHours" validate:"gte=0,lte=720"`
 
+	// Subscription leak alert (event sub.leak): this many client networks (IPv4 /24, IPv6 /48)
+	// fetching one subscription within subLeakWindowHours.
+	SubLeakNetworks    int `json:"subLeakNetworks" form:"subLeakNetworks" validate:"gte=2,lte=64" example:"6"`
+	SubLeakWindowHours int `json:"subLeakWindowHours" form:"subLeakWindowHours" validate:"gte=1,lte=168" example:"24"`
+
 	OutboundDownThreshold int `json:"outboundDownThreshold" form:"outboundDownThreshold" validate:"gte=1,lte=100"`
 	NodeDownThreshold     int `json:"nodeDownThreshold" form:"nodeDownThreshold" validate:"gte=1,lte=100"`
+	// Minutes without a heartbeat before the node.silent alert; 0 turns it off.
+	NodeSilenceMinutes int `json:"nodeSilenceMinutes" form:"nodeSilenceMinutes" validate:"gte=0,lte=10080" example:"30"`
 
 	TimeLocation    string `json:"timeLocation" form:"timeLocation"`
 	TwoFactorEnable bool   `json:"twoFactorEnable" form:"twoFactorEnable"`
@@ -167,6 +177,7 @@ type AllSetting struct {
 	SubClashAutoGroupTolerance  int    `json:"subClashAutoGroupTolerance" form:"subClashAutoGroupTolerance" validate:"gte=0,lte=10000"`
 	SubLocalDirect              string `json:"subLocalDirect" form:"subLocalDirect"`
 	SubLocalDirectProxy         string `json:"subLocalDirectProxy" form:"subLocalDirectProxy"`
+	SubLocalDirectAwg           bool   `json:"subLocalDirectAwg" form:"subLocalDirectAwg"`
 	SubJsonMux                  string `json:"subJsonMux" form:"subJsonMux"`
 	SubJsonRules                string `json:"subJsonRules" form:"subJsonRules"`
 	SubJsonRoutingRules         string `json:"subJsonRoutingRules" form:"subJsonRoutingRules"`

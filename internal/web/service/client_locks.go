@@ -198,6 +198,58 @@ func readSettingsClient(entry json.RawMessage) (settingsClientEntry, bool) {
 	return c, true
 }
 
+// canonicalNodeSettings is the one strict parse of a node's settings; every later reader gets
+// its re-marshalled result, without the keys that only fold to "clients".
+func canonicalNodeSettings(settings string) (string, bool) {
+	var members map[string]json.RawMessage
+	if json.Unmarshal([]byte(settings), &members) != nil || members == nil {
+		return "", false
+	}
+	for key := range members {
+		if key != "clients" && bindsAsClientsKey(key) {
+			delete(members, key)
+		}
+	}
+	out, err := json.Marshal(members)
+	return string(out), err == nil
+}
+
+// bindsAsClientsKey asks the decoder itself whether it would bind key to a clients field,
+// so this never rests on a second idea of case folding.
+func bindsAsClientsKey(key string) bool {
+	var probe struct {
+		Clients json.RawMessage `json:"clients"`
+	}
+	raw, err := json.Marshal(map[string]int{key: 1})
+	return err == nil && json.Unmarshal(raw, &probe) == nil && len(probe.Clients) > 0
+}
+
+// snapshotAttachedEmails lowercases the emails a snapshot's settings list, read entry by entry
+// as the claim check does; ok is false when the list cannot be parsed (membership unknown).
+func snapshotAttachedEmails(settings string) (emails map[string]struct{}, unreadable int, ok bool) {
+	var members map[string]json.RawMessage
+	if json.Unmarshal([]byte(settings), &members) != nil || members == nil {
+		return nil, 0, false
+	}
+	emails = map[string]struct{}{}
+	raw := members["clients"]
+	if len(raw) == 0 || string(raw) == "null" {
+		return emails, 0, true
+	}
+	var entries []json.RawMessage
+	if json.Unmarshal(raw, &entries) != nil {
+		return nil, 0, false
+	}
+	for _, entry := range entries {
+		if c, read := readSettingsClient(entry); read && c.Email != "" {
+			emails[strings.ToLower(c.Email)] = struct{}{}
+		} else {
+			unreadable++
+		}
+	}
+	return emails, unreadable, true
+}
+
 // joinSettingsClients writes the blob back compactly; indenting it again would cost the
 // square of whatever depth the node nested into it.
 func joinSettingsClients(settings string, members map[string]json.RawMessage, entries []json.RawMessage) (string, bool) {

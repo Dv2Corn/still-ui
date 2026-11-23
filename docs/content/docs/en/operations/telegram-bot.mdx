@@ -103,6 +103,7 @@ links, and QR codes.
   | `xray.crash`    | Xray-core crashes                                       |
   | `outbound.down` / `outbound.up` | An outbound goes down / recovers        |
   | `node.down` / `node.up`         | A node goes offline / comes back        |
+  | `sub.leak`      | One subscription is fetched from `subLeakNetworks` client networks (IPv4 /24, IPv6 /48) within `subLeakWindowHours`; once, then again after 7 days or when the count doubles. Nothing is blocked. |
 
 The warning lead times come from `expireDiff` (days before expiry) and
 `trafficDiff` (GB of quota remaining); both default to `0` (off).
@@ -121,6 +122,7 @@ The warning lead times come from `expireDiff` (days before expiry) and
 | `tgCpu` / `tgMemory` | `80` / `80`          | CPU / memory alert thresholds (percent).       |
 | `tgLang`       | `en-US`                    | Bot language.                                  |
 | `tgEnabledEvents` | `login.attempt,cpu.high`| Which events to deliver.                       |
+| `subLeakNetworks` / `subLeakWindowHours` | `6` / `24` | When `sub.leak` fires: networks (2–64) within hours (1–168). |
 
 <Callout type="warn">
   The bot token controls your bot — keep it secret and only add **trusted** admin

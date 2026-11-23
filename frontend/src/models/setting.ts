@@ -99,6 +99,7 @@ export class AllSetting {
   subClashAutoGroupTolerance = 50;
   subLocalDirect = '';
   subLocalDirectProxy = '';
+  subLocalDirectAwg = false;
   subJsonMux = '';
   subJsonRules = '';
   subJsonRoutingRules = '';
@@ -185,7 +186,7 @@ export class AllSetting {
   ldapDefaultExpiryDays = 0;
   ldapDefaultLimitIP = 0;
   tgEnabledEvents =
-    'login.attempt,cpu.high,xray.down,xray.flapping,process.memory,disk.high,cert.expiring,backup.failed,node.traffic';
+    'login.attempt,cpu.high,xray.down,xray.flapping,process.memory,disk.high,cert.expiring,backup.failed,node.traffic,sub.leak';
   smtpEnable = false;
   smtpHost = '';
   smtpPort = 587;
@@ -200,6 +201,7 @@ export class AllSetting {
   smtpMemory = 80;
   outboundDownThreshold = 3;
   nodeDownThreshold = 1;
+  nodeSilenceMinutes = 30;
   hasTgBotToken = false;
   hasTwoFactorToken = false;
   hasLdapPassword = false;
@@ -233,11 +235,14 @@ export class AllSetting {
   alertDisk = 90;
   alertCertDays = 7;
   alertRemindHours = 6;
+  subLeakNetworks = 6;
+  subLeakWindowHours = 24;
   connLogEnable = false;
   connLogRetentionDays = 30;
   connLogMaxSizeMB = 2048;
   connLogDestination = 'full';
   connLogSource = 'full';
+  auditLogRetentionDays = 90;
 
   constructor(data?: unknown) {
     if (data != null) {

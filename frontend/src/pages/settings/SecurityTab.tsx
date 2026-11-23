@@ -5,6 +5,7 @@ import {
   Empty,
   Form,
   Input,
+  InputNumber,
   Modal,
   Select,
   Space,
@@ -14,8 +15,9 @@ import {
   Tag,
   message,
 } from 'antd';
-import { ApiOutlined, SafetyOutlined, UserOutlined } from '@ant-design/icons';
+import { ApiOutlined, AuditOutlined, SafetyOutlined, UserOutlined } from '@ant-design/icons';
 import { ClipboardManager, HttpUtil, IntlUtil, RandomUtil } from '@/utils';
+import { onNumber } from '@/utils/onNumber';
 import type { AllSetting } from '@/models/setting';
 import { SettingListItem } from '@/components/ui';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
@@ -147,14 +149,18 @@ export default function SecurityTab({ allSetting, updateSetting, saveSetting }: 
     }
   }
 
-  const fetchApiTokens = useCallback(async () => {
-    try {
-      const msg = (await HttpUtil.get('/panel/api/setting/apiTokens')) as ApiMsg<ApiTokenRow[]>;
-      if (msg?.success) setApiTokens(Array.isArray(msg.obj) ? msg.obj : []);
-    } finally {
-      setApiTokensLoading(false);
-    }
-  }, []);
+  // State is set only in promise callbacks, so the mount effect below starts the
+  // request without a synchronous setState.
+  const fetchApiTokens = useCallback(
+    () =>
+      HttpUtil.get('/panel/api/setting/apiTokens')
+        .then((res) => {
+          const msg = res as ApiMsg<ApiTokenRow[]>;
+          if (msg?.success) setApiTokens(Array.isArray(msg.obj) ? msg.obj : []);
+        })
+        .finally(() => setApiTokensLoading(false)),
+    [],
+  );
 
   const loadApiTokens = useCallback(async () => {
     setApiTokensLoading(true);
@@ -424,6 +430,29 @@ export default function SecurityTab({ allSetting, updateSetting, saveSetting }: 
                   ))}
                 </Spin>
               </div>
+            ),
+          },
+          {
+            key: '4',
+            label: catTabLabel(
+              <AuditOutlined aria-hidden />,
+              t('pages.settings.security.audit'),
+              isMobile,
+            ),
+            children: (
+              <SettingListItem
+                paddings="small"
+                title={t('pages.settings.auditLogRetention')}
+                description={t('pages.settings.auditLogRetentionDesc')}
+              >
+                <InputNumber
+                  min={1}
+                  max={3650}
+                  value={allSetting.auditLogRetentionDays}
+                  onChange={onNumber((v) => updateSetting({ auditLogRetentionDays: v }))}
+                  style={{ width: '100%' }}
+                />
+              </SettingListItem>
             ),
           },
         ]}

@@ -112,7 +112,8 @@
     "localDirectShadowrocket": "Archivo de reglas para Shadowrocket",
     "localDirectShadowrocketHint": "En Shadowrocket añade el archivo en la pestaña Config y pon Global Routing en Config.",
     "saveQr": "Guardar QR",
-    "devices": "Dispositivos"
+    "devices": "Dispositivos",
+    "linksHidden": "This subscription has a device limit, so the configs are shown only in an app registered as one of its devices. Add the subscription link to your VPN app."
   },
   "menu": {
     "basedOn": "Basado en 3x-ui de MHSanaei · GPL-3.0",
@@ -135,7 +136,8 @@
     "unpinSidebar": "Desfijar barra lateral",
     "subFormats": "Sub Formats",
     "probes": "Sondas",
-    "connections": "Conexiones"
+    "connections": "Conexiones",
+    "audit": "Registro de auditoría"
   },
   "pages": {
     "login": {
@@ -158,6 +160,11 @@
       "xrayStatus": "Xray",
       "stopXray": "Detener",
       "restartXray": "Reiniciar",
+      "startXray": "Iniciar",
+      "stopXrayDisabledHint": "Xray no se está ejecutando",
+      "stopXrayConfirmTitle": "¿Detener Xray?",
+      "stopXrayConfirmContent": "Detener Xray interrumpirá de inmediato todas las conexiones proxy. ¿Seguro que quieres continuar?",
+      "stopXrayConfirmOk": "Detener Xray",
       "xraySwitch": "Versión",
       "xrayUpdates": "Actualizaciones de Xray",
       "xraySwitchClickDesk": "Elige sabiamente, ya que las versiones anteriores pueden no ser compatibles con las configuraciones actuales.",
@@ -1021,6 +1028,10 @@
       "importClients": "Importar clientes",
       "import": "Importar",
       "delOrphans": "Eliminar clientes sin entrante",
+      "rotationCheck": "Comprobar la reemisión de la suscripción",
+      "rotationCheckRunning": "Comprobando la reemisión de la suscripción…",
+      "rotationCheckPassed": "La reemisión de la suscripción funciona",
+      "rotationCheckFailed": "Falló la comprobación de la reemisión de la suscripción",
       "delOrphansConfirmTitle": "¿Eliminar clientes sin entrante?",
       "delOrphansConfirmContent": "Elimina todos los clientes que no están vinculados a ningún entrante, junto con su registro de tráfico. No se puede deshacer.",
       "auth": "Auth",
@@ -1260,7 +1271,7 @@
       "tlsPin": "Fijar certificado (SHA-256)",
       "tlsSkip": "Omitir verificación",
       "tlsMtls": "TLS mutuo (certificado de cliente)",
-      "mtlsFormHint": "Este nodo autentica al panel con un certificado de cliente. Copia el CA de este panel desde la sección mTLS del nodo al nodo, configura su CA de confianza y luego reinícialo.",
+      "mtlsFormHint": "Este nodo autentica al panel con un certificado de cliente. Copia el CA de este panel desde la sección mTLS del nodo al nodo, configura su CA de confianza y luego reinícialo. Actualizar el panel de este nodo desde aquí sigue requiriendo un token de API con el alcance node-admin.",
       "mtls": {
         "title": "mTLS del nodo",
         "intro": "TLS mutuo añade un factor de certificado de cliente además del token de API para las llamadas entre nodos. Es opcional: déjalo vacío para mantener solo la autenticación por token.",
@@ -1544,6 +1555,7 @@
         "applyTo": "Aplicar a",
         "addNoise": "+ Ruido",
         "concurrency": "Concurrencia",
+        "concurrencyHint": "Flujos por conexión. xray-core 26.11.9 y posteriores elevan a 128 cualquier valor entre 0 y 128; los núcleos anteriores usan el número tal cual (0 significa 8). -1 desactiva el mux TCP.",
         "xudpConcurrency": "Concurrencia xudp",
         "xudpUdp443": "xudp UDP 443"
       },
@@ -1598,7 +1610,8 @@
         "apiTokenEmpty": "Aún no hay tokens — crea uno para autenticar bots o paneles remotos.",
         "apiTokenDeleteWarning": "Cualquier cliente que use este token dejará de autenticarse inmediatamente.",
         "apiTokenCreatedTitle": "Token creado",
-        "apiTokenCreatedNotice": "Copia este token ahora. Por seguridad, no se almacena de forma legible y no se volverá a mostrar."
+        "apiTokenCreatedNotice": "Copia este token ahora. Por seguridad, no se almacena de forma legible y no se volverá a mostrar.",
+        "audit": "Registro de auditoría"
       },
       "toasts": {
         "modifySettings": "Los parámetros han sido modificados.",
@@ -1648,6 +1661,8 @@
       "eventNodeUp": "Activo",
       "eventNodeTraffic": "Límite de tráfico",
       "eventNodeTrafficHint": "se define por nodo en la página Nodos",
+      "eventNodeSilent": "Sin respuesta",
+      "eventNodeSilentHint": "minutos sin contacto, 0 = desactivado",
       "eventCPUHigh": "CPU alta (%)",
       "requestFailed": "La solicitud falló",
       "smtpEncryption": "Cifrado",
@@ -1663,6 +1678,8 @@
       "smtpNoRecipients": "No hay destinatarios configurados",
       "smtpFromNotConfigured": "La dirección del remitente SMTP no está configurada",
       "eventLoginAttempt": "Intento de inicio de sesión",
+      "eventSubLeak": "Filtración de suscripción",
+      "eventSubLeakHint": "redes en horas",
       "backupSettings": "Copias de seguridad",
       "backupEnable": "Copias programadas",
       "backupEnableDesc": "Guardar una copia de la base de datos en este servidor según un horario.",
@@ -2032,6 +2049,8 @@
       "subLocalDirectOff": "Desactivado",
       "subLocalDirectProxy": "Siempre por la VPN",
       "subLocalDirectProxyDesc": "Telegram, YouTube, Instagram, Facebook, WhatsApp, Discord, ChatGPT y Claude van siempre por la VPN, aunque parezcan locales. Añade aquí más dominios o rangos de IP, uno por línea; se comprueban antes que la regla del país.",
+      "subLocalDirectAwg": "También archivos AmneziaWG",
+      "subLocalDirectAwgDesc": "Los archivos de configuración AmneziaWG (descarga, QR, enlaces vpn://) también dejan fuera las direcciones del país y su DNS sigue accesible. El archivo es grande (~35 KB, ~2000 prefijos) y puede no caber en un código QR. El servidor no cambia, así que los archivos ya importados siguen funcionando como túnel completo hasta que se reimporten.",
       "subProbeOrder": "Usar los resultados de las sondas",
       "subProbeOrderDesc": "Los enlaces que las sondas de accesibilidad marcan como caídos (2 fallos seguidos) pasan al final de la suscripción o se ocultan, en todos los formatos: enlaces, JSON y Clash. El usuario conserva siempre al menos un enlace y, sin resultados recientes de las sondas, nada cambia. La página de sondas muestra qué pasa con cada punto de acceso.",
       "subProbeOrderOff": "Desactivado (predeterminado)",
@@ -2061,7 +2080,9 @@
       "connLogSourceDesc": "Qué se guarda sobre la dirección desde la que se conectó un cliente.",
       "connLogSourceFull": "Dirección completa y puerto",
       "connLogSourceMasked": "Solo la red (/24 en IPv4, /48 en IPv6)",
-      "connLogPrivacyHint": "Este registro contiene datos personales: guarde solo lo necesario. Se almacena junto a la base de datos del panel, no dentro de ella ni en sus copias de seguridad. Un cambio se aplica a las conexiones nuevas; lo ya guardado queda como está hasta que caduque."
+      "connLogPrivacyHint": "Este registro contiene datos personales: guarde solo lo necesario. Se almacena junto a la base de datos del panel, no dentro de ella ni en sus copias de seguridad. Un cambio se aplica a las conexiones nuevas; lo ya guardado queda como está hasta que caduque.",
+      "auditLogRetention": "Conservar entradas de auditoría (días)",
+      "auditLogRetentionDesc": "Las entradas más antiguas se borran cada hora; la cadena sigue siendo verificable."
     },
     "xray": {
       "save": "Guardar configuración",
@@ -2464,7 +2485,7 @@
         "presetQuic": "I1 tipo QUIC",
         "presetDns": "I1 tipo DNS",
         "presetHint": "Regenerar sustituye todos los parámetros por nuevos valores aleatorios, por lo que los clientes existentes deben volver a importar su configuración. Los botones I1 solo cambian los paquetes de firma (se establece I1 y se vacían I2–I5): el paquete enviado antes de cada handshake parece el inicio de una conexión QUIC o una consulta DNS. Los clientes existentes siguen funcionando y reciben el nuevo paquete con su próxima configuración.",
-        "mtuMobileHint": "Se incluye en cada configuración de cliente que genera el panel. En redes móviles que descartan paquetes grandes, 1280 puede ser varias veces más rápido que el valor predeterminado.",
+        "mtuMobileHint": "Vacío: el servidor mantiene 1420 menos S4 y las configuraciones de cliente reciben 1280, varias veces más rápido en rutas que descartan paquetes grandes (redes móviles, PPPoE, otros túneles). Un valor aquí se aplica al servidor y a cada configuración de cliente.",
         "mtuMobile": "Usar {mtu}",
         "jc": "Jc (cantidad de paquetes basura)",
         "jmin": "Jmin (tamaño mínimo de paquete basura)",
@@ -2634,7 +2655,20 @@
       "defaultOutboundDesc": "El tráfico que no coincide con ninguna regla de enrutamiento usa esta salida (la primera de la lista).",
       "routingScript": "Script de enrutamiento",
       "routingScriptDesc": "Ruta a un archivo .lua que define HandleRoute, absoluta o relativa a la carpeta bin de Xray. El script elige entonces cada ruta y Xray ignora todas las reglas de enrutamiento, incluida la regla api del panel: envía el inbound api al outbound api o se detendrán las estadísticas de tráfico y los cambios de clientes en vivo. Xray no arrancará si el archivo falta o no es válido.",
-      "routingScriptActive": "Hay un script de enrutamiento definido en {section}, así que Xray ignora estas reglas."
+      "routingScriptActive": "Hay un script de enrutamiento definido en {section}, así que Xray ignora estas reglas.",
+      "exitAddress": {
+        "menu": "IP de salida separada",
+        "title": "IP de entrada y salida separadas",
+        "intro": "Los clientes siguen conectándose a la dirección de la entrada, mientras su tráfico sale del servidor por otra dirección IPv4 de este servidor. Mantenerlas separadas evita que la dirección que ven los sitios web delate la dirección a la que se conectan los clientes.",
+        "exitIp": "Dirección IPv4 de salida",
+        "exitIpHint": "Otra dirección IPv4 asignada a este servidor. Las entradas que escuchan en todas las direcciones no se pueden comprobar; asegúrese de que los clientes se conecten a otra dirección.",
+        "inbounds": "Entradas",
+        "inboundsRequired": "Seleccione al menos una entrada",
+        "invalidIp": "Introduzca una dirección IPv4 válida",
+        "sameAsInbound": "Los clientes se conectan a esta dirección. Elija otra dirección del servidor.",
+        "tagTaken": "Ya existe una salida para esta IP de salida",
+        "added": "Salida y regla de enrutamiento añadidas. Guarde para aplicar."
+      }
     },
     "hosts": {
       "addHost": "Agregar host",
@@ -2851,6 +2885,27 @@
       "newer": "Más recientes",
       "older": "Más antiguas",
       "ofClient": "Conexiones de este cliente"
+    },
+    "audit": {
+      "title": "Registro de auditoría",
+      "intro": "Cada acción de administración que cambia el estado y cada inicio de sesión, encadenados con SHA-256 para detectar una entrada editada o borrada. Nunca se guardan cuerpos de petición ni secretos. Cada búsqueda y exportación aquí también se registra.",
+      "time": "Hora",
+      "actor": "Usuario o token",
+      "ip": "IP de origen",
+      "action": "Acción",
+      "target": "Objetivo",
+      "outcome": "Resultado",
+      "detail": "Detalle",
+      "actorPlaceholder": "Usuario o token (exacto)",
+      "actionPlaceholder": "La acción contiene…",
+      "success": "Éxito",
+      "failure": "Fallo",
+      "exportCsv": "Exportar CSV",
+      "exportHint": "La exportación incluye hasta {count} filas del filtro actual, con horas en UTC.",
+      "empty": "No hay entradas que coincidan.",
+      "verify": "Verificar cadena",
+      "verifyOk": "La cadena está intacta: {count} entradas comprobadas.",
+      "verifyBroken": "La cadena está rota en la entrada #{id}: {reason}"
     }
   },
   "tgbot": {
@@ -2982,6 +3037,9 @@
       "alertNodeTrafficLimit": "El nodo {{ .Name }} alcanzó su límite de tráfico: {{ .Used }} de {{ .Limit }}. Se reinicia el {{ .Reset }}.",
       "alertNodeTrafficLimitOff": "El nodo {{ .Name }} alcanzó su límite de tráfico: {{ .Used }} de {{ .Limit }}. Sus entradas están desactivadas hasta el {{ .Reset }}.",
       "alertNodeTrafficBack": "El nodo {{ .Name }} vuelve a estar bajo su límite de tráfico: {{ .Used }} de {{ .Limit }}.",
+      "alertNodeSilent": "El nodo {{ .Name }} ({{ .Address }}) no responde desde hace {{ .Minutes }} min. Visto por última vez: {{ .LastSeen }}.",
+      "alertNodeSilentBack": "El nodo {{ .Name }} ({{ .Address }}) vuelve a responder tras {{ .Minutes }} min sin respuesta.",
+      "alertSubLeak": "La suscripción de {{ .Client }} puede haberse filtrado: se descargó desde {{ .Count }} redes en {{ .Hours }} h (primera vez {{ .First }}, última {{ .Last }}). No se bloqueó nada.\nPor ejemplo: {{ .Networks }}",
       "inboundsCount": "🔌 Inbounds: {{ .Count }}\r\n",
       "clientsCount": "👥 Clients: {{ .Count }}\r\n",
       "category_server": "🖥 Servidor",

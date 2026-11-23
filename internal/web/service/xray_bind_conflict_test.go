@@ -26,7 +26,7 @@ func configFromInbounds(t *testing.T, inbounds string) *xray.Config {
 func TestBindConflicts(t *testing.T) {
 	const (
 		relay = `{"listen":"127.0.0.1","port":65101,"protocol":"socks","tag":"relay","settings":{"auth":"password","udp":true,"accounts":[]}}`
-		user  = `{"listen":"0.0.0.0","port":65101,"protocol":"vless","tag":"user","streamSettings":{"network":"tcp"}}`
+		user  = `{"listen":"0.0.0.0","port":65101,"protocol":"vless","settings":{"clients":[],"decryption":"none"},"tag":"user","streamSettings":{"network":"tcp"}}`
 	)
 
 	cases := []struct {
@@ -37,100 +37,100 @@ func TestBindConflicts(t *testing.T) {
 	}{
 		{
 			"same listen, port and tcp",
-			`{"listen":"0.0.0.0","port":443,"protocol":"vless","tag":"a"},
-			 {"listen":"0.0.0.0","port":443,"protocol":"vmess","tag":"b"}`,
+			`{"listen":"0.0.0.0","port":443,"protocol":"vless","settings":{"clients":[],"decryption":"none"},"tag":"a"},
+			 {"listen":"0.0.0.0","port":443,"protocol":"vmess","settings":{"clients":[]},"tag":"b"}`,
 			``, 1,
 		},
 		{
 			"tcp and udp on one port are legal",
-			`{"listen":"0.0.0.0","port":443,"protocol":"vless","tag":"a"},
-			 {"listen":"0.0.0.0","port":443,"protocol":"hysteria","tag":"b"}`,
+			`{"listen":"0.0.0.0","port":443,"protocol":"vless","settings":{"clients":[],"decryption":"none"},"tag":"a"},
+			 {"listen":"0.0.0.0","port":443,"protocol":"hysteria","settings":{"version":2,"clients":[]},"streamSettings":{"network":"hysteria","hysteriaSettings":{"version":2},"security":"tls","tlsSettings":{}},"tag":"b"}`,
 			``, 0,
 		},
 		{
 			"kcp moves vless to udp and frees the port",
-			`{"listen":"0.0.0.0","port":443,"protocol":"vless","tag":"a","streamSettings":{"network":"kcp"}},
-			 {"listen":"0.0.0.0","port":443,"protocol":"vless","tag":"b","streamSettings":{"network":"tcp"}}`,
+			`{"listen":"0.0.0.0","port":443,"protocol":"vless","settings":{"clients":[],"decryption":"none"},"tag":"a","streamSettings":{"network":"kcp"}},
+			 {"listen":"0.0.0.0","port":443,"protocol":"vless","settings":{"clients":[],"decryption":"none"},"tag":"b","streamSettings":{"network":"tcp"}}`,
 			``, 0,
 		},
 		{
 			"ipv4 and ipv6 wildcards bind one dual-stack socket",
-			`{"listen":"::","port":443,"protocol":"vless","tag":"ipv6"},
-			 {"listen":"0.0.0.0","port":443,"protocol":"vless","tag":"ipv4"}`,
+			`{"listen":"::","port":443,"protocol":"vless","settings":{"clients":[],"decryption":"none"},"tag":"ipv6"},
+			 {"listen":"0.0.0.0","port":443,"protocol":"vless","settings":{"clients":[],"decryption":"none"},"tag":"ipv4"}`,
 			``, 1,
 		},
 		{
 			"dual-stack ipv6 wildcard takes an ipv4 address",
-			`{"listen":"::","port":443,"protocol":"vless","tag":"ipv6"},
-			 {"listen":"10.5.0.200","port":443,"protocol":"vless","tag":"ipv4"}`,
+			`{"listen":"::","port":443,"protocol":"vless","settings":{"clients":[],"decryption":"none"},"tag":"ipv6"},
+			 {"listen":"10.5.0.200","port":443,"protocol":"vless","settings":{"clients":[],"decryption":"none"},"tag":"ipv4"}`,
 			``, 1,
 		},
 		{
 			"v6only ipv6 wildcard leaves an ipv4 address free",
-			`{"listen":"::","port":443,"protocol":"vless","tag":"ipv6","streamSettings":{"network":"tcp","sockopt":{"v6only":true}}},
-			 {"listen":"10.5.0.200","port":443,"protocol":"vless","tag":"ipv4"}`,
+			`{"listen":"::","port":443,"protocol":"vless","settings":{"clients":[],"decryption":"none"},"tag":"ipv6","streamSettings":{"network":"tcp","sockopt":{"v6only":true}}},
+			 {"listen":"10.5.0.200","port":443,"protocol":"vless","settings":{"clients":[],"decryption":"none"},"tag":"ipv4"}`,
 			``, 0,
 		},
 		{
 			"v6only ipv6 wildcard still collides with the dual-stack 0.0.0.0",
-			`{"listen":"::","port":443,"protocol":"vless","tag":"ipv6","streamSettings":{"network":"tcp","sockopt":{"v6only":true}}},
-			 {"listen":"0.0.0.0","port":443,"protocol":"vless","tag":"ipv4"}`,
+			`{"listen":"::","port":443,"protocol":"vless","settings":{"clients":[],"decryption":"none"},"tag":"ipv6","streamSettings":{"network":"tcp","sockopt":{"v6only":true}}},
+			 {"listen":"0.0.0.0","port":443,"protocol":"vless","settings":{"clients":[],"decryption":"none"},"tag":"ipv4"}`,
 			``, 1,
 		},
 		{
 			"wildcard listen overlaps a loopback one",
-			`{"listen":"0.0.0.0","port":8443,"protocol":"vless","tag":"a"},
-			 {"listen":"127.0.0.1","port":8443,"protocol":"trojan","tag":"b"}`,
+			`{"listen":"0.0.0.0","port":8443,"protocol":"vless","settings":{"clients":[],"decryption":"none"},"tag":"a"},
+			 {"listen":"127.0.0.1","port":8443,"protocol":"trojan","settings":{"clients":[]},"tag":"b"}`,
 			``, 1,
 		},
 		{
 			"absent listen means wildcard",
-			`{"port":8443,"protocol":"vless","tag":"a"},
-			 {"listen":"127.0.0.1","port":8443,"protocol":"trojan","tag":"b"}`,
+			`{"port":8443,"protocol":"vless","settings":{"clients":[],"decryption":"none"},"tag":"a"},
+			 {"listen":"127.0.0.1","port":8443,"protocol":"trojan","settings":{"clients":[]},"tag":"b"}`,
 			``, 1,
 		},
 		{
 			"distinct loopback addresses do not overlap",
-			`{"listen":"127.0.0.1","port":8443,"protocol":"vless","tag":"a"},
-			 {"listen":"127.0.0.2","port":8443,"protocol":"vless","tag":"b"}`,
+			`{"listen":"127.0.0.1","port":8443,"protocol":"vless","settings":{"clients":[],"decryption":"none"},"tag":"a"},
+			 {"listen":"127.0.0.2","port":8443,"protocol":"vless","settings":{"clients":[],"decryption":"none"},"tag":"b"}`,
 			``, 0,
 		},
 		{
 			"port zero is not a bind",
 			`{"listen":"0.0.0.0","port":0,"protocol":"tunnel","tag":"a"},
-			 {"listen":"0.0.0.0","port":0,"protocol":"vless","tag":"b"}`,
+			 {"listen":"0.0.0.0","port":0,"protocol":"vless","settings":{"clients":[],"decryption":"none"},"tag":"b"}`,
 			``, 0,
 		},
 		{
 			"clean config",
-			`{"listen":"0.0.0.0","port":443,"protocol":"vless","tag":"a"},
+			`{"listen":"0.0.0.0","port":443,"protocol":"vless","settings":{"clients":[],"decryption":"none"},"tag":"a"},
 			 {"listen":"127.0.0.1","port":62789,"protocol":"tunnel","tag":"api"},
 			 ` + relay,
 			``, 0,
 		},
 		{
-			// The relay the AmneziaWG family lives on: loopback tcp+udp, on the
+			// The relay the AmneziaWG family lives on: loopback tcp, on the
 			// same port as a user inbound's tcp.
 			"amneziawg relay against a tcp inbound",
 			relay + "," + user, ``, 1,
 		},
 		{
-			"amneziawg relay against a udp inbound",
-			relay + `,{"listen":"0.0.0.0","port":65101,"protocol":"hysteria","tag":"user"}`,
-			``, 1,
+			// The core's socks server answers a UDP associate from a fresh port, so even
+			// with settings.udp the relay binds only tcp on its own port.
+			"amneziawg relay coexists with a udp inbound",
+			relay + `,{"listen":"0.0.0.0","port":65101,"protocol":"hysteria","settings":{"version":2,"clients":[]},"streamSettings":{"network":"hysteria","hysteriaSettings":{"version":2},"security":"tls","tlsSettings":{}},"tag":"user"}`,
+			``, 0,
 		},
 		{
-			// Proves the relay's transports come from settings.udp and not from a
-			// blanket "loopback owns everything" rule.
 			"socks bridge without udp coexists with a udp inbound",
 			`{"listen":"127.0.0.1","port":65101,"protocol":"socks","tag":"bridge","settings":{"auth":"noauth"}},
-			 {"listen":"0.0.0.0","port":65101,"protocol":"hysteria","tag":"user"}`,
+			 {"listen":"0.0.0.0","port":65101,"protocol":"hysteria","settings":{"version":2,"clients":[]},"streamSettings":{"network":"hysteria","hysteriaSettings":{"version":2},"security":"tls","tlsSettings":{}},"tag":"user"}`,
 			``, 0,
 		},
 		{
 			"reserved api inbound against a user inbound",
 			`{"listen":"127.0.0.1","port":62789,"protocol":"tunnel","tag":"api","settings":{"rewriteAddress":"127.0.0.1"}},
-			 {"listen":"0.0.0.0","port":62789,"protocol":"vless","tag":"user"}`,
+			 {"listen":"0.0.0.0","port":62789,"protocol":"vless","settings":{"clients":[],"decryption":"none"},"tag":"user"}`,
 			``, 1,
 		},
 		{
@@ -147,26 +147,26 @@ func TestBindConflicts(t *testing.T) {
 			// `::` and `0.0.0.0` on one port is what bindv6only=1 makes legal, so the
 			// running config excuses it -- but moving one onto the other is not it.
 			"excused pair whose listen changed into a real collision",
-			`{"listen":"0.0.0.0","port":443,"protocol":"vless","tag":"a"},
-			 {"listen":"0.0.0.0","port":443,"protocol":"vless","tag":"b"}`,
-			`{"listen":"::","port":443,"protocol":"vless","tag":"a"},
-			 {"listen":"0.0.0.0","port":443,"protocol":"vless","tag":"b"}`,
+			`{"listen":"0.0.0.0","port":443,"protocol":"vless","settings":{"clients":[],"decryption":"none"},"tag":"a"},
+			 {"listen":"0.0.0.0","port":443,"protocol":"vless","settings":{"clients":[],"decryption":"none"},"tag":"b"}`,
+			`{"listen":"::","port":443,"protocol":"vless","settings":{"clients":[],"decryption":"none"},"tag":"a"},
+			 {"listen":"0.0.0.0","port":443,"protocol":"vless","settings":{"clients":[],"decryption":"none"},"tag":"b"}`,
 			1,
 		},
 		{
 			// The same pair of sockets is the same evidence, whichever order the
 			// generator happened to emit them in.
 			"excused pair with its listens swapped stays excused",
-			`{"listen":"0.0.0.0","port":443,"protocol":"vless","tag":"a"},
-			 {"listen":"::","port":443,"protocol":"vless","tag":"b"}`,
-			`{"listen":"::","port":443,"protocol":"vless","tag":"a"},
-			 {"listen":"0.0.0.0","port":443,"protocol":"vless","tag":"b"}`,
+			`{"listen":"0.0.0.0","port":443,"protocol":"vless","settings":{"clients":[],"decryption":"none"},"tag":"a"},
+			 {"listen":"::","port":443,"protocol":"vless","settings":{"clients":[],"decryption":"none"},"tag":"b"}`,
+			`{"listen":"::","port":443,"protocol":"vless","settings":{"clients":[],"decryption":"none"},"tag":"a"},
+			 {"listen":"0.0.0.0","port":443,"protocol":"vless","settings":{"clients":[],"decryption":"none"},"tag":"b"}`,
 			0,
 		},
 		{
 			"same pair on another port is still new",
 			`{"listen":"127.0.0.1","port":65102,"protocol":"socks","tag":"relay","settings":{"auth":"password","udp":true,"accounts":[]}},
-			 {"listen":"0.0.0.0","port":65102,"protocol":"vless","tag":"user","streamSettings":{"network":"tcp"}}`,
+			 {"listen":"0.0.0.0","port":65102,"protocol":"vless","settings":{"clients":[],"decryption":"none"},"tag":"user","streamSettings":{"network":"tcp"}}`,
 			relay + "," + user, 1,
 		},
 	}
@@ -177,7 +177,14 @@ func TestBindConflicts(t *testing.T) {
 			if tc.running != "" {
 				running = configFromInbounds(t, tc.running)
 			}
-			got := bindConflicts(configFromInbounds(t, tc.inbounds), running)
+			cfg := configFromInbounds(t, tc.inbounds)
+			// An unbuildable side holds every socket, which would pass these cases for nothing.
+			for i := range cfg.InboundConfigs {
+				if _, ok := configTransports(&cfg.InboundConfigs[i]); !ok {
+					t.Fatalf("inbound %q does not build", cfg.InboundConfigs[i].Tag)
+				}
+			}
+			got := bindConflicts(cfg, running)
 			if len(got) != tc.want {
 				t.Fatalf("bindConflicts = %v, want %d conflict(s)", got, tc.want)
 			}
@@ -193,7 +200,7 @@ func TestBindConflicts(t *testing.T) {
 func TestBindConflicts_MessageNamesBothSides(t *testing.T) {
 	conflicts := bindConflicts(configFromInbounds(t, `
 		{"listen":"127.0.0.1","port":65101,"protocol":"socks","tag":"relay","settings":{"auth":"password","udp":true,"accounts":[]}},
-		{"listen":"0.0.0.0","port":65101,"protocol":"vless","tag":"user","streamSettings":{"network":"tcp"}}`), nil)
+		{"listen":"0.0.0.0","port":65101,"protocol":"vless","settings":{"clients":[],"decryption":"none"},"tag":"user","streamSettings":{"network":"tcp"}}`), nil)
 	if len(conflicts) != 1 {
 		t.Fatalf("want exactly one conflict, got %v", conflicts)
 	}
@@ -229,7 +236,7 @@ func TestBindConflicts_GeneratedConfig(t *testing.T) {
 				t.Fatalf("read seeded row: %v", err)
 			}
 			relayPort := amneziawgnet.SOCKSPortForInbound(awg.Id)
-			seedInboundConflict(t, "user", "0.0.0.0", relayPort+tc.portOff, model.VLESS, `{"network":"tcp"}`, `{}`)
+			seedInboundConflict(t, "user", "0.0.0.0", relayPort+tc.portOff, model.VLESS, `{"network":"tcp"}`, vlessSettings)
 
 			svc := &XrayService{}
 			cfg, err := svc.GetXrayConfig()

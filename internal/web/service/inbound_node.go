@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"maps"
 	"sort"
 	"strings"
 	"sync"
@@ -487,23 +486,21 @@ func snapshotDropsEveryHubClient(tx *gorm.DB, inboundID int, wireSettings string
 	return links > 0
 }
 
-// snapshotAttachedEmails lowercases the emails a snapshot inbound's settings list;
-// ok is false when the settings cannot be parsed, so membership is unknown.
-func snapshotAttachedEmails(settings string) (map[string]struct{}, bool) {
-	clients, err := ParseInboundSettingsClients(settings)
-	if err != nil {
-		return nil, false
-	}
-	emails := make(map[string]struct{}, len(clients))
-	for i := range clients {
-		emails[strings.ToLower(clients[i].Email)] = struct{}{}
-	}
-	return emails, true
-}
-
 func (s *InboundService) setRemoteTrafficLocked(nodeID int, snap *runtime.TrafficSnapshot, dirty, justPushed bool) (bool, error) {
 	if snap == nil || nodeID <= 0 {
 		return false, nil
+	}
+	// Settings that are not one JSON object are no settings: that inbound is left out below.
+	unreadableSettings := map[*model.Inbound]struct{}{}
+	for _, snapIb := range snap.Inbounds {
+		if snapIb == nil {
+			continue
+		}
+		canonical, ok := canonicalNodeSettings(snapIb.Settings)
+		if !ok {
+			unreadableSettings[snapIb] = struct{}{}
+		}
+		snapIb.Settings = canonical
 	}
 	db := database.GetDB()
 	now := time.Now().UnixMilli()
@@ -628,7 +625,7 @@ func (s *InboundService) setRemoteTrafficLocked(nodeID int, snap *runtime.Traffi
 	reportedEmails := make(map[string]struct{})
 	nodeEmailTotals := make(map[string]nodeTrafficCounter)
 	for _, snapIb := range snap.Inbounds {
-		if snapIb == nil {
+		if _, unreadable := unreadableSettings[snapIb]; snapIb == nil || unreadable {
 			continue
 		}
 		for i := range snapIb.ClientStats {
@@ -696,12 +693,8 @@ func (s *InboundService) setRemoteTrafficLocked(nodeID int, snap *runtime.Traffi
 	if err != nil {
 		return false, err
 	}
-	// The raw blob stays for the usage-only lookup: those entries are refused from the stored
-	// settings, yet the node's usage under them still counts.
-	rawSettings := make(map[*model.Inbound]string, len(snap.Inbounds))
 	for _, snapIb := range snap.Inbounds {
 		if snapIb != nil {
-			rawSettings[snapIb] = snapIb.Settings
 			snapIb.Settings = claims.apply(snapIb.Settings)
 		}
 	}
@@ -778,7 +771,11 @@ func (s *InboundService) setRemoteTrafficLocked(nodeID int, snap *runtime.Traffi
 			}
 			mergedCentral[c.Id] = struct{}{}
 		}
-		if reason := oversizeNodeInbound(snapIb); reason != "" {
+		reason := oversizeNodeInbound(snapIb)
+		if _, unreadable := unreadableSettings[snapIb]; unreadable {
+			reason = "its settings are not a JSON object"
+		}
+		if reason != "" {
 			oversizeTags[snapIb.Tag] = reason
 			snap.Inbounds[snapIdx] = nil
 			continue
@@ -1070,8 +1067,16 @@ func (s *InboundService) setRemoteTrafficLocked(nodeID int, snap *runtime.Traffi
 		snapEmails := make(map[string]struct{}, len(snapIb.ClientStats))
 		// Parsed once per inbound on the first renewal candidate, not per client.
 		var snapExpiries map[string]int64
-		attachedOnNode, membershipKnown := snapshotAttachedEmails(snapIb.Settings)
-		usageOnly := claims.usageOnlyIn(rawSettings[snapIb])
+		attachedOnNode, unreadable, membershipKnown := snapshotAttachedEmails(snapIb.Settings)
+		// Fail closed: without the node's client list no email in its stats is known to be on
+		// this inbound, so none of them is credited (and nothing is swept) this round.
+		if !membershipKnown {
+			logger.Warningf("setRemoteTraffic: node %d inbound %q: settings do not parse, its client traffic is not counted", nodeID, snapIb.Tag)
+			continue
+		}
+		if unreadable > 0 {
+			logger.Warningf("setRemoteTraffic: node %d inbound %q: %d client entries have no readable email, their traffic is not counted", nodeID, snapIb.Tag, unreadable)
+		}
 		ownInbound := originGuidFor(snapIb) == selfKey
 		// advanceBaseline is the one place a node counter is consumed, so the node's own
 		// usage grows exactly by what the stored baseline moves past.
@@ -1086,12 +1091,9 @@ func (s *InboundService) setRemoteTrafficLocked(nodeID int, snap *runtime.Traffi
 			nodeBaselines[email] = canon
 			return nil
 		}
-		if membershipKnown {
-			maps.Copy(attachedOnNode, usageOnly)
-		}
 		for _, cs := range snapIb.ClientStats {
 			// A node detach keeps the stat row, so its quota and verdict are stale (#6724).
-			if _, attached := attachedOnNode[strings.ToLower(cs.Email)]; membershipKnown && !attached {
+			if _, attached := attachedOnNode[strings.ToLower(cs.Email)]; !attached {
 				continue
 			}
 			snapEmails[cs.Email] = struct{}{}
@@ -1101,8 +1103,7 @@ func (s *InboundService) setRemoteTrafficLocked(nodeID int, snap *runtime.Traffi
 			// Until the node applies a reset it owes, its verdict rests on the
 			// pre-reset counters: only usage may move for this client.
 			_, owed := owedResets[cs.Email]
-			_, onlyUsage := usageOnly[strings.ToLower(cs.Email)]
-			clientFrozen := lifecycleFrozen || owed || onlyUsage
+			clientFrozen := lifecycleFrozen || owed
 
 			base, seen := nodeBaselines[cs.Email]
 			var deltaUp, deltaDown int64

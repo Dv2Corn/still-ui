@@ -77,20 +77,23 @@ export default function XrayLogModal({ open, onClose }: XrayLogModalProps) {
 
   const orderedLogs = useMemo(() => [...logs].reverse(), [logs]);
 
-  const runRefresh = useCallback(async () => {
-    try {
-      const msg = await HttpUtil.post<XrayLogEntry[]>(`/panel/api/server/xraylogs/${rows}`, {
+  // State is set only in promise callbacks, so the fetch effect starts the
+  // request without a synchronous setState.
+  const runRefresh = useCallback(
+    () =>
+      HttpUtil.post<XrayLogEntry[]>(`/panel/api/server/xraylogs/${rows}`, {
         filter,
         showDirect,
         showBlocked,
         showProxy,
-      });
-      if (msg?.success) setLogs(msg.obj || []);
-      await PromiseUtil.sleep(300);
-    } finally {
-      setLoading(false);
-    }
-  }, [rows, filter, showDirect, showBlocked, showProxy]);
+      })
+        .then((msg) => {
+          if (msg?.success) setLogs(msg.obj || []);
+          return PromiseUtil.sleep(300);
+        })
+        .finally(() => setLoading(false)),
+    [rows, filter, showDirect, showBlocked, showProxy],
+  );
 
   const refresh = useCallback(() => {
     setLoading(true);

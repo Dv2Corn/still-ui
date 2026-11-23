@@ -329,6 +329,8 @@ const (
 	cadenceHealthAlerts = "@every 1m"
 	// Connection log: read the access log's new lines, prune once a minute inside the step.
 	cadenceConnLog = "@every 5s"
+	// Admin audit log: delete entries past the retention setting.
+	cadenceAuditPrune = "@hourly"
 )
 
 // startTask schedules background jobs (Xray checks, traffic jobs, cron
@@ -449,6 +451,10 @@ func (s *Server) startTask(restartXray, forceXrayRestart bool, loc *time.Locatio
 	// Connection log (still-ui): the step reads the setting itself, so on/off needs no restart.
 	connLog := service.ConnLogService{}
 	_, _ = s.cron.AddFunc(cadenceConnLog, connLog.Tick)
+
+	// Admin audit log (still-ui): the prune reads the retention setting on every run.
+	auditLog := service.AuditService{}
+	_, _ = s.cron.AddFunc(cadenceAuditPrune, auditLog.PruneJob)
 
 	// Scheduled local backups (still-ui): snapshot, encrypt, rotate, optionally send to Telegram.
 	if on, _ := s.settingService.GetBackupEnable(); on {
@@ -669,7 +675,7 @@ func (s *Server) start(restartXray bool, startTgBot bool) (err error) {
 	if err != nil {
 		return err
 	}
-	listener = network.NewLimitListener(listener, network.MaxPanelConns, network.MaxPanelConnsPerSource)
+	listener = network.NewLimitListener(listener, network.MaxConns, network.MaxConnsPerSource, nil)
 	certreload.Register("panel", nil)
 	if certFile != "" || keyFile != "" {
 		pair, err := certreload.Load(certFile, keyFile)
@@ -741,6 +747,10 @@ func (s *Server) start(restartXray bool, startTgBot bool) (err error) {
 	s.discordService = discord.NewDiscordService(s.settingService)
 	discordSub := discord.NewSubscriber(s.settingService, s.discordService)
 	s.bus.Subscribe("discord-notifier", discordSub.HandleEvent)
+
+	// Admin logins reach the audit log through the bus, like the notifiers.
+	auditLog := service.AuditService{}
+	s.bus.Subscribe("audit-log", auditLog.HandleEvent)
 
 	// Wire discord service to controller for test endpoint
 	controller.SetDiscordService(s.discordService)

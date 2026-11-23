@@ -40,19 +40,12 @@ export type AwgObfuscation = Pick<
 
 const randInt = (min: number, max: number) => min + Math.floor(Math.random() * (max - min + 1));
 
-// WireGuard's usual tunnel MTU on a 1500-byte host link.
-export const DEFAULT_MTU = 1420;
+// Client-config MTU when the inbound's MTU is blank; the server keeps 1420-S4.
+// Mirrors Go's ClientMTU.
+export const CLIENT_DEFAULT_MTU = 1280;
 
-/** Floor for the S4-adjusted default, so a large s4 cannot shrink the tunnel
- * below what clients reliably tolerate. */
-export const MIN_MTU = 1280;
-
-// s4 junk is prepended to every transport packet and never clamped to the MTU,
-// so a plain 1420 tunnel fragments once s4 passes 20. Mirrors Go's EffectiveMTU.
-export function effectiveMtu(configuredMtu: number | undefined, s4: number | undefined): number {
-  if (configuredMtu && configuredMtu > 0) return configuredMtu;
-  const junk = Math.max(s4 ?? 0, 0);
-  return Math.max(DEFAULT_MTU - junk, MIN_MTU);
+export function clientMtu(configuredMtu: number | undefined): number {
+  return configuredMtu && configuredMtu > 0 ? configuredMtu : CLIENT_DEFAULT_MTU;
 }
 
 /*

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -55,11 +56,21 @@ func createNodeInboundWithClient(t *testing.T, db *gorm.DB, nodeID int, tag stri
 func syncNode(t *testing.T, svc *InboundService, nodeID int, tag string, stats ...xray.ClientTraffic) {
 	t.Helper()
 	snap := &runtime.TrafficSnapshot{
-		Inbounds: []*model.Inbound{{Tag: tag, ClientStats: stats}},
+		Inbounds: []*model.Inbound{{Tag: tag, Settings: settingsListing(stats), ClientStats: stats}},
 	}
 	if _, err := svc.setRemoteTrafficLocked(nodeID, snap, false, false); err != nil {
 		t.Fatalf("setRemoteTrafficLocked node %d: %v", nodeID, err)
 	}
+}
+
+// settingsListing is the settings a real node reports with these stats: every client in them.
+func settingsListing(stats []xray.ClientTraffic) string {
+	clients := make([]map[string]any, 0, len(stats))
+	for _, cs := range stats {
+		clients = append(clients, map[string]any{"email": cs.Email, "enable": true})
+	}
+	settings, _ := json.Marshal(map[string]any{"clients": clients})
+	return string(settings)
 }
 
 // syncNodeWithSettings mirrors syncNode but carries a real settings JSON on
@@ -94,8 +105,8 @@ func assertUpDown(t *testing.T, ct xray.ClientTraffic, wantUp, wantDown int64, w
 
 func TestTwoNodesShareEmail_SumsCorrectly(t *testing.T) {
 	db := initTrafficTestDB(t)
-	createNodeInbound(t, db, 1, "n1-in", 41001)
-	createNodeInbound(t, db, 2, "n2-in", 41002)
+	createNodeInboundWithClient(t, db, 1, "n1-in", 41001, "shared")
+	createNodeInboundWithClient(t, db, 2, "n2-in", 41002, "shared")
 	svc := &InboundService{}
 
 	const email = "shared"
@@ -272,8 +283,8 @@ func TestNodeCounterReset_NoReAdd(t *testing.T) {
 
 func TestCentralReset_NoReAdd(t *testing.T) {
 	db := initTrafficTestDB(t)
-	createNodeInbound(t, db, 1, "n1-in", 41001)
-	createNodeInbound(t, db, 2, "n2-in", 41002)
+	createNodeInboundWithClient(t, db, 1, "n1-in", 41001, "reset")
+	createNodeInboundWithClient(t, db, 2, "n2-in", 41002, "reset")
 	svc := &InboundService{}
 
 	const email = "reset"
@@ -691,4 +702,21 @@ func TestNodeDelete_CleansNodeBaselines(t *testing.T) {
 	if eightCnt != 1 {
 		t.Errorf("node 8 baseline should survive, found %d", eightCnt)
 	}
+}
+
+// Settings that do not parse (or are missing) leave the node's client list unknown, so its
+// stats credit nothing: no email is known to be on that inbound (fail closed).
+func TestUnparsableNodeSettings_CreditNothing(t *testing.T) {
+	db := initTrafficTestDB(t)
+	createNodeInbound(t, db, 1, "n1-in", 41001)
+	svc := &InboundService{}
+
+	const email = "solo"
+	syncNode(t, svc, 1, "n1-in", xray.ClientTraffic{Email: email, Up: 500, Down: 600, Enable: true})
+	for _, bad := range []string{`{"clients":[{"email":`, "", `{"clients":"x"}`} {
+		syncNodeWithSettings(t, svc, 1, "n1-in", bad, xray.ClientTraffic{Email: email, Up: 9_000, Down: 9_000, Enable: true})
+		assertUpDown(t, readTraffic(t, db, email), 0, 0, "after a snapshot with settings "+strconv.Quote(bad))
+	}
+	syncNode(t, svc, 1, "n1-in", xray.ClientTraffic{Email: email, Up: 550, Down: 650, Enable: true})
+	assertUpDown(t, readTraffic(t, db, email), 50, 50, "a parsable snapshot counts from the last good baseline")
 }

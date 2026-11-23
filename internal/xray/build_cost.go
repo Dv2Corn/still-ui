@@ -1,6 +1,7 @@
 package xray
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -123,9 +124,16 @@ func walkStreams(stream *conf.StreamConfig, visit func(*conf.StreamConfig, *conf
 // CheckConfigCertFiles refuses a certificateFile or keyFile, at any depth and in any key
 // case, that is not a bounded regular file: the core reads it whole inside the panel.
 func CheckConfigCertFiles(raw []byte) error {
-	var decoded any
-	if len(raw) == 0 || json.Unmarshal(raw, &decoded) != nil {
+	if len(raw) == 0 {
 		return nil
+	}
+	// Numbers stay text: the core's structs take a 1e400 that a float64 refuses, and a
+	// config this check cannot read must not pass it.
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.UseNumber()
+	var decoded any
+	if err := decoder.Decode(&decoded); err != nil {
+		return common.NewErrorf("cannot read the config to check its certificate files: %v", err)
 	}
 	return checkCertFileKeys(decoded)
 }

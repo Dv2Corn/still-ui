@@ -12,25 +12,20 @@ import (
 // Standard TOTP clock-drift tolerance, see MHSanaei/3x-ui#6535.
 const SkewWindows = 1
 
-// NormalizeSecret turns a base32 key the way authenticator apps show it (lower
-// case, grouped by spaces, padded) into the bare upper-case form gotp decodes.
+// NormalizeSecret turns a base32 key as authenticator apps show it (lower case,
+// grouped by spaces, padded) into the bare upper-case form gotp decodes.
 func NormalizeSecret(secret string) string {
-	secret = strings.ToUpper(strings.Join(strings.Fields(secret), ""))
-	return strings.TrimRight(secret, "=")
+	return strings.TrimRight(strings.ToUpper(strings.Join(strings.Fields(secret), "")), "=")
 }
 
 // ValidSecret reports whether secret is a non-empty base32 key once normalized.
 func ValidSecret(secret string) bool {
-	secret = NormalizeSecret(secret)
-	if secret == "" {
-		return false
-	}
-	key, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(secret)
+	key, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(NormalizeSecret(secret))
 	return err == nil && len(key) > 0
 }
 
 // VerifyWithSkew accepts the code for the current step plus/minus SkewWindows.
-// A secret that is not base32 verifies nothing: gotp panics on it.
+// An empty or non-base32 secret verifies nothing (gotp panics on the latter).
 func VerifyWithSkew(secret, code string, now time.Time) bool {
 	if !ValidSecret(secret) {
 		return false

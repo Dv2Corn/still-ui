@@ -26,6 +26,9 @@ export const keys = {
   connlog: {
     list: (filter: unknown) => ['connlog', 'list', filter] as const,
   },
+  audit: {
+    list: (filter: unknown) => ['audit', 'list', filter] as const,
+  },
   subBalancers: {
     root: () => ['sub-balancers'] as const,
     list: () => ['sub-balancers', 'list'] as const,

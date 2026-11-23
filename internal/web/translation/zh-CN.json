@@ -112,7 +112,8 @@
     "localDirectShadowrocket": "Shadowrocket 规则文件",
     "localDirectShadowrocketHint": "在 Shadowrocket 的“配置”页添加该文件，并将全局路由设为“配置”。",
     "saveQr": "保存二维码",
-    "devices": "设备"
+    "devices": "设备",
+    "linksHidden": "This subscription has a device limit, so the configs are shown only in an app registered as one of its devices. Add the subscription link to your VPN app."
   },
   "menu": {
     "basedOn": "基于 MHSanaei 的 3x-ui · GPL-3.0",
@@ -135,7 +136,8 @@
     "unpinSidebar": "取消固定侧边栏",
     "subFormats": "Sub Formats",
     "probes": "探针",
-    "connections": "连接"
+    "connections": "连接",
+    "audit": "审计日志"
   },
   "pages": {
     "login": {
@@ -158,6 +160,11 @@
       "xrayStatus": "Xray",
       "stopXray": "停止",
       "restartXray": "重启",
+      "startXray": "启动",
+      "stopXrayDisabledHint": "Xray 未运行",
+      "stopXrayConfirmTitle": "停止 Xray?",
+      "stopXrayConfirmContent": "停止 Xray 将立即中断所有代理连接。确定要继续吗?",
+      "stopXrayConfirmOk": "停止 Xray",
       "xraySwitch": "版本",
       "xrayUpdates": "Xray 更新",
       "xraySwitchClickDesk": "请谨慎选择，因为较旧版本可能与当前配置不兼容",
@@ -1021,6 +1028,10 @@
       "importClients": "导入客户端",
       "import": "导入",
       "delOrphans": "删除未关联的客户端",
+      "rotationCheck": "检查订阅重新签发",
+      "rotationCheckRunning": "正在检查订阅重新签发…",
+      "rotationCheckPassed": "订阅重新签发正常",
+      "rotationCheckFailed": "订阅重新签发检查失败",
       "delOrphansConfirmTitle": "删除没有入站的客户端？",
       "delOrphansConfirmContent": "删除所有未关联到任何入站的客户端及其流量记录。该操作不可撤销。",
       "auth": "认证",
@@ -1260,7 +1271,7 @@
       "tlsPin": "固定证书（SHA-256）",
       "tlsSkip": "跳过校验",
       "tlsMtls": "双向 TLS（客户端证书）",
-      "mtlsFormHint": "此节点使用客户端证书对面板进行认证。请从“节点 mTLS”区域复制本面板的 CA 到该节点，设置其受信任的 CA，然后重启该节点。",
+      "mtlsFormHint": "此节点使用客户端证书对面板进行认证。请从“节点 mTLS”区域复制本面板的 CA 到该节点，设置其受信任的 CA，然后重启该节点。 从这里更新此节点的面板仍需要具有 node-admin 权限范围的 API 令牌。",
       "mtls": {
         "title": "节点 mTLS",
         "intro": "双向 TLS 在节点间调用的 API 令牌之上增加客户端证书认证。此为可选项：留空则仅使用令牌认证。",
@@ -1544,6 +1555,7 @@
         "applyTo": "应用于",
         "addNoise": "+ 噪声",
         "concurrency": "并发",
+        "concurrencyHint": "每个连接承载的流数量。xray-core 26.11.9 及更新版本会把 0 到 128 之间的值一律提高到 128；更早的核心按填写的数值使用（0 表示 8）。-1 关闭 TCP mux。",
         "xudpConcurrency": "xudp 并发",
         "xudpUdp443": "xudp UDP 443"
       },
@@ -1598,7 +1610,8 @@
         "apiTokenEmpty": "暂无令牌 — 创建一个用于认证机器人或远程面板。",
         "apiTokenDeleteWarning": "使用此令牌的任何调用方将立即无法认证。",
         "apiTokenCreatedTitle": "令牌已创建",
-        "apiTokenCreatedNotice": "请立即复制此令牌。出于安全考虑，它不会以可读形式存储，也不会再次显示。"
+        "apiTokenCreatedNotice": "请立即复制此令牌。出于安全考虑，它不会以可读形式存储，也不会再次显示。",
+        "audit": "审计日志"
       },
       "toasts": {
         "modifySettings": "参数已更改。",
@@ -1648,6 +1661,8 @@
       "eventNodeUp": "上线",
       "eventNodeTraffic": "流量上限",
       "eventNodeTrafficHint": "在节点页面为每个节点设置",
+      "eventNodeSilent": "失联",
+      "eventNodeSilentHint": "失联分钟数，0 = 关闭",
       "eventCPUHigh": "CPU 占用过高（%）",
       "requestFailed": "请求失败",
       "smtpEncryption": "加密",
@@ -1663,6 +1678,8 @@
       "smtpNoRecipients": "尚未配置收件人",
       "smtpFromNotConfigured": "未配置 SMTP 发件人地址",
       "eventLoginAttempt": "登录尝试",
+      "eventSubLeak": "订阅泄露",
+      "eventSubLeakHint": "个网络 / 小时数",
       "backupSettings": "备份",
       "backupEnable": "定时备份",
       "backupEnableDesc": "按计划在本服务器上保存数据库副本。",
@@ -2032,6 +2049,8 @@
       "subLocalDirectOff": "关闭",
       "subLocalDirectProxy": "始终走 VPN",
       "subLocalDirectProxyDesc": "Telegram、YouTube、Instagram、Facebook、WhatsApp、Discord、ChatGPT 和 Claude 即使看起来是本地地址也始终走 VPN。可在此添加其他域名或 IP 段，每行一个；它们在国家规则之前匹配。",
+      "subLocalDirectAwg": "同样用于 AmneziaWG 文件",
+      "subLocalDirectAwgDesc": "AmneziaWG 配置文件（下载、二维码、vpn:// 链接）同样让该国地址直连，DNS 仍可访问。这类文件较大（约 35 KB，约 2000 个前缀），可能无法放入二维码。服务器端不变，已导入的旧文件在重新导入前仍是全局隧道。",
       "subProbeOrder": "使用探针结果",
       "subProbeOrderDesc": "可达性探针报告不通的链接（连续 2 次失败）会移到订阅末尾或被隐藏，适用于所有格式：链接、JSON 和 Clash。用户始终至少保留一个链接；没有新的探针结果时不做任何改动。探针页面会显示每个端点的处理情况。",
       "subProbeOrderOff": "关闭（默认）",
@@ -2061,7 +2080,9 @@
       "connLogSourceDesc": "保存客户端来源地址的哪些信息。",
       "connLogSourceFull": "完整地址和端口",
       "connLogSourceMasked": "仅网段（IPv4 为 /24，IPv6 为 /48）",
-      "connLogPrivacyHint": "此日志包含个人数据：只保留需要的内容。它存放在面板数据库旁边，不在数据库内，也不在其备份中。更改只对新连接生效；已保存的记录保持原样，直到过期。"
+      "connLogPrivacyHint": "此日志包含个人数据：只保留需要的内容。它存放在面板数据库旁边，不在数据库内，也不在其备份中。更改只对新连接生效；已保存的记录保持原样，直到过期。",
+      "auditLogRetention": "审计条目保留天数",
+      "auditLogRetentionDesc": "更早的条目每小时删除一次；链仍可验证。"
     },
     "xray": {
       "importRules": "导入规则",
@@ -2464,7 +2485,7 @@
         "presetQuic": "类 QUIC 的 I1",
         "presetDns": "类 DNS 的 I1",
         "presetHint": "“重新生成”会把所有参数换成新的随机值，因此现有客户端必须重新导入配置。I1 按钮只修改签名包（设置 I1，清空 I2–I5）：每次握手前发送的数据包看起来像 QUIC 连接的开头或一次 DNS 查询。现有客户端继续可用，并在下次获取配置时得到新的数据包。",
-        "mtuMobileHint": "会写入面板生成的每个客户端配置。在会丢弃大包的移动网络上，1280 可能比默认值快好几倍。",
+        "mtuMobileHint": "留空：服务器保持 1420 减 S4，客户端配置写入 1280；在会丢弃大包的路径上（移动网络、PPPoE、其他隧道）可快好几倍。此处填写的值同时用于服务器和所有客户端配置。",
         "mtuMobile": "设为 {mtu}",
         "jc": "Jc（垃圾包数量）",
         "jmin": "Jmin（垃圾包最小大小）",
@@ -2634,7 +2655,20 @@
       "defaultOutboundDesc": "未匹配任何路由规则的流量走此出站（列表中的第一个出站）。",
       "routingScript": "路由脚本",
       "routingScriptDesc": "定义了 HandleRoute 的 .lua 文件路径，可为绝对路径或相对于 Xray bin 目录的路径。设置后由脚本选择所有路由，Xray 会忽略全部路由规则，包括面板的 api 规则：请把 api 入站路由到 api 出站，否则流量统计和客户端变更的实时生效都会停止。文件不存在或无效时 Xray 无法启动。",
-      "routingScriptActive": "已在“{section}”中设置路由脚本，因此 Xray 会忽略这些规则。"
+      "routingScriptActive": "已在“{section}”中设置路由脚本，因此 Xray 会忽略这些规则。",
+      "exitAddress": {
+        "menu": "独立出口 IP",
+        "title": "分离入口 IP 与出口 IP",
+        "intro": "客户端仍连接入站地址，而其流量通过本服务器的另一个 IPv4 地址离开服务器。将两者分开可避免网站看到的地址暴露客户端连接的地址。",
+        "exitIp": "出口 IPv4 地址",
+        "exitIpHint": "分配给本服务器的另一个 IPv4 地址。监听所有地址的入站无法检查，请确认客户端连接的是其他地址。",
+        "inbounds": "入站",
+        "inboundsRequired": "请至少选择一个入站",
+        "invalidIp": "请输入有效的 IPv4 地址",
+        "sameAsInbound": "客户端连接的就是此地址。请选择服务器的其他地址。",
+        "tagTaken": "该出口 IP 的出站已存在",
+        "added": "已添加出口出站和路由规则。保存后生效。"
+      }
     },
     "hosts": {
       "addHost": "添加主机",
@@ -2851,6 +2885,27 @@
       "newer": "较新",
       "older": "较旧",
       "ofClient": "此客户端的连接"
+    },
+    "audit": {
+      "title": "审计日志",
+      "intro": "每一次更改状态的管理操作和每一次登录都以 SHA-256 串联记录，因此被修改或删除的条目会被发现。从不保存请求正文和机密信息。此处的每次搜索和导出也会被记录。",
+      "time": "时间",
+      "actor": "用户或令牌",
+      "ip": "来源 IP",
+      "action": "操作",
+      "target": "对象",
+      "outcome": "结果",
+      "detail": "详情",
+      "actorPlaceholder": "用户或令牌（精确）",
+      "actionPlaceholder": "操作包含…",
+      "success": "成功",
+      "failure": "失败",
+      "exportCsv": "导出 CSV",
+      "exportHint": "导出最多包含当前筛选的 {count} 行，时间为 UTC。",
+      "empty": "没有匹配的条目。",
+      "verify": "验证链",
+      "verifyOk": "链完整：已检查 {count} 个条目。",
+      "verifyBroken": "链在条目 #{id} 处断裂：{reason}"
     }
   },
   "tgbot": {
@@ -2982,6 +3037,9 @@
       "alertNodeTrafficLimit": "节点 {{ .Name }} 已达到流量上限：{{ .Used }} / {{ .Limit }}。{{ .Reset }} 重置。",
       "alertNodeTrafficLimitOff": "节点 {{ .Name }} 已达到流量上限：{{ .Used }} / {{ .Limit }}。其入站已关闭至 {{ .Reset }}。",
       "alertNodeTrafficBack": "节点 {{ .Name }} 已回到流量上限以内：{{ .Used }} / {{ .Limit }}。",
+      "alertNodeSilent": "节点 {{ .Name }} ({{ .Address }}) 已 {{ .Minutes }} 分钟无响应。最后在线：{{ .LastSeen }}。",
+      "alertNodeSilentBack": "节点 {{ .Name }} ({{ .Address }}) 在失联 {{ .Minutes }} 分钟后恢复响应。",
+      "alertSubLeak": "{{ .Client }} 的订阅可能已泄露：{{ .Hours }} 小时内从 {{ .Count }} 个网络获取，首次 {{ .First }}，最近 {{ .Last }}。未做任何封禁。\n例如：{{ .Networks }}",
       "inboundsCount": "🔌 Inbounds: {{ .Count }}\r\n",
       "clientsCount": "👥 Clients: {{ .Count }}\r\n",
       "category_server": "🖥 服务器",

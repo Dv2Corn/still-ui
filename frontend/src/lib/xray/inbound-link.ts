@@ -1,5 +1,5 @@
 import { Base64, Wireguard } from '@/utils';
-import { effectiveMtu } from '@/lib/xray/amneziawg-obfuscation';
+import { clientMtu } from '@/lib/xray/amneziawg-obfuscation';
 import { AmneziaWGKeepAliveRangeSchema } from '@/schemas/primitives/keepalive';
 
 import type { Inbound } from '@/schemas/api/inbound';
@@ -1077,7 +1077,11 @@ export interface GenAmneziaWGLinkInput {
   port: number;
   remark?: string;
   peerIndex: number;
+  // Backend-computed "local sites direct" list (InboundOption.awgAllowedIPs); the browser has no geoip.dat.
+  allowedIPs?: string;
 }
+
+const FULL_TUNNEL_ALLOWED_IPS = '0.0.0.0/0, ::/0';
 
 function amneziaWGHLine(key: string, value: string | undefined, fallback: string): string {
   return `${key} = ${value && value.trim() !== '' ? value : fallback}`;
@@ -1112,7 +1116,7 @@ export function genAmneziaWGLink(input: GenAmneziaWGLinkInput): string {
 // share with the server (see internal/amneziawg.writeObfuscation on the Go
 // side).
 export function genAmneziaWGConfig(input: GenAmneziaWGLinkInput): string {
-  const { settings, address, port, remark = '', peerIndex } = input;
+  const { settings, address, port, remark = '', peerIndex, allowedIPs } = input;
   const client = settings.clients[peerIndex];
   if (!client) return '';
   const server = settings.server;
@@ -1124,7 +1128,7 @@ export function genAmneziaWGConfig(input: GenAmneziaWGLinkInput): string {
   ];
   const dns = [server.primaryDns, server.secondaryDns].filter((v) => !!v && v.trim() !== '');
   if (dns.length > 0) lines.push(`DNS = ${dns.join(', ')}`);
-  lines.push(`MTU = ${effectiveMtu(server.mtu, server.s4)}`);
+  lines.push(`MTU = ${clientMtu(server.mtu)}`);
   lines.push(`Jc = ${server.jc}`, `Jmin = ${server.jmin}`, `Jmax = ${server.jmax}`);
   lines.push(`S1 = ${server.s1}`, `S2 = ${server.s2}`);
   if (server.s3) lines.push(`S3 = ${server.s3}`);
@@ -1157,7 +1161,10 @@ export function genAmneziaWGConfig(input: GenAmneziaWGLinkInput): string {
   if (client.preSharedKey && client.preSharedKey.length > 0) {
     lines.push(`PresharedKey = ${client.preSharedKey}`);
   }
-  lines.push('AllowedIPs = 0.0.0.0/0, ::/0', `Endpoint = ${address}:${port}`);
+  lines.push(
+    `AllowedIPs = ${allowedIPs || FULL_TUNNEL_ALLOWED_IPS}`,
+    `Endpoint = ${address}:${port}`,
+  );
   if (typeof client.keepAlive === 'string') {
     if (!AmneziaWGKeepAliveRangeSchema.safeParse(client.keepAlive).success) return '';
     lines.push(`PersistentKeepalive = ${client.keepAlive}`);
@@ -1172,13 +1179,14 @@ export interface GenAmneziaWGFanoutInput {
   remark?: string;
   hostOverride?: string;
   fallbackHostname: string;
+  amneziaWGAllowedIPs?: string;
 }
 
 function amneziaWGFanout(
   input: GenAmneziaWGFanoutInput,
   render: (input: GenAmneziaWGLinkInput) => string,
 ): string[][] {
-  const { inbound, remark = '', hostOverride = '', fallbackHostname } = input;
+  const { inbound, remark = '', hostOverride = '', fallbackHostname, amneziaWGAllowedIPs } = input;
   if (inbound.protocol !== 'amneziawg') return [];
   const endpoints = tunnelEndpoints(inbound, resolveAddr(inbound, hostOverride, fallbackHostname));
   const settings = inbound.settings as AmneziawgInboundSettings;
@@ -1191,6 +1199,7 @@ function amneziaWGFanout(
         port: e.port,
         remark: tunnelPeerRemark(remark, e.remark, i, c),
         peerIndex: i,
+        allowedIPs: amneziaWGAllowedIPs,
       }),
     ),
   );
@@ -1620,6 +1629,7 @@ export interface GenInboundLinksInput {
   remark?: string;
   hostOverride?: string;
   fallbackHostname: string;
+  amneziaWGAllowedIPs?: string;
 }
 
 // Top-level entrypoint that produces the full \r\n-joined block a user
@@ -1653,7 +1663,14 @@ export function genInboundLinks(input: GenInboundLinksInput): string {
     return genWireguardConfigs({ inbound, remark, hostOverride, fallbackHostname });
   }
   if (inbound.protocol === 'amneziawg') {
-    return genAmneziaWGConfigs({ inbound, remark, hostOverride, fallbackHostname });
+    const { amneziaWGAllowedIPs } = input;
+    return genAmneziaWGConfigs({
+      inbound,
+      remark,
+      hostOverride,
+      fallbackHostname,
+      amneziaWGAllowedIPs,
+    });
   }
   return '';
 }

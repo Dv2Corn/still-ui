@@ -43,14 +43,17 @@ export default function VersionModal({ open, status, onClose, onBusy }: VersionM
   const [selected, setSelected] = useState<string | null>(null);
   const [understood, setUnderstood] = useState(false);
 
-  const fetchVersions = useCallback(async () => {
-    try {
-      const msg = await HttpUtil.get<string[]>('/panel/api/server/getXrayVersion');
-      if (msg?.success) setVersions(msg.obj || []);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // State is set only in promise callbacks, so the open effect starts the
+  // request without a synchronous setState.
+  const fetchVersions = useCallback(
+    () =>
+      HttpUtil.get<string[]>('/panel/api/server/getXrayVersion')
+        .then((msg) => {
+          if (msg?.success) setVersions(msg.obj || []);
+        })
+        .finally(() => setLoading(false)),
+    [],
+  );
 
   const [wasOpen, setWasOpen] = useState(false);
   if (open !== wasOpen) {

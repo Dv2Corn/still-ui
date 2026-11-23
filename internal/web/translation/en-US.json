@@ -112,7 +112,8 @@
     "localDirectShadowrocket": "Shadowrocket rules file",
     "localDirectShadowrocketHint": "In Shadowrocket add the file on the Config tab and set Global Routing to Config.",
     "saveQr": "Save QR",
-    "devices": "Devices"
+    "devices": "Devices",
+    "linksHidden": "This subscription has a device limit, so the configs are shown only in an app registered as one of its devices. Add the subscription link to your VPN app."
   },
   "menu": {
     "basedOn": "Based on 3x-ui by MHSanaei · GPL-3.0",
@@ -135,7 +136,8 @@
     "unpinSidebar": "Unpin sidebar",
     "subFormats": "Sub Formats",
     "probes": "Probes",
-    "connections": "Connections"
+    "connections": "Connections",
+    "audit": "Audit log"
   },
   "pages": {
     "login": {
@@ -158,6 +160,11 @@
       "xrayStatus": "Xray",
       "stopXray": "Stop",
       "restartXray": "Restart",
+      "startXray": "Start",
+      "stopXrayDisabledHint": "Xray is not running",
+      "stopXrayConfirmTitle": "Stop Xray?",
+      "stopXrayConfirmContent": "Stopping Xray will immediately interrupt all proxy connections. Are you sure you want to continue?",
+      "stopXrayConfirmOk": "Stop Xray",
       "xraySwitch": "Version",
       "xrayUpdates": "Xray Updates",
       "xraySwitchClickDesk": "Choose carefully, as older versions may not be compatible with current configurations.",
@@ -1021,6 +1028,10 @@
       "importClients": "Import clients",
       "import": "Import",
       "delOrphans": "Delete unattached clients",
+      "rotationCheck": "Check subscription re-issue",
+      "rotationCheckRunning": "Checking subscription re-issue…",
+      "rotationCheckPassed": "Subscription re-issue works",
+      "rotationCheckFailed": "Subscription re-issue check failed",
       "delOrphansConfirmTitle": "Delete clients without an inbound?",
       "delOrphansConfirmContent": "Removes every client that is not attached to any inbound, along with its traffic record. This cannot be undone.",
       "auth": "Auth",
@@ -1381,7 +1392,7 @@
       "tlsPin": "Pin certificate (SHA-256)",
       "tlsSkip": "Skip verification",
       "tlsMtls": "Mutual TLS (client certificate)",
-      "mtlsFormHint": "This node authenticates the panel with a client certificate. Copy this panel's CA from the Node mTLS section onto the node, set its Trusted parent CA, then restart it.",
+      "mtlsFormHint": "This node authenticates the panel with a client certificate. Copy this panel's CA from the Node mTLS section onto the node, set its Trusted parent CA, then restart it. Updating this node's panel from here still needs an API token with the node-admin scope.",
       "mtls": {
         "title": "Node mTLS",
         "intro": "Mutual TLS adds a client-certificate factor on top of the API token for node-to-node calls. It is opt-in: leave it empty to keep token-only auth.",
@@ -1669,6 +1680,7 @@
         "applyTo": "Apply to",
         "addNoise": "+ Noise",
         "concurrency": "Concurrency",
+        "concurrencyHint": "Streams per connection. xray-core 26.11.9 and newer raise any value from 0 to 128 to 128; older cores use the number as written (0 means 8). -1 turns TCP mux off.",
         "xudpConcurrency": "xudp concurrency",
         "xudpUdp443": "xudp UDP 443"
       },
@@ -1723,7 +1735,8 @@
         "apiTokenEmpty": "No tokens yet — create one to authenticate bots or remote panels.",
         "apiTokenDeleteWarning": "Any caller using this token will stop authenticating immediately.",
         "apiTokenCreatedTitle": "Token created",
-        "apiTokenCreatedNotice": "Copy this token now. For security it is not stored in readable form and will not be shown again."
+        "apiTokenCreatedNotice": "Copy this token now. For security it is not stored in readable form and will not be shown again.",
+        "audit": "Audit log"
       },
       "toasts": {
         "modifySettings": "The parameters have been changed.",
@@ -1773,6 +1786,8 @@
       "eventNodeUp": "Up",
       "eventNodeTraffic": "Traffic limit",
       "eventNodeTrafficHint": "set per node on the Nodes page",
+      "eventNodeSilent": "Silent",
+      "eventNodeSilentHint": "minutes without contact, 0 = off",
       "eventCPUHigh": "CPU high (%)",
       "requestFailed": "Request failed",
       "smtpEncryption": "Encryption",
@@ -1788,6 +1803,8 @@
       "smtpNoRecipients": "No recipients configured",
       "smtpFromNotConfigured": "SMTP sender address not configured",
       "eventLoginAttempt": "Login attempt",
+      "eventSubLeak": "Subscription leak",
+      "eventSubLeakHint": "networks in hours",
       "backupSettings": "Backups",
       "backupEnable": "Scheduled backups",
       "backupEnableDesc": "Save a copy of the database on this server on a schedule.",
@@ -2153,6 +2170,8 @@
       "subLocalDirectOff": "Off",
       "subLocalDirectProxy": "Always through the VPN",
       "subLocalDirectProxyDesc": "Telegram, YouTube, Instagram, Facebook, WhatsApp, Discord, ChatGPT and Claude always go through the VPN, even where they look local. Add more domains or IP ranges here, one per line; they are checked before the country rule.",
+      "subLocalDirectAwg": "AmneziaWG files too",
+      "subLocalDirectAwgDesc": "AmneziaWG config files (download, QR, vpn:// links) also skip the country's addresses, and their DNS stays reachable. Such a file is large (~35 KB, ~2000 prefixes) and may not fit in a QR code. The server side is unchanged, so files imported earlier keep working as a full tunnel until re-imported.",
       "subProbeOrder": "Use probe results",
       "subProbeOrderDesc": "Links that the reachability probes report down (2 failed checks in a row) move to the end of the subscription or are hidden, in every format: links, JSON and Clash. A user always keeps at least one link, and without fresh probe results nothing changes. The Probes page shows what happens to each endpoint.",
       "subProbeOrderOff": "Off (default)",
@@ -2182,7 +2201,9 @@
       "connLogSourceDesc": "What is stored about the address a client connected from.",
       "connLogSourceFull": "Full address and port",
       "connLogSourceMasked": "Network only (/24 for IPv4, /48 for IPv6)",
-      "connLogPrivacyHint": "This log holds personal data: keep only what you need. It is stored beside the panel database, not in it and not in its backups. A change applies to new connections; what is already stored stays as it is until it expires."
+      "connLogPrivacyHint": "This log holds personal data: keep only what you need. It is stored beside the panel database, not in it and not in its backups. A change applies to new connections; what is already stored stays as it is until it expires.",
+      "auditLogRetention": "Keep audit entries (days)",
+      "auditLogRetentionDesc": "Older entries are deleted every hour; the chain stays verifiable."
     },
     "xray": {
       "save": "Save",
@@ -2585,7 +2606,7 @@
         "presetQuic": "QUIC-like I1",
         "presetDns": "DNS-like I1",
         "presetHint": "Regenerate replaces every parameter with new random values, so existing clients must import their config again. The I1 buttons change only the signature packets (I1 is set, I2–I5 are cleared): the packet sent before each handshake then looks like the start of a QUIC connection or like a DNS query. Existing clients keep working and get the new packet with their next config.",
-        "mtuMobileHint": "Goes into every client config the panel generates. On mobile networks that drop large packets, 1280 can be several times faster than the default.",
+        "mtuMobileHint": "Blank: the server keeps 1420 minus S4 and client configs get 1280, which is several times faster on paths that drop large packets (mobile, PPPoE, other tunnels). A value set here goes to the server and to every client config.",
         "mtuMobile": "Set {mtu}",
         "jc": "Jc (junk packet count)",
         "jmin": "Jmin (junk packet min size)",
@@ -2755,7 +2776,20 @@
       "defaultOutboundDesc": "Traffic that does not match any routing rule uses this outbound (Xray uses the first outbound in the list).",
       "routingScript": "Routing Script",
       "routingScriptDesc": "Path to a .lua file defining HandleRoute, absolute or relative to the Xray bin folder. The script then picks every route and Xray ignores all routing rules, the panel's api rule included: send the api inbound to the api outbound or traffic stats and live client changes stop. Xray will not start if the file is missing or invalid.",
-      "routingScriptActive": "A routing script is set under {section}, so Xray ignores these rules."
+      "routingScriptActive": "A routing script is set under {section}, so Xray ignores these rules.",
+      "exitAddress": {
+        "menu": "Separate exit IP",
+        "title": "Separate entry and exit IP",
+        "intro": "Clients keep connecting to the inbound address, while their traffic leaves the server from another IPv4 address of this server. Keeping the two apart stops the address that websites see from pointing at the address clients connect to.",
+        "exitIp": "Exit IPv4 address",
+        "exitIpHint": "Another IPv4 address assigned to this server. Inbounds that listen on all addresses cannot be checked, so make sure clients connect to a different address.",
+        "inbounds": "Inbounds",
+        "inboundsRequired": "Select at least one inbound",
+        "invalidIp": "Enter a valid IPv4 address",
+        "sameAsInbound": "Clients connect to this address. Pick a different address of the server.",
+        "tagTaken": "An outbound for this exit IP already exists",
+        "added": "Exit outbound and routing rule added. Save to apply."
+      }
     },
     "probes": {
       "title": "Reachability probes",
@@ -2851,6 +2885,27 @@
       "newer": "Newer",
       "older": "Older",
       "ofClient": "This client's connections"
+    },
+    "audit": {
+      "title": "Audit log",
+      "intro": "Every state-changing admin action and login, chained by SHA-256 so that an edited or deleted entry is detected. Request bodies and secrets are never stored. Each search and export here is recorded too.",
+      "time": "Time",
+      "actor": "User or token",
+      "ip": "Source IP",
+      "action": "Action",
+      "target": "Target",
+      "outcome": "Outcome",
+      "detail": "Detail",
+      "actorPlaceholder": "User or token (exact)",
+      "actionPlaceholder": "Action contains…",
+      "success": "Success",
+      "failure": "Failure",
+      "exportCsv": "Export CSV",
+      "exportHint": "The export holds up to {count} rows of the current filter, with times in UTC.",
+      "empty": "No entries match.",
+      "verify": "Verify chain",
+      "verifyOk": "The chain is intact: {count} entries checked.",
+      "verifyBroken": "The chain is broken at entry #{id}: {reason}"
     }
   },
   "tgbot": {
@@ -2982,6 +3037,9 @@
       "alertNodeTrafficLimit": "Node {{ .Name }} reached its traffic limit: {{ .Used }} of {{ .Limit }}. Resets on {{ .Reset }}.",
       "alertNodeTrafficLimitOff": "Node {{ .Name }} reached its traffic limit: {{ .Used }} of {{ .Limit }}. Its inbounds are off until {{ .Reset }}.",
       "alertNodeTrafficBack": "Node {{ .Name }} is under its traffic limit again: {{ .Used }} of {{ .Limit }}.",
+      "alertNodeSilent": "Node {{ .Name }} ({{ .Address }}) has not answered for {{ .Minutes }} min. Last seen: {{ .LastSeen }}.",
+      "alertNodeSilentBack": "Node {{ .Name }} ({{ .Address }}) is answering again after {{ .Minutes }} min of silence.",
+      "alertSubLeak": "Subscription of {{ .Client }} may have leaked: fetched from {{ .Count }} networks in {{ .Hours }} h, first at {{ .First }}, last at {{ .Last }}. Nothing was blocked.\nFor example: {{ .Networks }}",
       "inboundsCount": "🔌 Inbounds: {{ .Count }}\r\n",
       "clientsCount": "👥 Clients: {{ .Count }}\r\n",
       "category_server": "🖥 Server",

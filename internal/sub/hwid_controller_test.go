@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -93,6 +94,58 @@ func TestSubscriptionHwidGateSkipsHtmlInfoPage(t *testing.T) {
 	}
 	if rec.Header().Get("X-Hwid-Not-Supported") != "" {
 		t.Fatalf("HTML sub page should not be HWID-gated: %#v", rec.Header())
+	}
+}
+
+// The page's share links are the credentials the gate guards on the body routes: only a
+// device that already holds a slot sees them, and viewing the page registers no device.
+func TestSubPageCarriesLinksOnlyForRegisteredDevice(t *testing.T) {
+	router, subID := initHwidSubRouter(t, 2)
+	assertServesRealServers(t, "/sub/"+subID, requestSub(t, router, http.MethodGet, "/sub/"+subID, "device-one", ""))
+
+	pages := []struct{ path, accept string }{
+		{"/sub/" + subID + "?html=1", ""},
+		{"/sub/" + subID, "text/html"},
+		{"/json/" + subID + "?view=html", ""},
+		{"/clash/" + subID + "?html=1", ""},
+	}
+	for _, page := range pages {
+		for _, hwid := range []string{"device-one", "device-two", ""} {
+			rec := requestSub(t, router, http.MethodGet, page.path, hwid, page.accept)
+			if rec.Code != http.StatusOK || !strings.HasPrefix(rec.Header().Get("Content-Type"), "text/html") {
+				t.Fatalf("%s (accept %q) for %q = %d %q, want the HTML page", page.path, page.accept, hwid, rec.Code, rec.Header().Get("Content-Type"))
+			}
+			if got, want := strings.Contains(rec.Body.String(), hwidTestClientUUID), hwid == "device-one"; got != want {
+				t.Fatalf("%s (accept %q) for %q carries the client's credentials = %v, want %v", page.path, page.accept, hwid, got, want)
+			}
+		}
+	}
+	assertHwidStatus(t, requestSub(t, router, http.MethodGet, "/sub/"+subID+"/hwid-status", "", ""), true, 2, 1, 1, false)
+}
+
+// A page left without links must say so: a browser never holds a device slot, and an empty
+// page with no reason reads as a broken subscription.
+func TestSubPageSaysWhenTheDeviceLimitHidesItsLinks(t *testing.T) {
+	router, subID := initHwidSubRouter(t, 2)
+	assertServesRealServers(t, "/sub/"+subID, requestSub(t, router, http.MethodGet, "/sub/"+subID, "device-one", ""))
+	for hwid, hidden := range map[string]bool{"device-one": false, "device-two": true, "": true} {
+		body := requestSub(t, router, http.MethodGet, "/sub/"+subID+"?html=1", hwid, "").Body.String()
+		if got := strings.Contains(body, "linksHidden"); got != hidden {
+			t.Fatalf("page for %q says its links are hidden = %v, want %v", hwid, got, hidden)
+		}
+	}
+}
+
+// A failed device lookup is not the device limit: the page answers with an error, not with
+// the notice that the limit hides its links.
+func TestSubPageDoesNotBlameTheDeviceLimitForADatabaseError(t *testing.T) {
+	router, subID := initHwidSubRouter(t, 2)
+	if err := database.GetDB().Exec("ALTER TABLE client_hwids RENAME TO client_hwids_gone").Error; err != nil {
+		t.Fatal(err)
+	}
+	rec := requestSub(t, router, http.MethodGet, "/sub/"+subID+"?html=1", "device-one", "")
+	if rec.Code != http.StatusInternalServerError || strings.Contains(rec.Body.String(), "linksHidden") || strings.Contains(rec.Body.String(), hwidTestClientUUID) {
+		t.Fatalf("page on a failed device lookup = %d %q, want a bare 500", rec.Code, rec.Body.String())
 	}
 }
 

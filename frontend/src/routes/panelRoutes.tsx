@@ -2,6 +2,7 @@ import { lazy } from 'react';
 import type { ComponentType } from 'react';
 import {
   ApiOutlined,
+  AuditOutlined,
   ClusterOutlined,
   DashboardOutlined,
   ExportOutlined,
@@ -24,6 +25,7 @@ const NodesPage = lazy(() => import('@/pages/nodes/NodesPage'));
 const HostsPage = lazy(() => import('@/pages/hosts/HostsPage'));
 const ProbesPage = lazy(() => import('@/pages/probes/ProbesPage'));
 const ConnectionsPage = lazy(() => import('@/pages/connections/ConnectionsPage'));
+const AuditLogPage = lazy(() => import('@/pages/audit/AuditLogPage'));
 const SettingsPage = lazy(() => import('@/pages/settings/SettingsPage'));
 const XrayPage = lazy(() => import('@/pages/xray/XrayPage'));
 const ApiDocsPage = lazy(() => import('@/pages/api-docs/ApiDocsPage'));
@@ -51,6 +53,7 @@ export const PANEL_ROUTES: PanelRoute[] = [
     icon: HistoryOutlined,
     component: ConnectionsPage,
   },
+  { path: '/audit', titleKey: 'menu.audit', icon: AuditOutlined, component: AuditLogPage },
   { path: '/outbound', titleKey: 'menu.outbounds', icon: ExportOutlined, component: XrayPage },
   { path: '/routing', titleKey: 'menu.routing', icon: SwapOutlined, component: XrayPage },
   { path: '/settings', titleKey: 'menu.settings', icon: SettingOutlined, component: SettingsPage },

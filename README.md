@@ -60,6 +60,7 @@ still-ui migrate-rollback
 - **A monthly traffic limit for each node.** The master counts the traffic of a node's own inbounds per month (from the reset day you pick), sends a Telegram alert at 80% (adjustable) and at the limit, and can turn the node's inbounds off until the next period. An accounting multiplier from 0.1 to 100 scales that node's traffic in client totals, from the moment it is set (earlier traffic keeps its old rate). The node checks each client's quota by its own master's count, so masters with different multipliers can share a node. No limit by default.
 - **Adding a node takes one command.** **Nodes → Add with a command** makes a one-time invitation (valid 30 minutes by default, can be revoked); running the command it shows as root on a new server installs still-ui from the release, sets it up as a node and adds it to the master. No API tokens or certificate pins to copy by hand; the node checks the master's key before it changes anything. [Guide](docs/content/docs/en/operations/multi-node.mdx).
 - **The device limit tells the person what happened, has a panel default and forgets old devices.** 3x-ui v3.11.0 can cap the devices of a subscription (a client's **HWID Limit**; unlike **IP limit** it needs no Fail2ban and does not trip when a phone moves between Wi-Fi and mobile data), but a device over the limit gets a bare 404, an app that sends no device ID is always refused, there is no panel-wide default and a device holds its slot until an admin removes it. In still-ui a new device over the limit gets a valid answer for its app whose only server is a notice — "Device limit 3 reached. Remove a device in your account or ask the seller." (the text is yours; Happ also shows it as the announcement) — and never an error; devices registered before keep getting the servers. **Settings → Subscription → Device limit** adds one default limit for every client without its own (off until you set it; a subscription that already has more devices keeps the most recently seen ones), a choice for apps that send no device ID — all of them share one slot of the subscription (the default on a new panel), they are refused with a notice, or they are served and not counted (what an upgraded panel without limits keeps; with it the limit can be bypassed by an app that leaves the ID out, and the panel warns about that) — and expiry: a device that has not fetched the subscription for 30 days (adjustable; off on an upgraded panel until you set it) frees its slot. The subscription page shows the person "2 / 3" devices and nothing about them; the admin sees and removes devices in the client's card, the API lists and deletes them (`/panel/api/clients/hwids/:email`). The panel stores a hash of the device ID, never the ID. The limit is on fetching the subscription: servers already imported into an app keep working, and links copied by hand are not counted.
+- **An alert when a subscription looks leaked.** A subscription that was resold, shared around or bought by a censor gets fetched from many networks, and every address in it can end up blocked. The panel counts the networks each subscription is fetched from (an IPv4 /24 or an IPv6 /48; the subscription page and a device refused by the limit count too) and sends one Telegram message when one subscription reaches 6 networks within 24 hours (both adjustable): which client, how many networks, first and last fetch, a few of the networks. The next message for that subscription comes after 7 days, or sooner if the count doubles. Nothing is blocked. Behind a reverse proxy the client address is taken from `X-Forwarded-For`/`X-Real-IP` only when the proxy is in **Trusted proxy CIDRs**, as for the panel login. The counts live in memory, so a panel restart starts them afresh. **Settings → Telegram → Telegram Event Notifications → Security → Subscription leak**: on for new installs (the bot itself stays off until you set it up), off on an upgraded panel.
 - **Moving from Marzban or an old x-ui takes one command.** `still-ui import marzban /var/lib/marzban` brings inbounds, users and hosts over with the same UUIDs and passwords, the same REALITY key and short IDs, ports, traffic used, limits, expiry dates and states, so the links users already have keep connecting, and the subscription links Marzban issued keep working. `-dry-run` shows what would be imported and what cannot be; a real import takes a backup first and writes all or nothing. The same is in **Settings → Import**. See [Moving from Marzban or x-ui](#moving-from-marzban-or-x-ui).
 - **Panel memory over several days: checked.** 72 hours under mixed load (200 users; a client change every 5 s; UI and API calls; subscriptions; VLESS, VMess and AmneziaWG traffic), still-ui v1.6.0 next to 3x-ui v3.11.0 with the same data and the same load: no growth in either (+0.1 MB/h over the last 24 h, goroutines and file descriptors flat, no restarts). Many *slow* AmneziaWG clients can still hold kernel socket buffers (about 12 MB per slow stream) that count against the panel; the memory cap the installer sets for the service keeps that in check (with Docker, set `mem_limit`).
 - **A connection log in the panel.** The **Connections** page shows who connected, when, through which inbound and where to, with filters by client, inbound, time, destination and source address, and a CSV export; the icon in a client's row opens that client's connections. An abuse complaint ("who reached this host at that time") is answered without shell access. Off by default. You choose how long it is kept (30 days by default), a size limit, and what is stored: the full destination, only its registered domain or nothing; the client's full address, only its network or nothing. Old days delete themselves. [How it works](#connection-log).
@@ -106,7 +107,7 @@ STILL_UI_ARCHIVE=/path/still-ui-linux-amd64.tar.gz bash install.sh
 
 The installer generates a random username, password and panel path and prints them at the end — save them. After that, run `still-ui` to open the management menu: start and stop the service, show or reset the login, change the port, manage certificates and so on. The subcommands are the same as in 3x-ui's `x-ui` script (`still-ui start`, `stop`, `restart`, `status`, `log`, `update`, `legacy`, `uninstall` and others).
 
-Release builds exist for **Linux amd64 and arm64** only. The current release is still-ui **1.7.1**, based on 3x-ui 3.11.0 and the fixes merged after it, with **Xray v26.10.31** in still-ui's own build ([what differs](scripts/xray-build/README.md)).
+Release builds exist for **Linux amd64 and arm64** only. The current release is still-ui **1.10.0**, based on 3x-ui 3.11.0 and the fixes merged after it, with **Xray v26.10.31** in still-ui's own build ([what differs](scripts/xray-build/README.md)).
 
 ### Where things live
 
@@ -269,6 +270,8 @@ Refused TCP connections are closed at once instead of hanging. Every generated X
 
 With nodes, choose **All nodes** or **Selected nodes**: the panel hands the filter to those nodes and keeps retrying the ones that are offline; nodes taken out of the list keep their last filter as their own. A node shows that its filter was set by the central panel; saving it on the node makes it the node's own until the central panel sends it again.
 
+**Separate exit IP.** Use it on a server with two or more public IPv4 addresses. Normally traffic leaves from the same address clients connect to, so the address websites see leads straight to your entry point; on our own servers the entry address was blocked about a day after it also became the exit address. **Xray Configs → Outbounds → More → Separate exit IP** asks for another IPv4 address of the server and the inbounds to apply it to, then adds a `freedom` outbound with `sendThrough` set to that address and a routing rule at the end of the list that sends those inbounds to it. It refuses an address that a selected inbound listens on or advertises as its custom share address, but it cannot check inbounds that listen on all addresses, and the address must really be assigned to the server or the traffic will not leave. Traffic that earlier rules send elsewhere (WARP, a blackhole) is not affected; press **Save** to apply.
+
 ## Verify a release
 
 Release archives are built by GitHub Actions from the tagged commit ([release workflow](.github/workflows/release.yml)), not on a developer's machine, and every archive comes with a signed [build provenance attestation](https://docs.github.com/actions/security-for-github-actions/using-artifact-attestations). Releases up to and including 1.4.0 were built by hand with `scripts/still-release.sh` and have only the `.sha256` files.
@@ -282,10 +285,10 @@ Release archives are built by GitHub Actions from the tagged commit ([release wo
 | `install.sh`, `update.sh`, `x-ui.sh`, `migrate.sh` | the installer, the updater, the `still-ui` menu and the 3x-ui migration of this release (the same files are inside the archive); the panel's update button and `still-ui update` run `update.sh` only when its sum is in `SHA256SUMS` |
 | `SHA256SUMS` | checksums of the archives, SBOMs, probe archives and scripts |
 
-Download and check the checksums (replace `v1.7.1` with the release you install):
+Download and check the checksums (replace `v1.10.0` with the release you install):
 
 ```bash
-gh release download v1.7.1 -R Dv2Corn/still-ui -p 'still-ui-linux-amd64.tar.gz*' -p SHA256SUMS
+gh release download v1.10.0 -R Dv2Corn/still-ui -p 'still-ui-linux-amd64.tar.gz*' -p SHA256SUMS
 sha256sum -c SHA256SUMS --ignore-missing
 ```
 
@@ -293,7 +296,7 @@ Check that the archive was built by this repository's release workflow from that
 
 ```bash
 gh attestation verify still-ui-linux-amd64.tar.gz -R Dv2Corn/still-ui \
-  --signer-workflow Dv2Corn/still-ui/.github/workflows/release.yml --source-ref refs/tags/v1.7.1
+  --signer-workflow Dv2Corn/still-ui/.github/workflows/release.yml --source-ref refs/tags/v1.10.0
 ```
 
 The SBOM is attested too:
@@ -307,7 +310,7 @@ The Xray core inside the archive can be rebuilt bit for bit. On a Linux host wit
 ```bash
 tar -xzf still-ui-linux-amd64.tar.gz still-ui/bin/xray-linux-amd64
 sha256sum still-ui/bin/xray-linux-amd64
-git clone https://github.com/Dv2Corn/still-ui && cd still-ui && git checkout v1.7.1
+git clone https://github.com/Dv2Corn/still-ui && cd still-ui && git checkout v1.10.0
 scripts/xray-build/build.sh /tmp/xray-out amd64 arm64
 ```
 

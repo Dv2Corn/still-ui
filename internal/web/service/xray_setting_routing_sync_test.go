@@ -331,7 +331,7 @@ func TestUpdateInbound_PropagatesRoutingRuleOnPortChange(t *testing.T) {
 		},
 		"outbounds": [{"tag":"direct","protocol":"freedom"}]
 	}`)
-	seedInboundConflict(t, "in-22435-tcp", "0.0.0.0", 22435, model.VLESS, `{"network":"tcp"}`, `{"clients":[]}`)
+	seedInboundConflict(t, "in-22435-tcp", "0.0.0.0", 22435, model.VLESS, `{"network":"tcp"}`, vlessSettings)
 
 	var existing model.Inbound
 	if err := database.GetDB().Where("tag = ?", "in-22435-tcp").First(&existing).Error; err != nil {
@@ -375,7 +375,7 @@ func TestDelInbound_RemovesInboundOnlyRoutingRule(t *testing.T) {
 			]
 		}
 	}`)
-	seedInboundConflict(t, "in-22435-tcp", "0.0.0.0", 22435, model.VLESS, `{"network":"tcp"}`, `{"clients":[]}`)
+	seedInboundConflict(t, "in-22435-tcp", "0.0.0.0", 22435, model.VLESS, `{"network":"tcp"}`, vlessSettings)
 
 	var existing model.Inbound
 	if err := database.GetDB().Where("tag = ?", "in-22435-tcp").First(&existing).Error; err != nil {

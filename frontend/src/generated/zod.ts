@@ -37,6 +37,7 @@ export const AllSettingSchema = z.object({
   alertRemindHours: z.number().int().min(0).max(720),
   alertXrayRestartWindow: z.number().int().min(1).max(1440),
   alertXrayRestarts: z.number().int().min(1).max(100),
+  auditLogRetentionDays: z.number().int().min(1).max(3650),
   backupAgeRecipients: z.string(),
   backupEnable: z.boolean(),
   backupKeep: z.number().int().min(1).max(1000),
@@ -86,6 +87,7 @@ export const AllSettingSchema = z.object({
   ldapUserFilter: z.string(),
   ldapVlessField: z.string(),
   nodeDownThreshold: z.number().int().min(1).max(100),
+  nodeSilenceMinutes: z.number().int().min(0).max(10080),
   outboundDownThreshold: z.number().int().min(1).max(100),
   pageSize: z.number().int().min(0).max(1000),
   panelOutbound: z.string(),
@@ -201,8 +203,11 @@ export const AllSettingSchema = z.object({
   subJsonURI: z.string(),
   subJsonUserAgentRegex: z.string(),
   subKeyFile: z.string(),
+  subLeakNetworks: z.number().int().min(2).max(64),
+  subLeakWindowHours: z.number().int().min(1).max(168),
   subListen: z.string(),
   subLocalDirect: z.string(),
+  subLocalDirectAwg: z.boolean(),
   subLocalDirectProxy: z.string(),
   subPath: z.string(),
   subPort: z.number().int().min(1).max(65535),
@@ -252,6 +257,7 @@ export const AllSettingViewSchema = z.object({
   alertRemindHours: z.number().int().min(0).max(720),
   alertXrayRestartWindow: z.number().int().min(1).max(1440),
   alertXrayRestarts: z.number().int().min(1).max(100),
+  auditLogRetentionDays: z.number().int().min(1).max(3650),
   backupAgeRecipients: z.string(),
   backupEnable: z.boolean(),
   backupKeep: z.number().int().min(1).max(1000),
@@ -309,6 +315,7 @@ export const AllSettingViewSchema = z.object({
   ldapUserFilter: z.string(),
   ldapVlessField: z.string(),
   nodeDownThreshold: z.number().int().min(1).max(100),
+  nodeSilenceMinutes: z.number().int().min(0).max(10080),
   outboundDownThreshold: z.number().int().min(1).max(100),
   pageSize: z.number().int().min(0).max(1000),
   panelOutbound: z.string(),
@@ -424,8 +431,11 @@ export const AllSettingViewSchema = z.object({
   subJsonURI: z.string(),
   subJsonUserAgentRegex: z.string(),
   subKeyFile: z.string(),
+  subLeakNetworks: z.number().int().min(2).max(64),
+  subLeakWindowHours: z.number().int().min(1).max(168),
   subListen: z.string(),
   subLocalDirect: z.string(),
+  subLocalDirectAwg: z.boolean(),
   subLocalDirectProxy: z.string(),
   subPath: z.string(),
   subPort: z.number().int().min(1).max(65535),
@@ -496,6 +506,45 @@ export const ApiTokenViewSchema = z.object({
   token: z.string().optional(),
 });
 export type ApiTokenView = z.infer<typeof ApiTokenViewSchema>;
+
+export const AuditFilterSchema = z.object({
+  action: z.string(),
+  actor: z.string(),
+  from: z.number().int(),
+  outcome: z.enum(['success', 'failure']),
+  page: z.number().int(),
+  pageSize: z.number().int(),
+  to: z.number().int(),
+});
+export type AuditFilter = z.infer<typeof AuditFilterSchema>;
+
+export const AuditLogSchema = z.object({
+  action: z.string(),
+  actor: z.string(),
+  detail: z.string(),
+  hash: z.string(),
+  id: z.number().int(),
+  ip: z.string(),
+  outcome: z.string(),
+  prevHash: z.string(),
+  target: z.string(),
+  time: z.number().int(),
+});
+export type AuditLog = z.infer<typeof AuditLogSchema>;
+
+export const AuditPageSchema = z.object({
+  rows: z.array(z.lazy(() => AuditLogSchema)),
+  total: z.number().int(),
+});
+export type AuditPage = z.infer<typeof AuditPageSchema>;
+
+export const AuditVerifyResultSchema = z.object({
+  brokenId: z.number().int(),
+  checked: z.number().int(),
+  ok: z.boolean(),
+  reason: z.string(),
+});
+export type AuditVerifyResult = z.infer<typeof AuditVerifyResultSchema>;
 
 export const AwgSignaturePacketResponseSchema = z.object({
   i1: z.string(),
@@ -920,6 +969,7 @@ export const InboundFallbackSchema = z.object({
 export type InboundFallback = z.infer<typeof InboundFallbackSchema>;
 
 export const InboundOptionSchema = z.object({
+  awgAllowedIPs: z.string().optional(),
   awgServer: z.lazy(() => ServerSettingsSchema).nullable().optional(),
   enable: z.boolean(),
   id: z.number().int(),
@@ -1400,6 +1450,20 @@ export const SubBalancerSchema = z.object({
   updatedAt: z.number().int(),
 });
 export type SubBalancer = z.infer<typeof SubBalancerSchema>;
+
+export const SubRotationReportSchema = z.object({
+  client: z.string(),
+  passed: z.boolean(),
+  steps: z.array(z.lazy(() => SubRotationStepSchema)),
+});
+export type SubRotationReport = z.infer<typeof SubRotationReportSchema>;
+
+export const SubRotationStepSchema = z.object({
+  detail: z.string(),
+  name: z.string(),
+  ok: z.boolean(),
+});
+export type SubRotationStep = z.infer<typeof SubRotationStepSchema>;
 
 export const TgBotCapabilitiesSchema = z.object({
   groupPrivacy: z.boolean(),

@@ -50,10 +50,11 @@ func TestProbeRejectsOversizedStatusBody(t *testing.T) {
 }
 
 // A panelGuid is copied into every inbound the node reports and into indexed columns, so
-// one oversized value multiplies into gigabytes of stored copies.
+// one oversized value multiplies into gigabytes of stored copies. The refused answer must not
+// carry the node's xray error either: it would reach the node-down alert.
 func TestProbeRefusesAnOversizedPanelGuid(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(`{"success":true,"obj":{"cpuPct":1,"panelGuid":"` + strings.Repeat("g", maxPanelGuidLen+1) + `"}}`))
+		_, _ = w.Write([]byte(`{"success":true,"obj":{"cpuPct":1,"xray":{"state":"error","errorMsg":"<a href=x>sign in</a>"},"panelGuid":"` + strings.Repeat("g", maxPanelGuidLen+1) + `"}}`))
 	}))
 	defer srv.Close()
 	u, _ := url.Parse(srv.URL)
@@ -62,5 +63,8 @@ func TestProbeRefusesAnOversizedPanelGuid(t *testing.T) {
 	patch, err := (&NodeService{}).Probe(context.Background(), n)
 	if err == nil || patch.Guid != "" || !strings.Contains(patch.LastError, "panelGuid") {
 		t.Fatalf("Probe = guid %d bytes, %v (%q); want the heartbeat refused", len(patch.Guid), err, patch.LastError)
+	}
+	if patch.XrayError != "" || patch.XrayState != "" || patch.CpuPct != 0 {
+		t.Fatalf("refused probe kept the node's report: xray %q/%q, cpu %v", patch.XrayState, patch.XrayError, patch.CpuPct)
 	}
 }

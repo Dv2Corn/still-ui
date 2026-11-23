@@ -389,3 +389,25 @@ func TestCertificateCopyNeverMovesAheadOfItsKey(t *testing.T) {
 		t.Fatalf("after the key is readable: cert %q key %q changed %v, want both new, key first", cert, key, changed)
 	}
 }
+
+// A refresh re-reads the configured source, which may have grown or turned into a device
+// since it was saved; the 1 MiB regular-file bound of the save check applies there too.
+func TestCertificateRefreshRefusesASourceThatOutgrewTheBound(t *testing.T) {
+	setupFakeUnit(t)
+	src := t.TempDir()
+	keySource := filepath.Join(src, "a.key")
+	writeTestFile(t, keySource, "old key")
+	writeTestFile(t, filepath.Join(src, "a.pem"), "old cert")
+	cfg := unitTestConfig("warning")
+	cfg.InboundConfigs = append(cfg.InboundConfigs, tlsInbound("a", src))
+	MirrorCertificateFiles(cfg)
+	_, keyMirror := mirrorPaths(t, cfg.InboundConfigs[1])
+
+	writeTestFile(t, keySource, strings.Repeat("k", maxCertFileBytes+1))
+	if changed := SyncCertificateMirrors(); len(changed) != 0 {
+		t.Fatalf("refresh copied %v, want an oversized source refused", changed)
+	}
+	if key, _ := os.ReadFile(keyMirror); string(key) != "old key" {
+		t.Fatalf("key copy holds %d bytes, want the last bounded copy kept", len(key))
+	}
+}

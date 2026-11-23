@@ -16,6 +16,9 @@ const (
 	// Node health (heartbeat-driven)
 	EventNodeDown EventType = "node.down"
 	EventNodeUp   EventType = "node.up"
+	// EventNodeSilent is a node not heard from for the configured minutes, and its return;
+	// raised once per outage, resolved once. Data is *HealthAlertData.
+	EventNodeSilent EventType = "node.silent"
 	// EventNodeTraffic is a node's traffic quota crossing its warning or limit level, or
 	// dropping back under it (still-ui). Data is *HealthAlertData with a Level param.
 	EventNodeTraffic EventType = "node.traffic"
@@ -35,6 +38,10 @@ const (
 	EventDiskHigh      EventType = "disk.high"
 	EventCertExpiring  EventType = "cert.expiring"
 	EventBackupFailed  EventType = "backup.failed"
+
+	// EventSubLeak is one subscription fetched from more client networks than its threshold in
+	// a window (still-ui). Raised once, quiet for a week unless the count doubles; *HealthAlertData.
+	EventSubLeak EventType = "sub.leak"
 
 	// External reachability probes (reports from an agent inside a censored network)
 	EventProbeDown  EventType = "probe.down"

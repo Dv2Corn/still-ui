@@ -112,7 +112,8 @@
     "localDirectShadowrocket": "Berkas aturan Shadowrocket",
     "localDirectShadowrocketHint": "Di Shadowrocket tambahkan berkas di tab Config lalu atur Global Routing ke Config.",
     "saveQr": "Simpan QR",
-    "devices": "Perangkat"
+    "devices": "Perangkat",
+    "linksHidden": "This subscription has a device limit, so the configs are shown only in an app registered as one of its devices. Add the subscription link to your VPN app."
   },
   "menu": {
     "basedOn": "Berbasis 3x-ui oleh MHSanaei · GPL-3.0",
@@ -135,7 +136,8 @@
     "unpinSidebar": "Lepas sematan bilah sisi",
     "subFormats": "Sub Formats",
     "probes": "Probe",
-    "connections": "Koneksi"
+    "connections": "Koneksi",
+    "audit": "Log audit"
   },
   "pages": {
     "login": {
@@ -158,6 +160,11 @@
       "xrayStatus": "Xray",
       "stopXray": "Hentikan",
       "restartXray": "Mulai ulang",
+      "startXray": "Mulai",
+      "stopXrayDisabledHint": "Xray tidak berjalan",
+      "stopXrayConfirmTitle": "Hentikan Xray?",
+      "stopXrayConfirmContent": "Menghentikan Xray akan langsung memutus semua koneksi proxy. Yakin ingin melanjutkan?",
+      "stopXrayConfirmOk": "Hentikan Xray",
       "xraySwitch": "Versi",
       "xrayUpdates": "Pembaruan Xray",
       "xraySwitchClickDesk": "Pilih dengan hati-hati, karena versi yang lebih lama mungkin tidak kompatibel dengan konfigurasi saat ini.",
@@ -1021,6 +1028,10 @@
       "importClients": "Impor klien",
       "import": "Impor",
       "delOrphans": "Hapus klien tanpa inbound",
+      "rotationCheck": "Periksa penerbitan ulang langganan",
+      "rotationCheckRunning": "Memeriksa penerbitan ulang langganan…",
+      "rotationCheckPassed": "Penerbitan ulang langganan berfungsi",
+      "rotationCheckFailed": "Pemeriksaan penerbitan ulang langganan gagal",
       "delOrphansConfirmTitle": "Hapus klien tanpa inbound?",
       "delOrphansConfirmContent": "Menghapus setiap klien yang tidak terhubung ke inbound mana pun, beserta catatan lalu lintasnya. Tidak dapat dibatalkan.",
       "auth": "Auth",
@@ -1260,7 +1271,7 @@
       "tlsPin": "Pin sertifikat (SHA-256)",
       "tlsSkip": "Lewati verifikasi",
       "tlsMtls": "TLS mutual (sertifikat klien)",
-      "mtlsFormHint": "Node ini mengautentikasi panel dengan sertifikat klien. Salin CA panel ini dari bagian mTLS Node ke node, atur CA tepercayanya, lalu mulai ulang.",
+      "mtlsFormHint": "Node ini mengautentikasi panel dengan sertifikat klien. Salin CA panel ini dari bagian mTLS Node ke node, atur CA tepercayanya, lalu mulai ulang. Memperbarui panel node ini dari sini tetap memerlukan token API dengan cakupan node-admin.",
       "mtls": {
         "title": "mTLS Node",
         "intro": "TLS mutual menambahkan faktor sertifikat klien di atas token API untuk panggilan antar-node. Bersifat opsional: biarkan kosong untuk tetap menggunakan autentikasi token saja.",
@@ -1544,6 +1555,7 @@
         "applyTo": "Terapkan ke",
         "addNoise": "+ Noise",
         "concurrency": "Konkurensi",
+        "concurrencyHint": "Jumlah stream per koneksi. xray-core 26.11.9 dan yang lebih baru menaikkan nilai 0 sampai 128 menjadi 128; core yang lebih lama memakai angka apa adanya (0 berarti 8). -1 mematikan mux TCP.",
         "xudpConcurrency": "Konkurensi xudp",
         "xudpUdp443": "xudp UDP 443"
       },
@@ -1598,7 +1610,8 @@
         "apiTokenEmpty": "Belum ada token — buat satu untuk mengautentikasi bot atau panel jarak jauh.",
         "apiTokenDeleteWarning": "Setiap pemanggil yang menggunakan token ini akan berhenti terautentikasi segera.",
         "apiTokenCreatedTitle": "Token dibuat",
-        "apiTokenCreatedNotice": "Salin token ini sekarang. Demi keamanan, token tidak disimpan dalam bentuk yang dapat dibaca dan tidak akan ditampilkan lagi."
+        "apiTokenCreatedNotice": "Salin token ini sekarang. Demi keamanan, token tidak disimpan dalam bentuk yang dapat dibaca dan tidak akan ditampilkan lagi.",
+        "audit": "Log audit"
       },
       "toasts": {
         "modifySettings": "Parameter telah diubah.",
@@ -1648,6 +1661,8 @@
       "eventNodeUp": "Aktif",
       "eventNodeTraffic": "Batas trafik",
       "eventNodeTrafficHint": "diatur per node di halaman Node",
+      "eventNodeSilent": "Diam",
+      "eventNodeSilentHint": "menit tanpa kontak, 0 = mati",
       "eventCPUHigh": "CPU tinggi (%)",
       "requestFailed": "Permintaan gagal",
       "smtpEncryption": "Enkripsi",
@@ -1663,6 +1678,8 @@
       "smtpNoRecipients": "Tidak ada penerima yang dikonfigurasi",
       "smtpFromNotConfigured": "Alamat pengirim SMTP belum dikonfigurasi",
       "eventLoginAttempt": "Percobaan masuk",
+      "eventSubLeak": "Kebocoran langganan",
+      "eventSubLeakHint": "jaringan dalam jam",
       "backupSettings": "Cadangan",
       "backupEnable": "Cadangan terjadwal",
       "backupEnableDesc": "Simpan salinan basis data di server ini sesuai jadwal.",
@@ -2032,6 +2049,8 @@
       "subLocalDirectOff": "Mati",
       "subLocalDirectProxy": "Selalu lewat VPN",
       "subLocalDirectProxyDesc": "Telegram, YouTube, Instagram, Facebook, WhatsApp, Discord, ChatGPT, dan Claude selalu lewat VPN meski tampak lokal. Tambahkan domain atau rentang IP lain di sini, satu per baris; diperiksa sebelum aturan negara.",
+      "subLocalDirectAwg": "Juga berkas AmneziaWG",
+      "subLocalDirectAwgDesc": "Berkas konfigurasi AmneziaWG (unduhan, QR, tautan vpn://) juga melewatkan alamat negara itu dan DNS-nya tetap terjangkau. Berkasnya besar (~35 KB, ~2000 prefiks) dan mungkin tidak muat di kode QR. Sisi server tidak berubah, jadi berkas yang sudah diimpor tetap menjadi terowongan penuh sampai diimpor ulang.",
       "subProbeOrder": "Gunakan hasil probe",
       "subProbeOrderDesc": "Tautan yang dilaporkan mati oleh probe keterjangkauan (2 kali gagal berturut-turut) dipindah ke akhir langganan atau disembunyikan, di semua format: tautan, JSON, dan Clash. Pengguna selalu menyisakan setidaknya satu tautan, dan tanpa hasil probe terbaru tidak ada yang berubah. Halaman Probe menampilkan apa yang terjadi pada setiap endpoint.",
       "subProbeOrderOff": "Mati (bawaan)",
@@ -2061,7 +2080,9 @@
       "connLogSourceDesc": "Apa yang disimpan tentang alamat asal koneksi klien.",
       "connLogSourceFull": "Alamat lengkap dan port",
       "connLogSourceMasked": "Hanya jaringan (/24 untuk IPv4, /48 untuk IPv6)",
-      "connLogPrivacyHint": "Log ini berisi data pribadi: simpan hanya yang diperlukan. Log disimpan di samping basis data panel, bukan di dalamnya dan bukan di cadangannya. Perubahan berlaku untuk koneksi baru; yang sudah tersimpan tetap seperti adanya sampai kedaluwarsa."
+      "connLogPrivacyHint": "Log ini berisi data pribadi: simpan hanya yang diperlukan. Log disimpan di samping basis data panel, bukan di dalamnya dan bukan di cadangannya. Perubahan berlaku untuk koneksi baru; yang sudah tersimpan tetap seperti adanya sampai kedaluwarsa.",
+      "auditLogRetention": "Simpan entri audit (hari)",
+      "auditLogRetentionDesc": "Entri yang lebih lama dihapus setiap jam; rantai tetap dapat diverifikasi."
     },
     "xray": {
       "save": "Simpan",
@@ -2464,7 +2485,7 @@
         "presetQuic": "I1 mirip QUIC",
         "presetDns": "I1 mirip DNS",
         "presetHint": "Buat ulang mengganti semua parameter dengan nilai acak baru, sehingga klien yang ada harus mengimpor konfigurasinya lagi. Tombol I1 hanya mengubah paket tanda tangan (I1 diisi, I2–I5 dikosongkan): paket yang dikirim sebelum setiap handshake tampak seperti awal koneksi QUIC atau kueri DNS. Klien yang ada tetap berfungsi dan mendapat paket baru pada konfigurasi berikutnya.",
-        "mtuMobileHint": "Masuk ke setiap konfigurasi klien yang dibuat panel. Pada jaringan seluler yang membuang paket besar, 1280 bisa beberapa kali lebih cepat daripada nilai bawaan.",
+        "mtuMobileHint": "Kosong: server tetap 1420 dikurangi S4 dan konfigurasi klien mendapat 1280, beberapa kali lebih cepat di jalur yang membuang paket besar (seluler, PPPoE, terowongan lain). Nilai yang diisi di sini berlaku untuk server dan setiap konfigurasi klien.",
         "mtuMobile": "Atur ke {mtu}",
         "jc": "Jc (jumlah paket sampah)",
         "jmin": "Jmin (ukuran min paket sampah)",
@@ -2634,7 +2655,20 @@
       "defaultOutboundDesc": "Lalu lintas tanpa aturan routing memakai outbound ini (yang pertama dalam daftar).",
       "routingScript": "Skrip Routing",
       "routingScriptDesc": "Path ke file .lua yang mendefinisikan HandleRoute, absolut atau relatif terhadap folder bin Xray. Skrip lalu memilih setiap rute dan Xray mengabaikan semua aturan routing, termasuk aturan api panel: arahkan inbound api ke outbound api atau statistik trafik dan perubahan klien langsung akan berhenti. Xray tidak akan berjalan jika file tidak ada atau tidak valid.",
-      "routingScriptActive": "Skrip routing diatur di {section}, jadi Xray mengabaikan aturan ini."
+      "routingScriptActive": "Skrip routing diatur di {section}, jadi Xray mengabaikan aturan ini.",
+      "exitAddress": {
+        "menu": "IP keluar terpisah",
+        "title": "IP masuk dan keluar terpisah",
+        "intro": "Klien tetap terhubung ke alamat inbound, sedangkan lalu lintas mereka keluar dari server melalui alamat IPv4 lain milik server ini. Memisahkan keduanya mencegah alamat yang dilihat situs web mengungkap alamat yang dihubungi klien.",
+        "exitIp": "Alamat IPv4 keluar",
+        "exitIpHint": "Alamat IPv4 lain yang ditetapkan ke server ini. Inbound yang mendengarkan semua alamat tidak dapat diperiksa, jadi pastikan klien terhubung ke alamat lain.",
+        "inbounds": "Inbound",
+        "inboundsRequired": "Pilih setidaknya satu inbound",
+        "invalidIp": "Masukkan alamat IPv4 yang valid",
+        "sameAsInbound": "Klien terhubung ke alamat ini. Pilih alamat server yang lain.",
+        "tagTaken": "Outbound untuk IP keluar ini sudah ada",
+        "added": "Outbound keluar dan aturan routing ditambahkan. Simpan untuk menerapkan."
+      }
     },
     "hosts": {
       "addHost": "Tambah Host",
@@ -2851,6 +2885,27 @@
       "newer": "Lebih baru",
       "older": "Lebih lama",
       "ofClient": "Koneksi klien ini"
+    },
+    "audit": {
+      "title": "Log audit",
+      "intro": "Setiap tindakan admin yang mengubah keadaan dan setiap login, dirantai dengan SHA-256 sehingga entri yang diedit atau dihapus terdeteksi. Isi permintaan dan rahasia tidak pernah disimpan. Setiap pencarian dan ekspor di sini juga dicatat.",
+      "time": "Waktu",
+      "actor": "Pengguna atau token",
+      "ip": "IP sumber",
+      "action": "Tindakan",
+      "target": "Target",
+      "outcome": "Hasil",
+      "detail": "Detail",
+      "actorPlaceholder": "Pengguna atau token (persis)",
+      "actionPlaceholder": "Tindakan berisi…",
+      "success": "Berhasil",
+      "failure": "Gagal",
+      "exportCsv": "Ekspor CSV",
+      "exportHint": "Ekspor berisi hingga {count} baris dari filter saat ini, dengan waktu UTC.",
+      "empty": "Tidak ada entri yang cocok.",
+      "verify": "Verifikasi rantai",
+      "verifyOk": "Rantai utuh: {count} entri diperiksa.",
+      "verifyBroken": "Rantai rusak pada entri #{id}: {reason}"
     }
   },
   "tgbot": {
@@ -2982,6 +3037,9 @@
       "alertNodeTrafficLimit": "Node {{ .Name }} mencapai batas trafik: {{ .Used }} dari {{ .Limit }}. Reset pada {{ .Reset }}.",
       "alertNodeTrafficLimitOff": "Node {{ .Name }} mencapai batas trafik: {{ .Used }} dari {{ .Limit }}. Inbound-nya mati sampai {{ .Reset }}.",
       "alertNodeTrafficBack": "Node {{ .Name }} kembali di bawah batas trafik: {{ .Used }} dari {{ .Limit }}.",
+      "alertNodeSilent": "Node {{ .Name }} ({{ .Address }}) tidak merespons selama {{ .Minutes }} menit. Terakhir terlihat: {{ .LastSeen }}.",
+      "alertNodeSilentBack": "Node {{ .Name }} ({{ .Address }}) merespons lagi setelah {{ .Minutes }} menit diam.",
+      "alertSubLeak": "Langganan {{ .Client }} mungkin bocor: diambil dari {{ .Count }} jaringan dalam {{ .Hours }} jam (pertama {{ .First }}, terakhir {{ .Last }}). Tidak ada yang diblokir.\nContoh: {{ .Networks }}",
       "inboundsCount": "🔌 Inbounds: {{ .Count }}\r\n",
       "clientsCount": "👥 Clients: {{ .Count }}\r\n",
       "category_server": "🖥 Server",

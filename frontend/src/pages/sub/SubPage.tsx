@@ -129,6 +129,13 @@ export default function SubPage() {
         ),
         children: <SubConfigsTab links={links} onCopy={copy} />,
       });
+    } else if (subData.linksHidden) {
+      items.push({
+        key: 'configs',
+        icon: <UnorderedListOutlined aria-hidden />,
+        label: t('subscription.tabConfigs'),
+        children: <Alert type="info" showIcon message={t('subscription.linksHidden')} />,
+      });
     }
     return items;
   }, [t, copy, open]);

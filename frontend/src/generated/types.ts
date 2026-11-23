@@ -17,6 +17,7 @@ export interface AllSetting {
   alertRemindHours: number;
   alertXrayRestartWindow: number;
   alertXrayRestarts: number;
+  auditLogRetentionDays: number;
   backupAgeRecipients: string;
   backupEnable: boolean;
   backupKeep: number;
@@ -66,6 +67,7 @@ export interface AllSetting {
   ldapUserFilter: string;
   ldapVlessField: string;
   nodeDownThreshold: number;
+  nodeSilenceMinutes: number;
   outboundDownThreshold: number;
   pageSize: number;
   panelOutbound: string;
@@ -181,8 +183,11 @@ export interface AllSetting {
   subJsonURI: string;
   subJsonUserAgentRegex: string;
   subKeyFile: string;
+  subLeakNetworks: number;
+  subLeakWindowHours: number;
   subListen: string;
   subLocalDirect: string;
+  subLocalDirectAwg: boolean;
   subLocalDirectProxy: string;
   subPath: string;
   subPort: number;
@@ -231,6 +236,7 @@ export interface AllSettingView {
   alertRemindHours: number;
   alertXrayRestartWindow: number;
   alertXrayRestarts: number;
+  auditLogRetentionDays: number;
   backupAgeRecipients: string;
   backupEnable: boolean;
   backupKeep: number;
@@ -288,6 +294,7 @@ export interface AllSettingView {
   ldapUserFilter: string;
   ldapVlessField: string;
   nodeDownThreshold: number;
+  nodeSilenceMinutes: number;
   outboundDownThreshold: number;
   pageSize: number;
   panelOutbound: string;
@@ -403,8 +410,11 @@ export interface AllSettingView {
   subJsonURI: string;
   subJsonUserAgentRegex: string;
   subKeyFile: string;
+  subLeakNetworks: number;
+  subLeakWindowHours: number;
   subListen: string;
   subLocalDirect: string;
+  subLocalDirectAwg: boolean;
   subLocalDirectProxy: string;
   subPath: string;
   subPort: number;
@@ -470,6 +480,41 @@ export interface ApiTokenView {
   name: string;
   scope: string;
   token?: string;
+}
+
+export interface AuditFilter {
+  action: string;
+  actor: string;
+  from: number;
+  outcome: string;
+  page: number;
+  pageSize: number;
+  to: number;
+}
+
+export interface AuditLog {
+  action: string;
+  actor: string;
+  detail: string;
+  hash: string;
+  id: number;
+  ip: string;
+  outcome: string;
+  prevHash: string;
+  target: string;
+  time: number;
+}
+
+export interface AuditPage {
+  rows: AuditLog[];
+  total: number;
+}
+
+export interface AuditVerifyResult {
+  brokenId: number;
+  checked: number;
+  ok: boolean;
+  reason: string;
 }
 
 export interface AwgSignaturePacketResponse {
@@ -865,6 +910,7 @@ export interface InboundFallback {
 }
 
 export interface InboundOption {
+  awgAllowedIPs?: string;
   awgServer?: ServerSettings | null;
   enable: boolean;
   id: number;
@@ -1313,6 +1359,18 @@ export interface SubBalancer {
   sortOrder: number;
   strategy: string;
   updatedAt: number;
+}
+
+export interface SubRotationReport {
+  client: string;
+  passed: boolean;
+  steps: SubRotationStep[];
+}
+
+export interface SubRotationStep {
+  detail: string;
+  name: string;
+  ok: boolean;
 }
 
 export interface TgBotCapabilities {

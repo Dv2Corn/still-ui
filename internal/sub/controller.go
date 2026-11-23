@@ -439,6 +439,7 @@ func (a *SUBController) maybeServeSubPage(c *gin.Context) bool {
 		return true
 	}
 	a.serveSubPage(c, page.BasePath, page)
+	countFetchNetwork(c)
 	return true
 }
 
@@ -514,6 +515,17 @@ func (a *SUBController) buildSubPageData(c *gin.Context) (PageData, bool) {
 	if devices, found, err := a.clientService.HwidSlotStatusForSubID(subId); err == nil && found && devices.Active {
 		page.DeviceLimit, page.DeviceCount = devices.Limit, devices.Registered
 	}
+	// The links are the credentials the device gate guards on the body routes.
+	held, err := a.clientService.HwidDeviceHoldsSlotForSubID(subId, c.GetHeader("X-HWID"))
+	if err != nil {
+		// Not the device limit's doing, so the page must not say it is.
+		writeSubError(c, err)
+		return PageData{}, false
+	}
+	if !held {
+		page.Result = []string{}
+		page.LinksHidden = true
+	}
 	return page, true
 }
 
@@ -563,6 +575,7 @@ func (a *SUBController) subs(c *gin.Context) {
 	subReq := a.subService.ForRequest(host)
 	subReq.subscriptionBody = true
 	subReq.deviceNotice = c.GetString(deviceNoticeKey)
+	subReq.omitServerDescription = !IsHappClient(userAgent) && !IsIncyClient(userAgent)
 	subs, _, _, traffic, err := subReq.getSubs(subId)
 	if err != nil || subs == nil {
 		writeSubError(c, err)
@@ -600,7 +613,7 @@ func (a *SUBController) subs(c *gin.Context) {
 }
 
 func (a *SUBController) recordSubscriptionFetch(c *gin.Context) {
-	if c.Request == nil || c.Request.Method != http.MethodGet || c.Writer.Status() != http.StatusOK {
+	if !countFetchNetwork(c) {
 		return
 	}
 	// A refused device got the notice, not the subscription.
@@ -610,6 +623,18 @@ func (a *SUBController) recordSubscriptionFetch(c *gin.Context) {
 	if err := a.subService.RecordSubscriptionFetch(c.Param("subid")); err != nil {
 		logger.Warning("Failed to record subscription fetch:", err)
 	}
+}
+
+// countFetchNetwork feeds the leak alert with the client network of a GET that got the subscription,
+// its page or a device notice: a refused device is someone else holding the link too.
+func countFetchNetwork(c *gin.Context) bool {
+	if c.Request == nil || c.Request.Method != http.MethodGet || c.Writer.Status() != http.StatusOK {
+		return false
+	}
+	for _, ip := range service.SubLeakIPs(c.Request) {
+		service.RecordSubscriptionNetwork(c.Param("subid"), ip)
+	}
+	return true
 }
 
 func shouldAutoServeClash(autoDetect, clashEnabled, wantsHTML bool, userAgent string, userAgentRegex *regexp.Regexp) bool {
@@ -783,6 +808,9 @@ func (a *SUBController) subPageContext(page PageData) map[string]any {
 	if page.DeviceLimit > 0 {
 		data["deviceLimit"] = page.DeviceLimit
 		data["deviceCount"] = page.DeviceCount
+	}
+	if page.LinksHidden {
+		data["linksHidden"] = true
 	}
 	return data
 }

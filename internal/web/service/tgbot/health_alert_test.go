@@ -6,7 +6,10 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strings"
 	"testing"
+
+	"github.com/nicksnyder/go-i18n/v2/i18n"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/eventbus"
 )
@@ -26,7 +29,7 @@ func params(s string) []string {
 // I18nBot("...") literals does not see them: every locale must carry each one, with the
 // same template parameters as English (a misspelt one renders as "<no value>").
 func TestHealthAlertMessagesInEveryLocale(t *testing.T) {
-	keys := []string{"alertCertExpired", "alertStill", "alertNodeTrafficWarn", "alertNodeTrafficLimit", "alertNodeTrafficLimitOff", "alertNodeTrafficBack"}
+	keys := []string{"alertCertExpired", "alertStill", "alertNodeTrafficWarn", "alertNodeTrafficLimit", "alertNodeTrafficLimitOff", "alertNodeTrafficBack", "alertSubLeak"}
 	for _, pair := range healthAlertKeys {
 		keys = append(keys, pair[0], pair[1])
 	}
@@ -83,10 +86,44 @@ func TestHealthAlertMessageChoice(t *testing.T) {
 		{eventbus.EventNodeTraffic, &eventbus.HealthAlertData{Phase: "raised", Params: map[string]string{"Level": "limit", "Action": "notify"}}, "alertNodeTrafficLimit"},
 		{eventbus.EventNodeTraffic, &eventbus.HealthAlertData{Phase: "raised", Params: map[string]string{"Level": "limit", "Action": "disable"}}, "alertNodeTrafficLimitOff"},
 		{eventbus.EventNodeTraffic, &eventbus.HealthAlertData{Phase: "resolved", Params: map[string]string{"Level": "under", "Action": "disable"}}, "alertNodeTrafficBack"},
+		{eventbus.EventSubLeak, &eventbus.HealthAlertData{Phase: "raised"}, "alertSubLeak"},
 	}
 	for _, c := range cases {
 		if got, _ := healthAlertMessage(c.event, c.data); got != c.want {
 			t.Errorf("%s %s: %q, want %q", c.event, c.data.Phase, got, c.want)
+		}
+	}
+}
+
+// The leak alert is worded by the bot's language from the shipped translations; a client name
+// is escaped once for Telegram's HTML mode.
+func TestSubLeakAlertText(t *testing.T) {
+	dir := filepath.Join(repoRootForTest(t), "internal", "web", "translation")
+	data := &eventbus.HealthAlertData{Phase: "raised", Params: map[string]string{
+		"Client": "bob <vip>", "Count": "7", "Hours": "24", "First": "2026-11-12 08:00",
+		"Last": "2026-11-12 21:30", "Networks": "203.0.113.0/24, 2001:db8:1::/48, …",
+	}}
+	want := map[string]string{
+		"en-US.json": "⚠️ Subscription of bob &lt;vip&gt; may have leaked: fetched from 7 networks in 24 h, first at 2026-11-12 08:00, last at 2026-11-12 21:30. Nothing was blocked.\nFor example: 203.0.113.0/24, 2001:db8:1::/48, …",
+		"ru-RU.json": "⚠️ Подписка bob &lt;vip&gt;, похоже, утекла: её получали из 7 сетей за 24 ч, первый раз в 2026-11-12 08:00, последний в 2026-11-12 21:30. Ничего не заблокировано.\nНапример: 203.0.113.0/24, 2001:db8:1::/48, …",
+	}
+	for file, text := range want {
+		raw, err := os.ReadFile(filepath.Join(dir, file))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var doc struct {
+			Tgbot struct {
+				Messages map[string]string `json:"messages"`
+			} `json:"tgbot"`
+		}
+		if err := json.Unmarshal(raw, &doc); err != nil {
+			t.Fatal(err)
+		}
+		draftLocalizer(t, &i18n.Message{ID: "tgbot.messages.alertSubLeak", Other: doc.Tgbot.Messages["alertSubLeak"]})
+		got := (&Tgbot{}).formatHealthAlert(eventbus.EventSubLeak, data)
+		if _, body, _ := strings.Cut(got, "\n"); body != text {
+			t.Errorf("%s:\n got %q\nwant %q", file, body, text)
 		}
 	}
 }

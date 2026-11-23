@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/json_util"
 	"github.com/mhsanaei/3x-ui/v3/internal/xray"
 )
@@ -73,7 +72,7 @@ func rawBindConflicts(cfg *xray.Config) []bindConflict {
 				}
 				// One port carrying tcp on one inbound and udp on another is a
 				// supported deployment (vless/tcp + hysteria2/udp), never a clash.
-				shared := configTransports(left) & configTransports(right)
+				shared := bindTransports(left) & bindTransports(right)
 				if shared == 0 {
 					continue
 				}
@@ -137,13 +136,11 @@ func configListen(raw json_util.RawMessage) string {
 	return listen
 }
 
-// configTransports reads a generated inbound's transports through the same rule
-// the save-time guards use, so the two cannot drift apart.
-func configTransports(ib *xray.InboundConfig) transportBits {
-	// "socks" is the panel's own bridge shape (injectAmneziawgnetSocks and
-	// friends): its udp flag lives in settings like a mixed inbound's.
-	if ib.Protocol == "socks" {
-		return inboundTransports(model.Mixed, string(ib.StreamSettings), string(ib.Settings))
+// bindTransports reads a generated inbound's sockets through the core's build, as the
+// save-time guards do; one the core cannot build may hold any of them.
+func bindTransports(ib *xray.InboundConfig) transportBits {
+	if bits, ok := configTransports(ib); ok {
+		return bits
 	}
-	return inboundTransports(model.Protocol(ib.Protocol), string(ib.StreamSettings), string(ib.Settings))
+	return transportTCP | transportUDP
 }

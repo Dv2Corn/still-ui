@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/config"
@@ -32,6 +33,7 @@ import (
 	"github.com/xtls/xray-core/common/platform/filesystem"
 	"github.com/xtls/xray-core/common/protocol"
 	"github.com/xtls/xray-core/common/serial"
+	"github.com/xtls/xray-core/core"
 	"github.com/xtls/xray-core/infra/conf"
 	hysteriaAccount "github.com/xtls/xray-core/proxy/hysteria/account"
 	"github.com/xtls/xray-core/proxy/masque"
@@ -161,17 +163,7 @@ func (x *XrayAPI) AddInbound(inbound []byte) error {
 	}
 	client := *x.HandlerServiceClient
 
-	conf := new(conf.InboundDetourConfig)
-	err := json.Unmarshal(inbound, conf)
-	if err != nil {
-		logger.Debug("Failed to unmarshal inbound:", err)
-		return err
-	}
-	if err := checkUntrustedBuildInput(conf.StreamSetting, inbound); err != nil {
-		return err
-	}
-	localizeNoiseScripts(conf.StreamSetting)
-	config, err := conf.Build()
+	config, err := BuildInbound(inbound, nil)
 	if err != nil {
 		logger.Debug("Failed to build inbound Detur:", err)
 		return err
@@ -204,23 +196,8 @@ func (x *XrayAPI) DelInbound(tag string) error {
 // startup — notably v26.7.11's refusal of unencrypted vless/trojan outbounds
 // whose server address is a public IP or domain.
 func ValidateOutboundConfig(outbound []byte) (err error) {
-	ensureXrayAssetLocation()
-	// The loader panics on some third-party values (a short vless encryption, a bad spiderX).
-	defer func() {
-		if r := recover(); r != nil {
-			err = common.NewErrorf("xray-core config loader panicked: %v", r)
-		}
-	}()
-
-	detour := new(conf.OutboundDetourConfig)
-	if err := json.Unmarshal(outbound, detour); err != nil {
-		return err
-	}
-	if err := checkUntrustedBuildInput(detour.StreamSetting, outbound); err != nil {
-		return err
-	}
-	localizeNoiseScripts(detour.StreamSetting)
-	built, err := detour.Build()
+	defer recoverLoaderPanic(&err)
+	built, err := buildOutbound(outbound)
 	if err != nil {
 		return err
 	}
@@ -228,6 +205,50 @@ func ValidateOutboundConfig(outbound []byte) (err error) {
 		return err
 	}
 	return validateHandlerSettings(built.ProxySettings)
+}
+
+// BuildInbound runs conf.Build() inside the panel the one safe way: assets and noise scripts
+// resolved as the core sees them, untrusted input checked, a loader panic returned.
+func BuildInbound(raw []byte, adjust func(*conf.InboundDetourConfig)) (built *core.InboundHandlerConfig, err error) {
+	ensureXrayAssetLocation()
+	defer recoverLoaderPanic(&err)
+	detour := new(conf.InboundDetourConfig)
+	if err := json.Unmarshal(raw, detour); err != nil {
+		logger.Debug("Failed to unmarshal inbound:", err)
+		return nil, err
+	}
+	if adjust != nil {
+		adjust(detour)
+	}
+	if err := checkUntrustedBuildInput(detour.StreamSetting, raw); err != nil {
+		return nil, err
+	}
+	localizeNoiseScripts(detour.StreamSetting)
+	return detour.Build()
+}
+
+// buildOutbound is BuildInbound for an outbound JSON object.
+func buildOutbound(raw []byte) (built *core.OutboundHandlerConfig, err error) {
+	ensureXrayAssetLocation()
+	defer recoverLoaderPanic(&err)
+	detour := new(conf.OutboundDetourConfig)
+	if err := json.Unmarshal(raw, detour); err != nil {
+		logger.Debug("Failed to unmarshal outbound:", err)
+		return nil, err
+	}
+	if err := checkUntrustedBuildInput(detour.StreamSetting, raw); err != nil {
+		return nil, err
+	}
+	localizeNoiseScripts(detour.StreamSetting)
+	return detour.Build()
+}
+
+// recoverLoaderPanic turns a panic of the config loader into err: it panics on some
+// values (a short vless encryption, a bad spiderX) and runs in the panel process.
+func recoverLoaderPanic(err *error) {
+	if r := recover(); r != nil {
+		*err = common.NewErrorf("xray-core config loader panicked: %v", r)
+	}
 }
 
 // ValidateTunWfpBlockLeak runs the core's own check of a TUN inbound's autoSystemWfpBlockLeak,
@@ -383,18 +404,7 @@ func (x *XrayAPI) AddOutbound(outbound []byte) error {
 	}
 	client := *x.HandlerServiceClient
 
-	ensureXrayAssetLocation()
-
-	conf := new(conf.OutboundDetourConfig)
-	if err := json.Unmarshal(outbound, conf); err != nil {
-		logger.Debug("Failed to unmarshal outbound:", err)
-		return err
-	}
-	if err := checkUntrustedBuildInput(conf.StreamSetting, outbound); err != nil {
-		return err
-	}
-	localizeNoiseScripts(conf.StreamSetting)
-	config, err := conf.Build()
+	config, err := buildOutbound(outbound)
 	if err != nil {
 		logger.Debug("Failed to build outbound detour:", err)
 		return err
@@ -690,12 +700,36 @@ func childLuaScriptPath(script string) string {
 }
 
 func ensureXrayAssetLocation() {
-	if os.Getenv("XRAY_LOCATION_ASSET") != "" || os.Getenv("xray.location.asset") != "" {
+	assetLocationMu.Lock()
+	defer assetLocationMu.Unlock()
+	current := os.Getenv("XRAY_LOCATION_ASSET")
+	if os.Getenv("xray.location.asset") != "" || current != "" && current != panelAssetLocation {
 		return
 	}
-	if abs, err := filepath.Abs(config.GetBinFolderPath()); err == nil {
+	// Follows the bin folder: a value the panel set earlier must not outlive a changed XUI_BIN_FOLDER.
+	if abs, err := filepath.Abs(config.GetBinFolderPath()); err == nil && abs != current {
 		os.Setenv("XRAY_LOCATION_ASSET", abs)
+		panelAssetLocation = abs
 	}
+}
+
+var (
+	assetLocationMu sync.Mutex
+	// panelAssetLocation is the XRAY_LOCATION_ASSET value the panel set itself, not the operator.
+	panelAssetLocation string
+)
+
+// OperatorAssetLocation is the asset folder the operator configured through the core's
+// environment, or "" when there is none (the panel's own default does not count).
+func OperatorAssetLocation() string {
+	assetLocationMu.Lock()
+	defer assetLocationMu.Unlock()
+	for _, key := range [...]string{"XRAY_LOCATION_ASSET", "xray.location.asset"} {
+		if dir := os.Getenv(key); dir != "" && dir != panelAssetLocation {
+			return dir
+		}
+	}
+	return ""
 }
 
 // collectStringSlice normalizes a JSON-decoded value into a slice of non-empty

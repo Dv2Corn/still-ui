@@ -58,6 +58,19 @@ func EffectiveMTU(configuredMTU, s4 int) int {
 	return max(DefaultMTU-max(s4, 0), 1280)
 }
 
+// ClientDefaultMTU goes into issued client configs when MTU is blank: paths below
+// 1500 (mobile, PPPoE, tunnels) were several times faster at 1280 than at ~1420.
+const ClientDefaultMTU = 1280
+
+// ClientMTU is the MTU for issued client configs: the admin's value when set
+// (it applies to both ends), else ClientDefaultMTU.
+func ClientMTU(configuredMTU int) int {
+	if configuredMTU > 0 {
+		return min(configuredMTU, MaxMTU)
+	}
+	return ClientDefaultMTU
+}
+
 // GenerateObfuscation31 produces a randomized AmneziaWG 3.1 parameter set: a
 // static value gets profiled by DPI, defeating the point.
 func GenerateObfuscation31() Obfuscation31 {

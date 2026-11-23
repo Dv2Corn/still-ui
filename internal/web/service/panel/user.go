@@ -14,6 +14,7 @@ import (
 	ldaputil "github.com/mhsanaei/3x-ui/v3/internal/util/ldap"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/totp"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/service"
+	"github.com/mhsanaei/3x-ui/v3/internal/web/session"
 )
 
 // UserService provides business logic for user management and authentication.
@@ -122,10 +123,18 @@ func (s *UserService) CheckUser(username string, password string, twoFactorCode 
 
 func (s *UserService) BumpLoginEpoch() error {
 	db := database.GetDB()
-	return db.Model(model.User{}).
+	return epochBumped(db.Model(model.User{}).
 		Where("1 = 1").
 		Update("login_epoch", gorm.Expr("login_epoch + 1")).
-		Error
+		Error)
+}
+
+// epochBumped wakes open WebSocket connections so the logins the bump ended stop at once.
+func epochBumped(err error) error {
+	if err == nil {
+		session.NotifyRevoked()
+	}
+	return err
 }
 
 func (s *UserService) UpdateUser(id int, username string, password string) error {
@@ -148,14 +157,14 @@ func (s *UserService) UpdateUser(id int, username string, password string) error
 		_ = s.settingService.SetTwoFactorToken("")
 	}
 
-	return db.Model(model.User{}).
+	return epochBumped(db.Model(model.User{}).
 		Where("id = ?", id).
 		Updates(map[string]any{
 			"username":    username,
 			"password":    hashedPassword,
 			"login_epoch": gorm.Expr("login_epoch + 1"),
 		}).
-		Error
+		Error)
 }
 
 func (s *UserService) UpdateFirstUser(username string, password string) error {
@@ -185,7 +194,7 @@ func (s *UserService) UpdateFirstUser(username string, password string) error {
 	user.Username = username
 	user.Password = hashedPassword
 	user.LoginEpoch++
-	return db.Save(user).Error
+	return epochBumped(db.Save(user).Error)
 }
 
 // MaxUsernameLength bounds a panel username: the login route refuses longer names before

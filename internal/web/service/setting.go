@@ -10,6 +10,7 @@ import (
 	"os"
 	"reflect"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -21,6 +22,7 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/config"
 	"github.com/mhsanaei/3x-ui/v3/internal/database"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
+	"github.com/mhsanaei/3x-ui/v3/internal/eventbus"
 	"github.com/mhsanaei/3x-ui/v3/internal/logger"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/common"
 	"github.com/mhsanaei/3x-ui/v3/internal/util/netproxy"
@@ -206,6 +208,7 @@ var defaultValueMap = map[string]string{
 	"subClashAutoGroupTolerance":  "50",
 	"subLocalDirect":              "",
 	"subLocalDirectProxy":         "",
+	"subLocalDirectAwg":           "false",
 	"subJsonMux":                  "",
 	"subJsonRules":                "",
 	"subJsonRoutingRules":         "",
@@ -251,7 +254,7 @@ var defaultValueMap = map[string]string{
 	"ldapDefaultLimitIP":     "0",
 
 	// Event bus — per-subscriber event filtering (empty = all disabled)
-	"tgEnabledEvents":   "login.attempt,cpu.high," + DefaultHealthAlertEvents + ",node.traffic",
+	"tgEnabledEvents":   "login.attempt,cpu.high," + DefaultHealthAlertEvents + ",node.traffic,sub.leak",
 	"smtpEnabledEvents": "login.attempt,cpu.high",
 	"smtpCpu":           "80",
 	"smtpMemory":        "80",
@@ -259,7 +262,8 @@ var defaultValueMap = map[string]string{
 	// Consecutive failed observatory probes before an outbound.down event fires
 	"outboundDownThreshold": "3",
 
-	"nodeDownThreshold": "1",
+	"nodeDownThreshold":  "1",
+	"nodeSilenceMinutes": "30",
 
 	// Email (SMTP) notifications
 	"smtpEnable":         "false",
@@ -300,6 +304,9 @@ var defaultValueMap = map[string]string{
 	"connLogDestination":   "full",
 	"connLogSource":        "full",
 
+	// Admin audit log (still-ui): days an entry is kept before the cron prune.
+	"auditLogRetentionDays": "90",
+
 	// Server health alerts (still-ui): thresholds shared by every notifier
 	"alertXrayRestarts":      "3",
 	"alertXrayRestartWindow": "10",
@@ -307,6 +314,10 @@ var defaultValueMap = map[string]string{
 	"alertDisk":              "90",
 	"alertCertDays":          "7",
 	"alertRemindHours":       "6",
+
+	// Subscription leak alert (still-ui): networks in hours that make one subscription suspect
+	"subLeakNetworks":    "6",
+	"subLeakWindowHours": "24",
 }
 
 // DefaultHealthAlertEvents are the server health alerts a new panel sends to Telegram.
@@ -444,7 +455,8 @@ func getEnv(key, fallback string) string {
 func (s *SettingService) ResetSettings() error {
 	db := database.GetDB()
 	return db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("1 = 1").Delete(model.Setting{}).Error; err != nil {
+		// The audit prune anchor is journal state, not a setting: losing it breaks Verify.
+		if err := tx.Where("key <> ?", auditAnchorKey).Delete(model.Setting{}).Error; err != nil {
 			return err
 		}
 		paths := []model.Setting{
@@ -732,6 +744,16 @@ type ConnLogSettings struct {
 	Source        string
 }
 
+// GetAuditLogRetentionDays is how long audit entries are kept; a value under one day is refused
+// rather than read as "prune everything".
+func (s *SettingService) GetAuditLogRetentionDays() (int, error) {
+	days, err := s.getInt("auditLogRetentionDays")
+	if err == nil && days < 1 {
+		err = common.NewErrorf("audit log retention of %d days is not valid", days)
+	}
+	return days, err
+}
+
 // GetConnLogEnable reports whether the connection log is on; an unreadable switch reads as off.
 func (s *SettingService) GetConnLogEnable() bool {
 	enable, _ := s.getBool("connLogEnable")
@@ -791,6 +813,32 @@ func (s *SettingService) GetHealthAlertThresholds() HealthAlertThresholds {
 		CertDays:          read("alertCertDays"),
 		RemindHours:       read("alertRemindHours"),
 	}
+}
+
+// SubLeakAlert is when one subscription counts as leaked: fetched from Networks client networks
+// within Window.
+type SubLeakAlert struct {
+	Networks int
+	Window   time.Duration
+}
+
+// GetSubLeakAlert reads the sub.leak alert; on is false while the bot or the event is off.
+func (s *SettingService) GetSubLeakAlert() (cfg SubLeakAlert, on bool) {
+	if enabled, err := s.GetTgbotEnabled(); err != nil || !enabled {
+		return cfg, false
+	}
+	events, err := s.GetTgEnabledEvents()
+	if err != nil || !slices.Contains(strings.Split(strings.ReplaceAll(events, " ", ""), ","), string(eventbus.EventSubLeak)) {
+		return cfg, false
+	}
+	read := func(key string) int {
+		if v, err := s.getInt(key); err == nil && v > 0 {
+			return v
+		}
+		v, _ := strconv.Atoi(defaultValueMap[key])
+		return v
+	}
+	return SubLeakAlert{Networks: read("subLeakNetworks"), Window: time.Duration(read("subLeakWindowHours")) * time.Hour}, true
 }
 
 func (s *SettingService) GetTgBotBackup() (bool, error) {
@@ -1838,6 +1886,14 @@ func (s *SettingService) SetNodeDownThreshold(value int) error {
 	return s.setInt("nodeDownThreshold", value)
 }
 
+func (s *SettingService) GetNodeSilenceMinutes() (int, error) {
+	return s.getInt("nodeSilenceMinutes")
+}
+
+func (s *SettingService) SetNodeSilenceMinutes(value int) error {
+	return s.setInt("nodeSilenceMinutes", value)
+}
+
 // SecretClears marks redacted secrets the user explicitly emptied. Without a
 // flag, a blank submitted secret means "unchanged" (the field is always served
 // blank to the browser) and the stored value is preserved.
@@ -1879,6 +1935,11 @@ func (s *SettingService) UpdateAllSetting(allSetting *entity.AllSetting, clears 
 	}
 	if allSetting.ConnLogSource == "" {
 		allSetting.ConnLogSource = connLog.Source
+	}
+	if allSetting.AuditLogRetentionDays == 0 {
+		if allSetting.AuditLogRetentionDays, err = s.GetAuditLogRetentionDays(); err != nil {
+			return err
+		}
 	}
 	switch allSetting.SubProfileMode {
 	case "", SubProfileModeNone, SubProfileModeBuiltin, SubProfileModeCustom:

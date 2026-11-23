@@ -93,6 +93,7 @@ ID 的所有客户端。订阅 ID 就是邀请码，因此请保持其足够长�
   | `xray.crash`    | Xray-core 崩溃                                          |
   | `outbound.down` / `outbound.up` | 某个出站断开 / 恢复                      |
   | `node.down` / `node.up`         | 某个节点下线 / 重新上线                  |
+  | `sub.leak`      | 一个订阅在 `subLeakWindowHours` 小时内从 `subLeakNetworks` 个客户网络（IPv4 /24、IPv6 /48）被获取；只发一次，7 天后或网络数翻倍时再发。不会封锁任何东西。 |
 
 提醒的提前时间由 `expireDiff`（到期前的天数）和 `trafficDiff`
 （剩余配额的 GB 数）决定；两者默认均为 `0`（关闭）。
@@ -111,6 +112,7 @@ ID 的所有客户端。订阅 ID 就是邀请码，因此请保持其足够长�
 | `tgCpu` / `tgMemory` | `80` / `80`          | CPU / 内存告警阈值（百分比）。                 |
 | `tgLang`       | `en-US`                    | 机器人语言。                                   |
 | `tgEnabledEvents` | `login.attempt,cpu.high`| 投递哪些事件。                                 |
+| `subLeakNetworks` / `subLeakWindowHours` | `6` / `24` | `sub.leak` 的触发条件：网络数（2–64）与小时数（1–168）。 |
 
 <Callout type="warn">
   机器人令牌掌控着你的机器人——务必妥善保密，且只添加**可信的**管理员聊天 ID。

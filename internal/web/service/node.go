@@ -1014,6 +1014,9 @@ func (s *NodeService) UpdateHeartbeat(id int, p HeartbeatPatch) error {
 		updates["guid"] = p.Guid
 		s.warnOnDuplicateGuid(id, p.Guid)
 	}
+	if p.Status == "online" {
+		updates["last_seen_at"] = p.LastHeartbeat
+	}
 	if err := db.Model(model.Node{}).Where("id = ?", id).Updates(updates).Error; err != nil {
 		return err
 	}
@@ -1085,6 +1088,12 @@ func (s *NodeService) SetDownNotified(id int, notified bool) error {
 	return database.GetDB().Model(model.Node{}).
 		Where("id = ?", id).
 		Update("down_notified", notified).Error
+}
+
+func (s *NodeService) SetSilenceAlertAt(id int, at int64) error {
+	return database.GetDB().Model(model.Node{}).
+		Where("id = ?", id).
+		Update("silence_alert_at", at).Error
 }
 
 func (s *NodeService) MarkNodeInboundsAdopted(id int) error {
@@ -1392,6 +1401,11 @@ func (s *NodeService) probe(ctx context.Context, n *model.Node, proxyURL string)
 		return patch, errors.New(patch.LastError)
 	}
 	o := envelope.Obj
+	// Checked before any field is copied: a refused answer carries nothing the node reported.
+	if len(o.PanelGuid) > maxPanelGuidLen {
+		patch.LastError = fmt.Sprintf("remote panel reported a %d-byte panelGuid", len(o.PanelGuid))
+		return patch, errors.New(patch.LastError)
+	}
 	patch.CpuPct = o.CpuPct
 	patch.UnavailableMetrics = o.UnavailableMetrics
 	if o.Mem.Total > 0 {
@@ -1402,10 +1416,6 @@ func (s *NodeService) probe(ctx context.Context, n *model.Node, proxyURL string)
 	patch.XrayError = o.Xray.ErrorMsg
 	patch.PanelVersion = o.PanelVersion
 	patch.UpstreamVersion = o.UpstreamVersion
-	if len(o.PanelGuid) > maxPanelGuidLen {
-		patch.LastError = fmt.Sprintf("remote panel reported a %d-byte panelGuid", len(o.PanelGuid))
-		return patch, errors.New(patch.LastError)
-	}
 	patch.Guid = o.PanelGuid
 	patch.UptimeSecs = o.Uptime
 	patch.NetUp = o.NetIO.Up

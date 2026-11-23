@@ -45,53 +45,56 @@ export default function GeodataSection({ active, onBusy, onClose }: GeodataSecti
   const [template, setTemplate] = useState<Record<string, unknown> | null>(null);
   const outboundTestUrlRef = useRef('');
 
-  const load = useCallback(async () => {
-    try {
-      const msg = await HttpUtil.post('/panel/api/xray/', undefined, { silent: true });
-      if (!msg?.success || typeof msg.obj !== 'string') return;
-      const parsed = XrayConfigPayloadSchema.safeParse(JSON.parse(msg.obj));
-      if (!parsed.success) return;
-      const payload = parsed.data;
-      const next = payload.xraySetting as Record<string, unknown>;
-      setTemplate(next);
-      outboundTestUrlRef.current =
-        typeof payload.outboundTestUrl === 'string' ? payload.outboundTestUrl : '';
+  // State is set only in promise callbacks, so the activation effect starts the
+  // request without a synchronous setState.
+  const load = useCallback(
+    () =>
+      HttpUtil.post('/panel/api/xray/', undefined, { silent: true })
+        .then((msg) => {
+          if (!msg?.success || typeof msg.obj !== 'string') return;
+          const parsed = XrayConfigPayloadSchema.safeParse(JSON.parse(msg.obj));
+          if (!parsed.success) return;
+          const payload = parsed.data;
+          const next = payload.xraySetting as Record<string, unknown>;
+          setTemplate(next);
+          outboundTestUrlRef.current =
+            typeof payload.outboundTestUrl === 'string' ? payload.outboundTestUrl : '';
 
-      const geodata = (next.geodata || {}) as Record<string, unknown>;
-      const assets = Array.isArray(geodata.assets) ? geodata.assets : [];
-      setRows(
-        assets
-          .filter((a): a is Record<string, unknown> => !!a && typeof a === 'object')
-          .map((a) => ({ url: String(a.url ?? ''), file: String(a.file ?? '') })),
-      );
-      setCron(typeof geodata.cron === 'string' && geodata.cron ? geodata.cron : DEFAULT_CRON);
-      setOutbound(
-        typeof geodata.outbound === 'string' && geodata.outbound ? geodata.outbound : undefined,
-      );
-      setStandardSources(payload.geodataSources ?? []);
+          const geodata = (next.geodata || {}) as Record<string, unknown>;
+          const assets = Array.isArray(geodata.assets) ? geodata.assets : [];
+          setRows(
+            assets
+              .filter((a): a is Record<string, unknown> => !!a && typeof a === 'object')
+              .map((a) => ({ url: String(a.url ?? ''), file: String(a.file ?? '') })),
+          );
+          setCron(typeof geodata.cron === 'string' && geodata.cron ? geodata.cron : DEFAULT_CRON);
+          setOutbound(
+            typeof geodata.outbound === 'string' && geodata.outbound ? geodata.outbound : undefined,
+          );
+          setStandardSources(payload.geodataSources ?? []);
 
-      // Download outbound candidates: template outbounds + subscription outbounds.
-      // Skip blackhole outbounds — routing a download through one just drops it.
-      const tags = new Set<string>();
-      const outbounds = Array.isArray(next.outbounds) ? next.outbounds : [];
-      for (const o of outbounds) {
-        if (!o || typeof o !== 'object') continue;
-        const rec = o as Record<string, unknown>;
-        if (isOutboundProtocol(rec, 'blackhole')) continue;
-        const tag = rec.tag;
-        if (typeof tag === 'string' && tag) tags.add(tag);
-      }
-      const subTags = Array.isArray(payload.subscriptionOutboundTags)
-        ? payload.subscriptionOutboundTags
-        : [];
-      for (const tag of subTags) {
-        if (typeof tag === 'string' && tag) tags.add(tag);
-      }
-      setOutboundTags([...tags]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+          // Download outbound candidates: template outbounds + subscription outbounds.
+          // Skip blackhole outbounds — routing a download through one just drops it.
+          const tags = new Set<string>();
+          const outbounds = Array.isArray(next.outbounds) ? next.outbounds : [];
+          for (const o of outbounds) {
+            if (!o || typeof o !== 'object') continue;
+            const rec = o as Record<string, unknown>;
+            if (isOutboundProtocol(rec, 'blackhole')) continue;
+            const tag = rec.tag;
+            if (typeof tag === 'string' && tag) tags.add(tag);
+          }
+          const subTags = Array.isArray(payload.subscriptionOutboundTags)
+            ? payload.subscriptionOutboundTags
+            : [];
+          for (const tag of subTags) {
+            if (typeof tag === 'string' && tag) tags.add(tag);
+          }
+          setOutboundTags([...tags]);
+        })
+        .finally(() => setLoading(false)),
+    [],
+  );
 
   const [wasActive, setWasActive] = useState(false);
   if (active !== wasActive) {

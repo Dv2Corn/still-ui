@@ -29,8 +29,8 @@ func disableInboundRow(t *testing.T, id int) {
 // was the one path that could still put two inbounds on one socket.
 func TestSetInboundEnableRefusesAPortAnotherEnabledInboundServes(t *testing.T) {
 	setupEnablePortTest(t)
-	seedInboundConflict(t, "holder", "0.0.0.0", 44431, model.VLESS, `{"network":"tcp"}`, `{}`)
-	seedInboundConflict(t, "sleeper", "0.0.0.0", 44431, model.VLESS, `{"network":"tcp"}`, `{}`)
+	seedInboundConflict(t, "holder", "0.0.0.0", 44431, model.VLESS, `{"network":"tcp"}`, vlessSettings)
+	seedInboundConflict(t, "sleeper", "0.0.0.0", 44431, model.VLESS, `{"network":"tcp"}`, vlessSettings)
 	sleeper := loadInboundByTag(t, "sleeper")
 	disableInboundRow(t, sleeper.Id)
 
@@ -50,8 +50,8 @@ func TestSetInboundEnableRefusesAPortAnotherEnabledInboundServes(t *testing.T) {
 // allow, or it would refuse half of the working setups out there.
 func TestSetInboundEnableAllowsTCPUDPCoexistence(t *testing.T) {
 	setupEnablePortTest(t)
-	seedInboundConflict(t, "udp-holder", "0.0.0.0", 44432, model.Hysteria, ``, `{}`)
-	seedInboundConflict(t, "tcp-sleeper", "0.0.0.0", 44432, model.VLESS, `{"network":"tcp"}`, `{}`)
+	seedInboundConflict(t, "udp-holder", "0.0.0.0", 44432, model.Hysteria, hysteriaStream, hysteriaSettings)
+	seedInboundConflict(t, "tcp-sleeper", "0.0.0.0", 44432, model.VLESS, `{"network":"tcp"}`, vlessSettings)
 	sleeper := loadInboundByTag(t, "tcp-sleeper")
 	disableInboundRow(t, sleeper.Id)
 
@@ -67,13 +67,13 @@ func TestSetInboundEnableAllowsTCPUDPCoexistence(t *testing.T) {
 // stay enableable.
 func TestSetInboundEnableAllowsANodeRowOnALocalPort(t *testing.T) {
 	setupEnablePortTest(t)
-	seedInboundConflict(t, "local-holder", "0.0.0.0", 44433, model.VLESS, `{"network":"tcp"}`, `{}`)
+	seedInboundConflict(t, "local-holder", "0.0.0.0", 44433, model.VLESS, `{"network":"tcp"}`, vlessSettings)
 
 	node := &model.Node{Name: "n1", Address: "127.0.0.1", Port: 2096, Scheme: "https", Enable: true, Status: "online"}
 	if err := database.GetDB().Create(node).Error; err != nil {
 		t.Fatalf("seed node: %v", err)
 	}
-	seedInboundConflictNode(t, "node-row", "0.0.0.0", 44433, model.VLESS, `{"network":"tcp"}`, `{}`, &node.Id)
+	seedInboundConflictNode(t, "node-row", "0.0.0.0", 44433, model.VLESS, `{"network":"tcp"}`, vlessSettings, &node.Id)
 	row := loadInboundByTag(t, "node-row")
 	disableInboundRow(t, row.Id)
 

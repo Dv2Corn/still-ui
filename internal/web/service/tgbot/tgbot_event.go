@@ -208,6 +208,7 @@ var healthAlertKeys = map[eventbus.EventType][2]string{
 	eventbus.EventDiskHigh:      {"alertDisk", "alertDiskResolved"},
 	eventbus.EventCertExpiring:  {"alertCertExpiring", "alertCertRenewed"},
 	eventbus.EventBackupFailed:  {"alertBackupFailed", "alertBackupResolved"},
+	eventbus.EventNodeSilent:    {"alertNodeSilent", "alertNodeSilentBack"},
 }
 
 // healthAlertMessage picks the message and its icon: the problem, or its fix; a certificate
@@ -215,6 +216,9 @@ var healthAlertKeys = map[eventbus.EventType][2]string{
 func healthAlertMessage(eventType eventbus.EventType, data *eventbus.HealthAlertData) (key, icon string) {
 	if eventType == eventbus.EventNodeTraffic && data != nil {
 		return nodeTrafficAlertMessage(data)
+	}
+	if eventType == eventbus.EventSubLeak && data != nil {
+		return "alertSubLeak", "⚠️ "
 	}
 	keys, ok := healthAlertKeys[eventType]
 	if !ok || data == nil {
