@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>still-ui — یک بار راه‌اندازی کنید و فراموشش کنید</title>
+<meta name="description" content="still-ui انشعابی از پنل 3x-ui برای Xray-core است: تنظیمات کاربران از بین نمی‌رود، Xray با راه‌اندازی مجدد پنل قطع نمی‌شود و پنل روی سرور ۲ گیگابایتی سبک می‌ماند.">
+<meta property="og:title" content="still-ui">
+<meta property="og:description" content="still-ui انشعابی از پنل 3x-ui برای Xray-core است: تنظیمات کاربران از بین نمی‌رود، Xray با راه‌اندازی مجدد پنل قطع نمی‌شود و پنل روی سرور ۲ گیگابایتی سبک می‌ماند.">
+<meta property="og:image" content="https://dv2corn.github.io/still-ui/media/still-ui-overview-dark.png">
+<link rel="alternate" hreflang="en" href="https://dv2corn.github.io/still-ui/"><link rel="alternate" hreflang="ru" href="https://dv2corn.github.io/still-ui/ru/"><link rel="alternate" hreflang="zh" href="https://dv2corn.github.io/still-ui/zh/"><link rel="alternate" hreflang="fa" href="https://dv2corn.github.io/still-ui/fa/">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<div class="w">
+<nav><b>still-ui</b><span><a href="https://github.com/Dv2Corn/still-ui#readme">مستندات</a><a href="https://github.com/Dv2Corn/still-ui/releases/latest">نسخه‌ها</a><a href="https://github.com/Dv2Corn/still-ui">GitHub</a><select class="lang" aria-label="Language" onchange="location.href=this.value"><option value="../" lang="en">English</option><option value="../ru/" lang="ru">Русский</option><option value="../zh/" lang="zh">中文</option><option value="../fa/" selected lang="fa">فارسی</option></select></span></nav>
+
+<header>
+  <h1>یک بار راه‌اندازی کنید.<br>بعد فراموشش کنید.</h1>
+  <p class="lead">still-ui یک پنل VPN برای Xray-core است که بر پایه 3x-ui ساخته شده؛ برای سرورهایی که ماه‌ها با ۲&nbsp;گیگابایت رم کار می‌کنند و کاربرانشان روی اینترنت همراه هستند.</p>
+  <div class="cmd" dir="ltr"><code id="c">bash &lt;(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh)</code><button onclick="navigator.clipboard.writeText(document.getElementById('c').textContent);this.textContent='کپی شد'">کپی</button></div>
+  <p class="sub">Linux amd64 / arm64 · با دسترسی root اجرا می‌شود · در پایان آدرس پنل، نام کاربری و رمز عبور را نشان می‌دهد</p>
+  <picture class="shot">
+    <source srcset="../media/still-ui-mobile-dark.png" media="(max-width: 600px)">
+    <source srcset="../media/still-ui-overview-dark.png" media="(prefers-color-scheme: dark)">
+    <img src="../media/still-ui-overview-light.png" alt="صفحه نمای کلی still-ui" width="1440" height="900">
+  </picture>
+</header>
+
+<section>
+  <h2>مشکلاتی که قبلاً داشتید، حل شده‌اند.</h2>
+  <p class="sec-lead">هر چه 3x-ui انجام می‌دهد همچنان کار می‌کند: همان پروتکل‌ها، همان رابط و همان پایگاه داده. still-ui چیزهایی را درست می‌کند که پس از چند ماه روی یک سرور کوچک خراب می‌شوند.</p>
+  <div class="grid"><div class="card"><h3>کاربران تنظیماتشان را از دست نمی‌دهند</h3><p>به‌روزرسانی کاربر از طریق API با بخشی از فیلدها دیگر او را غیرفعال نمی‌کند و محدودیت‌ها، شناسه تلگرام و تنظیمات تمدید را پاک نمی‌کند.</p></div><div class="card"><h3>راه‌اندازی مجدد پنل کسی را قطع نمی‌کند</h3><p>Xray به‌صورت یک سرویس جداگانه و ایزوله اجرا می‌شود. پنل را به‌روز یا ری‌استارت کنید و کاربران Xray متصل می‌مانند.</p></div><div class="card"><h3>پنل سبک می‌ماند</h3><p>سقف حافظه از نصب‌کننده و بافرهای قابل استفاده مجدد AmneziaWG: پنلی که از کنترل خارج شود ری‌استارت می‌شود، نه اینکه سرور را به swap بکشاند.</p></div><div class="card"><h3>اثر انگشت iOS و sing-box دوباره کار می‌کنند</h3><p>یک بیلد قابل بازتولید از Xray با وصله‌ای یک‌خطی در REALITY، ClientHello کوتاه <code>ios</code> را که شبکه‌های همراه عبور می‌دهند دوباره می‌پذیرد.</p></div><div class="card"><h3>گواهی‌ها خودشان تمدید می‌شوند</h3><p>پنل بررسی می‌کند هر اینباند واقعاً چه گواهی‌ای ارائه می‌دهد و فقط Xray را، و فقط وقتی گواهی جدید بارگذاری نشده، ری‌استارت می‌کند.</p></div><div class="card"><h3>سایت‌های داخلی مستقیم باز می‌شوند</h3><p>یک تنظیم: سایت‌های بانک‌ها و سازمان‌های دولتی کشور شما بدون VPN باز می‌شوند و بقیه از VPN عبور می‌کند. در همه قالب‌های اشتراک.</p></div></div>
+</section>
+
+<section>
+  <h2>اندازه‌گیری شده، نه وعده.</h2>
+  <p class="sec-lead">سرور 2 vCPU / 2 GiB، ۱۰۰ اتصال کوتاه AmneziaWG در ثانیه به مدت ۵ دقیقه، هر کدام ۳ بار. <a href="https://github.com/Dv2Corn/still-ui/tree/main/bench/awg-relay-churn">روش و داده‌های خام</a>.</p>
+  <div class="grid"><div class="card"><span class="num">403 → 176 MiB</span><p>میانگین حافظه پنل زیر بار: 3x-ui v3.11.0 در برابر still-ui.</p></div><div class="card"><span class="num">525 → 211 MiB</span><p>اوج حافظه پنل در همان آزمایش.</p></div><div class="card"><span class="num">۷۲ ساعت</span><p>بار ترکیبی با ۲۰۰ کاربر کنار 3x-ui: بدون رشد حافظه، گوروتین‌ها و توصیف‌گرها ثابت، بدون ری‌استارت.</p></div></div>
+</section>
+
+<section>
+  <h2>از 3x-ui استفاده می‌کنید؟ یک دستور.</h2>
+  <p class="sec-lead">نصب‌کننده پایگاه داده 3x-ui را پیدا می‌کند، اینباندها، کاربران و اشتراک‌ها را منتقل می‌کند و یکسان بودنشان را بررسی می‌کند. لینک‌های کاربران تغییر نمی‌کند و یک دستور دیگر 3x-ui را برمی‌گرداند.</p>
+  <div class="cmd" dir="ltr"><code id="m">bash &lt;(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh) migrate</code><button onclick="navigator.clipboard.writeText(document.getElementById('m').textContent);this.textContent='کپی شد'">کپی</button></div>
+  <p class="sub" style="text-align:center">Marzban و x-ui قدیمی: <code dir="ltr">still-ui import marzban /var/lib/marzban</code></p>
+</section>
+
+<section>
+  <h2>still-ui و 3x-ui در کنار هم.</h2>
+  <p class="sec-lead">بر پایه 3x-ui v3.11.0. جزئیات هر سطر در README است. <a href="https://github.com/Dv2Corn/still-ui/blob/main/README.fa.md">README</a></p>
+  <table>
+    <tr><th>در 3x-ui 3.11.0</th><th>در still-ui</th></tr>
+    <tr><td>از Xray 26.9 سرور اثر انگشت <code>ios</code> و همه کلاینت‌های sing-box را رد می‌کند</td><td>بیلد وصله‌شده Xray دوباره آن‌ها را می‌پذیرد</td></tr><tr><td>ری‌استارت یا به‌روزرسانی پنل همه کاربران را قطع می‌کند</td><td>Xray سرویس جداگانه است و ری‌استارت پنل کاربران Xray را قطع نمی‌کند</td></tr><tr><td>حافظه پنل زیر ترافیک AmneziaWG رشد می‌کند و ممکن است سرور کوچک را به swap بکشاند</td><td>بافرهای قابل استفاده مجدد و سقف حافظه برای پنل</td></tr><tr><td>ربات تلگرام پایگاه داده را رمزنشده ارسال می‌کند</td><td>پشتیبان‌ها با کلید شما رمز می‌شوند، طبق برنامه، با دستور بازیابی</td></tr><tr><td>به‌روزرسانی جزئی کاربر از طریق API او را غیرفعال و فیلدها را پاک می‌کند</td><td>فیلدهایی که ارسال نشوند حفظ می‌شوند</td></tr><tr><td>دستگاهی که از محدودیت HWID بگذرد فقط 404 می‌گیرد</td><td>پیام روشن در برنامه، محدودیت پیش‌فرض پنل و حذف خودکار دستگاه‌های قدیمی</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2>ساخته شده برای بررسی.</h2>
+  <p class="sec-lead">شما این را با دسترسی root روی سرور خود اجرا می‌کنید. لازم نیست حرف ما را باور کنید.</p>
+  <div class="grid"><div class="card"><h3>بیلدهای تأییدشده</h3><p>هر آرشیو نسخه را GitHub Actions می‌سازد و گواهی ساخت دارد. <code>gh attestation verify</code> منبع آن را نشان می‌دهد.</p></div><div class="card"><h3>نصب‌کننده قابل بررسی</h3><p>هر نسخه <code>install.sh</code> خود را در <code>SHA256SUMS</code> منتشر می‌کند. نصب‌کننده آرشیوی را که checksum آن نیست یا اشتباه است رد می‌کند.</p></div><div class="card"><h3>گزارشی که می‌شود بررسی کرد</h3><p>اقدامات مدیران در یک گزارش حسابرسی با زنجیره هش ثبت می‌شود و پنل می‌تواند بررسی کند که هیچ رکوردی تغییر نکرده یا حذف نشده است.</p></div></div>
+</section>
+
+<section>
+  <h2>ببینید.</h2>
+  <div class="pair">
+    <picture><source srcset="../media/still-ui-presets-dark.png" media="(prefers-color-scheme: dark)"><img src="../media/still-ui-presets-light.png" alt="پیش‌تنظیم‌های اینباند برای شبکه‌های همراه" loading="lazy"></picture>
+    <picture><source srcset="../media/still-ui-client-dark.png" media="(prefers-color-scheme: dark)"><img src="../media/still-ui-client-light.png" alt="کارت کاربر با کد QR" loading="lazy"></picture>
+  </div>
+</section>
+
+<footer>
+  still-ui انشعابی مستقل از <a href="https://github.com/MHSanaei/3x-ui">3x-ui</a> اثر MHSanaei با مجوز GPL-3.0 است و با نویسندگان 3x-ui ارتباطی ندارد و مورد تأیید آن‌ها نیست.<br>
+  <a href="https://github.com/Dv2Corn/still-ui/issues">گزارش مشکل</a> · <a href="https://github.com/Dv2Corn/still-ui/blob/main/SECURITY.md">امنیت</a>
+</footer>
+</div>
+</body>
+</html>
