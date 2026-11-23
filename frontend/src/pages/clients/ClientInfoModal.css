@@ -1,6 +1,7 @@
 .info-table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
 }
 
 .info-table.block {
@@ -20,7 +21,8 @@
 }
 
 .info-large-tag {
-  max-width: 100%;
+  /* leaves room for the copy button on the same line */
+  max-width: calc(100% - 32px);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
