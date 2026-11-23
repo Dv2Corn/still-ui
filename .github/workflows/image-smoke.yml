@@ -1,0 +1,61 @@
+name: Image smoke test
+
+# Pulls a published ghcr.io image and runs it on real amd64 and arm64 runners:
+# the panel must answer on 2053 and the bundled Xray must start.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Image tag to test, e.g. 1.11.0"
+        required: true
+  workflow_run:
+    workflows: ["Release still-ui"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    steps:
+      - name: Pick the version
+        id: v
+        env:
+          INPUT: ${{ inputs.version }}
+          TAG: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          v="${INPUT:-${TAG#v}}"
+          # Only a plain release version reaches the docker commands below.
+          [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "not a release version: '$v'" >&2; exit 1; }
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      - name: Run the image
+        env:
+          IMAGE: ghcr.io/${{ github.repository_owner }}/still-ui:${{ steps.v.outputs.version }}
+        run: |
+          image="${IMAGE,,}"
+          docker pull "$image"
+          docker image inspect "$image" --format 'arch={{.Architecture}}'
+          docker run -d --name still-ui -p 127.0.0.1:2053:2053 "$image"
+          for _ in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:2053/ || true)
+            [[ "$code" =~ ^(200|301|302|307|308)$ ]] && break
+            sleep 2
+          done
+          echo "panel HTTP $code"
+          for _ in $(seq 1 30); do
+            docker logs still-ui 2>&1 | grep -qi 'xray.*started' && break
+            sleep 2
+          done
+          # The first start prints a generated login; show only Xray and error lines.
+          docker logs still-ui 2>&1 | grep -iE 'xray|error|panic|fatal' | grep -viE 'user|pass' | tail -n 20 || true
+          [[ "$code" =~ ^(200|301|302|307|308)$ ]] || { echo "panel did not answer" >&2; exit 1; }
+          docker logs still-ui 2>&1 | grep -qi 'xray.*started' || { echo "Xray did not start" >&2; exit 1; }
+          docker rm -f still-ui
