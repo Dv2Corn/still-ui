@@ -848,7 +848,11 @@
         "peerNumberConfig": "Peer {n} 設定"
       },
       "sniffingDestOverride": "宛先のオーバーライド",
-      "advancedTitle": "詳細設定"
+      "advancedTitle": "詳細設定",
+      "firstRun": {
+        "title": "用意されたインバウンドから始める",
+        "manual": "手動で設定"
+      }
     },
     "clients": {
       "tabBasics": "基本",

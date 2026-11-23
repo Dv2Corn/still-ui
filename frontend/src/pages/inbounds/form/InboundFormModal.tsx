@@ -199,6 +199,7 @@ interface InboundFormModalProps {
   dbInbounds: DBInbound[];
   availableNodes?: NodeRecord[];
   availableNodesFetched?: boolean;
+  initialPreset?: InboundPreset | null;
 }
 
 function buildAddModeValues(): InboundFormValues {
@@ -257,6 +258,7 @@ export default function InboundFormModal({
   dbInbounds,
   availableNodes,
   availableNodesFetched = true,
+  initialPreset = null,
 }: InboundFormModalProps) {
   const { t } = useTranslation();
   const uid = useId();
@@ -508,9 +510,10 @@ export default function InboundFormModal({
     } else {
       loadFallbacks(null);
     }
+    if (mode === 'add' && initialPreset) applyPreset(initialPreset);
 
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
-  }, [open, mode, dbInbound, methods]);
+  }, [open, mode, dbInbound, methods, initialPreset]);
 
   useEffect(() => {
     if (!open) return;

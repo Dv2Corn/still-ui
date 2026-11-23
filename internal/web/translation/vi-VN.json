@@ -848,7 +848,11 @@
         "peerNumberConfig": "Cấu hình Peer {n}"
       },
       "sniffingDestOverride": "Ghi đè đích",
-      "advancedTitle": "Cài đặt nâng cao"
+      "advancedTitle": "Cài đặt nâng cao",
+      "firstRun": {
+        "title": "Bắt đầu với một inbound có sẵn",
+        "manual": "Thiết lập thủ công"
+      }
     },
     "clients": {
       "tabBasics": "Cơ bản",

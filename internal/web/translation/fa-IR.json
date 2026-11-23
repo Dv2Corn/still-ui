@@ -848,7 +848,11 @@
         "peerNumberConfig": "پیکربندی Peer {n}"
       },
       "sniffingDestOverride": "بازنویسی مقصد",
-      "advancedTitle": "تنظیمات پیشرفته"
+      "advancedTitle": "تنظیمات پیشرفته",
+      "firstRun": {
+        "title": "با یک ورودی آماده شروع کنید",
+        "manual": "تنظیم دستی"
+      }
     },
     "clients": {
       "tabBasics": "پایه",

@@ -848,7 +848,11 @@
         "peerNumberConfig": "Конфіг Peer {n}"
       },
       "sniffingDestOverride": "Перевизначення призначення",
-      "advancedTitle": "Додаткові налаштування"
+      "advancedTitle": "Додаткові налаштування",
+      "firstRun": {
+        "title": "Почніть з готового підключення",
+        "manual": "Налаштувати вручну"
+      }
     },
     "clients": {
       "tabBasics": "Основні",
