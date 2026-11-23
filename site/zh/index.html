@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>still-ui — 设置一次，从此省心</title>
+<meta name="description" content="still-ui 是基于 3x-ui 的 Xray-core 面板分支：客户端设置不丢失，Xray 在面板重启时不断线，2 GB 服务器上面板占用保持很小。">
+<meta property="og:title" content="still-ui">
+<meta property="og:description" content="still-ui 是基于 3x-ui 的 Xray-core 面板分支：客户端设置不丢失，Xray 在面板重启时不断线，2 GB 服务器上面板占用保持很小。">
+<meta property="og:image" content="https://dv2corn.github.io/still-ui/media/still-ui-overview-dark.png">
+<link rel="alternate" hreflang="en" href="https://dv2corn.github.io/still-ui/"><link rel="alternate" hreflang="ru" href="https://dv2corn.github.io/still-ui/ru/"><link rel="alternate" hreflang="zh" href="https://dv2corn.github.io/still-ui/zh/"><link rel="alternate" hreflang="ar" href="https://dv2corn.github.io/still-ui/ar/">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<div class="w">
+<nav><b>still-ui</b><span><a href="https://github.com/Dv2Corn/still-ui#readme">文档</a><a href="https://github.com/Dv2Corn/still-ui/releases/latest">发布</a><a href="https://github.com/Dv2Corn/still-ui">GitHub</a><select class="lang" aria-label="Language" onchange="location.href=this.value"><option value="../" lang="en">English</option><option value="../ru/" lang="ru">Русский</option><option value="../zh/" selected lang="zh">中文</option><option value="../ar/" lang="ar">العربية</option></select></span></nav>
+
+<header>
+  <h1>设置一次。<br>从此省心。</h1>
+  <p class="lead">still-ui 是基于 3x-ui 的 Xray-core VPN 面板，专为在 2&nbsp;GB 内存上连续运行数月、用户使用移动网络的服务器而打造。</p>
+  <div class="cmd" dir="ltr"><code id="c">bash &lt;(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh)</code><button onclick="navigator.clipboard.writeText(document.getElementById('c').textContent);this.textContent='已复制'">复制</button></div>
+  <p class="sub">Linux amd64 / arm64 · 以 root 运行 · 结束时显示面板地址、用户名和密码</p>
+  <picture class="shot">
+    <source srcset="../media/still-ui-mobile-dark.png" media="(max-width: 600px)">
+    <source srcset="../media/still-ui-overview-dark.png" media="(prefers-color-scheme: dark)">
+    <img src="../media/still-ui-overview-light.png" alt="still-ui 概览页面" width="1440" height="900">
+  </picture>
+</header>
+
+<section>
+  <h2>曾经的痛点，已经修好。</h2>
+  <p class="sec-lead">3x-ui 的一切照常可用：相同的协议、相同的界面、相同的数据库。still-ui 修复的是小服务器运行几个月后才会出现的问题。</p>
+  <div class="grid"><div class="card"><h3>客户端保留设置</h3><p>通过 API 只更新部分字段时，客户端不再被禁用，限额、Telegram ID 和续期设置也不再被清空。</p></div><div class="card"><h3>重启面板不掉线</h3><p>Xray 作为独立的沙箱服务运行。更新或重启面板，Xray 客户端保持连接。</p></div><div class="card"><h3>面板保持轻量</h3><p>安装程序设置内存上限，AmneziaWG 缓冲区复用：失控的面板会被重启，而不是把服务器拖进 swap。</p></div><div class="card"><h3>iOS 指纹和 sing-box 重新可用</h3><p>可复现的 Xray 构建加上一处 REALITY 补丁，重新接受移动网络放行的短 <code>ios</code> ClientHello。</p></div><div class="card"><h3>证书自动续期生效</h3><p>面板检查每个入站实际提供的证书，仅在新证书未被加载时才只重启 Xray。</p></div><div class="card"><h3>本地网站直连</h3><p>一个设置：本国的银行和政府网站不走 VPN，其余流量走 VPN。适用于所有订阅格式。</p></div></div>
+</section>
+
+<section>
+  <h2>实测数据，而非承诺。</h2>
+  <p class="sec-lead">2 vCPU / 2 GiB 服务器，每秒 100 个短 AmneziaWG 连接，持续 5 分钟，各测 3 次。 <a href="https://github.com/Dv2Corn/still-ui/tree/main/bench/awg-relay-churn">测试方法与原始数据</a>.</p>
+  <div class="grid"><div class="card"><span class="num">403 → 176 MiB</span><p>负载下面板平均内存：3x-ui v3.11.0 对比 still-ui。</p></div><div class="card"><span class="num">525 → 211 MiB</span><p>同一测试中的面板内存峰值。</p></div><div class="card"><span class="num">72 小时</span><p>200 个用户的混合负载，与 3x-ui 并行：内存无增长，goroutine 和文件描述符平稳，无重启。</p></div></div>
+</section>
+
+<section>
+  <h2>已经在用 3x-ui？一条命令。</h2>
+  <p class="sec-lead">安装程序会找到 3x-ui 数据库，迁移入站、客户端和订阅，并检查结果一致。用户的链接保持不变。另一条命令可以切回 3x-ui。</p>
+  <div class="cmd" dir="ltr"><code id="m">bash &lt;(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh) migrate</code><button onclick="navigator.clipboard.writeText(document.getElementById('m').textContent);this.textContent='已复制'">复制</button></div>
+  <p class="sub" style="text-align:center">Marzban 和旧版 x-ui： <code dir="ltr">still-ui import marzban /var/lib/marzban</code></p>
+</section>
+
+<section>
+  <h2>still-ui 与 3x-ui 对比。</h2>
+  <p class="sec-lead">基于 3x-ui v3.11.0。每一项的详情见 README。 <a href="https://github.com/Dv2Corn/still-ui/blob/main/README.zh.md">README</a></p>
+  <table>
+    <tr><th>3x-ui 3.11.0</th><th>still-ui</th></tr>
+    <tr><td>自 Xray 26.9 起，服务器拒绝 <code>ios</code> 指纹和所有 sing-box 客户端</td><td>打过补丁的 Xray 构建重新接受它们</td></tr><tr><td>重启或更新面板会断开所有客户端</td><td>Xray 是独立服务，重启面板不影响 Xray 客户端</td></tr><tr><td>AmneziaWG 流量下面板内存增长，可能把小服务器拖进 swap</td><td>缓冲区复用，并为面板设置内存上限</td></tr><tr><td>Telegram 机器人发送未加密的数据库</td><td>备份用你的密钥加密、按计划执行，并提供恢复命令</td></tr><tr><td>通过 API 部分更新客户端会禁用它并清空字段</td><td>未发送的字段会被保留</td></tr><tr><td>超出 HWID 限制的设备只收到 404</td><td>应用内清晰提示、面板级默认限制、旧设备自动过期</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2>可以验证。</h2>
+  <p class="sec-lead">你在自己的服务器上用 root 运行它，不必只听我们怎么说。</p>
+  <div class="grid"><div class="card"><h3>可证明的构建</h3><p>每个发布包都由 GitHub Actions 构建并附带构建证明。<code>gh attestation verify</code> 可以查看来源。</p></div><div class="card"><h3>可校验的安装程序</h3><p>每个版本都在 <code>SHA256SUMS</code> 中发布自己的 <code>install.sh</code>。校验和缺失或不符的包会被拒绝。</p></div><div class="card"><h3>可验证的日志</h3><p>管理员操作写入哈希链审计日志，面板可以检查是否有记录被修改或删除。</p></div></div>
+</section>
+
+<section>
+  <h2>看看界面。</h2>
+  <div class="pair">
+    <picture><source srcset="../media/still-ui-presets-dark.png" media="(prefers-color-scheme: dark)"><img src="../media/still-ui-presets-light.png" alt="移动网络入站预设" loading="lazy"></picture>
+    <picture><source srcset="../media/still-ui-client-dark.png" media="(prefers-color-scheme: dark)"><img src="../media/still-ui-client-light.png" alt="带二维码的客户端卡片" loading="lazy"></picture>
+  </div>
+</section>
+
+<footer>
+  still-ui 是 MHSanaei 的 <a href="https://github.com/MHSanaei/3x-ui">3x-ui</a> 的独立分支，采用 GPL-3.0 许可。本项目与 3x-ui 作者无关，也未获其认可。<br>
+  <a href="https://github.com/Dv2Corn/still-ui/issues">报告问题</a> · <a href="https://github.com/Dv2Corn/still-ui/blob/main/SECURITY.md">安全</a>
+</footer>
+</div>
+</body>
+</html>

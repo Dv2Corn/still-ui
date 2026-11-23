@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>still-ui — настроил один раз и забыл</title>
+<meta name="description" content="still-ui — форк панели 3x-ui для Xray-core: клиенты не теряют настройки, Xray переживает перезапуск панели, панель не разрастается на сервере с 2 ГБ.">
+<meta property="og:title" content="still-ui">
+<meta property="og:description" content="still-ui — форк панели 3x-ui для Xray-core: клиенты не теряют настройки, Xray переживает перезапуск панели, панель не разрастается на сервере с 2 ГБ.">
+<meta property="og:image" content="https://dv2corn.github.io/still-ui/media/still-ui-overview-dark.png">
+<link rel="alternate" hreflang="en" href="https://dv2corn.github.io/still-ui/"><link rel="alternate" hreflang="ru" href="https://dv2corn.github.io/still-ui/ru/"><link rel="alternate" hreflang="zh" href="https://dv2corn.github.io/still-ui/zh/"><link rel="alternate" hreflang="ar" href="https://dv2corn.github.io/still-ui/ar/">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<div class="w">
+<nav><b>still-ui</b><span><a href="https://github.com/Dv2Corn/still-ui#readme">Документация</a><a href="https://github.com/Dv2Corn/still-ui/releases/latest">Выпуски</a><a href="https://github.com/Dv2Corn/still-ui">GitHub</a><select class="lang" aria-label="Language" onchange="location.href=this.value"><option value="../" lang="en">English</option><option value="../ru/" selected lang="ru">Русский</option><option value="../zh/" lang="zh">中文</option><option value="../ar/" lang="ar">العربية</option></select></span></nav>
+
+<header>
+  <h1>Настроил один раз.<br>И забыл.</h1>
+  <p class="lead">still-ui — VPN-панель для Xray-core на основе 3x-ui. Для серверов, которые месяцами работают на 2&nbsp;ГБ памяти, а клиенты сидят в мобильных сетях.</p>
+  <div class="cmd" dir="ltr"><code id="c">bash &lt;(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh)</code><button onclick="navigator.clipboard.writeText(document.getElementById('c').textContent);this.textContent='Скопировано'">Копировать</button></div>
+  <p class="sub">Linux amd64 / arm64 · запуск от root · в конце покажет адрес панели, логин и пароль</p>
+  <picture class="shot">
+    <source srcset="../media/still-ui-mobile-dark.png" media="(max-width: 600px)">
+    <source srcset="../media/still-ui-overview-dark.png" media="(prefers-color-scheme: dark)">
+    <img src="../media/still-ui-overview-light.png" alt="Главная страница still-ui" width="1440" height="900">
+  </picture>
+</header>
+
+<section>
+  <h2>То, что раньше болело. Починено.</h2>
+  <p class="sec-lead">Всё, что умеет 3x-ui, работает: те же протоколы, тот же интерфейс, та же база. still-ui чинит то, что ломается на маленьком сервере через пару месяцев.</p>
+  <div class="grid"><div class="card"><h3>Клиенты не теряют настройки</h3><p>Обновление клиента через API с частью полей больше не выключает его и не стирает лимиты, Telegram ID и продление.</p></div><div class="card"><h3>Перезапуск панели никого не отключает</h3><p>Xray работает отдельной изолированной службой. Обновили или перезапустили панель — клиенты Xray остались на связи.</p></div><div class="card"><h3>Панель не разрастается</h3><p>Потолок памяти от установщика и переиспользуемые буферы AmneziaWG: зависшая панель перезапускается, а не загоняет сервер в своп.</p></div><div class="card"><h3>Снова работают iOS-отпечаток и sing-box</h3><p>Воспроизводимая сборка Xray с правкой REALITY в одну строку принимает короткий ClientHello <code>ios</code>, который пропускают мобильные сети.</p></div><div class="card"><h3>Сертификаты продлеваются сами</h3><p>Панель проверяет, какой сертификат реально отдаёт каждый вход, и перезапускает только Xray и только если новый не подхватился.</p></div><div class="card"><h3>Российские сайты — напрямую</h3><p>Одна настройка: банки и госуслуги открываются без VPN, остальное идёт через него. Во всех форматах подписки.</p></div></div>
+</section>
+
+<section>
+  <h2>Измерено, а не обещано.</h2>
+  <p class="sec-lead">Сервер 2 vCPU / 2 ГиБ, 100 коротких подключений AmneziaWG в секунду в течение 5 минут, по 3 прогона. <a href="https://github.com/Dv2Corn/still-ui/tree/main/bench/awg-relay-churn">Методика и сырые данные</a>.</p>
+  <div class="grid"><div class="card"><span class="num">403 → 176 МиБ</span><p>Средняя память панели под нагрузкой: 3x-ui v3.11.0 против still-ui.</p></div><div class="card"><span class="num">525 → 211 МиБ</span><p>Пик памяти панели в том же тесте.</p></div><div class="card"><span class="num">72 ч</span><p>Смешанная нагрузка, 200 пользователей, рядом с 3x-ui: память не растёт, горутины и дескрипторы ровные, перезапусков нет.</p></div></div>
+</section>
+
+<section>
+  <h2>Уже на 3x-ui? Одна команда.</h2>
+  <p class="sec-lead">Установщик находит базу 3x-ui, переносит входы, клиентов и подписки и проверяет, что всё совпало. Ссылки у пользователей остаются прежними. Другая команда возвращает 3x-ui.</p>
+  <div class="cmd" dir="ltr"><code id="m">bash &lt;(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh) migrate</code><button onclick="navigator.clipboard.writeText(document.getElementById('m').textContent);this.textContent='Скопировано'">Копировать</button></div>
+  <p class="sub" style="text-align:center">Marzban и старый x-ui: <code dir="ltr">still-ui import marzban /var/lib/marzban</code></p>
+</section>
+
+<section>
+  <h2>still-ui и 3x-ui рядом.</h2>
+  <p class="sec-lead">Основа — 3x-ui v3.11.0. Подробности по каждой строке — в README. <a href="https://github.com/Dv2Corn/still-ui/blob/main/README.ru.md">README</a></p>
+  <table>
+    <tr><th>В 3x-ui 3.11.0</th><th>В still-ui</th></tr>
+    <tr><td>С Xray 26.9 сервер отвергает отпечаток <code>ios</code> и всех клиентов на sing-box</td><td>Пропатченная сборка Xray снова их принимает</td></tr><tr><td>Перезапуск или обновление панели отключает всех клиентов</td><td>Xray — отдельная служба, перезапуск панели клиентов Xray не трогает</td></tr><tr><td>Память панели растёт под трафиком AmneziaWG и может загнать сервер в своп</td><td>Переиспользуемые буферы и потолок памяти для панели</td></tr><tr><td>Telegram-бот отправляет базу без шифрования</td><td>Бэкапы зашифрованы вашим ключом, по расписанию, есть команда восстановления</td></tr><tr><td>Частичное обновление клиента через API выключает его и стирает поля</td><td>Неотправленные поля сохраняются</td></tr><tr><td>Устройство сверх лимита HWID получает голый 404</td><td>Понятное сообщение в приложении, лимит по умолчанию, старые устройства забываются</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2>Сделано, чтобы проверять.</h2>
+  <p class="sec-lead">Вы ставите это на свой сервер с правами root. Верить на слово не нужно.</p>
+  <div class="grid"><div class="card"><h3>Подтверждённые сборки</h3><p>Каждый архив выпуска собирает GitHub Actions и снабжает аттестацией. <code>gh attestation verify</code> покажет, откуда он.</p></div><div class="card"><h3>Проверяемый установщик</h3><p>Каждый выпуск публикует свой <code>install.sh</code> в <code>SHA256SUMS</code>. Архив без верной контрольной суммы установщик не примет.</p></div><div class="card"><h3>Журнал, который можно проверить</h3><p>Действия админов пишутся в журнал с цепочкой хешей, и панель умеет проверить, что ни одну запись не изменили и не удалили.</p></div></div>
+</section>
+
+<section>
+  <h2>Как это выглядит.</h2>
+  <div class="pair">
+    <picture><source srcset="../media/still-ui-presets-dark.png" media="(prefers-color-scheme: dark)"><img src="../media/still-ui-presets-light.png" alt="Заготовки входов для мобильных сетей" loading="lazy"></picture>
+    <picture><source srcset="../media/still-ui-client-dark.png" media="(prefers-color-scheme: dark)"><img src="../media/still-ui-client-light.png" alt="Карточка клиента с QR-кодом" loading="lazy"></picture>
+  </div>
+</section>
+
+<footer>
+  still-ui — независимый форк <a href="https://github.com/MHSanaei/3x-ui">3x-ui</a> (автор MHSanaei), лицензия GPL-3.0. Проект не связан с авторами 3x-ui и не одобрен ими.<br>
+  <a href="https://github.com/Dv2Corn/still-ui/issues">Сообщить о проблеме</a> · <a href="https://github.com/Dv2Corn/still-ui/blob/main/SECURITY.md">Безопасность</a>
+</footer>
+</div>
+</body>
+</html>
