@@ -8,6 +8,8 @@ name: Release still-ui
 # scripts that run as root (install.sh, update.sh, x-ui.sh, migrate.sh) are
 # release files too: listed in SHA256SUMS and attested, so the panel updater
 # and the still-ui menu install from a release, never from a branch.
+# The same tag also pushes a linux/amd64 + linux/arm64 image made from those archives
+# to ghcr.io (version and latest tags) with a provenance attestation in the registry.
 # workflow_dispatch only builds and uploads the files as a workflow artifact.
 on:
   push:
@@ -151,3 +153,79 @@ jobs:
           EOF
             gh release create "$TAG" -R "$REPO" --verify-tag --title "still-ui ${TAG#v}" --notes-file "$notes" "${files[@]}"
           fi
+
+  # Packs the build job's checked archives into an image (deploy/docker/Dockerfile.release);
+  # separate from publish so the archives still ship if the image fails. No build cache.
+  image:
+    needs: build
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: still-ui-release
+          path: dist
+
+      - name: Check the archives against SHA256SUMS
+        working-directory: dist
+        run: |
+          sha256sum -c SHA256SUMS
+          for f in still-ui-linux-*.tar.gz; do sha256sum -c "$f.sha256"; done
+
+      - name: Image name and version
+        id: meta
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Build and push the image
+        id: push
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: deploy/docker/Dockerfile.release
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version }}
+            ${{ steps.meta.outputs.image }}:latest
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.licenses=GPL-3.0
+          # GHCR reads the repository link of a multi-arch image from the index.
+          annotations: |
+            index:org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            index:org.opencontainers.image.version=${{ steps.meta.outputs.version }}
+            index:org.opencontainers.image.revision=${{ github.sha }}
+            index:org.opencontainers.image.licenses=GPL-3.0
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ steps.meta.outputs.image }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true

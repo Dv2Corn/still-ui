@@ -119,6 +119,28 @@ The installer generates a random username, password and panel path and prints th
 
 Release builds exist for **Linux amd64 and arm64** only. The current release is still-ui **1.10.0**, based on 3x-ui 3.11.0 and the fixes merged after it, with **Xray v26.10.31** in still-ui's own build ([what differs](scripts/xray-build/README.md)).
 
+### Docker
+
+Every release also publishes an image for linux/amd64 and linux/arm64. It holds the same checked files as that release's archives ([deploy/docker/Dockerfile.release](deploy/docker/Dockerfile.release)); the [Dockerfile](Dockerfile) in the repository is for building locally:
+
+```bash
+docker pull ghcr.io/dv2corn/still-ui:latest
+```
+
+Use a version tag instead of `latest` (for example `ghcr.io/dv2corn/still-ui:1.11.0`) to stay on one release. Run it with the same settings as [docker-compose.yml](docker-compose.yml):
+
+```bash
+docker run -d --name still-ui --restart unless-stopped \
+  --cap-add NET_ADMIN --cap-add NET_RAW \
+  -p 2053:2053 \
+  -v "$PWD/db:/etc/x-ui" -v "$PWD/cert:/root/cert" -v "$PWD/acme:/root/.acme.sh" \
+  ghcr.io/dv2corn/still-ui:latest
+```
+
+Or with Compose, from the folder with `docker-compose.yml`: `docker compose up -d`. The panel listens on port 2053; on the first start it creates a user with a random name and password and prints them once in `docker logs still-ui` (with Compose: `docker compose logs 3xui`). `NET_ADMIN` and `NET_RAW` let the bundled Fail2ban apply its bans. In Docker there is no systemd, so Xray runs inside the panel, as in 3x-ui, and a panel restart drops clients.
+
+Check where an image came from: `gh attestation verify oci://ghcr.io/dv2corn/still-ui:latest -R Dv2Corn/still-ui`.
+
 ### Where things live
 
 | What | Where |

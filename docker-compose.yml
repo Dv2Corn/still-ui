@@ -1,8 +1,8 @@
 services:
   3xui:
-    build:
-      context: .
-      dockerfile: ./Dockerfile
+    # Published by every release; pin a version (e.g. :1.11.0) to stay on it.
+    # To build from this checkout instead, replace image: with build: . and run docker compose build.
+    image: ghcr.io/dv2corn/still-ui:latest
     container_name: 3xui_app
     # hostname: yourhostname <- optional
     # Optional hard memory cap. When set, the panel derives its Go soft limit
