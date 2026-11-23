@@ -241,6 +241,10 @@
   padding: 4px 0 8px;
 }
 
+.card-pagination:empty {
+  display: none;
+}
+
 .card-pagination .ant-pagination-options-size-changer,
 .card-pagination .ant-pagination-options-size-changer .ant-select-selector {
   min-width: 88px;

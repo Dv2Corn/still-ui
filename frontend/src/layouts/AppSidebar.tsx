@@ -558,7 +558,7 @@ export default function AppSidebar() {
         </div>
       </Drawer>
 
-      {!drawerOpen && (
+      <header className="mobile-topbar">
         <button
           className="drawer-handle"
           type="button"
@@ -567,7 +567,8 @@ export default function AppSidebar() {
         >
           <MenuOutlined aria-hidden />
         </button>
-      )}
+        <span className="mobile-topbar-brand">{BRAND_NAME}</span>
+      </header>
     </div>
   );
 }

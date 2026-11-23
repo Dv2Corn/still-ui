@@ -79,6 +79,8 @@
 @media (max-width: 768px) {
   .clients-page .content-area,
   .inbounds-page .content-area,
+  .xray-page .content-area,
+  .settings-page .content-area,
   .nodes-page .content-area,
   .groups-page .content-area {
     padding: 8px;
