@@ -13,7 +13,7 @@
 </head>
 <body>
 <div class="w">
-<nav><b>still-ui</b><span><a href="https://github.com/Dv2Corn/still-ui#readme">文档</a><a href="https://github.com/Dv2Corn/still-ui/releases/latest">发布</a><a href="https://github.com/Dv2Corn/still-ui">GitHub</a><select class="lang" aria-label="Language" onchange="location.href=this.value"><option value="../" lang="en">English</option><option value="../ru/" lang="ru">Русский</option><option value="../zh/" selected lang="zh">中文</option><option value="../fa/" lang="fa">فارسی</option></select></span></nav>
+<nav><b>still-ui</b><span><a href="https://github.com/Dv2Corn/still-ui/blob/main/guide/README.zh.md">文档</a><a href="https://github.com/Dv2Corn/still-ui/releases/latest">发布</a><a href="https://github.com/Dv2Corn/still-ui">GitHub</a><select class="lang" aria-label="Language" onchange="location.href=this.value"><option value="../" lang="en">English</option><option value="../ru/" lang="ru">Русский</option><option value="../zh/" selected lang="zh">中文</option><option value="../fa/" lang="fa">فارسی</option></select></span></nav>
 
 <header>
   <h1>设置一次。<br>从此省心。</h1>
@@ -48,7 +48,7 @@
 
 <section>
   <h2>still-ui 与 3x-ui 对比。</h2>
-  <p class="sec-lead">基于 3x-ui v3.11.0。每一项的详情见 README。 <a href="https://github.com/Dv2Corn/still-ui/blob/main/README.zh.md">README</a></p>
+  <p class="sec-lead">基于 3x-ui v3.11.0。每一项的详情见指南。 <a href="https://github.com/Dv2Corn/still-ui/blob/main/guide/README.zh.md">指南</a></p>
   <table>
     <tr><th>3x-ui 3.11.0</th><th>still-ui</th></tr>
     <tr><td>自 Xray 26.9 起，服务器拒绝 <code>ios</code> 指纹和所有 sing-box 客户端</td><td>打过补丁的 Xray 构建重新接受它们</td></tr><tr><td>重启或更新面板会断开所有客户端</td><td>Xray 是独立服务，重启面板不影响 Xray 客户端</td></tr><tr><td>AmneziaWG 流量下面板内存增长，可能把小服务器拖进 swap</td><td>缓冲区复用，并为面板设置内存上限</td></tr><tr><td>Telegram 机器人发送未加密的数据库</td><td>备份用你的密钥加密、按计划执行，并提供恢复命令</td></tr><tr><td>通过 API 部分更新客户端会禁用它并清空字段</td><td>未发送的字段会被保留</td></tr><tr><td>超出 HWID 限制的设备只收到 404</td><td>应用内清晰提示、面板级默认限制、旧设备自动过期</td></tr>

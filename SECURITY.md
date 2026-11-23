@@ -50,4 +50,4 @@ Only the latest release receives security fixes. Before reporting, update with
 
 Releases are built by GitHub Actions and carry build provenance attestations,
 SBOMs and checksums; the Xray core in them can be rebuilt bit for bit. See
-"Verify a release" in the [README](README.md#verify-a-release).
+"Verify a release" in the [guide](guide/README.md#verify-a-release).

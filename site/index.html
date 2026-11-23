@@ -13,7 +13,7 @@
 </head>
 <body>
 <div class="w">
-<nav><b>still-ui</b><span><a href="https://github.com/Dv2Corn/still-ui#readme">Docs</a><a href="https://github.com/Dv2Corn/still-ui/releases/latest">Releases</a><a href="https://github.com/Dv2Corn/still-ui">GitHub</a><select class="lang" aria-label="Language" onchange="location.href=this.value"><option value="./" selected lang="en">English</option><option value="ru/" lang="ru">Русский</option><option value="zh/" lang="zh">中文</option><option value="fa/" lang="fa">فارسی</option></select></span></nav>
+<nav><b>still-ui</b><span><a href="https://github.com/Dv2Corn/still-ui/blob/main/guide/README.md">Docs</a><a href="https://github.com/Dv2Corn/still-ui/releases/latest">Releases</a><a href="https://github.com/Dv2Corn/still-ui">GitHub</a><select class="lang" aria-label="Language" onchange="location.href=this.value"><option value="./" selected lang="en">English</option><option value="ru/" lang="ru">Русский</option><option value="zh/" lang="zh">中文</option><option value="fa/" lang="fa">فارسی</option></select></span></nav>
 
 <header>
   <h1>Set it up once.<br>Then leave it alone.</h1>
@@ -48,7 +48,7 @@
 
 <section>
   <h2>still-ui and 3x-ui, side by side.</h2>
-  <p class="sec-lead">Based on 3x-ui v3.11.0. Details for every line are in the README. <a href="https://github.com/Dv2Corn/still-ui/blob/main/README.md">README</a></p>
+  <p class="sec-lead">Based on 3x-ui v3.11.0. Details for every line are in the guide. <a href="https://github.com/Dv2Corn/still-ui/blob/main/guide/README.md">Guide</a></p>
   <table>
     <tr><th>In 3x-ui 3.11.0</th><th>In still-ui</th></tr>
     <tr><td>Since Xray 26.9 the server refuses the <code>ios</code> fingerprint and every sing-box client</td><td>A patched Xray build accepts them again</td></tr><tr><td>Restarting or updating the panel drops every client</td><td>Xray is its own service; a panel restart drops no Xray client</td></tr><tr><td>Panel memory grows under AmneziaWG traffic and can push a small server into swap</td><td>Reused buffers and a memory cap on the panel</td></tr><tr><td>The Telegram bot sends the database unencrypted</td><td>Backups encrypted to your key, on a schedule, with a restore command</td></tr><tr><td>A partial client update through the API disables the client and clears fields</td><td>Fields you do not send are kept</td></tr><tr><td>A device over the HWID limit gets a bare 404</td><td>A clear notice in the app, a panel-wide default, old devices expire</td></tr>

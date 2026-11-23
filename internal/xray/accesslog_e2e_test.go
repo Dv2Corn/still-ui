@@ -214,7 +214,7 @@ func TestAccessLog_E2E(t *testing.T) {
 	}
 	// No parser can tell this line from Xray's own; internal/connlog checks its time against the clock.
 	if !sawForged {
-		t.Errorf("Xray no longer writes a refused name's line break into the access log; drop this case and the limit in the README:\n%s", strings.Join(lines, "\n"))
+		t.Errorf("Xray no longer writes a refused name's line break into the access log; drop this case and the limit in guide/README.md:\n%s", strings.Join(lines, "\n"))
 	}
 	if !rejected {
 		t.Errorf("the wrong VLESS id left no refused line:\n%s", strings.Join(lines, "\n"))

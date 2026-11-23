@@ -238,7 +238,7 @@ _still_swap_check() {
     case "$answer" in
         y | Y | yes | YES) ;;
         *)
-            echo -e "${yellow}Swap not created. You can add it later; see the still-ui README.${plain}"
+            echo -e "${yellow}Swap not created. You can add it later; see guide/README.md in the still-ui repository.${plain}"
             return 0
             ;;
     esac
@@ -272,7 +272,7 @@ _still_swap_check() {
 # installer offers to copy it (3x-ui's files are left untouched) and to stop
 # and disable the x-ui service, which would otherwise hold the same ports.
 # Non-interactive: STILL_UI_IMPORT_3XUI=yes. A database from a 3x-ui newer than
-# the version still-ui is based on may not open; see the README.
+# the version still-ui is based on may not open; see guide/README.md.
 _still_import_3xui() {
     local answer src_env dst_env
     [[ -f /etc/x-ui/x-ui.db && ! -e /etc/still-ui/x-ui.db ]] || return 0

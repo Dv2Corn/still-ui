@@ -149,7 +149,7 @@ jobs:
             cat > "$notes" <<EOF
           still-ui ${TAG#v}. Built by GitHub Actions from ${GITHUB_SHA}: run ${GITHUB_SERVER_URL}/${REPO}/actions/runs/${GITHUB_RUN_ID}.
 
-          Verify a downloaded archive: \`gh attestation verify still-ui-linux-amd64.tar.gz -R ${REPO}\` and \`sha256sum -c SHA256SUMS --ignore-missing\`. See "Verify a release" in the README.
+          Verify a downloaded archive: \`gh attestation verify still-ui-linux-amd64.tar.gz -R ${REPO}\` and \`sha256sum -c SHA256SUMS --ignore-missing\`. See "Verify a release": ${GITHUB_SERVER_URL}/${REPO}/blob/main/guide/README.md#verify-a-release
           EOF
             gh release create "$TAG" -R "$REPO" --verify-tag --title "still-ui ${TAG#v}" --notes-file "$notes" "${files[@]}"
           fi
