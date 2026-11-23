@@ -13,7 +13,7 @@
 </head>
 <body>
 <div class="w">
-<nav><b>still-ui</b><span><a href="https://github.com/Dv2Corn/still-ui#readme">Документация</a><a href="https://github.com/Dv2Corn/still-ui/releases/latest">Выпуски</a><a href="https://github.com/Dv2Corn/still-ui">GitHub</a><select class="lang" aria-label="Language" onchange="location.href=this.value"><option value="../" lang="en">English</option><option value="../ru/" selected lang="ru">Русский</option><option value="../zh/" lang="zh">中文</option><option value="../fa/" lang="fa">فارسی</option></select></span></nav>
+<nav><b>still-ui</b><span><a href="https://github.com/Dv2Corn/still-ui/blob/main/guide/README.ru.md">Документация</a><a href="https://github.com/Dv2Corn/still-ui/releases/latest">Выпуски</a><a href="https://github.com/Dv2Corn/still-ui">GitHub</a><select class="lang" aria-label="Language" onchange="location.href=this.value"><option value="../" lang="en">English</option><option value="../ru/" selected lang="ru">Русский</option><option value="../zh/" lang="zh">中文</option><option value="../fa/" lang="fa">فارسی</option></select></span></nav>
 
 <header>
   <h1>Настроил один раз.<br>И забыл.</h1>
@@ -48,7 +48,7 @@
 
 <section>
   <h2>still-ui и 3x-ui рядом.</h2>
-  <p class="sec-lead">Основа — 3x-ui v3.11.0. Подробности по каждой строке — в README. <a href="https://github.com/Dv2Corn/still-ui/blob/main/README.ru.md">README</a></p>
+  <p class="sec-lead">Основа — 3x-ui v3.11.0. Подробности по каждой строке — в руководстве. <a href="https://github.com/Dv2Corn/still-ui/blob/main/guide/README.ru.md">Руководство</a></p>
   <table>
     <tr><th>В 3x-ui 3.11.0</th><th>В still-ui</th></tr>
     <tr><td>С Xray 26.9 сервер отвергает отпечаток <code>ios</code> и всех клиентов на sing-box</td><td>Пропатченная сборка Xray снова их принимает</td></tr><tr><td>Перезапуск или обновление панели отключает всех клиентов</td><td>Xray — отдельная служба, перезапуск панели клиентов Xray не трогает</td></tr><tr><td>Память панели растёт под трафиком AmneziaWG и может загнать сервер в своп</td><td>Переиспользуемые буферы и потолок памяти для панели</td></tr><tr><td>Telegram-бот отправляет базу без шифрования</td><td>Бэкапы зашифрованы вашим ключом, по расписанию, есть команда восстановления</td></tr><tr><td>Частичное обновление клиента через API выключает его и стирает поля</td><td>Неотправленные поля сохраняются</td></tr><tr><td>Устройство сверх лимита HWID получает голый 404</td><td>Понятное сообщение в приложении, лимит по умолчанию, старые устройства забываются</td></tr>

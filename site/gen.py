@@ -11,7 +11,7 @@ T = {
  'en': dict(
   title='still-ui — set it up once, then leave it alone',
   desc='still-ui is a fork of the 3x-ui panel for Xray-core: clients that keep their settings, Xray that survives panel restarts, a panel that stays small on a 2 GB server.',
-  docs='Docs', releases='Releases', readme='README.md', copy='Copy', copied='Copied',
+  docs='Docs', releases='Releases', readme='guide/README.md', readme_label='Guide', copy='Copy', copied='Copied',
   h1='Set it up once.<br>Then leave it alone.',
   lead='still-ui is a VPN panel for Xray-core, built from 3x-ui for servers that run for months on 2&nbsp;GB of RAM, with real people on mobile networks.',
   sub='Linux amd64 / arm64 · runs as root · prints the panel address, login and password at the end',
@@ -34,7 +34,7 @@ T = {
   mig_h='Already on 3x-ui? One command.',
   mig_p='The installer finds your 3x-ui database, moves inbounds, clients and subscriptions over and checks they are the same. Users keep their links. Another command brings 3x-ui back.',
   mig_sub='Marzban and old x-ui:',
-  cmp_h='still-ui and 3x-ui, side by side.', cmp_p='Based on 3x-ui v3.11.0. Details for every line are in the README.',
+  cmp_h='still-ui and 3x-ui, side by side.', cmp_p='Based on 3x-ui v3.11.0. Details for every line are in the guide.',
   cmp_th=('In 3x-ui 3.11.0', 'In still-ui'),
   cmp=[('Since Xray 26.9 the server refuses the <code>ios</code> fingerprint and every sing-box client', 'A patched Xray build accepts them again'),
        ('Restarting or updating the panel drops every client', 'Xray is its own service; a panel restart drops no Xray client'),
@@ -52,7 +52,7 @@ T = {
  'ru': dict(
   title='still-ui — настроил один раз и забыл',
   desc='still-ui — форк панели 3x-ui для Xray-core: клиенты не теряют настройки, Xray переживает перезапуск панели, панель не разрастается на сервере с 2 ГБ.',
-  docs='Документация', releases='Выпуски', readme='README.ru.md', copy='Копировать', copied='Скопировано',
+  docs='Документация', releases='Выпуски', readme='guide/README.ru.md', readme_label='Руководство', copy='Копировать', copied='Скопировано',
   h1='Настроил один раз.<br>И забыл.',
   lead='still-ui — VPN-панель для Xray-core на основе 3x-ui. Для серверов, которые месяцами работают на 2&nbsp;ГБ памяти, а клиенты сидят в мобильных сетях.',
   sub='Linux amd64 / arm64 · запуск от root · в конце покажет адрес панели, логин и пароль',
@@ -75,7 +75,7 @@ T = {
   mig_h='Уже на 3x-ui? Одна команда.',
   mig_p='Установщик находит базу 3x-ui, переносит входы, клиентов и подписки и проверяет, что всё совпало. Ссылки у пользователей остаются прежними. Другая команда возвращает 3x-ui.',
   mig_sub='Marzban и старый x-ui:',
-  cmp_h='still-ui и 3x-ui рядом.', cmp_p='Основа — 3x-ui v3.11.0. Подробности по каждой строке — в README.',
+  cmp_h='still-ui и 3x-ui рядом.', cmp_p='Основа — 3x-ui v3.11.0. Подробности по каждой строке — в руководстве.',
   cmp_th=('В 3x-ui 3.11.0', 'В still-ui'),
   cmp=[('С Xray 26.9 сервер отвергает отпечаток <code>ios</code> и всех клиентов на sing-box', 'Пропатченная сборка Xray снова их принимает'),
        ('Перезапуск или обновление панели отключает всех клиентов', 'Xray — отдельная служба, перезапуск панели клиентов Xray не трогает'),
@@ -93,7 +93,7 @@ T = {
  'zh': dict(
   title='still-ui — 设置一次，从此省心',
   desc='still-ui 是基于 3x-ui 的 Xray-core 面板分支：客户端设置不丢失，Xray 在面板重启时不断线，2 GB 服务器上面板占用保持很小。',
-  docs='文档', releases='发布', readme='README.zh.md', copy='复制', copied='已复制',
+  docs='文档', releases='发布', readme='guide/README.zh.md', readme_label='指南', copy='复制', copied='已复制',
   h1='设置一次。<br>从此省心。',
   lead='still-ui 是基于 3x-ui 的 Xray-core VPN 面板，专为在 2&nbsp;GB 内存上连续运行数月、用户使用移动网络的服务器而打造。',
   sub='Linux amd64 / arm64 · 以 root 运行 · 结束时显示面板地址、用户名和密码',
@@ -116,7 +116,7 @@ T = {
   mig_h='已经在用 3x-ui？一条命令。',
   mig_p='安装程序会找到 3x-ui 数据库，迁移入站、客户端和订阅，并检查结果一致。用户的链接保持不变。另一条命令可以切回 3x-ui。',
   mig_sub='Marzban 和旧版 x-ui：',
-  cmp_h='still-ui 与 3x-ui 对比。', cmp_p='基于 3x-ui v3.11.0。每一项的详情见 README。',
+  cmp_h='still-ui 与 3x-ui 对比。', cmp_p='基于 3x-ui v3.11.0。每一项的详情见指南。',
   cmp_th=('3x-ui 3.11.0', 'still-ui'),
   cmp=[('自 Xray 26.9 起，服务器拒绝 <code>ios</code> 指纹和所有 sing-box 客户端', '打过补丁的 Xray 构建重新接受它们'),
        ('重启或更新面板会断开所有客户端', 'Xray 是独立服务，重启面板不影响 Xray 客户端'),
@@ -134,7 +134,7 @@ T = {
  'fa': dict(
   title='still-ui — یک بار راه‌اندازی کنید و فراموشش کنید',
   desc='still-ui انشعابی از پنل 3x-ui برای Xray-core است: تنظیمات کاربران از بین نمی‌رود، Xray با راه‌اندازی مجدد پنل قطع نمی‌شود و پنل روی سرور ۲ گیگابایتی سبک می‌ماند.',
-  docs='مستندات', releases='نسخه‌ها', readme='README.fa.md', copy='کپی', copied='کپی شد',
+  docs='مستندات', releases='نسخه‌ها', readme='guide/README.fa.md', readme_label='راهنما', copy='کپی', copied='کپی شد',
   h1='یک بار راه‌اندازی کنید.<br>بعد فراموشش کنید.',
   lead='still-ui یک پنل VPN برای Xray-core است که بر پایه 3x-ui ساخته شده؛ برای سرورهایی که ماه‌ها با ۲&nbsp;گیگابایت رم کار می‌کنند و کاربرانشان روی اینترنت همراه هستند.',
   sub='Linux amd64 / arm64 · با دسترسی root اجرا می‌شود · در پایان آدرس پنل، نام کاربری و رمز عبور را نشان می‌دهد',
@@ -157,7 +157,7 @@ T = {
   mig_h='از 3x-ui استفاده می‌کنید؟ یک دستور.',
   mig_p='نصب‌کننده پایگاه داده 3x-ui را پیدا می‌کند، اینباندها، کاربران و اشتراک‌ها را منتقل می‌کند و یکسان بودنشان را بررسی می‌کند. لینک‌های کاربران تغییر نمی‌کند و یک دستور دیگر 3x-ui را برمی‌گرداند.',
   mig_sub='Marzban و x-ui قدیمی:',
-  cmp_h='still-ui و 3x-ui در کنار هم.', cmp_p='بر پایه 3x-ui v3.11.0. جزئیات هر سطر در README است.',
+  cmp_h='still-ui و 3x-ui در کنار هم.', cmp_p='بر پایه 3x-ui v3.11.0. جزئیات هر سطر در راهنما است.',
   cmp_th=('در 3x-ui 3.11.0', 'در still-ui'),
   cmp=[('از Xray 26.9 سرور اثر انگشت <code>ios</code> و همه کلاینت‌های sing-box را رد می‌کند', 'بیلد وصله‌شده Xray دوباره آن‌ها را می‌پذیرد'),
        ('ری‌استارت یا به‌روزرسانی پنل همه کاربران را قطع می‌کند', 'Xray سرویس جداگانه است و ری‌استارت پنل کاربران Xray را قطع نمی‌کند'),
@@ -204,7 +204,7 @@ def page(lang, prefix):
 </head>
 <body>
 <div class="w">
-<nav><b>still-ui</b><span><a href="{GH}#readme">{t['docs']}</a><a href="{GH}/releases/latest">{t['releases']}</a><a href="{GH}">GitHub</a><select class="lang" aria-label="Language" onchange="location.href=this.value">{langs}</select></span></nav>
+<nav><b>still-ui</b><span><a href="{GH}/blob/main/{t['readme']}">{t['docs']}</a><a href="{GH}/releases/latest">{t['releases']}</a><a href="{GH}">GitHub</a><select class="lang" aria-label="Language" onchange="location.href=this.value">{langs}</select></span></nav>
 
 <header>
   <h1>{t['h1']}</h1>

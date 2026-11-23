@@ -35,7 +35,7 @@ answered here, but say when the fix belongs upstream.
   menu script installed under that name), program `/usr/local/still-ui`,
   database `/etc/still-ui/x-ui.db`, logs `/var/log/still-ui`, settings
   `/etc/default/still-ui`. The optional separate Xray service is
-  `still-xray`. README.md describes them.
+  `still-xray`. guide/README.md describes them.
 
 ## Stack
 
