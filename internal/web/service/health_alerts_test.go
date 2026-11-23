@@ -193,3 +193,20 @@ func TestMemoryAlertDoesNotFlapAroundTheThreshold(t *testing.T) {
 		t.Fatalf("third round below the clear level = %v, want resolved", got)
 	}
 }
+
+// Alert sizes read like "1.4 GB", not "1434 MB"; small figures stay in whole MB.
+func TestAlertSize(t *testing.T) {
+	for _, c := range []struct {
+		bytes uint64
+		want  string
+	}{
+		{300 << 20, "300 MB"},
+		{1023 << 20, "1023 MB"},
+		{1 << 30, "1.0 GB"},
+		{1434 << 20, "1.4 GB"},
+	} {
+		if got := alertSize(c.bytes); got != c.want {
+			t.Errorf("alertSize(%d) = %q, want %q", c.bytes, got, c.want)
+		}
+	}
+}
