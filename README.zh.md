@@ -78,6 +78,9 @@ still-ui migrate-rollback
 - **由面板自行配置的 Hysteria2 端口跳跃。** 在 3x-ui 中，跳跃端口范围只是告知客户端，服务器上的重定向要自己写。**UDP Hop → 在本服务器上重定向** 会加载一条 nftables 规则，把该范围转到入站端口，重启后自动恢复，并随入站一起移除。在无法生效的环境（没有 `nft`、容器没有 `NET_ADMIN`）面板会拒绝该选项，而不是把无法连通的端口发给客户端。默认关闭。
 - **AmneziaWG：首包伪装成 QUIC 或 DNS，一键设置 MTU 1280。** 两个按钮生成形似 QUIC Initial 或 DNS 查询的 `I1` 签名包；随机部分每次握手都不同。每个预设都在测试中由真实的 amneziawg-go 客户端和服务器完成握手。按钮只修改 `I1`–`I5`，已有客户端可继续使用。MTU 旁的 **设为 1280**：在俄罗斯移动网络上实测，AmneziaWG 在 1280 时比默认值快 4–5 倍。
 - **基于 XHTTP 与 REALITY 的 VLESS 预设。** **添加入站 → 预设 → 移动网络（俄罗斯）：VLESS XHTTP REALITY** 会填好 TCP 443 上使用 XHTTP 传输和 REALITY 的 VLESS：新的密钥对和 short ID、`ios` 指纹、随机路径、`auto` 模式以及 100–1000 字节的填充；与另一个 REALITY 预设一样，在 **安全** 标签页选择目标。客户端不设流控：XTLS Vision 不能在 XHTTP 上使用。分享链接、JSON 订阅和 Clash/Mihomo 配置都带上了传输设置；在测试中，使用其中每一种的 Xray 客户端以及 mihomo 1.19.22 和 1.19.33 都能通过 still-ui 的 Xray 取回页面。XHTTP 不会拆分下载：50 MB 以一个 HTTP 响应经一个 TCP 连接传输，因此无法绕过连接在最初几 KB 后被切断的情况。
+- **空面板上的现成入站。** 新面板会在 **入站列表** 页面以卡片形式显示面向移动网络的预设——VLESS REALITY、VLESS XHTTP REALITY 和 Hysteria2。点击卡片会打开已应用该预设的 **添加入站**，**手动设置** 打开普通表单。一旦有了入站，页面与以前相同。
+- **用平实语言写的告警。** Telegram 告警会说明发生了什么、为什么重要、该去哪里查看，而不是事件名。大小显示为“1.4 GB”。邮件标题保持简短。全部 14 种语言。
+- **由发布产物构建的 Docker 镜像。** 每个版本都会发布 linux/amd64 和 linux/arm64 的 `ghcr.io/dv2corn/still-ui`：由该版本已校验的归档在按摘要固定的 Alpine 上构建，并带有 GitHub Actions 构建证明；发布后会在真实的 amd64 和 arm64 机器上启动测试。见 [Docker](#docker)。
 
 ### 进行中
 
@@ -108,6 +111,28 @@ STILL_UI_ARCHIVE=/path/still-ui-linux-amd64.tar.gz bash install.sh
 安装脚本会随机生成用户名、密码和面板访问路径，并在结束时显示出来，请妥善保存。之后运行 `still-ui` 即可打开管理菜单：启动和停止服务、查看或重置登录信息、修改端口、管理证书等。子命令与 3x-ui 的 `x-ui` 脚本相同：`still-ui start`、`stop`、`restart`、`status`、`log`、`update`、`legacy`、`uninstall` 等。
 
 发行版只提供 **Linux amd64 和 arm64** 的构建。当前版本：still-ui **1.11.0**（基于 3x-ui 3.11.0 及其后合并的修复），内置 still-ui 自行构建的 **Xray v26.10.31**（[有何不同](scripts/xray-build/README.md)）。
+
+### Docker
+
+每个版本还会发布 linux/amd64 和 linux/arm64 的镜像，内含与该版本归档相同的已校验文件（[deploy/docker/Dockerfile.release](deploy/docker/Dockerfile.release)）；仓库中的 [Dockerfile](Dockerfile) 用于本地构建：
+
+```bash
+docker pull ghcr.io/dv2corn/still-ui:latest
+```
+
+如需固定在某个版本，请用版本号代替 `latest`（例如 `ghcr.io/dv2corn/still-ui:1.11.0`）。按 [docker-compose.yml](docker-compose.yml) 的相同设置运行：
+
+```bash
+docker run -d --name still-ui --restart unless-stopped \
+  --cap-add NET_ADMIN --cap-add NET_RAW \
+  -p 2053:2053 \
+  -v "$PWD/db:/etc/x-ui" -v "$PWD/cert:/root/cert" -v "$PWD/acme:/root/.acme.sh" \
+  ghcr.io/dv2corn/still-ui:latest
+```
+
+或在 `docker-compose.yml` 所在目录使用 Compose：`docker compose up -d`。面板监听 2053 端口；首次启动时会创建随机用户名和密码，并在 `docker logs still-ui` 中打印一次（使用 Compose 时：`docker compose logs 3xui`）。`NET_ADMIN` 和 `NET_RAW` 供内置 Fail2ban 执行封禁。Docker 中没有 systemd，所以 Xray 与 3x-ui 一样运行在面板内部，重启面板会断开客户端。
+
+查看镜像来源：`gh attestation verify oci://ghcr.io/dv2corn/still-ui:latest -R Dv2Corn/still-ui`。
 
 ### 文件位置
 
