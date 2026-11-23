@@ -1519,6 +1519,12 @@ EOF
             else
                 echo -e "${yellow}⚠ SSL Certificate: Skipped — panel is HTTP-only. Use a reverse proxy or SSH tunnel.${plain}"
             fi
+            echo ""
+            echo -e "${green}Next steps:${plain}"
+            echo -e "  1. Open the Access URL above and log in."
+            echo -e "  2. Inbounds: pick one of the ready-made cards (VLESS REALITY, Hysteria2, XHTTP) and save it."
+            echo -e "  3. Add a client to it and send them the QR code or the subscription link."
+            echo -e "  Manage the service later with ${blue}still-ui${plain} (start, stop, logs, update)."
 
             if [[ "$db_choice" == "2" ]]; then
                 echo ""
