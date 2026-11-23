@@ -6,53 +6,20 @@
 <title>still-ui — set it up once, then leave it alone</title>
 <meta name="description" content="still-ui is a fork of the 3x-ui panel for Xray-core: clients that keep their settings, Xray that survives panel restarts, a panel that stays small on a 2 GB server.">
 <meta property="og:title" content="still-ui">
-<meta property="og:description" content="A VPN panel you set up once and then leave alone.">
-<meta property="og:image" content="media/still-ui-overview-dark.png">
-<style>
-:root{--bg:#fbfbfd;--fg:#1d1d1f;--mute:#6e6e73;--card:#fff;--line:#e5e5ea;--acc:#0071e3;--code:#f2f2f5}
-@media (prefers-color-scheme:dark){:root{--bg:#0b0b0d;--fg:#f5f5f7;--mute:#a1a1a6;--card:#161618;--line:#2a2a2e;--acc:#2997ff;--code:#1c1c1f}}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);font:17px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
-a{color:var(--acc);text-decoration:none} a:hover{text-decoration:underline}
-.w{max-width:1080px;margin:0 auto;padding:0 20px}
-nav{display:flex;justify-content:space-between;align-items:center;padding:18px 0;font-size:15px}
-nav b{font-size:18px;letter-spacing:-.01em;white-space:nowrap} nav span a{margin-left:20px;color:var(--fg)}
-header{text-align:center;padding:72px 0 40px}
-h1{font-size:clamp(40px,7vw,72px);line-height:1.04;letter-spacing:-.035em;margin:0 0 18px}
-.lead{font-size:clamp(19px,2.4vw,24px);color:var(--mute);max-width:720px;margin:0 auto 32px}
-.cmd{display:flex;align-items:center;gap:10px;max-width:760px;margin:0 auto;background:var(--code);border:1px solid var(--line);border-radius:14px;padding:12px 12px 12px 18px;font:14px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;text-align:left}
-.cmd code{flex:1;overflow-x:auto;white-space:nowrap}
-.cmd button{border:0;border-radius:9px;background:var(--acc);color:#fff;font:600 14px system-ui;padding:9px 14px;cursor:pointer}
-.sub{color:var(--mute);font-size:14px;margin-top:12px}
-.shot{display:block;margin:56px auto 0;border-radius:16px;border:1px solid var(--line);overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.18)}
-.shot img{display:block;width:100%;height:auto}
-section{padding:88px 0 0}
-h2{font-size:clamp(30px,4.5vw,46px);letter-spacing:-.03em;line-height:1.1;margin:0 0 14px;text-align:center}
-.sec-lead{color:var(--mute);text-align:center;max-width:680px;margin:0 auto 40px;font-size:19px}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:26px}
-.card h3{margin:0 0 8px;font-size:20px;letter-spacing:-.01em}
-.card p{margin:0;color:var(--mute);font-size:16px}
-.num{font-size:40px;font-weight:700;letter-spacing:-.03em;color:var(--fg);display:block;margin-bottom:6px}
-table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:18px;overflow:hidden;font-size:16px}
-th,td{padding:16px 20px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}
-th{font-size:14px;color:var(--mute);font-weight:600} tr:last-child td{border-bottom:0}
-td:first-child{color:var(--mute);width:46%}
-.pair{display:grid;grid-template-columns:1fr 1fr;gap:18px}
-.pair picture{display:block}
-.pair img{width:100%;border-radius:14px;border:1px solid var(--line)}
-footer{padding:96px 0 48px;color:var(--mute);font-size:14px;text-align:center}
-@media (max-width:720px){.pair{grid-template-columns:1fr}td,th{padding:12px 14px}header{padding:40px 0 24px}nav span a{margin-left:12px}nav span a:first-child{display:none}nav{font-size:14px}}
-</style>
+<meta property="og:description" content="still-ui is a fork of the 3x-ui panel for Xray-core: clients that keep their settings, Xray that survives panel restarts, a panel that stays small on a 2 GB server.">
+<meta property="og:image" content="https://dv2corn.github.io/still-ui/media/still-ui-overview-dark.png">
+<link rel="alternate" hreflang="en" href="https://dv2corn.github.io/still-ui/"><link rel="alternate" hreflang="ru" href="https://dv2corn.github.io/still-ui/ru/"><link rel="alternate" hreflang="zh" href="https://dv2corn.github.io/still-ui/zh/"><link rel="alternate" hreflang="ar" href="https://dv2corn.github.io/still-ui/ar/">
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="w">
-<nav><b>still-ui</b><span><a href="https://github.com/Dv2Corn/still-ui#readme">Docs</a><a href="https://github.com/Dv2Corn/still-ui/releases/latest">Releases</a><a href="https://github.com/Dv2Corn/still-ui/blob/main/README.ru.md">Русский</a><a href="https://github.com/Dv2Corn/still-ui">GitHub</a></span></nav>
+<nav><b>still-ui</b><span><a href="https://github.com/Dv2Corn/still-ui#readme">Docs</a><a href="https://github.com/Dv2Corn/still-ui/releases/latest">Releases</a><a href="https://github.com/Dv2Corn/still-ui">GitHub</a></span></nav>
+<div class="langs"><a href="" aria-current="page" hreflang="en">EN</a><a href="ru/" hreflang="ru">RU</a><a href="zh/" hreflang="zh">中文</a><a href="ar/" hreflang="ar">العربية</a></div>
 
 <header>
   <h1>Set it up once.<br>Then leave it alone.</h1>
   <p class="lead">still-ui is a VPN panel for Xray-core, built from 3x-ui for servers that run for months on 2&nbsp;GB of RAM, with real people on mobile networks.</p>
-  <div class="cmd"><code id="c">bash &lt;(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh)</code><button onclick="navigator.clipboard.writeText(document.getElementById('c').textContent);this.textContent='Copied'">Copy</button></div>
+  <div class="cmd" dir="ltr"><code id="c">bash &lt;(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh)</code><button onclick="navigator.clipboard.writeText(document.getElementById('c').textContent);this.textContent='Copied'">Copy</button></div>
   <p class="sub">Linux amd64 / arm64 · runs as root · prints the panel address, login and password at the end</p>
   <picture class="shot">
     <source srcset="media/still-ui-mobile-dark.png" media="(max-width: 600px)">
@@ -64,55 +31,35 @@ footer{padding:96px 0 48px;color:var(--mute);font-size:14px;text-align:center}
 <section>
   <h2>The things that used to hurt. Fixed.</h2>
   <p class="sec-lead">Everything 3x-ui does still works: the same protocols, the same interface, the same database. still-ui changes what breaks on a small server after a few months.</p>
-  <div class="grid">
-    <div class="card"><h3>Clients keep their settings</h3><p>Updating a client through the API with only some fields no longer disables it and wipes its limits, Telegram ID and renewal settings.</p></div>
-    <div class="card"><h3>Restarting the panel drops nobody</h3><p>Xray runs as its own sandboxed service. Update or restart the panel and Xray clients stay connected.</p></div>
-    <div class="card"><h3>The panel stays small</h3><p>A memory cap from the installer and pooled AmneziaWG buffers: a runaway panel restarts instead of pushing the server into swap.</p></div>
-    <div class="card"><h3>iOS fingerprint and sing-box work again</h3><p>A reproducible Xray build with a one-hunk REALITY patch accepts the short <code>ios</code> ClientHello that mobile networks let through.</p></div>
-    <div class="card"><h3>Certificates renew without you</h3><p>The panel checks what each inbound really serves and restarts only Xray, only when a renewed certificate was not picked up.</p></div>
-    <div class="card"><h3>Local sites open directly</h3><p>One setting: banks and government portals of your country open without the VPN, everything else goes through it. In every subscription format.</p></div>
-  </div>
+  <div class="grid"><div class="card"><h3>Clients keep their settings</h3><p>Updating a client through the API with only some fields no longer disables it and wipes its limits, Telegram ID and renewal settings.</p></div><div class="card"><h3>Restarting the panel drops nobody</h3><p>Xray runs as its own sandboxed service. Update or restart the panel and Xray clients stay connected.</p></div><div class="card"><h3>The panel stays small</h3><p>A memory cap from the installer and pooled AmneziaWG buffers: a runaway panel restarts instead of pushing the server into swap.</p></div><div class="card"><h3>iOS fingerprint and sing-box work again</h3><p>A reproducible Xray build with a one-hunk REALITY patch accepts the short <code>ios</code> ClientHello that mobile networks let through.</p></div><div class="card"><h3>Certificates renew without you</h3><p>The panel checks what each inbound really serves and restarts only Xray, only when a renewed certificate was not picked up.</p></div><div class="card"><h3>Local sites open directly</h3><p>One setting: banks and government portals of your country open without the VPN, everything else goes through it. In every subscription format.</p></div></div>
 </section>
 
 <section>
   <h2>Measured, not promised.</h2>
   <p class="sec-lead">2 vCPU / 2 GiB server, 100 short AmneziaWG connections per second for 5 minutes, 3 runs each. <a href="https://github.com/Dv2Corn/still-ui/tree/main/bench/awg-relay-churn">Method and raw data</a>.</p>
-  <div class="grid">
-    <div class="card"><span class="num">403 → 176 MiB</span><p>Average panel memory under load, 3x-ui v3.11.0 vs still-ui.</p></div>
-    <div class="card"><span class="num">525 → 211 MiB</span><p>Peak panel memory in the same test.</p></div>
-    <div class="card"><span class="num">72 h</span><p>Mixed load with 200 users next to 3x-ui: no memory growth, goroutines and file descriptors flat, no restarts.</p></div>
-  </div>
+  <div class="grid"><div class="card"><span class="num">403 → 176 MiB</span><p>Average panel memory under load, 3x-ui v3.11.0 vs still-ui.</p></div><div class="card"><span class="num">525 → 211 MiB</span><p>Peak panel memory in the same test.</p></div><div class="card"><span class="num">72 h</span><p>Mixed load with 200 users next to 3x-ui: no memory growth, goroutines and file descriptors flat, no restarts.</p></div></div>
 </section>
 
 <section>
   <h2>Already on 3x-ui? One command.</h2>
   <p class="sec-lead">The installer finds your 3x-ui database, moves inbounds, clients and subscriptions over and checks they are the same. Users keep their links. Another command brings 3x-ui back.</p>
-  <div class="cmd"><code id="m">bash &lt;(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh) migrate</code><button onclick="navigator.clipboard.writeText(document.getElementById('m').textContent);this.textContent='Copied'">Copy</button></div>
-  <p class="sub" style="text-align:center">Marzban and old x-ui: <code>still-ui import marzban /var/lib/marzban</code></p>
+  <div class="cmd" dir="ltr"><code id="m">bash &lt;(curl -Ls https://github.com/Dv2Corn/still-ui/releases/latest/download/install.sh) migrate</code><button onclick="navigator.clipboard.writeText(document.getElementById('m').textContent);this.textContent='Copied'">Copy</button></div>
+  <p class="sub" style="text-align:center">Marzban and old x-ui: <code dir="ltr">still-ui import marzban /var/lib/marzban</code></p>
 </section>
 
 <section>
   <h2>still-ui and 3x-ui, side by side.</h2>
-  <p class="sec-lead">Based on 3x-ui v3.11.0. Every line links to the details in the README.</p>
+  <p class="sec-lead">Based on 3x-ui v3.11.0. Details for every line are in the README. <a href="https://github.com/Dv2Corn/still-ui/blob/main/README.md">README</a></p>
   <table>
     <tr><th>In 3x-ui 3.11.0</th><th>In still-ui</th></tr>
-    <tr><td>Since Xray 26.9 the server refuses the <code>ios</code> fingerprint and every sing-box client</td><td>A patched Xray build accepts them again</td></tr>
-    <tr><td>Restarting or updating the panel drops every client</td><td>Xray is its own service; a panel restart drops no Xray client</td></tr>
-    <tr><td>Panel memory grows under AmneziaWG traffic and can push a small server into swap</td><td>Reused buffers and a memory cap on the panel</td></tr>
-    <tr><td>The Telegram bot sends the database unencrypted</td><td>Backups encrypted to your key, on a schedule, with a restore command</td></tr>
-    <tr><td>A partial client update through the API disables the client and clears fields</td><td>Fields you do not send are kept</td></tr>
-    <tr><td>A device over the HWID limit gets a bare 404</td><td>A clear notice in the app, a panel-wide default, old devices expire</td></tr>
+    <tr><td>Since Xray 26.9 the server refuses the <code>ios</code> fingerprint and every sing-box client</td><td>A patched Xray build accepts them again</td></tr><tr><td>Restarting or updating the panel drops every client</td><td>Xray is its own service; a panel restart drops no Xray client</td></tr><tr><td>Panel memory grows under AmneziaWG traffic and can push a small server into swap</td><td>Reused buffers and a memory cap on the panel</td></tr><tr><td>The Telegram bot sends the database unencrypted</td><td>Backups encrypted to your key, on a schedule, with a restore command</td></tr><tr><td>A partial client update through the API disables the client and clears fields</td><td>Fields you do not send are kept</td></tr><tr><td>A device over the HWID limit gets a bare 404</td><td>A clear notice in the app, a panel-wide default, old devices expire</td></tr>
   </table>
 </section>
 
 <section>
   <h2>Built to be checked.</h2>
   <p class="sec-lead">You run this on your server with root. You should not have to take our word for anything.</p>
-  <div class="grid">
-    <div class="card"><h3>Attested builds</h3><p>Every release archive is built by GitHub Actions and carries a build attestation. <code>gh attestation verify</code> shows where it came from.</p></div>
-    <div class="card"><h3>Checked installer</h3><p>Each release publishes its own <code>install.sh</code> in <code>SHA256SUMS</code>. The installer refuses an archive whose checksum is missing or wrong.</p></div>
-    <div class="card"><h3>A journal you can verify</h3><p>Admin actions go to a hash-chained audit log, and the panel can check that no entry was changed or removed.</p></div>
-  </div>
+  <div class="grid"><div class="card"><h3>Attested builds</h3><p>Every release archive is built by GitHub Actions and carries a build attestation. <code>gh attestation verify</code> shows where it came from.</p></div><div class="card"><h3>Checked installer</h3><p>Each release publishes its own <code>install.sh</code> in <code>SHA256SUMS</code>. The installer refuses an archive whose checksum is missing or wrong.</p></div><div class="card"><h3>A journal you can verify</h3><p>Admin actions go to a hash-chained audit log, and the panel can check that no entry was changed or removed.</p></div></div>
 </section>
 
 <section>
