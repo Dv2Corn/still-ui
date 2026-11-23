@@ -121,7 +121,7 @@ Release builds exist for **Linux amd64 and arm64** only. The current release is 
 
 ### Docker
 
-Every release also publishes an image for linux/amd64 and linux/arm64, built from the [Dockerfile](Dockerfile):
+Every release also publishes an image for linux/amd64 and linux/arm64. It holds the same checked files as that release's archives ([deploy/docker/Dockerfile.release](deploy/docker/Dockerfile.release)); the [Dockerfile](Dockerfile) in the repository is for building locally:
 
 ```bash
 docker pull ghcr.io/dv2corn/still-ui:latest
