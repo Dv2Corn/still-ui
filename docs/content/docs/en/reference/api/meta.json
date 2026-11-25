@@ -16,8 +16,10 @@
     "reachability-probes",
     "connection-log",
     "audit-log",
+    "reality-watch",
     "nodes",
     "backup",
+    "mcp",
     "websocket"
   ]
 }

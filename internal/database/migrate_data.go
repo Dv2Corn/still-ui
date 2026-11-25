@@ -68,6 +68,8 @@ func migrationModels() []any {
 		&model.ReachProbeTarget{},
 		&model.NodeInvite{},
 		&model.AuditLog{},
+		&model.ClientTrafficWindow{},
+		&model.ClientChangeLog{},
 	}
 }
 

@@ -34,6 +34,7 @@ describe('node metric availability', () => {
           onToggleEnable={noop}
           onUpdateNode={noop}
           onUpdateSelected={noop}
+          onRestart={noop}
         />,
       );
       if (isMobile) fireEvent.click(screen.getByRole('button', { name: 'More Information' }));
@@ -65,6 +66,7 @@ describe('node metric availability', () => {
         onToggleEnable={noop}
         onUpdateNode={noop}
         onUpdateSelected={noop}
+        onRestart={noop}
       />,
     );
     expect(screen.getByText('0.0%')).not.toBeNull();

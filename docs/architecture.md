@@ -421,6 +421,7 @@ All registered in `web.go` → `startTask()`. Each is a struct with a `Run()` me
 | `@every 10s`        | `amneziawg_job`                                                                                  | Reconcile embedded AmneziaWG interfaces against enabled local inbounds                |
 | `@every 5m`         | `outbound_subscription_job`                                                                      | Refresh outbound provider configs                                                     |
 | `@every 5s`         | (`ConnLogService.Tick` in `startTask`)                                                           | Connection log: store new access-log lines while it is on; prune once a minute        |
+| `@every 5m`         | `reap_sync_orphans_job`                                                                          | Delete sync-orphaned clients, then the history of emails no client holds              |
 | `@every 10m`        | `clear_logs_job` (`PruneXrayLogsJob`)                                                            | Truncate Xray access/error logs once either exceeds 64 MiB                            |
 | `@hourly`           | `warp_ip_job`, `periodic_traffic_reset_job("hourly")`                                            | WARP IP rotation; traffic resets                                                      |
 | `@hourly`           | (`AuditService.PruneJob` in `startTask`)                                                         | Admin audit log: delete entries past `auditLogRetentionDays`, move the chain anchor   |

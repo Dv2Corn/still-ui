@@ -83,6 +83,7 @@ describe('device limit settings', () => {
 describe('client device list', () => {
   const entry = {
     id: 1,
+    blocked: false,
     firstSeen: 1,
     lastSeen: 2,
     userAgent: 'v2rayNG/1.10',
@@ -98,10 +99,12 @@ describe('client device list', () => {
       loading={false}
       clearing={false}
       deletingId={null}
+      blockingId={null}
       formatDate={String}
       onRefresh={vi.fn()}
       onClearAll={vi.fn()}
       onDelete={vi.fn()}
+      onSetBlocked={vi.fn()}
       onClose={vi.fn()}
     />
   );

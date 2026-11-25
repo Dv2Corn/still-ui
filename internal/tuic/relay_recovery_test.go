@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -58,7 +59,7 @@ func audit3RestartableSOCKS(t *testing.T) (string, *net.UDPConn, *net.UDPAddr) {
 
 func audit3StartUDPEcho(u *net.UDPConn, arrived chan<- struct{}) {
 	go func() {
-		buf := make([]byte, 2048)
+		buf := make([]byte, maxSocksUdpDatagramSize)
 		for {
 			n, src, err := u.ReadFromUDP(buf)
 			if err != nil {
@@ -209,7 +210,7 @@ func TestResponseStreamThePeerStoppedReadingIsNotARelayFailure(t *testing.T) {
 	case <-ctx.Done():
 		t.Fatal("the client's STOP_SENDING never reached the server")
 	}
-	if err := closeResponseStream(stream); err != nil {
+	if err := stream.Close(); err != nil && !peerStoppedStream(stream) {
 		t.Fatalf("closing a response the peer stopped reading = %v, want nil", err)
 	}
 }
@@ -233,6 +234,27 @@ func TestAudit3FirstTransportReturnsPositiveEchoAfterOppositeModePacket(t *testi
 				t.Fatalf("opposite request response did not keep first transport: %q %v", p, err)
 			}
 		})
+	}
+}
+
+func TestPeerStoppingOneResponseStreamKeepsItsUDPAssociation(t *testing.T) {
+	relayAddr, u, _ := audit3RestartableSOCKS(t)
+	audit3StartUDPEcho(u, nil)
+	// A stream window far below the response holds the server in Write until the stop arrives.
+	_, c, _, _ := startLifecycleTestServerWithClient(t, &SocksRelay{Addr: relayAddr, Password: "lifecycle-socks-password"},
+		"stopped-stream@x", &clientquic.Config{EnableDatagrams: true, InitialStreamReceiveWindow: 16, MaxStreamReceiveWindow: 16})
+	audit3SendPacket(t, c, packetTransportStream, 43301, 1, strings.Repeat("x", 1500))
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	response, err := c.AcceptUniStream(ctx)
+	if err != nil {
+		t.Fatalf("no response stream for the first packet: %v", err)
+	}
+	response.CancelRead(0)
+
+	audit3SendPacket(t, c, packetTransportDatagram, 43301, 2, "next")
+	if _, p, err := audit3ReceivePacket(c, packetTransportStream, 2*time.Second); err != nil || string(p) != "next" {
+		t.Fatalf("stopping one response stream ended its whole association: %q %v", p, err)
 	}
 }
 

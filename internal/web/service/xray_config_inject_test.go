@@ -1128,3 +1128,36 @@ func TestInjectNodeEgresses_FullRangeSkipsTheNode(t *testing.T) {
 		t.Fatalf("a node without a free port must get neither a bridge nor a rule; last inbound %+v", cfg.InboundConfigs[len(cfg.InboundConfigs)-1])
 	}
 }
+
+func TestMergeSubscriptionOutboundsDeduplicatesDuplicateTags(t *testing.T) {
+	cfg := &xray.Config{
+		OutboundConfigs: json_util.RawMessage(`[{"tag":"direct","protocol":"freedom"}]`),
+	}
+	prepend := []any{
+		map[string]any{"tag": "gh-canada-1", "protocol": "vmess"},
+	}
+	appendList := []any{
+		map[string]any{"tag": "gh-canada-1", "protocol": "vmess"},
+		map[string]any{"tag": "direct", "protocol": "vmess"},
+	}
+	mergeSubscriptionOutbounds(cfg, prepend, appendList)
+
+	var outbounds []map[string]any
+	if err := json.Unmarshal(cfg.OutboundConfigs, &outbounds); err != nil {
+		t.Fatal(err)
+	}
+	tags := make([]string, 0, len(outbounds))
+	seen := make(map[string]bool)
+	for _, o := range outbounds {
+		tag, _ := o["tag"].(string)
+		if seen[tag] {
+			t.Fatalf("found duplicate outbound tag %q in merged config: %v", tag, outbounds)
+		}
+		seen[tag] = true
+		tags = append(tags, tag)
+	}
+	// template tag "direct" must be preserved as "direct"
+	if tags[1] != "direct" {
+		t.Fatalf("template tag altered: %v", tags)
+	}
+}

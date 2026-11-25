@@ -13,16 +13,3 @@ overrides:
   # GHSA-r825-w8mm-5pxw, GHSA-698v-4r3x-3vcv, GHSA-9jrq-w75r-8gcw.
   'vite@<8.1.6': '~8.1.7'
 minimumReleaseAgeExcludePrune: true
-minimumReleaseAgeExclude:
-  - '@fumadocs/json-schema@0.3.5'
-  - '@next/env@16.4.3'
-  - '@next/swc-darwin-arm64@16.4.3'
-  - '@next/swc-darwin-x64@16.4.3'
-  - '@next/swc-linux-arm64-gnu@16.4.3'
-  - '@next/swc-linux-arm64-musl@16.4.3'
-  - '@next/swc-linux-x64-gnu@16.4.3'
-  - '@next/swc-linux-x64-musl@16.4.3'
-  - '@next/swc-win32-arm64-msvc@16.4.3'
-  - '@next/swc-win32-x64-msvc@16.4.3'
-  - fumadocs-mdx@15.4.10
-  - next@16.4.3

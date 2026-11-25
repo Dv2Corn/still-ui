@@ -65,6 +65,16 @@ node-e2e: dist-stub ## Master+node sync end to end with two real panel processes
 	go build -o $(NODE_E2E_BIN) .
 	XUI_NODE_E2E_BINARY=$(NODE_E2E_BIN) go test -count=1 -timeout 20m -v ./internal/nodee2e/
 
+.PHONY: xray-e2e
+# still-ui's shipped core (scripts/xray-build: v26.10.31 with the REALITY patch) as a real child
+# process; the stock core refuses the fp=ios hello our links carry. test-go only runs these as skips.
+XRAY_E2E_DIR = $(CURDIR)/.cache/xray-e2e
+XRAY_E2E_BIN = $(XRAY_E2E_DIR)/xray-linux-$(shell go env GOARCH)
+XRAY_E2E_PKGS = $(shell grep -rl --include='*_test.go' 'Getenv("XRAY_E2E_BINARY")' internal | xargs -n1 dirname | sort -u | sed 's|^|./|')
+xray-e2e: dist-stub ## Real-core tests against still-ui's shipped Xray (scripts/xray-build)
+	XRAY_BUILD_NATIVE=1 bash scripts/xray-build/build.sh $(XRAY_E2E_DIR) $(shell go env GOARCH)
+	XRAY_E2E_BINARY=$(XRAY_E2E_BIN) go test -count=1 -timeout 20m -v $(XRAY_E2E_PKGS)
+
 .PHONY: test-fe
 test-fe: ## Frontend tests (vitest)
 	cd $(FRONTEND) && npm test

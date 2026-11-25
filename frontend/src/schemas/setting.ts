@@ -4,6 +4,9 @@ const port = z.number().int().min(1).max(65535);
 const nonNegativeInt = z.number().int().min(0);
 const absolutePath = z.string().regex(/^\//, 'pages.settings.validation.pathLeadingSlash');
 
+export const NetworkTrafficModeSchema = z.enum(['legacy', 'auto', 'manual']);
+export type NetworkTrafficMode = z.infer<typeof NetworkTrafficModeSchema>;
+
 export const SubProfileModeSchema = z.enum(['none', 'builtin', 'custom']);
 export type SubProfileMode = z.infer<typeof SubProfileModeSchema>;
 
@@ -19,7 +22,10 @@ export type SubProbeOrder = z.infer<typeof SubProbeOrderSchema>;
 export const SubHwidNoIdPolicySchema = z.enum(['shared', 'allow', 'refuse']);
 export type SubHwidNoIdPolicy = z.infer<typeof SubHwidNoIdPolicySchema>;
 
-export const AllSettingSchema = z
+export const WechatModeSchema = z.enum(['wecom', 'webhook']);
+export type WechatMode = z.infer<typeof WechatModeSchema>;
+
+export const AllSettingFieldsSchema = z
   .object({
     webListen: z.string().optional(),
     webDomain: z.string().optional(),
@@ -28,16 +34,23 @@ export const AllSettingSchema = z
     webKeyFile: z.string().optional(),
     webBasePath: absolutePath.optional(),
     sessionMaxAge: z.number().int().min(1).max(525600).optional(),
+    publicIpRefreshMinutes: z.number().int().min(0).max(10080).optional(),
+    publicIpv6Detect: z.boolean().optional(),
+    publicIpv4Override: z.string().optional(),
+    publicIpv6Override: z.string().optional(),
     trustedProxyCIDRs: z.string().optional(),
     realityScanCandidates: z.string().optional(),
     ipLimitAllowlist: z.string().optional(),
     panelOutbound: z.string().optional(),
+    networkTrafficMode: NetworkTrafficModeSchema.optional(),
+    networkTrafficInterface: z.string().max(255).optional(),
     pageSize: z.number().int().min(0).max(1000).optional(),
     expireDiff: nonNegativeInt.optional(),
     trafficDiff: nonNegativeInt.max(100).optional(),
     remarkTemplate: z.string().optional(),
     subShowIdentityOnAllLinks: z.boolean().optional(),
     subInfoNodeEnable: z.boolean().optional(),
+    subHwidRejectWithConfig: z.boolean().optional(),
     subHostSortMode: SubHostSortModeSchema.optional(),
     subProbeOrder: SubProbeOrderSchema.optional(),
     subProbeMinAgents: z.number().int().min(0).max(10).optional(),
@@ -93,10 +106,13 @@ export const AllSettingSchema = z
     externalTrafficInformEnable: z.boolean().optional(),
     externalTrafficInformURI: z.string().optional(),
     restartXrayOnClientDisable: z.boolean().optional(),
+    mcpEnable: z.boolean().optional(),
     subCertFile: z.string().optional(),
     subKeyFile: z.string().optional(),
     externalSubUserAgent: z.string().max(512).optional(),
     subUpdates: z.number().int().min(0).max(525600).optional(),
+    subRateLimitEnable: z.boolean().optional(),
+    subRateLimit: z.number().int().min(1).max(1000).optional(),
     subEncrypt: z.boolean().optional(),
     subURI: z.string().optional(),
     subJsonURI: z.string().optional(),
@@ -230,8 +246,32 @@ export const AllSettingSchema = z
     connLogDestination: z.enum(['full', 'domain', 'none']).optional(),
     connLogSource: z.enum(['full', 'masked', 'none']).optional(),
     auditLogRetentionDays: z.number().int().min(1).max(3650).optional(),
+    wechatEnable: z.boolean().optional(),
+    wechatMode: WechatModeSchema.optional(),
+    wechatWebhookURL: z.string().optional(),
+    hasWechatWebhookURL: z.boolean().optional(),
+    clearWechatWebhookURL: z.boolean().optional(),
+    wechatToken: z.string().optional(),
+    hasWechatToken: z.boolean().optional(),
+    clearWechatToken: z.boolean().optional(),
+    wechatLang: z.string().optional(),
+    wechatReportEnable: z.boolean().optional(),
+    wechatRunTime: z.string().optional(),
+    wechatEnabledEvents: z.string().optional(),
+    wechatCpu: z.number().int().min(0).max(100).optional(),
+    wechatMemory: z.number().int().min(0).max(100).optional(),
   })
   .loose();
+
+export const AllSettingSchema = AllSettingFieldsSchema.superRefine((setting, context) => {
+  if (setting.networkTrafficMode === 'manual' && !setting.networkTrafficInterface) {
+    context.addIssue({
+      code: 'custom',
+      path: ['networkTrafficInterface'],
+      message: 'pages.settings.networkTrafficUnavailable',
+    });
+  }
+});
 
 export type AllSettingInput = z.infer<typeof AllSettingSchema>;
 
@@ -239,7 +279,7 @@ export type AllSettingInput = z.infer<typeof AllSettingSchema>;
 // enforced its 2,048-character limit. Accept those values when reading so the
 // settings page can display and let users correct them, while keeping the
 // stricter schema above for outgoing updates.
-export const AllSettingResponseSchema = AllSettingSchema.extend({
+export const AllSettingResponseSchema = AllSettingFieldsSchema.extend({
   subJsonUserAgentRegex: z.string().optional(),
   subClashUserAgentRegex: z.string().optional(),
 });

@@ -6,8 +6,8 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 )
 
-// #55/#58 review: /clients/add refused these emails and subIds, while
-// /inbounds/add still created exactly those records from the inbound's settings.
+// /clients/add refuses these emails and subIds, while /inbounds/add still
+// created exactly those records from the inbound's settings.
 func TestAddInboundRefusesClientNamesTheClientAPIRefuses(t *testing.T) {
 	for i, tc := range []struct{ email, subID, want string }{
 		{".", "", "client email must not be '.' or '..'\n"},

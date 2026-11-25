@@ -101,6 +101,22 @@ export function useNodeMutations() {
     },
   });
 
+  const restartMut = useMutation({
+    mutationFn: ({ id, target }: { id: number; target: 'xray' | 'panel' }) =>
+      HttpUtil.post(
+        `/panel/api/nodes/${target === 'xray' ? 'restartXray' : 'restartPanel'}/${id}`,
+        undefined,
+        {
+          silent: true,
+          timeout: 12000,
+        },
+      ),
+    retry: false,
+    onSuccess: (msg) => {
+      if (msg?.success) queryClient.invalidateQueries({ queryKey: keys.nodes.root() });
+    },
+  });
+
   return {
     create: (payload: Partial<NodeRecord>) => createMut.mutateAsync(payload),
     update: (id: number, payload: Partial<NodeRecord>) => updateMut.mutateAsync({ id, payload }),
@@ -109,6 +125,7 @@ export function useNodeMutations() {
     setTrafficLimit: (id: number, payload: NodeTrafficLimitPayload) =>
       trafficLimitMut.mutateAsync({ id, payload }),
     probe: (id: number) => probeMut.mutateAsync(id),
+    restart: (id: number, target: 'xray' | 'panel') => restartMut.mutateAsync({ id, target }),
     updatePanels: (ids: number[], dev: boolean): Promise<Msg<NodeUpdateResult[]>> =>
       updatePanelsMut.mutateAsync({ ids, dev }),
     testConnection: async (payload: Partial<NodeRecord>): Promise<Msg<ProbeResult>> => {

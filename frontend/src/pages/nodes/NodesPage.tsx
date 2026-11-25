@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -59,6 +59,7 @@ export default function NodesPage() {
     fetchInbounds,
     probe,
     updatePanels,
+    restart,
   } = useNodeMutations();
 
   const { data: latestVersion = '' } = useQuery({
@@ -74,6 +75,8 @@ export default function NodesPage() {
   const [formMode, setFormMode] = useState<'add' | 'edit'>('add');
   const [formNode, setFormNode] = useState<NodeRecord | null>(null);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [restartingIds, setRestartingIds] = useState<ReadonlySet<number>>(new Set());
+  const restartLocks = useRef(new Set<number>());
   const [mtlsOpen, setMtlsOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [trustCa, setTrustCa] = useState('');
@@ -173,6 +176,51 @@ export default function NodesPage() {
 
   // HttpUtil already toasts the result of the save.
   const [trafficNode, setTrafficNode] = useState<NodeRecord | null>(null);
+  const onRestart = useCallback(
+    (node: NodeRecord, target: 'xray' | 'panel') => {
+      if (!node.enable || node.transitive || node.id <= 0 || restartLocks.current.has(node.id))
+        return;
+      restartLocks.current.add(node.id);
+      const action = target === 'xray' ? 'restartXray' : 'restartPanel';
+      let started = false;
+      modal.confirm({
+        title: t('pages.nodes.restartConfirmTitle', { name: node.name || String(node.id) }),
+        content: t(`pages.nodes.${action}Content`),
+        okText: t(`pages.nodes.${action}`),
+        cancelText: t('cancel'),
+        onCancel: () => {
+          restartLocks.current.delete(node.id);
+        },
+        onOk: async () => {
+          if (started) return;
+          started = true;
+          setRestartingIds((ids) => new Set(ids).add(node.id));
+          try {
+            const msg = await restart(node.id, target);
+            if (msg?.success) {
+              messageApi.success(
+                t(
+                  `pages.nodes.toasts.${target === 'xray' ? 'xrayRestarted' : 'panelRestartAccepted'}`,
+                ),
+              );
+            } else {
+              messageApi.error(msg?.msg || t('somethingWentWrong'));
+            }
+          } catch (error) {
+            messageApi.error(error instanceof Error ? error.message : t('somethingWentWrong'));
+          } finally {
+            restartLocks.current.delete(node.id);
+            setRestartingIds((ids) => {
+              const next = new Set(ids);
+              next.delete(node.id);
+              return next;
+            });
+          }
+        },
+      });
+    },
+    [modal, t, restart, messageApi],
+  );
 
   const onToggleEnable = useCallback(
     async (node: NodeRecord, next: boolean) => {
@@ -335,6 +383,8 @@ export default function NodesPage() {
                       onTrafficLimit={setTrafficNode}
                       onUpdateNode={onUpdateNode}
                       onUpdateSelected={onUpdateSelected}
+                      onRestart={onRestart}
+                      restartingIds={restartingIds}
                     />
                   </Col>
                 </Row>
