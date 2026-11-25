@@ -38,6 +38,7 @@ describe('node traffic limit UI', () => {
         onInvite={noop}
         onMtls={noop}
         onEdit={noop}
+        onRestart={noop}
         onDelete={noop}
         onProbe={noop}
         onToggleEnable={noop}

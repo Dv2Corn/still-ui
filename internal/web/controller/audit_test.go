@@ -56,7 +56,7 @@ func newAuditTestEngine(t *testing.T) *gin.Engine {
 		}
 		c.String(http.StatusOK, token)
 	})
-	NewAPIController(engine.Group("/"))
+	NewAPIController(engine.Group("/"), engine)
 	return engine
 }
 

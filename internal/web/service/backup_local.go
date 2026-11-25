@@ -211,10 +211,7 @@ func writeDBSnapshot(dst string) error {
 	return nil
 }
 
-// pgDumpTimeout bounds one pg_dump: a hung server must not hold backupRunMu, and with it every
-// later scheduled backup, forever without a backup.failed alert.
-var pgDumpTimeout = time.Hour
-
+// pgDumpToFile is bounded by pgDumpTimeout (server.go): a hung server must not hold backupRunMu forever.
 func pgDumpToFile(dst string) error {
 	bin, err := exec.LookPath("pg_dump")
 	if err != nil {

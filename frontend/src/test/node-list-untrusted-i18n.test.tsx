@@ -33,6 +33,7 @@ function renderSubNode(fields: Partial<NodeRecord>) {
       onToggleEnable={noop}
       onUpdateNode={noop}
       onUpdateSelected={noop}
+      onRestart={noop}
     />,
   );
 }

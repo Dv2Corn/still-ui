@@ -1041,11 +1041,15 @@ func (s *Server) sendUDPPacketFragments(
 			if err != nil {
 				return err
 			}
-			if _, err := stream.Write(frame.Bytes()); err != nil {
-				stream.CancelWrite(0)
-				return err
+			_, err = stream.Write(frame.Bytes())
+			if err == nil {
+				err = stream.Close()
 			}
-			if err := closeResponseStream(stream); err != nil {
+			if err != nil {
+				if peerStoppedStream(stream) {
+					return nil
+				}
+				stream.CancelWrite(0)
 				return err
 			}
 			continue
@@ -1057,15 +1061,11 @@ func (s *Server) sendUDPPacketFragments(
 	return nil
 }
 
-// closeResponseStream sends the FIN of a written response. A client stops reading once it holds the
-// packet, and a STOP_SENDING that beats the FIN is that packet's end, not a failure of the relay.
-func closeResponseStream(stream *quic.SendStream) error {
-	err := stream.Close()
+// peerStoppedStream reports a STOP_SENDING: the peer dropped that one packet, while its
+// association lives on. Close reports it untyped, so the stream's own cause is read.
+func peerStoppedStream(stream *quic.SendStream) bool {
 	var stopped *quic.StreamError
-	if err != nil && errors.As(context.Cause(stream.Context()), &stopped) && stopped.Remote {
-		return nil
-	}
-	return err
+	return errors.As(context.Cause(stream.Context()), &stopped) && stopped.Remote
 }
 
 // Close gracefully stops the server and releases all network resources.

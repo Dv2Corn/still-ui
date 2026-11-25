@@ -31,6 +31,7 @@ import DiscordTab from './DiscordTab';
 import BackupTab from './BackupTab';
 import ConnLogTab from './ConnLogTab';
 import ImportTab from './ImportTab';
+import WechatTab from './WechatTab';
 import SubscriptionGeneralTab from './SubscriptionGeneralTab';
 import SubscriptionFormatsTab from './SubscriptionFormatsTab';
 import SubscriptionBalancersTab from './SubscriptionBalancersTab';
@@ -49,6 +50,7 @@ const tabSlugs = [
   'backups',
   'connections',
   'import',
+  'wechat',
   'subscription',
   'subscription-formats',
   'subscription-balancers',
@@ -233,6 +235,14 @@ export default function SettingsPage() {
         return <ConnLogTab allSetting={allSetting} updateSetting={updateSetting} />;
       case 'import':
         return <ImportTab />;
+      case 'wechat':
+        return (
+          <WechatTab
+            allSetting={allSetting}
+            updateSetting={updateSetting}
+            hasPendingChanges={!saveDisabled}
+          />
+        );
       case 'subscription':
         return <SubscriptionGeneralTab allSetting={allSetting} updateSetting={updateSetting} />;
       case 'subscription-formats':
@@ -242,7 +252,7 @@ export default function SettingsPage() {
       default:
         return <GeneralTab allSetting={allSetting} updateSetting={updateSetting} />;
     }
-  }, [activeSlug, allSetting, updateSetting, savePayload]);
+  }, [activeSlug, allSetting, updateSetting, savePayload, saveDisabled]);
 
   return (
     <ConfigProvider theme={antdThemeConfig}>

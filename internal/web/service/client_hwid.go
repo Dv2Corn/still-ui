@@ -26,6 +26,7 @@ type HwidRequest struct {
 
 type HwidGateResult struct {
 	Allowed           bool
+	Blocked           bool
 	Active            bool
 	NotSupported      bool
 	MaxDevicesReached bool
@@ -51,8 +52,11 @@ const (
 
 var errClientHwidWriteNotSerialized = errors.New("client HWID write requires the serialized transaction")
 
+var errHwidUnblockNoFreeSlot = errors.New("device limit reached: remove a device or raise the limit before unblocking this one")
+
 type ClientHwidInfo struct {
 	Id          int    `json:"id"`
+	Blocked     bool   `json:"blocked"`
 	FirstSeen   int64  `json:"firstSeen"`
 	LastSeen    int64  `json:"lastSeen"`
 	UserAgent   string `json:"userAgent"`
@@ -132,8 +136,9 @@ func (p hwidPolicy) liveHwids(tx *gorm.DB) *gorm.DB {
 	return tx.Where("last_seen >= ? AND hwid_hash <> ?", p.staleBefore, noIDHwidHash)
 }
 
-// staleHwids is the complement of liveHwids: the rows to delete.
+// staleHwids is the complement of liveHwids: the rows to delete. A ban is never stale.
 func (p hwidPolicy) staleHwids(tx *gorm.DB) *gorm.DB {
+	tx = tx.Where("blocked = ?", false)
 	if p.noID == HwidNoIdShared {
 		return tx.Where("last_seen < ?", p.staleBefore)
 	}
@@ -243,6 +248,18 @@ func (s *ClientService) EnforceHwidForSubID(subID string, req HwidRequest) (Hwid
 	}
 	req = normalizeHwidRequest(req)
 	hasID := len(req.Hwid) >= minHwidLength
+	// Bans are independent of the registration limit, including limit == 0.
+	if hasID {
+		var blocked int64
+		if err := db.Model(&model.ClientHwid{}).
+			Where("sub_id = ? AND hwid_hash = ? AND blocked = ?", subID, hashHwid(req.Hwid), true).
+			Count(&blocked).Error; err != nil {
+			return res, err
+		}
+		if blocked > 0 {
+			return HwidGateResult{Active: true, Blocked: true, Limit: limit}, nil
+		}
+	}
 	if limit <= 0 {
 		if !hasID {
 			return HwidGateResult{Allowed: true}, nil
@@ -290,13 +307,17 @@ func (s *ClientService) EnforceHwidForSubID(subID string, req HwidRequest) (Hwid
 		var existing model.ClientHwid
 		err = tx.Where("sub_id = ? AND hwid_hash = ?", subID, hwidHash).First(&existing).Error
 		if err == nil {
+			if existing.Blocked {
+				res.Blocked = true
+				return nil
+			}
 			if err := tx.Model(&model.ClientHwid{}).Where("id = ?", existing.Id).Updates(map[string]any{
 				"last_seen": now, "user_agent": req.UserAgent, "device_os": req.DeviceOS, "os_version": req.OsVersion, "device_model": req.DeviceModel,
 			}).Error; err != nil {
 				return err
 			}
 			var count int64
-			if err := tx.Model(&model.ClientHwid{}).Where("sub_id = ?", subID).Count(&count).Error; err != nil {
+			if err := tx.Model(&model.ClientHwid{}).Where("sub_id = ? AND blocked = ?", subID, false).Count(&count).Error; err != nil {
 				return err
 			}
 			res.Allowed = true
@@ -308,7 +329,7 @@ func (s *ClientService) EnforceHwidForSubID(subID string, req HwidRequest) (Hwid
 			return err
 		}
 		var count int64
-		if err := tx.Model(&model.ClientHwid{}).Where("sub_id = ?", subID).Count(&count).Error; err != nil {
+		if err := tx.Model(&model.ClientHwid{}).Where("sub_id = ? AND blocked = ?", subID, false).Count(&count).Error; err != nil {
 			return err
 		}
 		res.Registered = int(count)
@@ -412,7 +433,7 @@ func (s *ClientService) HwidSlotStatusForSubID(subID string) (status HwidSlotSta
 	}
 
 	var registered int64
-	if err := policy.liveHwids(db).Model(&model.ClientHwid{}).Where("sub_id = ?", subID).Count(&registered).Error; err != nil {
+	if err := policy.liveHwids(db).Model(&model.ClientHwid{}).Where("sub_id = ? AND blocked = ?", subID, false).Count(&registered).Error; err != nil {
 		return status, false, err
 	}
 	status.Active = true
@@ -449,6 +470,7 @@ func (s *ClientService) ListClientHwids(email string) ([]ClientHwidInfo, error) 
 	for _, r := range rows {
 		out = append(out, ClientHwidInfo{
 			Id:          r.Id,
+			Blocked:     r.Blocked,
 			FirstSeen:   r.FirstSeen,
 			LastSeen:    r.LastSeen,
 			UserAgent:   r.UserAgent,
@@ -474,7 +496,8 @@ func (s *ClientService) ClearClientHwids(email string) error {
 	if subID == "" {
 		return nil
 	}
-	return database.GetDB().Where("sub_id = ?", subID).Delete(&model.ClientHwid{}).Error
+	// Clearing the registration log must not silently revoke device bans.
+	return database.GetDB().Where("sub_id = ? AND blocked = ?", subID, false).Delete(&model.ClientHwid{}).Error
 }
 
 // DeleteClientHwid removes one device, scoped to the client's sub_id: ids
@@ -488,12 +511,70 @@ func (s *ClientService) DeleteClientHwid(email string, id int) error {
 	if subID == "" {
 		return errors.New("client has no subscription id")
 	}
-	res := database.GetDB().Where("sub_id = ? AND id = ?", subID, id).Delete(&model.ClientHwid{})
+	res := database.GetDB().Where("sub_id = ? AND id = ? AND blocked = ?", subID, id, false).Delete(&model.ClientHwid{})
 	if res.Error != nil {
 		return res.Error
 	}
 	if res.RowsAffected == 0 {
-		return errors.New("device not found")
+		return errors.New("device not found or blocked; unblock it before removing")
+	}
+	return nil
+}
+
+// SetClientHwidBlocked keeps the registration as a persistent ban scoped to
+// this subscription. Banned devices do not consume registration slots.
+func (s *ClientService) SetClientHwidBlocked(email string, id int, blocked bool) error {
+	return runSerializedTx(func(tx *gorm.DB) error {
+		var rec model.ClientRecord
+		if err := tx.Where("email = ?", email).First(&rec).Error; err != nil {
+			return err
+		}
+		subID := strings.TrimSpace(rec.SubID)
+		if subID == "" {
+			return errors.New("client has no subscription id")
+		}
+		if !blocked {
+			if err := requireFreeHwidSlotToUnblock(tx, subID, id); err != nil {
+				return err
+			}
+		}
+		res := tx.Model(&model.ClientHwid{}).
+			Where("sub_id = ? AND id = ?", subID, id).
+			Update("blocked", blocked)
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return errors.New("device not found")
+		}
+		return nil
+	})
+}
+
+// A banned device holds no slot, so lifting its ban needs one: registered devices
+// must never exceed the limit, and nothing trims after an unblock.
+func requireFreeHwidSlotToUnblock(tx *gorm.DB, subID string, id int) error {
+	policy, err := loadHwidPolicy(tx)
+	if err != nil {
+		return err
+	}
+	limit, err := effectiveHwidLimitForSubID(tx, subID, policy.defaultLimit)
+	if err != nil || limit <= 0 {
+		return err
+	}
+	var banned int64
+	if err := tx.Model(&model.ClientHwid{}).Where("sub_id = ? AND id = ? AND blocked = ?", subID, id, true).Count(&banned).Error; err != nil {
+		return err
+	}
+	if banned == 0 {
+		return nil
+	}
+	var registered int64
+	if err := policy.liveHwids(tx).Model(&model.ClientHwid{}).Where("sub_id = ? AND blocked = ?", subID, false).Count(&registered).Error; err != nil {
+		return err
+	}
+	if registered >= int64(limit) {
+		return errHwidUnblockNoFreeSlot
 	}
 	return nil
 }
@@ -582,7 +663,7 @@ func trimClientHwidsForSubID(tx *gorm.DB, subID string, limit int) error {
 	}
 	var keep []int
 	if err := tx.Model(&model.ClientHwid{}).
-		Where("sub_id = ?", subID).
+		Where("sub_id = ? AND blocked = ?", subID, false).
 		Order("last_seen DESC").
 		Order("id DESC").
 		Limit(limit).
@@ -590,9 +671,9 @@ func trimClientHwidsForSubID(tx *gorm.DB, subID string, limit int) error {
 		return err
 	}
 	if len(keep) == 0 {
-		return tx.Where("sub_id = ?", subID).Delete(&model.ClientHwid{}).Error
+		return tx.Where("sub_id = ? AND blocked = ?", subID, false).Delete(&model.ClientHwid{}).Error
 	}
-	return tx.Where("sub_id = ? AND id NOT IN ?", subID, keep).Delete(&model.ClientHwid{}).Error
+	return tx.Where("sub_id = ? AND blocked = ? AND id NOT IN ?", subID, false, keep).Delete(&model.ClientHwid{}).Error
 }
 
 func clearClientHwidsBySubIDTx(tx *gorm.DB, subIDs ...string) error {

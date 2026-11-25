@@ -32,6 +32,7 @@ func DomainValidatorMiddleware(domain string) gin.HandlerFunc {
 	}
 }
 
+// Host names are case-insensitive and may end with the root's dot (RFC 4343, 1034).
 func normalizeHost(host string) string {
 	return strings.TrimSuffix(strings.ToLower(strings.TrimSpace(host)), ".")
 }

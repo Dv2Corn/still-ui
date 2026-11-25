@@ -104,39 +104,73 @@ func TestCheckValidSchedules(t *testing.T) {
 	}
 }
 
-// A domain saved with capitals, a trailing dot or a stray space never matched the
-// Host header; one saved with a scheme, port or path can never match it at all.
+// The middleware only strips the port, so a saved scheme, port or path could
+// never match the Host header and locked the panel behind 403.
 func TestCheckValidNormalizesPanelAndSubDomains(t *testing.T) {
-	base := func() *AllSetting {
-		return &AllSetting{WebPort: 2053, SubPort: 2096}
+	tests := []struct {
+		name, in, want, wantErr string
+	}{
+		{"empty", "", "", ""},
+		{"capitals, spaces and root dot", " Panel.Example.COM. ", "panel.example.com", ""},
+		{"IPv6 address", "2001:DB8::1", "2001:db8::1", ""},
+		{"scheme", "https://panel.example.com", "", "must be a bare host name without scheme, port or path: https://panel.example.com"},
+		{"port", "panel.example.com:8443", "", "must be a bare host name without scheme, port or path: panel.example.com:8443"},
+		{"path", "panel.example.com/x", "", "must be a bare host name without scheme, port or path: panel.example.com/x"},
+		{"inner space", "panel example.com", "", "must be a bare host name without scheme, port or path: panel example.com"},
+		{"bracketed IPv6", "[2001:db8::1]", "", "must be a bare host name without scheme, port or path: [2001:db8::1]"},
 	}
-	for in, want := range map[string]string{
-		"":                     "",
-		"panel.example.com":    "panel.example.com",
-		" Panel.Example.COM. ": "panel.example.com",
-		"2001:DB8::1":          "2001:db8::1",
-		"\tsub.example.com\n":  "sub.example.com",
-	} {
-		s := base()
-		s.WebDomain, s.SubDomain = in, in
-		if err := s.CheckValid(); err != nil {
-			t.Errorf("domain %q: unexpected error %v", in, err)
+	for _, tc := range tests {
+		for _, field := range []string{"web domain", "subscription domain"} {
+			t.Run(field+"/"+tc.name, func(t *testing.T) {
+				s := &AllSetting{WebPort: 2053, SubPort: 2096}
+				target := &s.WebDomain
+				if field == "subscription domain" {
+					target = &s.SubDomain
+				}
+				*target = tc.in
+				err := s.CheckValid()
+				if tc.wantErr != "" {
+					if err == nil || err.Error() != field+" "+tc.wantErr {
+						t.Fatalf("CheckValid(%q) error = %v, want %q", tc.in, err, field+" "+tc.wantErr)
+					}
+					return
+				}
+				if err != nil {
+					t.Fatalf("CheckValid(%q): unexpected error %v", tc.in, err)
+				}
+				if *target != tc.want {
+					t.Errorf("CheckValid(%q) saved %q, want %q", tc.in, *target, tc.want)
+				}
+			})
+		}
+	}
+}
+
+// The override is displayed on the overview and used in backup filenames, so a
+// hostname, wrong-family or zoned address must be rejected at save time.
+func TestCheckValidPublicIPOverride(t *testing.T) {
+	cases := []struct {
+		v4, v6, want string
+	}{
+		{"", "", ""},
+		{"203.0.113.9", "2001:db8::1", ""},
+		{"example.com", "", "public IPv4 override is not a valid IPv4 address: example.com"},
+		{"2001:db8::1", "", "public IPv4 override is not a valid IPv4 address: 2001:db8::1"},
+		{"", "203.0.113.9", "public IPv6 override is not a valid IPv6 address: 203.0.113.9"},
+		{"", "fe80::1%eth0", "public IPv6 override is not a valid IPv6 address: fe80::1%eth0"},
+		{"", "::ffff:203.0.113.9", "public IPv6 override is not a valid IPv6 address: ::ffff:203.0.113.9"},
+	}
+	for _, c := range cases {
+		s := &AllSetting{WebPort: 2053, SubPort: 2096, PublicIpv4Override: c.v4, PublicIpv6Override: c.v6}
+		err := s.CheckValid()
+		if c.want == "" {
+			if err != nil {
+				t.Errorf("v4=%q v6=%q: unexpected error %v", c.v4, c.v6, err)
+			}
 			continue
 		}
-		if s.WebDomain != want || s.SubDomain != want {
-			t.Errorf("domain %q saved as web %q / sub %q, want %q", in, s.WebDomain, s.SubDomain, want)
-		}
-	}
-	for _, bad := range []string{"https://panel.example.com", "panel.example.com:8443", "panel.example.com/x", "panel example.com", "[2001:db8::1]"} {
-		s := base()
-		s.WebDomain = bad
-		if err := s.CheckValid(); err == nil {
-			t.Errorf("web domain %q: want error, got nil", bad)
-		}
-		s = base()
-		s.SubDomain = bad
-		if err := s.CheckValid(); err == nil {
-			t.Errorf("sub domain %q: want error, got nil", bad)
+		if err == nil || err.Error() != c.want {
+			t.Errorf("v4=%q v6=%q: err=%v, want %q", c.v4, c.v6, err, c.want)
 		}
 	}
 }

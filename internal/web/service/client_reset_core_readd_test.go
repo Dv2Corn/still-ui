@@ -73,8 +73,8 @@ func seedQuotaDisabledClient(t *testing.T, port int, proto model.Protocol, c mod
 
 const resetProbePeerKey = "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE="
 
-// #55 review: the reset re-added a WireGuard peer without publicKey/allowedIPs,
-// the core rejected it, and the reset restarted Xray for every connected user.
+// The reset re-added a WireGuard peer without publicKey/allowedIPs, the core
+// rejected it, and the reset restarted Xray for every connected user.
 func TestResetTrafficOfQuotaDisabledWireGuardPeerNeedsNoRestart(t *testing.T) {
 	const email = "wg-reset@x"
 	ib, probe := seedQuotaDisabledClient(t, 51840, model.WireGuard, model.Client{
@@ -179,8 +179,8 @@ func TestAutoRenewOfWireGuardPeerWithKeepAliveNeedsNoRestart(t *testing.T) {
 	}
 }
 
-// #58 review: bulk enable built its own account map without the WireGuard
-// keys, so enabling a peer restarted Xray for every user.
+// Bulk enable built its own account map without the WireGuard keys, so
+// enabling a peer restarted Xray for every user.
 func TestBulkEnableOfWireGuardPeerNeedsNoRestart(t *testing.T) {
 	const email = "wg-bulk@x"
 	_, probe := seedQuotaDisabledClient(t, 51843, model.WireGuard, model.Client{
