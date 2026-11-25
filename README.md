@@ -19,9 +19,7 @@
   </a>
 </p>
 
-**still-ui** is a fork of [3x-ui](https://github.com/MHSanaei/3x-ui) by MHSanaei — the web panel for [Xray-core](https://github.com/XTLS/Xray-core). It keeps everything 3x-ui **v3.11.0** can do and fixes what hurts when a panel runs for months on a small server with real users on mobile networks.
-
-The name says what we are after: a server you set up once and then leave alone.
+**still-ui** is a web panel for [Xray-core](https://github.com/XTLS/Xray-core), made for a server you set up once and then leave alone. It is a fork of [3x-ui](https://github.com/MHSanaei/3x-ui) by MHSanaei and does everything 3x-ui **v3.11.0** does. On top of that, iPhone (`fp=ios`) and sing-box clients (Hiddify, Karing) connect over REALITY again, restarting or updating the panel does not drop Xray clients, the panel cannot eat the server's memory, and Telegram backups are encrypted to your key.
 
 > [!IMPORTANT]
 > still-ui is an independent fork. It is not affiliated with or endorsed by the 3x-ui authors. Please report still-ui problems here, not upstream.
