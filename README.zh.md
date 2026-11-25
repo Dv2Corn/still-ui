@@ -19,11 +19,7 @@
   </a>
 </p>
 
-**still-ui** 是 MHSanaei 开发的 [3x-ui](https://github.com/MHSanaei/3x-ui) 面板的一个分支（fork），用于管理 [Xray-core](https://github.com/XTLS/Xray-core)。它以 3x-ui **v3.11.0** 为基础，保留了原面板的全部能力：相同的协议、相同的界面、相同的数据库。
-
-不同之处在于关注点。当面板在一台小服务器上连续运行几个月、用户大多使用移动网络时，一些问题会逐渐暴露出来：客户端设置悄无声息地丢失、握手在丢包严重的线路上失败、面板进程一点点吃光服务器内存。still-ui 专门解决这些问题。
-
-名字本身就说明了目标：服务器配置一次，之后就不用再操心。
+**still-ui** 是 [Xray-core](https://github.com/XTLS/Xray-core) 的 Web 面板，适合配置一次之后就不用再管的服务器。它是 MHSanaei 开发的 [3x-ui](https://github.com/MHSanaei/3x-ui) 的分支，具备 3x-ui **v3.11.0** 的全部功能，并且：iPhone（`fp=ios`）和 sing-box 客户端（Hiddify、Karing）重新可以通过 REALITY 连接；重启或更新面板不会断开 Xray 客户端；面板不会吃光服务器内存；Telegram 备份使用你自己的密钥加密。
 
 > [!IMPORTANT]
 > still-ui 是一个独立分支，与 3x-ui 的作者没有任何关联，也未获得其背书。still-ui 的问题请在本仓库反馈，不要提交到 3x-ui。
