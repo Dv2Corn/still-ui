@@ -163,7 +163,7 @@ jobs:
             echo "::error::bubblewrap is installed but cannot isolate a process on this runner; Claude Code would refuse to start."
             exit 1
           fi
-      - uses: anthropics/claude-code-action@f3b070c88125d33dbae5653df5f143101d4ea9dc # v1.0.276
+      - uses: anthropics/claude-code-action@acfe7992852970efb4fee683d63d628e3e52df67 # v1.0.286
         id: analyze
         if: steps.credentials.outputs.ready == 'true'
         with:
