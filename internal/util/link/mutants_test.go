@@ -94,3 +94,22 @@ func TestParseSubscriptionBodyBase64WithInsertedWhitespace(t *testing.T) {
 		t.Fatalf("got %d outbounds from base64 with inserted whitespace, want 2", len(outs))
 	}
 }
+
+func TestNestsWithinRejectsOneLevelPastTheLimit(t *testing.T) {
+	if !nestsWithin(map[string]any{"leaf": nil}, 1) {
+		t.Fatal("a value exactly at the remaining depth must be accepted")
+	}
+	if nestsWithin(map[string]any{"child": map[string]any{"leaf": nil}}, 1) {
+		t.Fatal("a child below the remaining depth must be rejected")
+	}
+	if nestsWithin([]any{[]any{nil}}, 1) {
+		t.Fatal("nested arrays must obey the same depth limit")
+	}
+}
+
+func TestSlugRemarkTruncatesAtRuneBoundary(t *testing.T) {
+	got := SlugRemark(strings.Repeat("я", maxSlugRunes+1))
+	if got != strings.Repeat("я", maxSlugRunes) {
+		t.Fatalf("SlugRemark length/value = %d/%q, want %d Cyrillic runes", len([]rune(got)), got, maxSlugRunes)
+	}
+}
