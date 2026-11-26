@@ -4,6 +4,12 @@ name: Mutation testing
 # source and a surviving (LIVED) mutant means no test caught the change. It is SLOW, so it
 # runs nightly / on demand and scoped per package — never per-commit. It is informational:
 # no thresholds are set, so it reports survivors as artifacts without failing the build.
+#
+# sub and service are too big to mutate whole in one job (until 26.11.2026 they ran out of
+# time or took the runner down every night, so they never produced a report). They are covered
+# by the "changed" job instead: only code changed on main since the previous day, from the repo
+# root (gremlins v0.6.0 finds no mutants when --diff is combined with a package path), skipped
+# with a notice when one day brings more than CHANGED_LIMIT mutants (an upstream sync).
 on:
   schedule:
     - cron: "0 3 * * *" # 03:00 UTC daily
@@ -20,9 +26,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: sub
-            path: ./internal/sub/
-            exclude: ""
+          - name: changed
+            path: ""
+            exclude: 'internal/web/service/(server|xray|inbound|client_bulk|inbound_traffic)\.go|_postgres_test\.go'
           - name: runtime
             path: ./internal/web/runtime/
             exclude: ""
@@ -32,11 +38,10 @@ jobs:
           - name: database
             path: ./internal/database/
             exclude: 'dump_sqlite\.go'
-          - name: service
-            path: ./internal/web/service/
-            exclude: 'server\.go|xray\.go|inbound\.go|client_bulk\.go|inbound_traffic\.go|.*_postgres_test\.go'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the "changed" job diffs against yesterday's main
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
@@ -48,11 +53,23 @@ jobs:
       - name: Run gremlins on ${{ matrix.name }}
         run: |
           OUT="mutation-${{ matrix.name }}.json"
-          if [ -n "${{ matrix.exclude }}" ]; then
-            gremlins unleash -E '${{ matrix.exclude }}' -o "$OUT" ${{ matrix.path }}
-          else
-            gremlins unleash -o "$OUT" ${{ matrix.path }}
+          set --
+          if [ -n "${{ matrix.exclude }}" ]; then set -- -E '${{ matrix.exclude }}'; fi
+          if [ "${{ matrix.name }}" = changed ]; then
+            CHANGED_LIMIT=600
+            base=$(git rev-list -1 --first-parent --before="1 day ago" HEAD)
+            if [ -z "$base" ] || [ "$base" = "$(git rev-parse HEAD)" ]; then
+              echo "No new commits on main since yesterday: nothing to mutate."; exit 0
+            fi
+            set -- "$@" --diff "$base"
+            n=$(gremlins unleash --dry-run "$@" | sed -n 's/^Runnable: \([0-9]*\).*/\1/p')
+            echo "Code changed since $base gives ${n:-0} mutants."
+            if [ "${n:-0}" -gt "$CHANGED_LIMIT" ]; then
+              echo "::notice::Skipped: ${n} mutants is more than ${CHANGED_LIMIT} (an upstream sync?); the next days cover new changes."
+              exit 0
+            fi
           fi
+          gremlins unleash "$@" -o "$OUT" ${{ matrix.path }}
       - name: Upload mutation report
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
