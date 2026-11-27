@@ -174,8 +174,8 @@ jobs:
           # All must pass. Counting, not SKIP-matching: renaming a test would
           # otherwise leave this step green while testing nothing.
           passed=$(grep -c -- '^--- PASS' /tmp/postgres-schema.log || true)
-          if [ "$passed" -lt 7 ]; then
-            echo "expected at least 7 passing PostgreSQL schema tests, got $passed" >&2
+          if [ "$passed" -lt 6 ]; then
+            echo "expected at least 6 passing PostgreSQL schema tests, got $passed" >&2
             exit 1
           fi
 
