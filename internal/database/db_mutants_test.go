@@ -266,8 +266,10 @@ func TestMtprotoCustomShareAddrMovesEveryInbound(t *testing.T) {
 	initTestDB(t)
 	db.Where("seeder_name = ?", "MtprotoCustomShareAddrToHosts").Delete(&model.HistoryOfSeeders{})
 	for i, port := range []int{4061, 4062} {
-		ib := &model.Inbound{UserId: 1, Tag: "mt-" + itoa(i), Enable: true, Port: port, Protocol: model.MTProto,
-			Settings: `{"clients":[]}`, StreamSettings: `{}`, ShareAddrStrategy: "custom", ShareAddr: "p" + itoa(i) + ".example.com"}
+		ib := &model.Inbound{
+			UserId: 1, Tag: "mt-" + itoa(i), Enable: true, Port: port, Protocol: model.MTProto,
+			Settings: `{"clients":[]}`, StreamSettings: `{}`, ShareAddrStrategy: "custom", ShareAddr: "p" + itoa(i) + ".example.com",
+		}
 		if err := db.Create(ib).Error; err != nil {
 			t.Fatal(err)
 		}

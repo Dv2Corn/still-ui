@@ -105,8 +105,10 @@ func TestBackfillClientForwardedPortsCoversEveryClient(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	ib := model.Inbound{UserId: 1, Port: 51830, Protocol: model.AmneziaWG, Tag: "awg-fp",
-		Settings: `{"clients":[{"email":"fa@x","forwardedPorts":"8080"},{"email":"fb@x","forwardedPorts":"9090"}]}`}
+	ib := model.Inbound{
+		UserId: 1, Port: 51830, Protocol: model.AmneziaWG, Tag: "awg-fp",
+		Settings: `{"clients":[{"email":"fa@x","forwardedPorts":"8080"},{"email":"fb@x","forwardedPorts":"9090"}]}`,
+	}
 	if err := db.Create(&ib).Error; err != nil {
 		t.Fatal(err)
 	}
