@@ -1,9 +1,7 @@
 package database
 
 import (
-	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
@@ -47,13 +45,7 @@ func TestHostAutoMigrateCreatesColumns(t *testing.T) {
 
 // TestHostAutoMigrateCreatesColumns_Postgres is the dual-driver counterpart.
 func TestHostAutoMigrateCreatesColumns_Postgres(t *testing.T) {
-	if strings.TrimSpace(os.Getenv("XUI_DB_DSN")) == "" || os.Getenv("XUI_DB_TYPE") != "postgres" {
-		t.Skip("set XUI_DB_TYPE=postgres and XUI_DB_DSN to run the postgres schema test")
-	}
-	if err := InitDB(""); err != nil {
-		t.Fatalf("InitDB: %v", err)
-	}
-	t.Cleanup(func() { _ = CloseDB() })
+	usePostgres(t)
 	assertHostSchema(t)
 }
 

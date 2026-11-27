@@ -20,6 +20,8 @@ import (
 // and paths in obj (success with that obj). It records the last request.
 type fakeNode struct {
 	fail     map[string]bool
+	msgFail  map[string]string // HTTP 200 with success=false and this msg
+	caps     string
 	obj      map[string]string
 	lastPath string
 	lastEnc  string
@@ -29,7 +31,16 @@ func (f *fakeNode) start(t *testing.T) *Remote {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		f.lastPath, f.lastEnc = r.URL.RequestURI(), r.Header.Get("Content-Encoding")
-		w.Header().Set(wirecodec.CapsHeader, wirecodec.CapZstd)
+		caps := wirecodec.CapZstd
+		if f.caps != "" {
+			caps = f.caps
+		}
+		w.Header().Set(wirecodec.CapsHeader, caps)
+		if m, ok := f.msgFail[r.URL.Path]; ok {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"success":false,"msg":"` + m + `"}`))
+			return
+		}
 		if f.fail[r.URL.Path] {
 			w.WriteHeader(http.StatusInternalServerError)
 			return

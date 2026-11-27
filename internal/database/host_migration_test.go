@@ -1,7 +1,6 @@
 package database
 
 import (
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -168,13 +167,7 @@ func TestMigrate_LegacyBooleanVerifyPeerCertByNameIsBlanked(t *testing.T) {
 // Postgres casts the boolean column with USING col::text whenever the hosts table
 // also lacks a newer column, the shape every boolean-era table had.
 func TestMigrate_LegacyBooleanVerifyPeerCertByNameIsBlanked_Postgres(t *testing.T) {
-	if strings.TrimSpace(os.Getenv("XUI_DB_DSN")) == "" || os.Getenv("XUI_DB_TYPE") != "postgres" {
-		t.Skip("set XUI_DB_TYPE=postgres and XUI_DB_DSN to run the postgres migration test")
-	}
-	if err := InitDB(""); err != nil {
-		t.Fatalf("InitDB: %v", err)
-	}
-	t.Cleanup(func() { _ = CloseDB() })
+	usePostgres(t)
 	GetDB().Exec("TRUNCATE TABLE hosts, inbounds RESTART IDENTITY CASCADE")
 	ib := seedInboundWithStream(t, "vcn-legacy-pg", 5558, `{"network":"tcp","security":"tls"}`)
 	for _, stmt := range []string{
@@ -266,13 +259,7 @@ func TestMigrate_KeepsExternalProxyIntact(t *testing.T) {
 
 // #5 — same against a real Postgres DSN (sequence resync); skips without a DSN.
 func TestMigrate_Postgres(t *testing.T) {
-	if strings.TrimSpace(os.Getenv("XUI_DB_DSN")) == "" || os.Getenv("XUI_DB_TYPE") != "postgres" {
-		t.Skip("set XUI_DB_TYPE=postgres and XUI_DB_DSN to run the postgres migration test")
-	}
-	if err := InitDB(""); err != nil {
-		t.Fatalf("InitDB: %v", err)
-	}
-	t.Cleanup(func() { _ = CloseDB() })
+	usePostgres(t)
 	// Clean slate so this run owns the migration regardless of prior tests.
 	GetDB().Exec("TRUNCATE TABLE hosts, inbounds RESTART IDENTITY CASCADE")
 	GetDB().Where("seeder_name = ?", "HostsFromExternalProxy").Delete(&model.HistoryOfSeeders{})

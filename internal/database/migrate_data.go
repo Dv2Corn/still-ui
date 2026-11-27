@@ -86,10 +86,6 @@ func MigrateData(srcPath, dstDSN string) error {
 		return errors.New("destination DSN is required")
 	}
 
-	if err := os.MkdirAll(path.Dir(srcPath), 0o755); err != nil {
-		return err
-	}
-
 	srcDSN := srcPath + "?_journal_mode=WAL&_busy_timeout=10000"
 	src, err := gorm.Open(sqlite.Open(srcDSN), &gorm.Config{Logger: logger.Discard})
 	if err != nil {
@@ -154,9 +150,7 @@ func MigrateData(srcPath, dstDSN string) error {
 
 	// setval is never rolled back by PostgreSQL, so sequences are resynced only
 	// after the transaction has committed.
-	if err := resetPostgresSequences(dst); err != nil {
-		log.Printf("warning: failed to reset some postgres sequences: %v", err)
-	}
+	resyncPostgresSequences(dst, migrationModels())
 
 	log.Printf("Migration complete: %d rows across %d tables.", totalRows, len(migrationModels()))
 	log.Println("Set XUI_DB_TYPE=postgres and XUI_DB_DSN=... in /etc/default/x-ui, then restart x-ui.")
@@ -289,15 +283,10 @@ func truncatePostgresTables(dst *gorm.DB, models []any) error {
 	return dst.Exec("TRUNCATE TABLE " + strings.Join(tables, ", ") + " RESTART IDENTITY CASCADE").Error
 }
 
-// resetPostgresSequences advances each migrated table's id sequence past MAX(id),
-// otherwise the next INSERT-without-id would clash with copied rows.
-func resetPostgresSequences(dst *gorm.DB) error {
-	return resyncPostgresSequences(dst, migrationModels())
-}
-
-// resyncPostgresSequences sets each model's id sequence to MAX(id); idempotent. Id-less
+// resyncPostgresSequences sets each model's id sequence to MAX(id), so the next
+// INSERT-without-id cannot clash with copied rows; idempotent. Id-less
 // composite-PK tables are skipped — Postgres rejects MAX(id) at parse time and logs it (#5665).
-func resyncPostgresSequences(db *gorm.DB, models []any) error {
+func resyncPostgresSequences(db *gorm.DB, models []any) {
 	for _, m := range models {
 		t, ok := tableWithIdColumn(db, m)
 		if !ok {
@@ -311,7 +300,6 @@ func resyncPostgresSequences(db *gorm.DB, models []any) error {
 			t, t,
 		).Error
 	}
-	return nil
 }
 
 // tableWithIdColumn resolves a model's table name and reports whether its GORM

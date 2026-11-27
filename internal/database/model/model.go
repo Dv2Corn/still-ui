@@ -332,7 +332,7 @@ func NormalizeXhttpExtra(stream map[string]any) bool {
 	if !ok && raw != nil {
 		return false
 	}
-	flat := make(map[string]any, len(inner)+3)
+	flat := make(map[string]any, len(inner))
 	for k, v := range inner {
 		flat[k] = v
 	}
@@ -473,10 +473,7 @@ func StripVmessClientSecurity(settings string) (string, bool) {
 	if !changed {
 		return settings, false
 	}
-	out, err := json.MarshalIndent(parsed, "", "  ")
-	if err != nil {
-		return settings, false
-	}
+	out, _ := json.MarshalIndent(parsed, "", "  ") // cannot fail: parsed came from json.Unmarshal
 	return string(out), true
 }
 
@@ -513,10 +510,7 @@ func MasqueClientsToCore(settings string) (string, bool) {
 	if !changed {
 		return settings, false
 	}
-	out, err := json.MarshalIndent(parsed, "", "  ")
-	if err != nil {
-		return settings, false
-	}
+	out, _ := json.MarshalIndent(parsed, "", "  ") // cannot fail: parsed came from json.Unmarshal
 	return string(out), true
 }
 
@@ -588,10 +582,7 @@ func WireguardClientsToPeers(settings string) (string, bool) {
 	}
 	delete(parsed, "clients")
 	parsed["peers"] = peers
-	out, err := json.MarshalIndent(parsed, "", "  ")
-	if err != nil {
-		return settings, false
-	}
+	out, _ := json.MarshalIndent(parsed, "", "  ") // cannot fail: parsed came from json.Unmarshal
 	return string(out), true
 }
 
@@ -607,10 +598,7 @@ func StripVlessInboundEncryption(settings string) (string, bool) {
 		return settings, false
 	}
 	delete(parsed, "encryption")
-	out, err := json.MarshalIndent(parsed, "", "  ")
-	if err != nil {
-		return settings, false
-	}
+	out, _ := json.MarshalIndent(parsed, "", "  ") // cannot fail: parsed came from json.Unmarshal
 	return string(out), true
 }
 
@@ -660,10 +648,7 @@ func HealShadowsocksClientMethods(settings string) (string, bool) {
 		if !changed {
 			return settings, false
 		}
-		out, err := json.MarshalIndent(parsed, "", "  ")
-		if err != nil {
-			return settings, false
-		}
+		out, _ := json.MarshalIndent(parsed, "", "  ") // cannot fail: parsed came from json.Unmarshal
 		return string(out), true
 	}
 	is2022 := strings.HasPrefix(method, "2022-blake3-")
@@ -694,10 +679,7 @@ func HealShadowsocksClientMethods(settings string) (string, bool) {
 	if !changed {
 		return settings, false
 	}
-	out, err := json.MarshalIndent(parsed, "", "  ")
-	if err != nil {
-		return settings, false
-	}
+	out, _ := json.MarshalIndent(parsed, "", "  ") // cannot fail: parsed came from json.Unmarshal
 	return string(out), true
 }
 
@@ -774,10 +756,7 @@ func StripMtprotoInboundSecret(settings string) (string, bool) {
 		return settings, false
 	}
 	delete(parsed, "secret")
-	out, err := json.MarshalIndent(parsed, "", "  ")
-	if err != nil {
-		return settings, false
-	}
+	out, _ := json.MarshalIndent(parsed, "", "  ") // cannot fail: parsed came from json.Unmarshal
 	return string(out), true
 }
 
@@ -794,10 +773,7 @@ func StripMtprotoInboundAdTag(settings string) (string, bool) {
 		return settings, false
 	}
 	delete(parsed, "adTag")
-	out, err := json.MarshalIndent(parsed, "", "  ")
-	if err != nil {
-		return settings, false
-	}
+	out, _ := json.MarshalIndent(parsed, "", "  ") // cannot fail: parsed came from json.Unmarshal
 	return string(out), true
 }
 
@@ -860,10 +836,7 @@ func HealMtprotoClientSecrets(settings string) (string, bool) {
 	if !changed {
 		return settings, false
 	}
-	out, err := json.MarshalIndent(parsed, "", "  ")
-	if err != nil {
-		return settings, false
-	}
+	out, _ := json.MarshalIndent(parsed, "", "  ") // cannot fail: parsed came from json.Unmarshal
 	return string(out), true
 }
 
@@ -1416,9 +1389,8 @@ func (c *Client) ToRecord() *ClientRecord {
 		AdTag:            c.AdTag,
 	}
 	if c.Reverse != nil {
-		if b, err := json.Marshal(c.Reverse); err == nil {
-			rec.Reverse = string(b)
-		}
+		b, _ := json.Marshal(c.Reverse) // a struct of one string cannot fail to marshal
+		rec.Reverse = string(b)
 	}
 	return rec
 }
@@ -1544,10 +1516,7 @@ func equalClientHostRuleIds(a, b []int) bool {
 // EncodeClientHostRuleIds marshals ids into the JSON text stored by raw
 // column writes (Update/Updates), which bypass GORM's serializer.
 func EncodeClientHostRuleIds(ids []int) string {
-	b, err := json.Marshal(ids)
-	if err != nil {
-		return "null"
-	}
+	b, _ := json.Marshal(ids) // an int slice cannot fail to marshal
 	return string(b)
 }
 
