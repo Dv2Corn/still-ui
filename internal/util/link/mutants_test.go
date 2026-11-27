@@ -1,9 +1,12 @@
 package link
 
 import (
+	"bytes"
+	"compress/zlib"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
 	"testing"
 )
@@ -248,5 +251,144 @@ func TestParseShadowsocksEdgeForms(t *testing.T) {
 	}
 	if got := res.Outbound["streamSettings"].(map[string]any)["network"]; got != "tcp" {
 		t.Errorf("default network = %v, want tcp", got)
+	}
+}
+
+func TestParseTrojanDefaultsToTLS(t *testing.T) {
+	res, err := ParseLink("trojan://pass@1.2.3.4:443#t")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := res.Outbound["streamSettings"].(map[string]any)["security"]; got != "tls" {
+		t.Fatalf("security = %v, want tls", got)
+	}
+}
+
+func TestParseHysteria2ShortScheme(t *testing.T) {
+	for _, l := range []string{"hy2://pw@1.2.3.4:443#h", "hysteria2://pw@1.2.3.4:443#h"} {
+		if _, err := ParseLink(l); err != nil {
+			t.Errorf("ParseLink(%q): %v", l, err)
+		}
+	}
+}
+
+func TestParseWireguardIgnoresUnparsableReserved(t *testing.T) {
+	res, err := ParseLink("wg://secret@1.2.3.4:51820?publickey=pub&reserved=x,y#w")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := res.Outbound["settings"].(map[string]any)["reserved"]; ok {
+		t.Fatal("reserved set although none of its values is a number")
+	}
+}
+
+func zlibBytes(t *testing.T, b []byte) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	zw := zlib.NewWriter(&buf)
+	_, _ = zw.Write(b)
+	_ = zw.Close()
+	return buf.Bytes()
+}
+
+func TestAmneziaVPNKeyConfInflateBudgetIsInclusive(t *testing.T) {
+	last, _ := json.Marshal(map[string]string{"config": awgConf})
+	js, _ := json.Marshal(map[string]any{"containers": []any{map[string]any{"container": "amnezia-awg", "awg": map[string]any{"last_config": string(last)}}}})
+	z := zlibBytes(t, js)
+	exact := len(js)
+	if _, _, err := amneziaVPNKeyConf(z, &exact); err != nil && strings.Contains(err.Error(), "exceeds") {
+		t.Fatalf("a payload of exactly the budget was refused: %v", err)
+	}
+	short := len(js) - 1
+	if _, _, err := amneziaVPNKeyConf(z, &short); err == nil || !strings.Contains(err.Error(), "exceeds") {
+		t.Fatalf("a payload one byte over the budget: err = %v, want exceeds", err)
+	}
+}
+
+func TestAmneziaWGConfEmptyDNSIsSkipped(t *testing.T) {
+	res, err := amneziaWGOutboundFromConf("[Interface]\nPrivateKey = k=\nAddress = 10.0.0.2/32\nDNS = \n[Peer]\nPublicKey = p=\nEndpoint = 1.2.3.4:51820\n", "t")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := res.Outbound["settings"].(map[string]any)["dns"]; ok {
+		t.Fatal("dns set from an empty DNS line")
+	}
+}
+
+func TestParseVlessXhttpModeAndPadding(t *testing.T) {
+	res, err := ParseLink("vless://uuid@1.2.3.4:443?type=xhttp&security=none&mode=stream-one&x_padding_bytes=200-300#x")
+	if err != nil {
+		t.Fatal(err)
+	}
+	xh := res.Outbound["streamSettings"].(map[string]any)["xhttpSettings"].(map[string]any)
+	if xh["mode"] != "stream-one" || xh["xPaddingBytes"] != "200-300" {
+		t.Fatalf("xhttpSettings = %v", xh)
+	}
+}
+
+func TestMkcpLegacyShareParamsOnlyApplyToKcp(t *testing.T) {
+	stream := map[string]any{"network": "tcp"}
+	applyMkcpLegacyFromShare(stream, url.Values{"headerType": {"wechat-video"}, "seed": {"s"}})
+	if len(stream) != 1 {
+		t.Fatalf("a tcp stream got mKCP settings: %v", stream)
+	}
+}
+
+func TestHysteria2GeckoPacketSize(t *testing.T) {
+	p := url.Values{"obfs": {"gecko"}, "obfs-password": {"pw"}, "minPacketSize": {"100"}, "maxPacketSize": {"200"}}
+	stream := map[string]any{}
+	applyHysteria2Obfs(stream, p)
+	udp := stream["finalmask"].(map[string]any)["udp"].([]any)
+	if got := udp[0].(map[string]any)["settings"].(map[string]any)["packetSize"]; got != "100-200" {
+		t.Fatalf("new mask packetSize = %v, want 100-200", got)
+	}
+
+	// An fm= mask without a packet size gets it from the params.
+	stream = map[string]any{"finalmask": map[string]any{"udp": []any{map[string]any{"type": "salamander", "settings": map[string]any{"password": "pw"}}}}}
+	applyHysteria2Obfs(stream, p)
+	udp = stream["finalmask"].(map[string]any)["udp"].([]any)
+	if got := udp[0].(map[string]any)["settings"].(map[string]any)["packetSize"]; got != "100-200" || len(udp) != 1 {
+		t.Fatalf("existing mask: packetSize = %v, masks = %d", got, len(udp))
+	}
+
+	// Salamander has no packet size.
+	stream = map[string]any{}
+	applyHysteria2Obfs(stream, url.Values{"obfs": {"salamander"}, "obfs-password": {"pw"}})
+	udp = stream["finalmask"].(map[string]any)["udp"].([]any)
+	if _, ok := udp[0].(map[string]any)["settings"].(map[string]any)["packetSize"]; ok {
+		t.Fatal("salamander mask got a packetSize")
+	}
+}
+
+func TestHysteria2HopKeepsAnExistingUdphopMask(t *testing.T) {
+	stream := map[string]any{"finalmask": map[string]any{"udp": []any{map[string]any{"type": "udphop"}}}}
+	applyHysteria2Hop(stream, url.Values{"mport": {"20000-30000"}})
+	if n := len(stream["finalmask"].(map[string]any)["udp"].([]any)); n != 1 {
+		t.Fatalf("udp masks = %d, want the fm= udphop mask only", n)
+	}
+}
+
+// An empty userinfo before "@" is still the modern form (and the legacy base64 form may decode
+// to one): it must not fall into the other branch.
+func TestParseShadowsocksEmptyUserInfo(t *testing.T) {
+	for _, l := range []string{
+		"ss://@1.2.3.4:443#x",
+		"ss://" + base64.StdEncoding.EncodeToString([]byte("@1.2.3.4:443")) + "#x",
+	} {
+		res, err := ParseLink(l)
+		if err != nil {
+			t.Fatalf("ParseLink(%q): %v", l, err)
+		}
+		if !strings.HasSuffix(res.Identity, "@1.2.3.4:443") {
+			t.Fatalf("ParseLink(%q) identity = %q", l, res.Identity)
+		}
+	}
+}
+
+// A payload of six bytes or fewer is a plain config, never a zlib stream.
+func TestParseAmneziaVPNShortPayloadIsPlainConfig(t *testing.T) {
+	_, err := parseAmneziaVPN("vpn://"+base64.RawURLEncoding.EncodeToString([]byte{0, 0, 0, 1, 0x78, 0x9c}), nil)
+	if err == nil || !strings.Contains(err.Error(), "lacks PrivateKey") {
+		t.Fatalf("6-byte payload: err = %v, want it parsed as a (bad) plain config", err)
 	}
 }
