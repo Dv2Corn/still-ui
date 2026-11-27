@@ -37,7 +37,7 @@ jobs:
             exclude: ""
           - name: database
             path: ./internal/database/
-            exclude: 'dump_sqlite\.go'
+            exclude: 'dump_sqlite\.go|dbtest/' # dbtest is a test helper, not product code
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

@@ -61,6 +61,9 @@ func Dialect() string {
 
 const sqliteBackupDirPrefix = ".x-ui-backup-"
 
+// dbConnMaxIdleTime closes pooled database connections idle this long.
+var dbConnMaxIdleTime = 30 * time.Minute
+
 func allModels() []any {
 	return []any{
 		&model.User{},
@@ -235,16 +238,13 @@ func initModels() error {
 	if err := migrateNodeTrafficLimitColumns(); err != nil {
 		return err
 	}
-	if err := migrateClientEmailLowerIndex(); err != nil {
-		return err
-	}
 	if IsPostgres() {
 		if err := resyncPostgresSequences(db, models); err != nil {
 			log.Printf("Error resyncing postgres sequences: %v", err)
 			return err
 		}
 	}
-	return nil
+	return migrateClientEmailLowerIndex()
 }
 
 func postgresModelSettled(mdl any) bool {
@@ -404,9 +404,7 @@ func migrateClientTrafficResetColumns() error {
 		}
 	}
 	if db.Migrator().HasColumn(&model.ClientRecord{}, "traffic_reset_day") {
-		if err := db.Exec("UPDATE clients SET traffic_reset_day = 1 WHERE traffic_reset_day IS NULL").Error; err != nil {
-			return err
-		}
+		return db.Exec("UPDATE clients SET traffic_reset_day = 1 WHERE traffic_reset_day IS NULL").Error
 	}
 	return nil
 }
@@ -1058,9 +1056,7 @@ func externalProxyEntryToHost(inboundId, index int, ep map[string]any) *model.Ho
 	if strings.TrimSpace(remark) == "" {
 		remark = "imported " + strconv.Itoa(index+1)
 	}
-	if len(remark) > 256 {
-		remark = remark[:256]
-	}
+	remark = remark[:min(len(remark), 256)]
 	sni, _ := ep["sni"].(string)
 	fingerprint, _ := ep["fingerprint"].(string)
 	ech, _ := ep["echConfigList"].(string)
@@ -3518,7 +3514,7 @@ func InitDB(dbPath string) error {
 	sqlDB.SetMaxOpenConns(maxOpen)
 	sqlDB.SetMaxIdleConns(maxIdle)
 	sqlDB.SetConnMaxLifetime(time.Hour)
-	sqlDB.SetConnMaxIdleTime(30 * time.Minute)
+	sqlDB.SetConnMaxIdleTime(dbConnMaxIdleTime)
 
 	if err := initModels(); err != nil {
 		return err
