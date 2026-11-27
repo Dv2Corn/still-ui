@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -207,5 +208,20 @@ func TestValidateSQLiteDBDetectsAMismatchedIndex(t *testing.T) {
 	}
 	if err := ValidateSQLiteDB(path); err == nil || !strings.Contains(err.Error(), "integrity check failed") {
 		t.Fatalf("ValidateSQLiteDB = %v, want an integrity check failure", err)
+	}
+}
+
+func TestDBConnMaxIdleTime(t *testing.T) {
+	if dbConnMaxIdleTime != 30*time.Minute {
+		t.Fatalf("dbConnMaxIdleTime = %v, want 30m", dbConnMaxIdleTime)
+	}
+}
+
+func TestExternalProxyRemarkIsCappedAt256Bytes(t *testing.T) {
+	for n, want := range map[int]int{255: 255, 256: 256, 300: 256} {
+		h := externalProxyEntryToHost(1, 0, map[string]any{"remark": strings.Repeat("r", n)})
+		if len(h.Remark) != want {
+			t.Errorf("remark of %d bytes -> %d, want %d", n, len(h.Remark), want)
+		}
 	}
 }

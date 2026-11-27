@@ -1,6 +1,7 @@
 package model
 
 import (
+	"encoding/hex"
 	"strings"
 	"testing"
 )
@@ -85,5 +86,20 @@ func TestClientReverseRoundTrip(t *testing.T) {
 	c := (&ClientRecord{Email: "a", Reverse: `{"tag":"r"}`}).ToClient()
 	if c.Reverse == nil || c.Reverse.Tag != "r" {
 		t.Fatalf("reverse = %+v, want tag r", c.Reverse)
+	}
+}
+
+func TestMtprotoSecretDomain(t *testing.T) {
+	mid := strings.Repeat("ab", 16)
+	dom := hex.EncodeToString([]byte("example.com"))
+	for secret, want := range map[string]string{
+		"ee" + mid + dom:  "example.com",
+		"ee" + mid:        "",
+		"ee" + mid[:30]:   "",
+		"ee" + mid + "zz": "",
+	} {
+		if got := mtprotoSecretDomain(secret); got != want {
+			t.Errorf("mtprotoSecretDomain(%q) = %q, want %q", secret, got, want)
+		}
 	}
 }

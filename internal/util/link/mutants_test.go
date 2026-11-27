@@ -392,3 +392,27 @@ func TestParseAmneziaVPNShortPayloadIsPlainConfig(t *testing.T) {
 		t.Fatalf("6-byte payload: err = %v, want it parsed as a (bad) plain config", err)
 	}
 }
+
+func TestParseShadowsocksRejectsAnEmptyHost(t *testing.T) {
+	user := base64.StdEncoding.EncodeToString([]byte("aes-128-gcm:pass"))
+	for _, l := range []string{
+		"ss://" + user + "@:443#x",
+		"ss://" + base64.StdEncoding.EncodeToString([]byte("aes-128-gcm:pass@:443")) + "#x",
+		"ss://" + user + "@1.2.3.4#x",
+	} {
+		if _, err := ParseLink(l); err == nil {
+			t.Errorf("ParseLink(%q) accepted a link without host or port", l)
+		}
+	}
+}
+
+func TestParseShadowsocksRemarkAndQuery(t *testing.T) {
+	user := base64.StdEncoding.EncodeToString([]byte("aes-128-gcm:pass"))
+	res, err := ParseLink("ss://" + user + "@1.2.3.4:443?type=tcp#my%20node")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Outbound["tag"] == nil || !strings.Contains(fmt.Sprint(res.Outbound["tag"]), "my") {
+		t.Errorf("tag = %v, want it built from the remark", res.Outbound["tag"])
+	}
+}
