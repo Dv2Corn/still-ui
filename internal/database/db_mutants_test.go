@@ -182,6 +182,9 @@ func TestFreshInstallMigratesTheLegacyAPIToken(t *testing.T) {
 	if count != 1 {
 		t.Fatalf("api tokens named default = %d, want the legacy token migrated", count)
 	}
+	if !historyRecorded(t, "ApiTokensTable") {
+		t.Fatal("seedApiTokens did not record its history row after migrating the legacy token")
+	}
 }
 
 // A database whose index no longer matches its declared columns opens and reads fine, but
@@ -358,5 +361,32 @@ func TestCopyTableWithoutAPrimaryKey(t *testing.T) {
 	}
 	if n, err := copyTable(src, dst, &noPKRow{}); err != nil || n != 2 {
 		t.Fatalf("copyTable = (%d, %v), want (2, nil)", n, err)
+	}
+}
+
+// The legacy table has two single-column UNIQUE indexes, on port and on tag: only the port one
+// may be reported for dropping.
+func TestSQLiteUniquePortIndexesFindsOnlyThePortIndex(t *testing.T) {
+	path := openLegacyPortUniqueDB(t)
+	saved := db
+	t.Cleanup(func() { db = saved })
+	g, err := gorm.Open(sqlite.Open(path), &gorm.Config{Logger: logger.Discard})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if s, err := g.DB(); err == nil {
+			_ = s.Close()
+		}
+	})
+	db = g
+	auto, explicit, err := sqliteUniquePortIndexes()
+	if err != nil || len(auto) != 1 || len(explicit) != 0 {
+		t.Fatalf("auto=%v explicit=%v err=%v, want one automatic index", auto, explicit, err)
+	}
+	var cols []struct{ Name string }
+	db.Raw(`PRAGMA index_info("` + auto[0] + `")`).Scan(&cols)
+	if len(cols) != 1 || cols[0].Name != "port" {
+		t.Fatalf("reported index %s covers %v, want port", auto[0], cols)
 	}
 }

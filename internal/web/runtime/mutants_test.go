@@ -3,10 +3,14 @@ package runtime
 import (
 	"context"
 	"errors"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
 	"testing"
+
+	"github.com/xtls/xray-core/app/proxyman/command"
+	"google.golang.org/grpc"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/amneziawgnet"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
@@ -121,5 +125,72 @@ func TestLocalUpdateTuicToXrayAddsTheXrayInbound(t *testing.T) {
 		&model.Inbound{Id: 2, Tag: "t", Protocol: model.VLESS, Enable: true, Settings: "{}"})
 	if err == nil || err.Error() != "local xray is not running" {
 		t.Fatalf("tuic -> vless error = %v, want the xray API path (local xray is not running)", err)
+	}
+}
+
+// okHandlerServer accepts both inbound calls, so the success path of AddInbound/DelInbound runs.
+type okHandlerServer struct {
+	command.UnimplementedHandlerServiceServer
+}
+
+func (okHandlerServer) AddInbound(context.Context, *command.AddInboundRequest) (*command.AddInboundResponse, error) {
+	return &command.AddInboundResponse{}, nil
+}
+
+func (okHandlerServer) RemoveInbound(context.Context, *command.RemoveInboundRequest) (*command.RemoveInboundResponse, error) {
+	return &command.RemoveInboundResponse{}, nil
+}
+
+func startOKCore(t *testing.T) int {
+	t.Helper()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := grpc.NewServer()
+	command.RegisterHandlerServiceServer(server, okHandlerServer{})
+	go func() { _ = server.Serve(listener) }()
+	t.Cleanup(server.Stop)
+	return listener.Addr().(*net.TCPAddr).Port
+}
+
+func TestLocalInboundCallbacksFollowTheAPIResult(t *testing.T) {
+	ctx := context.Background()
+	ib := &model.Inbound{Id: 7, Tag: "cb", Protocol: model.VLESS, Port: 40300, Enable: true, Settings: `{"clients":[],"decryption":"none"}`, StreamSettings: "{}", Sniffing: "{}"}
+	port := startOKCore(t)
+	applied, removed := 0, ""
+	ok := NewLocal(LocalDeps{
+		APIPort:        func() int { return port },
+		InboundApplied: func(*xray.InboundConfig) { applied++ },
+		InboundRemoved: func(tag string) { removed = tag },
+	})
+	if err := ok.AddInbound(ctx, ib); err != nil || applied != 1 {
+		t.Fatalf("AddInbound on a working core: err=%v applied=%d, want nil and 1", err, applied)
+	}
+	if err := ok.DelInbound(ctx, ib); err != nil || removed != "cb" {
+		t.Fatalf("DelInbound on a working core: err=%v removed=%q, want nil and cb", err, removed)
+	}
+
+	// Callbacks are optional.
+	bare := NewLocal(LocalDeps{APIPort: func() int { return port }})
+	if err := bare.AddInbound(ctx, ib); err != nil {
+		t.Fatal(err)
+	}
+	if err := bare.DelInbound(ctx, ib); err != nil {
+		t.Fatal(err)
+	}
+
+	// No core: an error, and no callback.
+	applied, removed = 0, ""
+	down := NewLocal(LocalDeps{
+		APIPort:        func() int { return 0 },
+		InboundApplied: func(*xray.InboundConfig) { applied++ },
+		InboundRemoved: func(tag string) { removed = tag },
+	})
+	if err := down.AddInbound(ctx, ib); err == nil || applied != 0 {
+		t.Fatalf("AddInbound without a core: err=%v applied=%d", err, applied)
+	}
+	if err := down.DelInbound(ctx, ib); err == nil || removed != "" {
+		t.Fatalf("DelInbound without a core: err=%v removed=%q", err, removed)
 	}
 }
