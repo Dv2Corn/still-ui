@@ -63,8 +63,18 @@ func TestUpgradeRunsEverySeeder(t *testing.T) {
 	if err := db.Where("1 = 1").Delete(&model.HistoryOfSeeders{}).Error; err != nil {
 		t.Fatalf("reset seeder history: %v", err)
 	}
+	// normalizeSettingPaths runs last on every start: a step that returned early would skip it.
+	db.Where("key = ?", "subPath").Delete(&model.Setting{})
+	if err := db.Create(&model.Setting{Key: "subPath", Value: "/sub"}).Error; err != nil {
+		t.Fatal(err)
+	}
 	if err := runSeeders(false); err != nil {
 		t.Fatalf("runSeeders: %v", err)
+	}
+	var subPath model.Setting
+	db.Where("key = ?", "subPath").First(&subPath)
+	if subPath.Value != "/sub/" {
+		t.Errorf("subPath = %q after upgrade, want /sub/ (normalizeSettingPaths did not run)", subPath.Value)
 	}
 	var after []string
 	if err := db.Model(&model.HistoryOfSeeders{}).Pluck("seeder_name", &after).Error; err != nil {
