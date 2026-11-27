@@ -1,11 +1,13 @@
 package runtime
 
 import (
+	"context"
 	"net/http"
 	"net/url"
 	"strings"
 	"testing"
 
+	"github.com/mhsanaei/3x-ui/v3/internal/amneziawgnet"
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 	"github.com/mhsanaei/3x-ui/v3/internal/xray"
 )
@@ -81,5 +83,42 @@ func TestWireInboundTagAndResetDay(t *testing.T) {
 	v = wireInbound(ib, 3)
 	if v.Get("tag") != "x" || v.Get("trafficResetDay") != "1" {
 		t.Fatalf("tag=%q trafficResetDay=%q, want x and 1", v.Get("tag"), v.Get("trafficResetDay"))
+	}
+}
+
+func TestLocalUpdateInboundKeepsPlainXrayOnTheXrayPath(t *testing.T) {
+	var restarts, reconciles int
+	local := NewLocal(LocalDeps{APIPort: func() int { return 0 }, SetNeedRestart: func() { restarts++ }, RequestReconcile: func() { reconciles++ }})
+	err := local.UpdateInbound(context.Background(),
+		&model.Inbound{Id: 1, Tag: "a", Protocol: model.VLESS, Enable: true, Settings: "{}"},
+		&model.Inbound{Id: 1, Tag: "a", Protocol: model.VLESS, Enable: true, Settings: "{}"})
+	if err == nil || err.Error() != "local xray is not running" {
+		t.Fatalf("vless update error = %v, want the xray API path (local xray is not running)", err)
+	}
+	if restarts != 0 || reconciles != 0 {
+		t.Fatalf("vless update took a sidecar path: restarts=%d reconciles=%d", restarts, reconciles)
+	}
+}
+
+func TestLocalAddAmneziaWGFlagsXrayResync(t *testing.T) {
+	ib := datapathInbound(t, 4183, 58733, false)
+	t.Cleanup(func() { amneziawgnet.GetManager().Remove(ib.Id) })
+	restarts := 0
+	local := NewLocal(LocalDeps{APIPort: func() int { return 0 }, SetNeedRestart: func() { restarts++ }})
+	if err := local.AddInbound(context.Background(), ib); err != nil {
+		t.Fatalf("AddInbound: %v", err)
+	}
+	if restarts != 1 {
+		t.Fatalf("SetNeedRestart called %d times, want 1", restarts)
+	}
+}
+
+func TestLocalUpdateTuicToXrayAddsTheXrayInbound(t *testing.T) {
+	local := NewLocal(LocalDeps{APIPort: func() int { return 0 }, RequestReconcile: func() {}})
+	err := local.UpdateInbound(context.Background(),
+		&model.Inbound{Id: 2, Tag: "t", Protocol: model.TUIC, Enable: true, Settings: "{}"},
+		&model.Inbound{Id: 2, Tag: "t", Protocol: model.VLESS, Enable: true, Settings: "{}"})
+	if err == nil || err.Error() != "local xray is not running" {
+		t.Fatalf("tuic -> vless error = %v, want the xray API path (local xray is not running)", err)
 	}
 }

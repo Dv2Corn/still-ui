@@ -15,3 +15,7 @@ Format: `path:line TYPE — why`.
 - `outbound.go:1350` CONDITIONALS_BOUNDARY — `i < len(keys)` vs `<=`: at `i == len(keys)` the inner loop starts at `len+1` and does nothing.
 - `outbound.go:1352` CONDITIONALS_BOUNDARY — `keys[j] < keys[i]` vs `<=`: the keys come from a map and are never equal.
 - `outbound.go:466, 471` CONDITIONALS_BOUNDARY — `i >= 0` vs `> 0` for `#` and `?`: the link starts with `ss://`, so neither can be at index 0.
+
+## internal/web/runtime
+
+- `remote.go:564` CONDITIONALS_BOUNDARY — `len(env.Obj) > 0` vs `>= 0`: an empty obj fails `json.Unmarshal` right after, so nothing is cached either way.
