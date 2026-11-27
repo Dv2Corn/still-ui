@@ -237,9 +237,7 @@ func copyTable(src, dst *gorm.DB, mdl any) (int, error) {
 	for offset := 0; ; offset += batchSize {
 		batchPtr := reflect.New(sliceType)
 		q := src.Model(mdl).Limit(batchSize).Offset(offset)
-		if order != "" {
-			q = q.Order(order)
-		}
+		q = q.Order(order) // a table without a primary key passes "", which gorm ignores
 		if err := q.Find(batchPtr.Interface()).Error; err != nil {
 			return total, err
 		}
