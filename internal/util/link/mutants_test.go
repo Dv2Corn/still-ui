@@ -416,3 +416,21 @@ func TestParseShadowsocksRemarkAndQuery(t *testing.T) {
 		t.Errorf("tag = %v, want it built from the remark", res.Outbound["tag"])
 	}
 }
+
+func TestParsePacketSizeRangeBounds(t *testing.T) {
+	for _, c := range []struct {
+		min, max string
+		ok       bool
+	}{
+		{"1", "1", true},
+		{"0", "10", false},
+		{"5", "5", true},
+		{"6", "5", false},
+		{"1", "2048", true},
+		{"1", "2049", false},
+	} {
+		if _, _, ok := parsePacketSizeRange(c.min, c.max); ok != c.ok {
+			t.Errorf("parsePacketSizeRange(%s, %s) ok = %v, want %v", c.min, c.max, ok, c.ok)
+		}
+	}
+}
