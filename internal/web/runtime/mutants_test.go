@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/url"
 	"strings"
@@ -62,10 +63,10 @@ func TestNoCrossHostRedirectLimits(t *testing.T) {
 	if err := NoCrossHostRedirect(req("NODE:2053"), via(9)); err != nil {
 		t.Fatalf("9th same-host redirect: %v", err)
 	}
-	if err := NoCrossHostRedirect(req("node:2053"), via(10)); err != http.ErrUseLastResponse {
+	if err := NoCrossHostRedirect(req("node:2053"), via(10)); !errors.Is(err, http.ErrUseLastResponse) {
 		t.Fatalf("10th redirect: %v, want ErrUseLastResponse", err)
 	}
-	if err := NoCrossHostRedirect(req("other:2053"), via(1)); err != http.ErrUseLastResponse {
+	if err := NoCrossHostRedirect(req("other:2053"), via(1)); !errors.Is(err, http.ErrUseLastResponse) {
 		t.Fatalf("cross-host redirect: %v, want ErrUseLastResponse", err)
 	}
 }

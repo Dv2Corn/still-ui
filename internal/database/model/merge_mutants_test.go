@@ -130,7 +130,7 @@ func TestMergeClientRecordLimitFields(t *testing.T) {
 					t.Fatalf("%s ex=%d in=%d newer=%v: got %d, want %d", f.name, c.ex, c.in, newer, got, c.want)
 				}
 				if hasConflict(cs, f.conflict) != (c.want != c.ex) {
-					t.Fatalf("%s ex=%d in=%d: conflict reported = %v", f.name, c.ex, c.in, !(c.want != c.ex))
+					t.Fatalf("%s ex=%d in=%d: conflict reported = %v", f.name, c.ex, c.in, c.want == c.ex)
 				}
 			}
 		}
