@@ -234,13 +234,13 @@ func TestParseWireguardFields(t *testing.T) {
 func TestParseShadowsocksEdgeForms(t *testing.T) {
 	user := base64.StdEncoding.EncodeToString([]byte("aes-128-gcm:pass"))
 	_, err := ParseLink("ss://" + user + "@1.2.3.4:abc#x")
-	if err == nil || !strings.Contains(err.Error(), `"abc"`) {
-		t.Errorf("bad port error = %v, want it to quote \"abc\"", err)
+	if err == nil || !strings.HasPrefix(err.Error(), `bad ss port "abc":`) {
+		t.Errorf("bad port error = %v, want it to start with bad ss port \"abc\"", err)
 	}
 	legacy := base64.StdEncoding.EncodeToString([]byte("aes-128-gcm:pass@1.2.3.4:abc"))
 	_, err = ParseLink("ss://" + legacy + "#x")
-	if err == nil || !strings.Contains(err.Error(), `"abc"`) {
-		t.Errorf("bad legacy port error = %v, want it to quote \"abc\"", err)
+	if err == nil || !strings.HasPrefix(err.Error(), `bad legacy ss port "abc":`) {
+		t.Errorf("bad legacy port error = %v, want it to start with bad legacy ss port \"abc\"", err)
 	}
 	res, err := ParseLink("ss://" + user + "@1.2.3.4:443#x")
 	if err != nil {
