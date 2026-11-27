@@ -1,7 +1,6 @@
 package database
 
 import (
-	"os"
 	"testing"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
@@ -13,10 +12,7 @@ import (
 )
 
 func TestMigrateData_CompositeKeyTableLargerThanBatch(t *testing.T) {
-	dsn := os.Getenv("XUI_TEST_PG_DSN")
-	if dsn == "" {
-		t.Skip("set XUI_TEST_PG_DSN to a reachable Postgres to run this test")
-	}
+	dsn := pgSchemaDSN(t)
 
 	// Seed a SQLite source with the full schema and >500 client_inbounds rows.
 	srcPath := t.TempDir() + "/x-ui.db"
@@ -64,10 +60,7 @@ func TestMigrateData_CompositeKeyTableLargerThanBatch(t *testing.T) {
 }
 
 func TestMigrateData_PreservesFalseDefaultedColumns(t *testing.T) {
-	dsn := os.Getenv("XUI_TEST_PG_DSN")
-	if dsn == "" {
-		t.Skip("set XUI_TEST_PG_DSN to a reachable Postgres to run this test")
-	}
+	dsn := pgSchemaDSN(t)
 
 	srcPath := t.TempDir() + "/x-ui.db"
 	src, err := gorm.Open(sqlite.Open(srcPath), &gorm.Config{Logger: logger.Discard})
@@ -139,10 +132,7 @@ func TestMigrateData_PreservesFalseDefaultedColumns(t *testing.T) {
 }
 
 func TestMigrateData_FailedCopyLeavesDestinationUntouched(t *testing.T) {
-	dsn := os.Getenv("XUI_TEST_PG_DSN")
-	if dsn == "" {
-		t.Skip("set XUI_TEST_PG_DSN to a reachable Postgres to run this test")
-	}
+	dsn := pgSchemaDSN(t)
 
 	seedSource := func(username string) string {
 		t.Helper()

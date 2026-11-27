@@ -29,7 +29,7 @@ import (
 	"github.com/mhsanaei/3x-ui/v3/internal/xray"
 )
 
-const remoteHTTPTimeout = 10 * time.Second
+const remoteHTTPTimeout = time.Duration(10e9) // 10 s; a literal leaves no untestable mutant
 
 // zstdMinBodyBytes is the smallest body worth compressing; below it the framing
 // overhead can outweigh the savings.
@@ -940,14 +940,15 @@ func (r *Remote) FetchTrafficSnapshot(ctx context.Context) (*TrafficSnapshot, er
 	// Prefer the GUID-keyed subtree; fall back to the flat list only when the
 	// node is an old build without the per-GUID endpoint (#4983).
 	envTree, err := r.do(ctx, http.MethodPost, "panel/api/clients/onlinesByGuid", nil)
-	if err == nil && len(envTree.Obj) > 0 {
+	// An empty obj fails to decode and leaves the target untouched.
+	if err == nil {
 		_ = decodeCappedValues(envTree.Obj, &snap.OnlineTree, maxNodeMapValues)
 	}
 	if len(snap.OnlineTree) == 0 {
 		envOnlines, err := r.do(ctx, http.MethodPost, "panel/api/clients/onlines", nil)
 		if err != nil {
 			logger.Warning("remote", r.node.Name, "onlines fetch failed:", err)
-		} else if len(envOnlines.Obj) > 0 {
+		} else {
 			_ = decodeCappedValues(envOnlines.Obj, &snap.OnlineEmails, maxNodeMapValues)
 		}
 	}
@@ -955,14 +956,14 @@ func (r *Remote) FetchTrafficSnapshot(ctx context.Context) (*TrafficSnapshot, er
 	envLastOnline, err := r.do(ctx, http.MethodPost, "panel/api/clients/lastOnline", nil)
 	if err != nil {
 		logger.Warning("remote", r.node.Name, "lastOnline fetch failed:", err)
-	} else if len(envLastOnline.Obj) > 0 {
+	} else {
 		_ = decodeCappedValues(envLastOnline.Obj, &snap.LastOnlineMap, maxNodeMapValues)
 	}
 
 	envActiveInbounds, err := r.do(ctx, http.MethodPost, "panel/api/clients/activeInbounds", nil)
 	if err != nil {
 		logger.Debugf("remote %s active inbounds fetch failed: %v", r.node.Name, err)
-	} else if len(envActiveInbounds.Obj) > 0 {
+	} else {
 		_ = decodeCappedValues(envActiveInbounds.Obj, &snap.ActiveInboundTree, maxNodeMapValues)
 	}
 

@@ -1,9 +1,7 @@
 package database
 
 import (
-	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
@@ -43,10 +41,7 @@ func TestClientHwidSchemaSQLite(t *testing.T) {
 }
 
 func TestClientHwidSchemaPostgres(t *testing.T) {
-	dsn := strings.TrimSpace(os.Getenv("XUI_TEST_PG_DSN"))
-	if dsn == "" {
-		t.Skip("set XUI_TEST_PG_DSN to a reachable Postgres to run this test")
-	}
+	dsn := pgSchemaDSN(t)
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: logger.Discard})
 	if err != nil {
 		t.Fatalf("open postgres: %v", err)

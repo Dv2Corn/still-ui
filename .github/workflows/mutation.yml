@@ -38,6 +38,25 @@ jobs:
           - name: database
             path: ./internal/database/
             exclude: 'dump_sqlite\.go|dbtest/' # dbtest is a test helper, not product code
+            postgres: postgres:16
+    # The PostgreSQL-only code is covered only with a server; each test takes its own schema
+    # (pgSchemaDSN), so gremlins' parallel test runs never share tables. An empty image skips it.
+    services:
+      postgres:
+        image: ${{ matrix.postgres }}
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: xui_scratch
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d xui_scratch"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      XUI_TEST_PG_DSN: ${{ matrix.postgres && 'host=127.0.0.1 port=5432 user=postgres password=postgres dbname=xui_scratch sslmode=disable' || '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

@@ -434,3 +434,22 @@ func TestParsePacketSizeRangeBounds(t *testing.T) {
 		}
 	}
 }
+
+func TestParseVmessGrpc(t *testing.T) {
+	vm := func(extra string) map[string]any {
+		inner := `{"v":"2","add":"a.com","port":"443","id":"11111111-2222-4333-8444-555555555555","net":"grpc","path":"svc"` + extra + `}`
+		res, err := ParseLink("vmess://" + base64.StdEncoding.EncodeToString([]byte(inner)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return streamSub(t, res, "grpcSettings")
+	}
+	gs := vm(`,"authority":"auth","type":"multi"`)
+	if gs["serviceName"] != "svc" || gs["authority"] != "auth" || gs["multiMode"] != true {
+		t.Fatalf("grpcSettings = %#v", gs)
+	}
+	gs = vm(`,"authority":7,"type":"gun"`)
+	if gs["authority"] != "" || gs["multiMode"] != false {
+		t.Fatalf("empty authority / gun mode: %#v", gs)
+	}
+}

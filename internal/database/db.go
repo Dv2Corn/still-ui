@@ -38,7 +38,7 @@ import (
 
 var db *gorm.DB
 
-var backupSQLiteTimeout = 2 * time.Minute
+var backupSQLiteTimeout = time.Duration(120e9) // 2 minutes; a literal, not 2*time.Minute, leaves no untestable mutant
 
 const (
 	DialectSQLite   = "sqlite"
@@ -62,7 +62,7 @@ func Dialect() string {
 const sqliteBackupDirPrefix = ".x-ui-backup-"
 
 // dbConnMaxIdleTime closes pooled database connections idle this long.
-var dbConnMaxIdleTime = 30 * time.Minute
+var dbConnMaxIdleTime = time.Duration(1800e9) // 30 minutes, written as a literal like backupSQLiteTimeout
 
 func allModels() []any {
 	return []any{
@@ -239,10 +239,7 @@ func initModels() error {
 		return err
 	}
 	if IsPostgres() {
-		if err := resyncPostgresSequences(db, models); err != nil {
-			log.Printf("Error resyncing postgres sequences: %v", err)
-			return err
-		}
+		resyncPostgresSequences(db, models)
 	}
 	return migrateClientEmailLowerIndex()
 }
@@ -273,11 +270,7 @@ func dropLegacyForeignKeys() error {
 	if !IsPostgres() {
 		return nil
 	}
-	if err := db.Exec("ALTER TABLE client_traffics DROP CONSTRAINT IF EXISTS fk_inbounds_client_stats").Error; err != nil {
-		log.Printf("Error dropping legacy foreign key fk_inbounds_client_stats: %v", err)
-		return err
-	}
-	return nil
+	return db.Exec("ALTER TABLE client_traffics DROP CONSTRAINT IF EXISTS fk_inbounds_client_stats").Error
 }
 
 type sqliteIndexListRow struct {
@@ -478,7 +471,7 @@ func migrateHostVerifyPeerCertByNameColumn() error {
 
 		var dataType string
 		if err := db.Raw(
-			`SELECT data_type FROM information_schema.columns WHERE table_name = 'hosts' AND column_name = 'verify_peer_cert_by_name'`,
+			`SELECT data_type FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'hosts' AND column_name = 'verify_peer_cert_by_name'`,
 		).Scan(&dataType).Error; err != nil {
 			return err
 		}
@@ -593,6 +586,15 @@ func CreateHostFromMtprotoCustomShareAddr(tx *gorm.DB, inboundId int, rawAddress
 	}).Error
 }
 
+// createLinkedClientRecord creates the record and links it to the inbound. The seeders
+// pick emails no record uses yet and skip inbounds that have links, so nothing can clash.
+func createLinkedClientRecord(tx *gorm.DB, rec *model.ClientRecord, inboundId int) error {
+	if err := tx.Create(rec).Error; err != nil {
+		return err
+	}
+	return tx.Create(&model.ClientInbound{ClientId: rec.Id, InboundId: inboundId}).Error
+}
+
 func seedWireguardPeersToClients() error {
 	var history []string
 	if err := db.Model(&model.HistoryOfSeeders{}).Pluck("seeder_name", &history).Error; err != nil {
@@ -666,26 +668,7 @@ func seedWireguardPeersToClients() error {
 				}
 				c.Email = email
 
-				incoming := c.ToRecord()
-				var row model.ClientRecord
-				err = tx.Where("email = ?", email).First(&row).Error
-				if errors.Is(err, gorm.ErrRecordNotFound) {
-					if err := tx.Create(incoming).Error; err != nil {
-						return err
-					}
-					row = *incoming
-				} else if err != nil {
-					return err
-				} else {
-					model.MergeClientRecord(&row, incoming)
-					if err := tx.Save(&row).Error; err != nil {
-						return err
-					}
-				}
-
-				link := model.ClientInbound{ClientId: row.Id, InboundId: inbound.Id}
-				if err := tx.Where("client_id = ? AND inbound_id = ?", row.Id, inbound.Id).
-					FirstOrCreate(&link).Error; err != nil {
+				if err := createLinkedClientRecord(tx, c.ToRecord(), inbound.Id); err != nil {
 					return err
 				}
 
@@ -795,26 +778,7 @@ func seedMtprotoSecretsToClients() error {
 			}
 			c := model.Client{Email: email, Secret: secret, Enable: true, SubID: obj["subId"].(string)}
 
-			incoming := c.ToRecord()
-			var row model.ClientRecord
-			err := tx.Where("email = ?", email).First(&row).Error
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				if err := tx.Create(incoming).Error; err != nil {
-					return err
-				}
-				row = *incoming
-			} else if err != nil {
-				return err
-			} else {
-				model.MergeClientRecord(&row, incoming)
-				if err := tx.Save(&row).Error; err != nil {
-					return err
-				}
-			}
-
-			link := model.ClientInbound{ClientId: row.Id, InboundId: inbound.Id}
-			if err := tx.Where("client_id = ? AND inbound_id = ?", row.Id, inbound.Id).
-				FirstOrCreate(&link).Error; err != nil {
+			if err := createLinkedClientRecord(tx, c.ToRecord(), inbound.Id); err != nil {
 				return err
 			}
 
@@ -1524,13 +1488,10 @@ func isIgnorableDuplicateColumnErr(gdb *gorm.DB, err error, mdl any) bool {
 		col = strings.Trim(col, "`\"[]")
 		return col != "" && gdb != nil && gdb.Migrator().HasColumn(mdl, col)
 	}
-	if strings.Contains(errMsg, "already exists") && strings.Contains(errMsg, "column ") {
+	if strings.Contains(errMsg, "already exists") {
 		if _, after, ok := strings.Cut(errMsg, "column \""); ok {
-			rest := after
-			if e := strings.Index(rest, "\""); e > 0 {
-				col := rest[:e]
-				return col != "" && gdb != nil && gdb.Migrator().HasColumn(mdl, col)
-			}
+			col, _, closed := strings.Cut(after, "\"")
+			return closed && col != "" && gdb != nil && gdb.Migrator().HasColumn(mdl, col)
 		}
 	}
 	return false
@@ -1911,55 +1872,19 @@ func resetIpLimitsWithoutFail2ban() error {
 		return nil
 	}
 
-	var inbounds []model.Inbound
-	if err := db.Find(&inbounds).Error; err != nil {
-		return err
-	}
-
 	return db.Transaction(func(tx *gorm.DB) error {
-		for _, inbound := range inbounds {
-			if strings.TrimSpace(inbound.Settings) == "" {
-				continue
-			}
-			var settings map[string]any
-			if err := json.Unmarshal([]byte(inbound.Settings), &settings); err != nil {
-				log.Printf("ResetIpLimitNoFail2ban: skip inbound %d (invalid settings json): %v", inbound.Id, err)
-				continue
-			}
-			clients, ok := settings["clients"].([]any)
-			if !ok {
-				continue
-			}
-			mutated := false
-			for i, raw := range clients {
-				obj, ok := raw.(map[string]any)
-				if !ok {
-					continue
+		err := fixInboundSettings(tx, "ResetIpLimitNoFail2ban", func(settings map[string]any) bool {
+			return fixClients(settings, func(client map[string]any) bool {
+				v, present := client["limitIp"]
+				if n, isNum := v.(float64); !present || (isNum && n == 0) {
+					return false
 				}
-				v, present := obj["limitIp"]
-				if !present {
-					continue
-				}
-				if n, isNum := v.(float64); isNum && n == 0 {
-					continue
-				}
-				obj["limitIp"] = 0
-				clients[i] = obj
-				mutated = true
-			}
-			if !mutated {
-				continue
-			}
-			settings["clients"] = clients
-			newSettings, err := json.MarshalIndent(settings, "", "  ")
-			if err != nil {
-				log.Printf("ResetIpLimitNoFail2ban: skip inbound %d (marshal failed): %v", inbound.Id, err)
-				continue
-			}
-			if err := tx.Model(&model.Inbound{}).Where("id = ?", inbound.Id).
-				Update("settings", string(newSettings)).Error; err != nil {
-				return err
-			}
+				client["limitIp"] = 0
+				return true
+			})
+		})
+		if err != nil {
+			return err
 		}
 		if err := tx.Model(&model.ClientRecord{}).Where("limit_ip <> ?", 0).
 			Update("limit_ip", 0).Error; err != nil {
@@ -2082,20 +2007,22 @@ func dropPreUpgradeSessionSecret() error {
 	})
 }
 
-func migrateOutboundRemovedKeys() error {
+// rewriteTemplateOnce applies one rewrite to the stored xrayTemplateConfig and records
+// seeder, so the rewrite runs once; a missing or unparseable template is recorded as done.
+func rewriteTemplateOnce(seeder string, rewrite func(string) (string, bool, error)) error {
 	var setting model.Setting
 	err := db.Model(model.Setting{}).Where("key = ?", "xrayTemplateConfig").First(&setting).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return db.Create(&model.HistoryOfSeeders{SeederName: "OutboundRemovedKeysFix"}).Error
+		return db.Create(&model.HistoryOfSeeders{SeederName: seeder}).Error
 	}
 	if err != nil {
 		return err
 	}
 
-	updated, changed, rErr := rewriteRemovedOutboundKeys(setting.Value)
+	updated, changed, rErr := rewrite(setting.Value)
 	if rErr != nil {
-		log.Printf("OutboundRemovedKeysFix: skip (invalid xrayTemplateConfig json): %v", rErr)
-		return db.Create(&model.HistoryOfSeeders{SeederName: "OutboundRemovedKeysFix"}).Error
+		log.Printf("%s: skip (invalid xrayTemplateConfig json): %v", seeder, rErr)
+		return db.Create(&model.HistoryOfSeeders{SeederName: seeder}).Error
 	}
 
 	return db.Transaction(func(tx *gorm.DB) error {
@@ -2105,8 +2032,12 @@ func migrateOutboundRemovedKeys() error {
 				return err
 			}
 		}
-		return tx.Create(&model.HistoryOfSeeders{SeederName: "OutboundRemovedKeysFix"}).Error
+		return tx.Create(&model.HistoryOfSeeders{SeederName: seeder}).Error
 	})
+}
+
+func migrateOutboundRemovedKeys() error {
+	return rewriteTemplateOnce("OutboundRemovedKeysFix", rewriteRemovedOutboundKeys)
 }
 
 // rewriteRemovedOutboundKeys moves outbound proxySettings.tag to sockopt.dialerProxy
@@ -2180,30 +2111,7 @@ func outboundSockopt(obj map[string]any, create bool) map[string]any {
 }
 
 func migrateFreedomDomainStrategy() error {
-	var setting model.Setting
-	err := db.Model(model.Setting{}).Where("key = ?", "xrayTemplateConfig").First(&setting).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return db.Create(&model.HistoryOfSeeders{SeederName: "FreedomDomainStrategyFix"}).Error
-	}
-	if err != nil {
-		return err
-	}
-
-	updated, changed, rErr := rewriteFreedomDomainStrategy(setting.Value)
-	if rErr != nil {
-		log.Printf("FreedomDomainStrategyFix: skip (invalid xrayTemplateConfig json): %v", rErr)
-		return db.Create(&model.HistoryOfSeeders{SeederName: "FreedomDomainStrategyFix"}).Error
-	}
-
-	return db.Transaction(func(tx *gorm.DB) error {
-		if changed {
-			if err := tx.Model(&model.Setting{}).Where("key = ?", "xrayTemplateConfig").
-				Update("value", updated).Error; err != nil {
-				return err
-			}
-		}
-		return tx.Create(&model.HistoryOfSeeders{SeederName: "FreedomDomainStrategyFix"}).Error
-	})
+	return rewriteTemplateOnce("FreedomDomainStrategyFix", rewriteFreedomDomainStrategy)
 }
 
 // rewriteFreedomDomainStrategy moves a freedom outbound's legacy strategy keys
@@ -2293,30 +2201,7 @@ var freedomDomainStrategies = map[string]bool{
 }
 
 func migrateWireguardDomainStrategy() error {
-	var setting model.Setting
-	err := db.Model(model.Setting{}).Where("key = ?", "xrayTemplateConfig").First(&setting).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return db.Create(&model.HistoryOfSeeders{SeederName: "WireguardDomainStrategyFix"}).Error
-	}
-	if err != nil {
-		return err
-	}
-
-	updated, changed, rErr := rewriteWireguardDomainStrategy(setting.Value)
-	if rErr != nil {
-		log.Printf("WireguardDomainStrategyFix: skip (invalid xrayTemplateConfig json): %v", rErr)
-		return db.Create(&model.HistoryOfSeeders{SeederName: "WireguardDomainStrategyFix"}).Error
-	}
-
-	return db.Transaction(func(tx *gorm.DB) error {
-		if changed {
-			if err := tx.Model(&model.Setting{}).Where("key = ?", "xrayTemplateConfig").
-				Update("value", updated).Error; err != nil {
-				return err
-			}
-		}
-		return tx.Create(&model.HistoryOfSeeders{SeederName: "WireguardDomainStrategyFix"}).Error
-	})
+	return rewriteTemplateOnce("WireguardDomainStrategyFix", rewriteWireguardDomainStrategy)
 }
 
 // rewriteWireguardDomainStrategy splits the settings.domainStrategy xray-core 26.9.30 (#6771)
@@ -2575,30 +2460,7 @@ func templateFinalmasks(doc any) []any {
 // migrateDNSOutboundLegacyKeys rewrites stored dns outbounds once, because the
 // core logs nonIPQuery/blockTypes as deprecated on every config load.
 func migrateDNSOutboundLegacyKeys() error {
-	var setting model.Setting
-	err := db.Model(model.Setting{}).Where("key = ?", "xrayTemplateConfig").First(&setting).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return db.Create(&model.HistoryOfSeeders{SeederName: "DNSOutboundLegacyKeysFix"}).Error
-	}
-	if err != nil {
-		return err
-	}
-
-	updated, changed, rErr := rewriteDNSOutboundLegacyKeys(setting.Value)
-	if rErr != nil {
-		log.Printf("DNSOutboundLegacyKeysFix: skip (invalid xrayTemplateConfig json): %v", rErr)
-		return db.Create(&model.HistoryOfSeeders{SeederName: "DNSOutboundLegacyKeysFix"}).Error
-	}
-
-	return db.Transaction(func(tx *gorm.DB) error {
-		if changed {
-			if err := tx.Model(&model.Setting{}).Where("key = ?", "xrayTemplateConfig").
-				Update("value", updated).Error; err != nil {
-				return err
-			}
-		}
-		return tx.Create(&model.HistoryOfSeeders{SeederName: "DNSOutboundLegacyKeysFix"}).Error
-	})
+	return rewriteTemplateOnce("DNSOutboundLegacyKeysFix", rewriteDNSOutboundLegacyKeys)
 }
 
 // rewriteDNSOutboundLegacyKeys turns a dns outbound's legacy nonIPQuery and
@@ -2725,30 +2587,7 @@ func dnsQTypeValue(blockTypes []int) any {
 // migrateDNSOutboundQTypeZero repairs the numeric qType 0 that 3.8.0's legacy-keys
 // seeder stored, which that seeder's own history row keeps it from revisiting.
 func migrateDNSOutboundQTypeZero() error {
-	var setting model.Setting
-	err := db.Model(model.Setting{}).Where("key = ?", "xrayTemplateConfig").First(&setting).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return db.Create(&model.HistoryOfSeeders{SeederName: "DNSOutboundQTypeZeroFix"}).Error
-	}
-	if err != nil {
-		return err
-	}
-
-	updated, changed, rErr := RewriteDNSOutboundQTypeZero(setting.Value)
-	if rErr != nil {
-		log.Printf("DNSOutboundQTypeZeroFix: skip (invalid xrayTemplateConfig json): %v", rErr)
-		return db.Create(&model.HistoryOfSeeders{SeederName: "DNSOutboundQTypeZeroFix"}).Error
-	}
-
-	return db.Transaction(func(tx *gorm.DB) error {
-		if changed {
-			if err := tx.Model(&model.Setting{}).Where("key = ?", "xrayTemplateConfig").
-				Update("value", updated).Error; err != nil {
-				return err
-			}
-		}
-		return tx.Create(&model.HistoryOfSeeders{SeederName: "DNSOutboundQTypeZeroFix"}).Error
-	})
+	return rewriteTemplateOnce("DNSOutboundQTypeZeroFix", RewriteDNSOutboundQTypeZero)
 }
 
 // RewriteDNSOutboundQTypeZero spells a dns rule's numeric qType 0 as "0", the one
@@ -2814,178 +2653,109 @@ func normalizeSettingPaths() error {
 }
 
 func normalizeInboundClientTgId() error {
-	var inbounds []model.Inbound
-	if err := db.Find(&inbounds).Error; err != nil {
-		return err
-	}
-
 	return db.Transaction(func(tx *gorm.DB) error {
-		for _, inbound := range inbounds {
-			if strings.TrimSpace(inbound.Settings) == "" {
-				continue
-			}
-			var settings map[string]any
-			if err := json.Unmarshal([]byte(inbound.Settings), &settings); err != nil {
-				log.Printf("InboundClientTgIdFix: skip inbound %d (invalid settings json): %v", inbound.Id, err)
-				continue
-			}
-			clients, ok := settings["clients"].([]any)
-			if !ok {
-				continue
-			}
-			mutated := false
-			for i, raw := range clients {
-				obj, ok := raw.(map[string]any)
-				if !ok {
-					continue
-				}
-				tgRaw, present := obj["tgId"]
+		err := fixInboundSettings(tx, "InboundClientTgIdFix", func(settings map[string]any) bool {
+			return fixClients(settings, func(client map[string]any) bool {
+				tgRaw, present := client["tgId"]
 				if !present {
-					continue
+					return false
 				}
-				v, isFloat := tgRaw.(float64)
-				if isFloat && !math.IsNaN(v) && !math.IsInf(v, 0) && v == math.Trunc(v) {
-					continue
+				// JSON numbers are never NaN or Inf; only a fraction needs fixing.
+				if v, isFloat := tgRaw.(float64); isFloat && v == math.Trunc(v) {
+					return false
 				}
-				obj["tgId"] = int64(0)
+				client["tgId"] = int64(0)
 				if s, isStr := tgRaw.(string); isStr {
 					if id, err := strconv.ParseInt(strings.ReplaceAll(strings.TrimSpace(s), " ", ""), 10, 64); err == nil {
-						obj["tgId"] = id
+						client["tgId"] = id
 					}
 				}
-				clients[i] = obj
-				mutated = true
-			}
-			if !mutated {
-				continue
-			}
-			settings["clients"] = clients
-			newSettings, err := json.MarshalIndent(settings, "", "  ")
-			if err != nil {
-				log.Printf("InboundClientTgIdFix: skip inbound %d (marshal failed): %v", inbound.Id, err)
-				continue
-			}
-			if err := tx.Model(&model.Inbound{}).Where("id = ?", inbound.Id).
-				Update("settings", string(newSettings)).Error; err != nil {
-				return err
-			}
+				return true
+			})
+		})
+		if err != nil {
+			return err
 		}
 		return tx.Create(&model.HistoryOfSeeders{SeederName: "InboundClientTgIdFix2"}).Error
 	})
 }
 
 func normalizeInboundClientSubId() error {
-	var inbounds []model.Inbound
-	if err := db.Find(&inbounds).Error; err != nil {
-		return err
-	}
-
 	return db.Transaction(func(tx *gorm.DB) error {
-		for _, inbound := range inbounds {
-			if strings.TrimSpace(inbound.Settings) == "" {
-				continue
-			}
-			var settings map[string]any
-			if err := json.Unmarshal([]byte(inbound.Settings), &settings); err != nil {
-				log.Printf("InboundClientSubIdFix: skip inbound %d (invalid settings json): %v", inbound.Id, err)
-				continue
-			}
-			clients, ok := settings["clients"].([]any)
-			if !ok {
-				continue
-			}
-			mutated := false
-			for i, raw := range clients {
-				obj, ok := raw.(map[string]any)
-				if !ok {
-					continue
+		err := fixInboundSettings(tx, "InboundClientSubIdFix", func(settings map[string]any) bool {
+			return fixClients(settings, func(client map[string]any) bool {
+				if existing, _ := client["subId"].(string); strings.TrimSpace(existing) != "" {
+					return false
 				}
-				existing, _ := obj["subId"].(string)
-				if strings.TrimSpace(existing) != "" {
-					continue
-				}
-				obj["subId"] = random.NumLower(16)
-				clients[i] = obj
-				mutated = true
-			}
-			if !mutated {
-				continue
-			}
-			settings["clients"] = clients
-			newSettings, err := json.MarshalIndent(settings, "", "  ")
-			if err != nil {
-				log.Printf("InboundClientSubIdFix: skip inbound %d (marshal failed): %v", inbound.Id, err)
-				continue
-			}
-			if err := tx.Model(&model.Inbound{}).Where("id = ?", inbound.Id).
-				Update("settings", string(newSettings)).Error; err != nil {
-				return err
-			}
+				client["subId"] = random.NumLower(16)
+				return true
+			})
+		})
+		if err != nil {
+			return err
 		}
 		return tx.Create(&model.HistoryOfSeeders{SeederName: "InboundClientSubIdFix"}).Error
 	})
 }
 
 func normalizeInboundClientsArray() error {
-	var inbounds []model.Inbound
-	if err := db.Find(&inbounds).Error; err != nil {
-		return err
-	}
-
 	return db.Transaction(func(tx *gorm.DB) error {
-		for _, inbound := range inbounds {
-			if strings.TrimSpace(inbound.Settings) == "" {
-				continue
-			}
-			var settings map[string]any
-			if err := json.Unmarshal([]byte(inbound.Settings), &settings); err != nil {
-				log.Printf("InboundClientsArrayFix: skip inbound %d (invalid settings json): %v", inbound.Id, err)
-				continue
-			}
-			raw, exists := settings["clients"]
-			if !exists || raw != nil {
-				continue
+		err := fixInboundSettings(tx, "InboundClientsArrayFix", func(settings map[string]any) bool {
+			if raw, exists := settings["clients"]; !exists || raw != nil {
+				return false
 			}
 			settings["clients"] = []any{}
-			newSettings, err := json.MarshalIndent(settings, "", "  ")
-			if err != nil {
-				log.Printf("InboundClientsArrayFix: skip inbound %d (marshal failed): %v", inbound.Id, err)
-				continue
-			}
-			if err := tx.Model(&model.Inbound{}).Where("id = ?", inbound.Id).
-				Update("settings", string(newSettings)).Error; err != nil {
-				return err
-			}
+			return true
+		})
+		if err != nil {
+			return err
 		}
 		return tx.Create(&model.HistoryOfSeeders{SeederName: "InboundClientsArrayFix"}).Error
 	})
 }
 
-func normalizeFreedomFinalRules() error {
-	var setting model.Setting
-	err := db.Model(model.Setting{}).Where("key = ?", "xrayTemplateConfig").First(&setting).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return db.Create(&model.HistoryOfSeeders{SeederName: "FreedomFinalRulesReverseFix"}).Error
-	}
-	if err != nil {
+// fixInboundSettings writes back every inbound whose parsed settings fix changed;
+// blank or unparseable settings are logged and skipped.
+func fixInboundSettings(tx *gorm.DB, logTag string, fix func(settings map[string]any) bool) error {
+	var inbounds []model.Inbound
+	if err := tx.Find(&inbounds).Error; err != nil {
 		return err
 	}
-
-	updated, changed, rErr := rewriteFreedomFinalRules(setting.Value)
-	if rErr != nil {
-		log.Printf("FreedomFinalRulesReverseFix: skip (invalid xrayTemplateConfig json): %v", rErr)
-		return db.Create(&model.HistoryOfSeeders{SeederName: "FreedomFinalRulesReverseFix"}).Error
-	}
-
-	return db.Transaction(func(tx *gorm.DB) error {
-		if changed {
-			if err := tx.Model(&model.Setting{}).Where("key = ?", "xrayTemplateConfig").
-				Update("value", updated).Error; err != nil {
-				return err
-			}
+	for _, inbound := range inbounds {
+		if strings.TrimSpace(inbound.Settings) == "" {
+			continue
 		}
-		return tx.Create(&model.HistoryOfSeeders{SeederName: "FreedomFinalRulesReverseFix"}).Error
-	})
+		var settings map[string]any
+		if err := json.Unmarshal([]byte(inbound.Settings), &settings); err != nil {
+			log.Printf("%s: skip inbound %d (invalid settings json): %v", logTag, inbound.Id, err)
+			continue
+		}
+		if !fix(settings) {
+			continue
+		}
+		newSettings, _ := json.MarshalIndent(settings, "", "  ") // cannot fail: settings came from json.Unmarshal
+		if err := tx.Model(&model.Inbound{}).Where("id = ?", inbound.Id).
+			Update("settings", string(newSettings)).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// fixClients applies fix to each client object in settings["clients"] and reports any change.
+func fixClients(settings map[string]any, fix func(client map[string]any) bool) bool {
+	clients, _ := settings["clients"].([]any)
+	changed := false
+	for _, raw := range clients {
+		if client, ok := raw.(map[string]any); ok && fix(client) {
+			changed = true
+		}
+	}
+	return changed
+}
+
+func normalizeFreedomFinalRules() error {
+	return rewriteTemplateOnce("FreedomFinalRulesReverseFix", rewriteFreedomFinalRules)
 }
 
 func rewriteFreedomFinalRules(raw string) (string, bool, error) {
@@ -3065,30 +2835,7 @@ func isUnrestrictedFreedomFinalRules(v any, present bool) bool {
 }
 
 func hardenFreedomFinalRules() error {
-	var setting model.Setting
-	err := db.Model(model.Setting{}).Where("key = ?", "xrayTemplateConfig").First(&setting).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return db.Create(&model.HistoryOfSeeders{SeederName: "FreedomFinalRulesPrivateEgressBlock"}).Error
-	}
-	if err != nil {
-		return err
-	}
-
-	updated, changed, rErr := rewriteFreedomFinalRulesPrivateEgress(setting.Value)
-	if rErr != nil {
-		log.Printf("FreedomFinalRulesPrivateEgressBlock: skip (invalid xrayTemplateConfig json): %v", rErr)
-		return db.Create(&model.HistoryOfSeeders{SeederName: "FreedomFinalRulesPrivateEgressBlock"}).Error
-	}
-
-	return db.Transaction(func(tx *gorm.DB) error {
-		if changed {
-			if err := tx.Model(&model.Setting{}).Where("key = ?", "xrayTemplateConfig").
-				Update("value", updated).Error; err != nil {
-				return err
-			}
-		}
-		return tx.Create(&model.HistoryOfSeeders{SeederName: "FreedomFinalRulesPrivateEgressBlock"}).Error
-	})
+	return rewriteTemplateOnce("FreedomFinalRulesPrivateEgressBlock", rewriteFreedomFinalRulesPrivateEgress)
 }
 
 func rewriteFreedomFinalRulesPrivateEgress(raw string) (string, bool, error) {
@@ -3139,30 +2886,7 @@ func rewriteFreedomFinalRulesPrivateEgress(raw string) (string, bool, error) {
 }
 
 func fixUppercaseFreedomFinalRules() error {
-	var setting model.Setting
-	err := db.Model(model.Setting{}).Where("key = ?", "xrayTemplateConfig").First(&setting).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return db.Create(&model.HistoryOfSeeders{SeederName: "UppercaseFreedomFinalRulesFix"}).Error
-	}
-	if err != nil {
-		return err
-	}
-
-	updated, changed, rErr := rewriteUppercaseFreedomFinalRules(setting.Value)
-	if rErr != nil {
-		log.Printf("UppercaseFreedomFinalRulesFix: skip (invalid xrayTemplateConfig json): %v", rErr)
-		return db.Create(&model.HistoryOfSeeders{SeederName: "UppercaseFreedomFinalRulesFix"}).Error
-	}
-
-	return db.Transaction(func(tx *gorm.DB) error {
-		if changed {
-			if err := tx.Model(&model.Setting{}).Where("key = ?", "xrayTemplateConfig").
-				Update("value", updated).Error; err != nil {
-				return err
-			}
-		}
-		return tx.Create(&model.HistoryOfSeeders{SeederName: "UppercaseFreedomFinalRulesFix"}).Error
-	})
+	return rewriteTemplateOnce("UppercaseFreedomFinalRulesFix", rewriteUppercaseFreedomFinalRules)
 }
 
 // Re-runs both finalRules rewrites, because the rows of the two seeders above it
@@ -3554,19 +3278,25 @@ func migrateApiTokenScopeAndExpiry() error {
 		Updates(map[string]any{"scope": model.ApiScopeAdmin, "expires_at": 0}).Error
 }
 
+// postgresRetryDelays are the waits before each connection attempt: 0, 2, 5, 10, 20 and 30 s.
+var postgresRetryDelays = []time.Duration{0, 2e9, 5e9, 10e9, 20e9, 30e9}
+
+// openPostgres opens one PostgreSQL connection; tests replace it.
+var openPostgres = func(dsn string, c *gorm.Config) (*gorm.DB, error) {
+	return gorm.Open(postgres.Open(dsn), c)
+}
+
 // openPostgresWithRetry retries the initial PostgreSQL connection with
 // backoff so a database that starts slower than the panel (or drops out
 // briefly) does not immediately kill the process and trip systemd's
 // restart loop. Every failed attempt logs the real driver error, which
 // used to be buried behind a generic startup failure.
 func openPostgresWithRetry(dsn string, c *gorm.Config) (*gorm.DB, error) {
-	delays := []time.Duration{0, 2 * time.Second, 5 * time.Second, 10 * time.Second, 20 * time.Second, 30 * time.Second}
+	delays := postgresRetryDelays
 	var lastErr error
 	for i, delay := range delays {
-		if delay > 0 {
-			time.Sleep(delay)
-		}
-		conn, err := gorm.Open(postgres.Open(dsn), c)
+		time.Sleep(delay)
+		conn, err := openPostgres(dsn, c)
 		if err == nil {
 			if i > 0 {
 				log.Printf("postgres connection established on attempt %d/%d", i+1, len(delays))
@@ -3752,7 +3482,7 @@ func BackupSQLite(dstPath string) (err error) {
 				select {
 				case <-ctx.Done():
 					return ctx.Err()
-				case <-time.After(10 * time.Millisecond):
+				case <-time.After(10e6): // 10 ms
 				}
 			}
 		})

@@ -248,9 +248,7 @@ func parseVmess(link string) (*ParseResult, error) {
 		setWS(stream, host, getString(j, "path", "/"))
 	case "grpc":
 		svc := getString(j, "path", "")
-		if auth, ok := j["authority"].(string); ok && auth != "" {
-			stream["grpcSettings"].(map[string]any)["authority"] = auth
-		}
+		stream["grpcSettings"].(map[string]any)["authority"] = getString(j, "authority", "")
 		stream["grpcSettings"].(map[string]any)["serviceName"] = svc
 		stream["grpcSettings"].(map[string]any)["multiMode"] = getString(j, "type", "") == "multi"
 	case "httpupgrade":

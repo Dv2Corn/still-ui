@@ -173,7 +173,8 @@ func (l *Local) UpdateInbound(ctx context.Context, oldIb, newIb *model.Inbound) 
 // when the inbound is disabled, loses its last active secret, or moves to a
 // different protocol.
 func (l *Local) updateMtprotoInbound(ctx context.Context, oldIb, newIb *model.Inbound) error {
-	if oldIb.Protocol == model.MTProto && newIb.Protocol != model.MTProto {
+	// UpdateInbound routes here only when one side is MTProto, so this one is the old side.
+	if newIb.Protocol != model.MTProto {
 		mtproto.GetManager().Remove(oldIb.Id)
 		if !newIb.Enable {
 			return nil
@@ -200,7 +201,8 @@ func (l *Local) updateAmneziaWGInbound(ctx context.Context, oldIb, newIb *model.
 	if l.deps.SetNeedRestart != nil {
 		l.deps.SetNeedRestart()
 	}
-	if oldIb.Protocol == model.AmneziaWG && newIb.Protocol != model.AmneziaWG {
+	// UpdateInbound routes here only when one side is AmneziaWG, so this one is the old side.
+	if newIb.Protocol != model.AmneziaWG {
 		removeAmneziaWG(oldIb.Id)
 		if !newIb.Enable {
 			return nil
