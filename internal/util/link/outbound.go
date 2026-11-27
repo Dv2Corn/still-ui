@@ -462,16 +462,9 @@ func parseShadowsocks(link string) (*ParseResult, error) {
 	//   ss://base64(method:pass@host:port)#remark
 	// Query may carry Xray-native stream params (type/security/sni/alpn/fp)
 	// emitted by genShadowsocksLink — preserve them like trojan/vless.
-	remark := ""
-	if i := strings.Index(link, "#"); i >= 0 {
-		remark, _ = url.QueryUnescape(link[i+1:])
-		link = link[:i]
-	}
-	rawQuery := ""
-	if i := strings.Index(link, "?"); i >= 0 {
-		rawQuery = link[i+1:]
-		link = link[:i]
-	}
+	link, fragment, _ := strings.Cut(link, "#")
+	remark, _ := url.QueryUnescape(fragment)
+	link, rawQuery, _ := strings.Cut(link, "?")
 	params, _ := url.ParseQuery(rawQuery)
 	core := strings.TrimPrefix(link, "ss://")
 	at := strings.Index(core, "@")
@@ -491,7 +484,7 @@ func parseShadowsocks(link string) (*ParseResult, error) {
 			}
 		}
 		colon := strings.LastIndex(hp, ":")
-		if colon < 0 {
+		if colon <= 0 { // no port, or no host before it
 			return nil, fmt.Errorf("bad ss host:port")
 		}
 		host = hp[:colon]
@@ -513,7 +506,7 @@ func parseShadowsocks(link string) (*ParseResult, error) {
 		userInfo := dec[:at]
 		hp := dec[at+1:]
 		colon := strings.LastIndex(hp, ":")
-		if colon < 0 {
+		if colon <= 0 { // no port, or no host before it
 			return nil, fmt.Errorf("bad legacy ss hp")
 		}
 		host = hp[:colon]
@@ -1346,14 +1339,7 @@ func canonicalQuery(p url.Values) string {
 		}
 		keys = append(keys, k)
 	}
-	// simple sort
-	for i := 0; i < len(keys); i++ {
-		for j := i + 1; j < len(keys); j++ {
-			if keys[j] < keys[i] {
-				keys[i], keys[j] = keys[j], keys[i]
-			}
-		}
-	}
+	slices.Sort(keys)
 	parts := make([]string, 0, len(keys))
 	for _, k := range keys {
 		for _, v := range p[k] {
@@ -1467,9 +1453,8 @@ func SlugRemark(remark string) string {
 		s = strings.ReplaceAll(s, "--", "-")
 	}
 	// The tag names Xray counters, a traffic row and the config; a link author picks the remark.
-	if r := []rune(s); len(r) > maxSlugRunes {
-		s = strings.TrimRight(string(r[:maxSlugRunes]), "-")
-	}
+	r := []rune(s)
+	s = strings.TrimRight(string(r[:min(len(r), maxSlugRunes)]), "-")
 	return s
 }
 

@@ -810,10 +810,8 @@ func mtprotoSecretDomain(secret string) string {
 	if strings.HasPrefix(s, "ee") || strings.HasPrefix(s, "dd") {
 		s = s[2:]
 	}
-	if len(s) <= 32 {
-		return ""
-	}
-	decoded, err := hex.DecodeString(s[32:])
+	// Up to 32 chars there is no domain: the tail is empty and decodes to nothing.
+	decoded, err := hex.DecodeString(s[min(len(s), 32):])
 	if err != nil || len(decoded) == 0 {
 		return ""
 	}
@@ -1647,40 +1645,28 @@ func MergeClientRecord(existing *ClientRecord, incoming *ClientRecord) []ClientM
 		}
 	}
 	if existing.TotalGB != incoming.TotalGB {
-		picked := existing.TotalGB
-		if existing.TotalGB == 0 || (incoming.TotalGB != 0 && incoming.TotalGB > existing.TotalGB) {
-			picked = incoming.TotalGB
-		}
+		picked := largerSet(existing.TotalGB, incoming.TotalGB)
 		if picked != existing.TotalGB {
 			keep("totalGB", existing.TotalGB, incoming.TotalGB, picked)
 			existing.TotalGB = picked
 		}
 	}
 	if existing.ExpiryTime != incoming.ExpiryTime {
-		picked := existing.ExpiryTime
-		if existing.ExpiryTime == 0 || (incoming.ExpiryTime != 0 && incoming.ExpiryTime > existing.ExpiryTime) {
-			picked = incoming.ExpiryTime
-		}
+		picked := largerSet(existing.ExpiryTime, incoming.ExpiryTime)
 		if picked != existing.ExpiryTime {
 			keep("expiryTime", existing.ExpiryTime, incoming.ExpiryTime, picked)
 			existing.ExpiryTime = picked
 		}
 	}
 	if existing.LimitIP != incoming.LimitIP && incoming.LimitIP != 0 {
-		picked := existing.LimitIP
-		if existing.LimitIP == 0 || incoming.LimitIP > existing.LimitIP {
-			picked = incoming.LimitIP
-		}
+		picked := largerSet(existing.LimitIP, incoming.LimitIP)
 		if picked != existing.LimitIP {
 			keep("limitIp", existing.LimitIP, incoming.LimitIP, picked)
 			existing.LimitIP = picked
 		}
 	}
 	if existing.LimitHwid != incoming.LimitHwid && incoming.LimitHwid != 0 {
-		picked := existing.LimitHwid
-		if existing.LimitHwid == 0 || incoming.LimitHwid > existing.LimitHwid {
-			picked = incoming.LimitHwid
-		}
+		picked := largerSet(existing.LimitHwid, incoming.LimitHwid)
 		if picked != existing.LimitHwid {
 			keep("limitHwid", existing.LimitHwid, incoming.LimitHwid, picked)
 			existing.LimitHwid = picked
@@ -1826,11 +1812,30 @@ func MergeClientRecord(existing *ClientRecord, incoming *ClientRecord) []ClientM
 			}
 		}
 	}
-	if incoming.CreatedAt != 0 && (existing.CreatedAt == 0 || incoming.CreatedAt < existing.CreatedAt) {
-		existing.CreatedAt = incoming.CreatedAt
-	}
-	if incoming.UpdatedAt > existing.UpdatedAt {
-		existing.UpdatedAt = incoming.UpdatedAt
-	}
+	existing.CreatedAt = smallerSet(existing.CreatedAt, incoming.CreatedAt)
+	existing.UpdatedAt = max(existing.UpdatedAt, incoming.UpdatedAt)
 	return conflicts
+}
+
+// largerSet returns the larger of two values where zero means "not set": a set value
+// always beats an unset one.
+func largerSet[T int | int64](a, b T) T {
+	if a == 0 {
+		return b
+	}
+	if b == 0 {
+		return a
+	}
+	return max(a, b)
+}
+
+// smallerSet is largerSet for the earliest of two set values.
+func smallerSet[T int | int64](a, b T) T {
+	if a == 0 {
+		return b
+	}
+	if b == 0 {
+		return a
+	}
+	return min(a, b)
 }

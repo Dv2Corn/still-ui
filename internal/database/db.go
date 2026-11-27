@@ -61,6 +61,9 @@ func Dialect() string {
 
 const sqliteBackupDirPrefix = ".x-ui-backup-"
 
+// dbConnMaxIdleTime closes pooled database connections idle this long.
+var dbConnMaxIdleTime = 30 * time.Minute
+
 func allModels() []any {
 	return []any{
 		&model.User{},
@@ -1058,9 +1061,7 @@ func externalProxyEntryToHost(inboundId, index int, ep map[string]any) *model.Ho
 	if strings.TrimSpace(remark) == "" {
 		remark = "imported " + strconv.Itoa(index+1)
 	}
-	if len(remark) > 256 {
-		remark = remark[:256]
-	}
+	remark = remark[:min(len(remark), 256)]
 	sni, _ := ep["sni"].(string)
 	fingerprint, _ := ep["fingerprint"].(string)
 	ech, _ := ep["echConfigList"].(string)
@@ -3518,7 +3519,7 @@ func InitDB(dbPath string) error {
 	sqlDB.SetMaxOpenConns(maxOpen)
 	sqlDB.SetMaxIdleConns(maxIdle)
 	sqlDB.SetConnMaxLifetime(time.Hour)
-	sqlDB.SetConnMaxIdleTime(30 * time.Minute)
+	sqlDB.SetConnMaxIdleTime(dbConnMaxIdleTime)
 
 	if err := initModels(); err != nil {
 		return err

@@ -561,10 +561,9 @@ func (r *Remote) AddInbound(ctx context.Context, ib *model.Inbound) error {
 		Id  int    `json:"id"`
 		Tag string `json:"tag"`
 	}
-	if len(env.Obj) > 0 {
-		if err := json.Unmarshal(env.Obj, &created); err == nil && created.Id > 0 && created.Tag != "" {
-			r.cacheSet(created.Tag, created.Id)
-		}
+	// An empty obj fails to unmarshal and caches nothing.
+	if err := json.Unmarshal(env.Obj, &created); err == nil && created.Id > 0 && created.Tag != "" {
+		r.cacheSet(created.Tag, created.Id)
 	}
 	r.recordPushedInbound(ib)
 	return nil
