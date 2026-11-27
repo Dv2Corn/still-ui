@@ -238,16 +238,13 @@ func initModels() error {
 	if err := migrateNodeTrafficLimitColumns(); err != nil {
 		return err
 	}
-	if err := migrateClientEmailLowerIndex(); err != nil {
-		return err
-	}
 	if IsPostgres() {
 		if err := resyncPostgresSequences(db, models); err != nil {
 			log.Printf("Error resyncing postgres sequences: %v", err)
 			return err
 		}
 	}
-	return nil
+	return migrateClientEmailLowerIndex()
 }
 
 func postgresModelSettled(mdl any) bool {
@@ -407,9 +404,7 @@ func migrateClientTrafficResetColumns() error {
 		}
 	}
 	if db.Migrator().HasColumn(&model.ClientRecord{}, "traffic_reset_day") {
-		if err := db.Exec("UPDATE clients SET traffic_reset_day = 1 WHERE traffic_reset_day IS NULL").Error; err != nil {
-			return err
-		}
+		return db.Exec("UPDATE clients SET traffic_reset_day = 1 WHERE traffic_reset_day IS NULL").Error
 	}
 	return nil
 }

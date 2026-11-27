@@ -225,3 +225,61 @@ func TestExternalProxyRemarkIsCappedAt256Bytes(t *testing.T) {
 		}
 	}
 }
+
+func TestLegacyInboundRebuildDropsItsScratchTable(t *testing.T) {
+	dbPath := openLegacyPortUniqueDB(t)
+	if err := InitDB(dbPath); err != nil {
+		t.Fatalf("InitDB over legacy schema: %v", err)
+	}
+	t.Cleanup(func() { _ = CloseDB() })
+	if db.Migrator().HasTable("inbounds_legacy_rebuild") {
+		t.Fatal("the rebuild left inbounds_legacy_rebuild behind")
+	}
+}
+
+func TestClientNullColumnsAreBackfilled(t *testing.T) {
+	initTestDB(t)
+	if err := db.Create(&model.ClientRecord{Email: "null@x", Enable: true}).Error; err != nil {
+		t.Fatal(err)
+	}
+	mustExec(t, "UPDATE clients SET traffic_reset = NULL, traffic_reset_day = NULL, sync_orphaned_at = NULL, sync_orphaned_by = NULL")
+	if err := migrateClientTrafficResetColumns(); err != nil {
+		t.Fatal(err)
+	}
+	if err := migrateSyncOrphanColumns(); err != nil {
+		t.Fatal(err)
+	}
+	var row struct {
+		TrafficReset    *string
+		TrafficResetDay *int
+		SyncOrphanedAt  *int64
+		SyncOrphanedBy  *int
+	}
+	db.Raw("SELECT traffic_reset, traffic_reset_day, sync_orphaned_at, sync_orphaned_by FROM clients WHERE email = ?", "null@x").Scan(&row)
+	if row.TrafficReset == nil || *row.TrafficReset != "never" || row.TrafficResetDay == nil || *row.TrafficResetDay != 1 ||
+		row.SyncOrphanedAt == nil || row.SyncOrphanedBy == nil {
+		t.Fatalf("after backfill: %+v", row)
+	}
+}
+
+func TestMtprotoCustomShareAddrMovesEveryInbound(t *testing.T) {
+	initTestDB(t)
+	db.Where("seeder_name = ?", "MtprotoCustomShareAddrToHosts").Delete(&model.HistoryOfSeeders{})
+	for i, port := range []int{4061, 4062} {
+		ib := &model.Inbound{UserId: 1, Tag: "mt-" + itoa(i), Enable: true, Port: port, Protocol: model.MTProto,
+			Settings: `{"clients":[]}`, StreamSettings: `{}`, ShareAddrStrategy: "custom", ShareAddr: "p" + itoa(i) + ".example.com"}
+		if err := db.Create(ib).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := seedMtprotoCustomShareAddrToHosts(); err != nil {
+		t.Fatal(err)
+	}
+	var left int64
+	db.Model(&model.Inbound{}).Where("tag LIKE ? AND share_addr_strategy = ?", "mt-%", "custom").Count(&left)
+	var hist int64
+	db.Model(&model.HistoryOfSeeders{}).Where("seeder_name = ?", "MtprotoCustomShareAddrToHosts").Count(&hist)
+	if left != 0 || hist != 1 {
+		t.Fatalf("inbounds still custom = %d, history rows = %d; want 0 and 1", left, hist)
+	}
+}
