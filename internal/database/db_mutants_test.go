@@ -283,3 +283,78 @@ func TestMtprotoCustomShareAddrMovesEveryInbound(t *testing.T) {
 		t.Fatalf("inbounds still custom = %d, history rows = %d; want 0 and 1", left, hist)
 	}
 }
+
+// With a rollback journal the backup copies 128 pages per step: a database larger than one
+// step must still be copied whole.
+func TestBackupSQLiteCopiesEveryStepInDeleteMode(t *testing.T) {
+	t.Setenv("XUI_DB_JOURNAL_MODE", "DELETE")
+	initTestDB(t)
+	big := strings.Repeat("x", 400)
+	rows := make([]model.Setting, 3000) // ~1.2 MB, far more than 128 pages
+	for i := range rows {
+		rows[i] = model.Setting{Key: "bulk-" + itoa(i), Value: big}
+	}
+	if err := db.CreateInBatches(rows, 500).Error; err != nil {
+		t.Fatal(err)
+	}
+	var want int64
+	db.Model(&model.Setting{}).Count(&want)
+	dst := filepath.Join(t.TempDir(), "backup.db")
+	if err := BackupSQLite(dst); err != nil {
+		t.Fatal(err)
+	}
+	g, err := gorm.Open(sqlite.Open(dst), &gorm.Config{Logger: logger.Discard})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if s, err := g.DB(); err == nil {
+			_ = s.Close()
+		}
+	}()
+	var got int64
+	if err := g.Model(&model.Setting{}).Count(&got).Error; err != nil || got != want {
+		t.Fatalf("backup has %d settings (err %v), want %d", got, err, want)
+	}
+}
+
+func TestFail2banStateHonoursTheDisableSwitch(t *testing.T) {
+	bin := t.TempDir()
+	if err := os.WriteFile(filepath.Join(bin, "fail2ban-client"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin)
+	t.Setenv("XUI_ENABLE_FAIL2BAN", "false")
+	if st, err := fail2banEnforcementState(); err != nil || st != fail2banAbsent {
+		t.Fatalf("disabled: state = %v (err %v), want absent", st, err)
+	}
+	t.Setenv("XUI_ENABLE_FAIL2BAN", "true")
+	if st, err := fail2banEnforcementState(); err != nil || st != fail2banEnforcing {
+		t.Fatalf("enabled with fail2ban-client present: state = %v (err %v), want enforcing", st, err)
+	}
+}
+
+type noPKRow struct {
+	Name  string
+	Value string
+}
+
+func TestCopyTableWithoutAPrimaryKey(t *testing.T) {
+	open := func(name string) *gorm.DB {
+		g, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), name)), &gorm.Config{Logger: logger.Discard})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := g.AutoMigrate(&noPKRow{}); err != nil {
+			t.Fatal(err)
+		}
+		return g
+	}
+	src, dst := open("src.db"), open("dst.db")
+	if err := src.Create(&[]noPKRow{{"a", "1"}, {"b", "2"}}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if n, err := copyTable(src, dst, &noPKRow{}); err != nil || n != 2 {
+		t.Fatalf("copyTable = (%d, %v), want (2, nil)", n, err)
+	}
+}

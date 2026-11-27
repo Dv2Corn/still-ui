@@ -5,6 +5,10 @@ import (
 	"encoding/json"
 	"testing"
 
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
+
 	"github.com/mhsanaei/3x-ui/v3/internal/database/model"
 )
 
@@ -154,5 +158,65 @@ func TestSeedWireguardPeersKeepsAGivenSubIDAndFillsAMissingOne(t *testing.T) {
 	db.Where("email = ?", "wg-s-tablet").First(&tablet)
 	if phone.SubID != "keep-me-sub-id01" || tablet.SubID == "" {
 		t.Fatalf("subIds = %q / %q, want the given one kept and the missing one generated", phone.SubID, tablet.SubID)
+	}
+}
+
+func TestSeedClientsFromInboundJSONMergesEveryExistingClient(t *testing.T) {
+	initTestDB(t)
+	settings := `{"clients":[{"id":"u-a","email":"a@example.com","enable":true,"comment":"from-json"},{"id":"u-b","email":"b@example.com","enable":true,"comment":"from-json"}]}`
+	ib := model.Inbound{UserId: 1, Port: 12346, Protocol: model.VLESS, Settings: settings, Tag: "seed-json"}
+	if err := db.Create(&ib).Error; err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range []string{"a@example.com", "b@example.com"} {
+		if err := db.Create(&model.ClientRecord{Email: e, Enable: true}).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	db.Where("seeder_name = ?", "ClientsTable").Delete(&model.HistoryOfSeeders{})
+	if err := seedClientsFromInboundJSON(); err != nil {
+		t.Fatal(err)
+	}
+	var merged, links int64
+	db.Model(&model.ClientRecord{}).Where("email IN ? AND comment = ?", []string{"a@example.com", "b@example.com"}, "from-json").Count(&merged)
+	db.Model(&model.ClientInbound{}).Where("inbound_id = ?", ib.Id).Count(&links)
+	if merged != 2 || links != 2 {
+		t.Fatalf("merged = %d, links = %d; want both clients merged and linked", merged, links)
+	}
+}
+
+func TestMigrateApiTokenScopeAndExpiryInOneRun(t *testing.T) {
+	originalDB := db
+	t.Cleanup(func() { db = originalDB })
+	var err error
+	db, err = gorm.Open(sqlite.Open(":memory:"), &gorm.Config{Logger: logger.Discard})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Scope exists but is empty on an old row; ExpiresAt is missing.
+	mustExec(t, `CREATE TABLE api_tokens (id integer primary key autoincrement, name text, token text, enabled numeric, created_at integer, scope text)`)
+	mustExec(t, "INSERT INTO api_tokens(name, token, enabled, created_at, scope) VALUES ('legacy','hash',1,1,'')")
+	if err := migrateApiTokenScopeAndExpiry(); err != nil {
+		t.Fatal(err)
+	}
+	var row model.ApiToken
+	if err := db.First(&row).Error; err != nil {
+		t.Fatal(err)
+	}
+	if !db.Migrator().HasColumn(&model.ApiToken{}, "ExpiresAt") || row.Scope != model.ApiScopeAdmin {
+		t.Fatalf("after one run: expires_at column = %v, scope = %q", db.Migrator().HasColumn(&model.ApiToken{}, "ExpiresAt"), row.Scope)
+	}
+
+	// Neither column exists yet: one run adds both.
+	db, err = gorm.Open(sqlite.Open(":memory:"), &gorm.Config{Logger: logger.Discard})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustExec(t, `CREATE TABLE api_tokens (id integer primary key autoincrement, name text, token text, enabled numeric, created_at integer)`)
+	if err := migrateApiTokenScopeAndExpiry(); err != nil {
+		t.Fatal(err)
+	}
+	if !db.Migrator().HasColumn(&model.ApiToken{}, "Scope") || !db.Migrator().HasColumn(&model.ApiToken{}, "ExpiresAt") {
+		t.Fatal("one run must add both scope and expires_at")
 	}
 }
